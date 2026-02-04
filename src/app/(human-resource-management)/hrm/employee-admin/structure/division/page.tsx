@@ -1,4 +1,4 @@
-// src/app/(human-resource-management)/hrm/department-management/page.tsx
+// src/app/(human-resource-management)/hrm/department/page.tsx
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -10,10 +10,10 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../_components/nav-user";
+import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
-import ComingSoon from "../_components/ComingSoon"
+import ComingSoon from "../../../_components/ComingSoon"
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,11 +98,11 @@ export default async function Page() {
                     <Breadcrumb>
                         <BreadcrumbList>
                             <BreadcrumbItem className="hidden md:block">
-                                <BreadcrumbLink href="#">HRM</BreadcrumbLink>
+                                <BreadcrumbLink href="#">Structure</BreadcrumbLink>
                             </BreadcrumbItem>
                             <BreadcrumbSeparator className="hidden md:block" />
                             <BreadcrumbItem>
-                                <BreadcrumbPage>Department Management</BreadcrumbPage>
+                                <BreadcrumbPage>Division</BreadcrumbPage>
                             </BreadcrumbItem>
                         </BreadcrumbList>
                     </Breadcrumb>

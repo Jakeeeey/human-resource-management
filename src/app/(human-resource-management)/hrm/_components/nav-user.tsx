@@ -127,7 +127,7 @@ export function NavUser({ user, onLogout }: NavUserProps) {
                             </DropdownMenuItem>
 
                             <DropdownMenuItem asChild>
-                                <Link href="/hrm/settings" className="cursor-pointer">
+                                <Link href="/hrm/employee-admin/settings" className="cursor-pointer">
                                     <Settings className="mr-2 size-4" />
                                     Settings
                                 </Link>

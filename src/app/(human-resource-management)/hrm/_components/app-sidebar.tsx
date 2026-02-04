@@ -25,17 +25,35 @@ import {
 
 const data = {
     navMain: [
-        {
+        /*{
             title: "Dashboard",
             url: "/hrm/",
             icon: BookOpen,
             isActive: true,
-        },
+        },*/
         {
-            title: "Department Management",
-            url: "/hrm/department-management",
+            title: "Employee Master List",
+            url: "/hrm/employee-admin/employee-master-list",
             icon: SquareTerminal,
             isActive: true,
+        },
+        {
+            title: "Administrator",
+            url: "#",
+            icon: SquareTerminal,
+            items: [
+                { title: "Department Schedule", url: "/hrm/employee-admin/administrator/department-schedule" },
+            ],
+        },
+        {
+            title: "Structure",
+            url: "#",
+            icon: SquareTerminal,
+            items: [
+                { title: "Division", url: "/hrm/employee-admin/structure/division" },
+                { title: "Company Profile", url: "/hrm/employee-admin/structure/company-profile" },
+                { title: "Department", url: "/hrm/employee-admin/structure/department" },
+            ],
         },
     ],
 }
