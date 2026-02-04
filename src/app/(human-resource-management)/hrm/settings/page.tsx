@@ -1,15 +1,6 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// src/app/settings/page.tsx
+import { SettingsAppearance } from "./settings-appearance";
 
-export default function HRSettingsPage() {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>HR Settings</CardTitle>
-                <CardDescription>/hr/settings</CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-                Coming soon.
-            </CardContent>
-        </Card>
-    );
+export default function Page() {
+    return <SettingsAppearance />;
 }
