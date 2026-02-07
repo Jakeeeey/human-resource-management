@@ -13,7 +13,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
-import ComingSoon from "../../../_components/ComingSoon"
+import { DepartmentModule } from "@/modules/human-resource-management/employee-admin/structrure/department";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,7 +116,7 @@ export default async function Page() {
 
             <ScrollArea className="min-h-0 flex-1">
                 <div className="p-4">
-                    <ComingSoon />
+                    <DepartmentModule />
                 </div>
             </ScrollArea>
         </div>
