@@ -51,6 +51,7 @@ const data = {
             icon: SquareTerminal,
             items: [
                 { title: "Division", url: "/hrm/employee-admin/structure/division" },
+                { title: "Salesman", url: "/hrm/employee-admin/administrator/salesman-management/" },
                 { title: "Company Profile", url: "/hrm/employee-admin/structure/company-profile" },
                 { title: "Department", url: "/hrm/employee-admin/structure/department" },
             ],
