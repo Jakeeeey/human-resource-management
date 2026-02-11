@@ -4,6 +4,7 @@ import type {
     User,
     DepartmentWithRelations,
     DirectusResponse,
+    DepartmentPosition,
 } from "../types";
 
 const DIRECTUS_URL = "http://100.110.197.61:8056";
@@ -13,6 +14,7 @@ const COLLECTIONS = {
     DEPARTMENT: "department",
     DIVISION: "division",
     USERS: "user",
+    DEPARTMENT_POSITIONS: "department_positions",
 } as const;
 
 // ============================================================================
@@ -67,10 +69,11 @@ export async function fetchAllUsers(): Promise<User[]> {
 // ============================================================================
 
 export async function fetchDepartmentsWithRelations() {
-    const [departments, divisions, users] = await Promise.all([
+    const [departments, divisions, users, positions] = await Promise.all([
         fetchAllDepartments(),
         fetchAllDivisions(),
         fetchAllUsers(),
+        fetchAll<DepartmentPosition>(COLLECTIONS.DEPARTMENT_POSITIONS),
     ]);
 
     const divisionMap = new Map(
@@ -81,60 +84,39 @@ export async function fetchDepartmentsWithRelations() {
         users.map(u => [u.user_id, u])
     );
 
-    const userMapByName = new Map(
-        users.map(u => [
-            `${u.user_fname} ${u.user_lname}`.trim().toLowerCase(),
-            u
-        ])
-    );
+    // ✅ group positions by department
+    const positionMap = new Map<number, DepartmentPosition[]>();
+
+    for (const p of positions) {
+        if (!positionMap.has(p.department_id)) {
+            positionMap.set(p.department_id, []);
+        }
+        positionMap.get(p.department_id)!.push(p);
+    }
 
     const departmentsWithRelations: DepartmentWithRelations[] =
         departments.map(dept => {
-            let headId: number | null = null;
-            let headUser: User | null = null;
 
-            const raw = dept.department_head;
-
-            // number FK
-            if (typeof raw === "number") {
-                headId = raw;
-                headUser = userMapById.get(raw) ?? null;
-            }
-
-            // numeric string FK
-            else if (typeof raw === "string" && /^\d+$/.test(raw)) {
-                headId = Number(raw);
-                headUser = userMapById.get(headId) ?? null;
-            }
-
-            // full name string
-            else if (typeof raw === "string") {
-                const u = userMapByName.get(raw.trim().toLowerCase());
-                if (u) {
-                    headUser = u;
-                    headId = u.user_id;
-                }
-            }
-
-            // object relation
-            else if (typeof raw === "object" && raw !== null) {
-                const id = (raw as any).user_id;
-                if (typeof id === "number") {
-                    headId = id;
-                    headUser = userMapById.get(id) ?? null;
-                }
-            }
+            const headId =
+                typeof dept.department_head === "number"
+                    ? dept.department_head
+                    : Number(dept.department_head) || null;
 
             return {
                 ...dept,
                 division: divisionMap.get(Number(dept.parent_division)) ?? null,
                 department_head_id: headId,
-                department_head_user: headUser,
+                department_head_user: headId
+                    ? userMapById.get(headId) ?? null
+                    : null,
+
+                positions: positionMap.get(dept.department_id) ?? [],
             };
         });
 
     return { departments: departmentsWithRelations, divisions, users };
 }
+
 
 
 
@@ -145,7 +127,6 @@ export async function fetchDepartmentsWithRelations() {
 
 export async function createDepartment(data: {
     department_name: string;
-    parent_division: number;
     department_description: string;
     department_head: number | null;
 }) {
@@ -162,7 +143,6 @@ export async function updateDepartment(
     id: number,
     data: Partial<{
         department_name: string;
-        parent_division: number;
         department_description: string;
         department_head: number | null;
     }>

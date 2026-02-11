@@ -41,22 +41,28 @@ async function getRelationsFiltered(req: NextRequest) {
     const fromParam = req.nextUrl.searchParams.get("from");
     const toParam = req.nextUrl.searchParams.get("to");
 
-    const [departments, divisions, users] = await Promise.all([
+    const [departments, divisions, users, deptPositions] = await Promise.all([
         fetchAll("department"),
         fetchAll("division"),
         fetchAll("user"),
+        fetchAll("department_positions"),
     ]);
 
-    const dMap = new Map(divisions.map((d: any) => [d.division_id, d]));
     const uMap = new Map(users.map((u: any) => [u.user_id, u]));
+    const posMap = new Map<number, any[]>();
+
+    deptPositions.forEach((p: any) => {
+        if (!posMap.has(p.department_id)) posMap.set(p.department_id, []);
+        posMap.get(p.department_id)!.push(p);
+    });
 
     let result = departments.map((d: any) => {
         const headId = cleanHead(d.department_head);
         return {
             ...d,
-            division: dMap.get(d.parent_division) || null,
             department_head_user: headId ? uMap.get(headId) || null : null,
             department_head_id: headId,
+            positions: posMap.get(d.department_id) || [],
         };
     });
 
@@ -94,19 +100,40 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     const body = await req.json();
-    await dFetch(`/items/department`, {
+    const { positions = [], ...deptData } = body;
+
+    const created = await dFetch(`/items/department`, {
         method: "POST",
         body: JSON.stringify({
-            ...body,
-            department_head: cleanHead(body.department_head),
+            ...deptData,
+            department_head: cleanHead(deptData.department_head),
         }),
     });
+
+    if (!created?.data) {
+        throw new Error("Department create failed — no data returned");
+    }
+
+    const deptId = created.data.department_id;
+
+    for (const pos of positions) {
+        await dFetch(`/items/department_positions`, {
+            method: "POST",
+            body: JSON.stringify({
+                department_id: deptId,
+                position: pos,
+            }),
+        });
+    }
+
     return NextResponse.json({ success: true });
 }
 
+
+
 export async function PATCH(req: NextRequest) {
     const body = await req.json();
-    const { department_id, ...rest } = body;
+    const { department_id, positions = [], ...rest } = body;
 
     await dFetch(`/items/department/${department_id}`, {
         method: "PATCH",
@@ -116,27 +143,45 @@ export async function PATCH(req: NextRequest) {
         }),
     });
 
+    // delete existing
+    const existing = await fetchAll("department_positions");
+
+    for (const p of existing.filter((x: any) => x.department_id === department_id)) {
+        await dFetch(`/items/department_positions/${p.id}`, {
+            method: "DELETE",
+        });
+    }
+
+    // recreate
+    for (const pos of positions) {
+        await dFetch(`/items/department_positions`, {
+            method: "POST",
+            body: JSON.stringify({
+                department_id,
+                position: pos,
+            }),
+        });
+    }
+
     return NextResponse.json({ success: true });
 }
+
 
 export async function DELETE(req: NextRequest) {
     const id = req.nextUrl.searchParams.get("id");
 
-    if (!id || isNaN(Number(id))) {
-        return NextResponse.json(
-            { error: "Invalid id" },
-            { status: 400 }
-        );
+    const existing = await fetchAll("department_positions");
+
+    for (const p of existing.filter((x: any) => x.department_id === Number(id))) {
+        await dFetch(`/items/department_positions/${p.id}`, {
+            method: "DELETE",
+        });
     }
 
-    await dFetch(`/items/department/${id}`, {
-        method: "DELETE",
-    });
+    await dFetch(`/items/department/${id}`, { method: "DELETE" });
 
-    return NextResponse.json(
-        { success: true },
-        { status: 200 }
-    );
+    return NextResponse.json({ success: true });
 }
+
 
 

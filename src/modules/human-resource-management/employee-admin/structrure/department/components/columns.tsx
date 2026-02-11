@@ -2,6 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import {
     DropdownMenu,
@@ -74,6 +75,22 @@ export const createColumns = (
         },
     },
 
+    {
+        id: "positions",
+        header: "Positions",
+        cell: ({ row }) => {
+            const positions = row.original.positions || [];
+            if (!positions.length) return "—";
+
+            return (
+                <div className="flex flex-wrap gap-1">
+                    {positions.map(p => (
+                        <Badge key={p.id}>{p.position}</Badge>
+                    ))}
+                </div>
+            );
+        },
+    },
 
 
     {
@@ -93,6 +110,9 @@ export const createColumns = (
             <div>{formatDate(row.getValue("date_added") as string)}</div>
         ),
     },
+
+
+
 
     {
         id: "actions",

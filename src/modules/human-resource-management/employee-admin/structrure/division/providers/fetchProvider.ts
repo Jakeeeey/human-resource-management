@@ -1,78 +1,129 @@
-"use client";
+import type {
+    Division,
+    Department,
+    User,
+    DepartmentPerDivision,
+    DivisionWithRelations,
+    DirectusListResponse,
+    DirectusSingleResponse,
+} from "../types";
 
-import React, { createContext, useContext, useState } from "react";
+const DIRECTUS_URL = "http://100.110.197.61:8056";
+const LIMIT = 1000;
 
-interface DivisionFilters {
-    search: string;
-    dateRange: {
-        from: Date | null;
-        to: Date | null;
-    };
+// =====================================================
+// generic paginated fetch
+// =====================================================
+
+async function fetchAll<T>(collection: string, offset = 0, acc: T[] = []): Promise<T[]> {
+    const res = await fetch(
+        `${DIRECTUS_URL}/items/${collection}?limit=${LIMIT}&offset=${offset}`,
+        { cache: "no-store" }
+    );
+
+    if (!res.ok) throw new Error(`Fetch failed: ${collection}`);
+
+    const json: DirectusListResponse<T> = await res.json();
+    const items = json.data ?? [];
+    const merged = [...acc, ...items];
+
+    if (items.length === LIMIT) {
+        return fetchAll(collection, offset + LIMIT, merged);
+    }
+
+    return merged;
 }
 
-interface DivisionFilterContextValue {
-    filters: DivisionFilters;
-    updateSearch: (v: string) => void;
-    updateFromDate: (d: Date | null) => void;
-    updateToDate: (d: Date | null) => void;
-    reset: () => void;
+// =====================================================
+// base fetchers
+// =====================================================
+
+export const fetchDivisions = () => fetchAll<Division>("division");
+export const fetchDepartments = () => fetchAll<Department>("department");
+export const fetchDivisionDepartments = () =>
+    fetchAll<DepartmentPerDivision>("department_per_division");
+
+export async function fetchUsers(): Promise<User[]> {
+    const res = await fetch(
+        `${DIRECTUS_URL}/items/user?fields=user_id,user_fname,user_lname,user_email`,
+        { cache: "no-store" }
+    );
+    if (!res.ok) throw new Error("Users fetch failed");
+    const json: DirectusListResponse<User> = await res.json();
+    return json.data ?? [];
 }
 
-const DivisionFilterContext =
-    createContext<DivisionFilterContextValue | null>(null);
+// =====================================================
+// JOIN builder
+// =====================================================
 
-export function DivisionFilterProvider({
-                                           children,
-                                       }: {
-    children: React.ReactNode;
-}) {
-    const [filters, setFilters] = useState<DivisionFilters>({
-        search: "",
-        dateRange: { from: null, to: null },
+export async function fetchDivisionsWithRelations(): Promise<DivisionWithRelations[]> {
+    const [divisions, departments, links, users] = await Promise.all([
+        fetchDivisions(),
+        fetchDepartments(),
+        fetchDivisionDepartments(),
+        fetchUsers(),
+    ]);
+
+    const userMap = new Map(users.map(u => [u.user_id, u]));
+    const deptMap = new Map(departments.map(d => [d.department_id, d]));
+
+    return divisions.map(div => {
+        const relLinks = links.filter(
+            l => Number(l.division_id) === Number(div.division_id)
+        );
+
+        const relDepartments = relLinks
+            .map(l => deptMap.get(l.department_id))
+            .filter(Boolean) as Department[];
+
+        return {
+            ...div,
+            division_head_user: div.division_head_id
+                ? userMap.get(div.division_head_id) ?? null
+                : null,
+            departments: relDepartments,
+        };
+    });
+}
+
+// =====================================================
+// CRUD
+// =====================================================
+
+export async function createDivision(data: Partial<Division>): Promise<Division> {
+    const res = await fetch(`${DIRECTUS_URL}/items/division`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
     });
 
-    const updateSearch = (search: string) =>
-        setFilters((f) => ({ ...f, search }));
+    if (!res.ok) throw new Error("Create division failed");
 
-    const updateFromDate = (from: Date | null) =>
-        setFilters((f) => ({
-            ...f,
-            dateRange: { ...f.dateRange, from },
-        }));
-
-    const updateToDate = (to: Date | null) =>
-        setFilters((f) => ({
-            ...f,
-            dateRange: { ...f.dateRange, to },
-        }));
-
-    const reset = () =>
-        setFilters({
-            search: "",
-            dateRange: { from: null, to: null },
-        });
-
-    return (
-        <DivisionFilterContext.Provider
-            value={{
-        filters,
-            updateSearch,
-            updateFromDate,
-            updateToDate,
-            reset,
-    }}
->
-    {children}
-    </DivisionFilterContext.Provider>
-);
+    const json: DirectusSingleResponse<Division> = await res.json();
+    return json.data;
 }
 
-export function useDivisionFilters() {
-    const ctx = useContext(DivisionFilterContext);
-    if (!ctx) {
-        throw new Error(
-            "useDivisionFilters must be used inside DivisionFilterProvider"
-        );
-    }
-    return ctx;
+export async function updateDivision(
+    id: number,
+    data: Partial<Division>
+): Promise<Division> {
+    const res = await fetch(`${DIRECTUS_URL}/items/division/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+
+    if (!res.ok) throw new Error("Update division failed");
+
+    const json: DirectusSingleResponse<Division> = await res.json();
+    return json.data;
+}
+
+export async function deleteDivision(id: number): Promise<void> {
+    const res = await fetch(`${DIRECTUS_URL}/items/division/${id}`, {
+        method: "DELETE",
+    });
+
+    if (!res.ok) throw new Error("Delete division failed");
 }

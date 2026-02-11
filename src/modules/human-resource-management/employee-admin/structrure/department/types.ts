@@ -2,6 +2,7 @@
  * Department Module - Type Definitions
  * Updated with User relation for department_head
  */
+// import {DepartmentPosition} from "@/modules/human-resource-management/employee-admin/structrure/department";
 
 // ============================================================================
 // DIRECTUS ENTITY TYPES
@@ -43,8 +44,14 @@ export interface DepartmentWithRelations extends Department {
     division: Division | null;
     department_head_user: User | null;
     department_head_id: number | null;
+    positions: DepartmentPosition[];
 }
 
+export interface DepartmentPosition {
+    id: number;
+    department_id: number;
+    position: string;
+}
 
 // ============================================================================
 // FILTER TYPES
@@ -68,6 +75,7 @@ export interface DepartmentFormData {
     department_description: string;
     department_head: number; // ✅ Changed from string to number
     date_added: string;
+    positions: string[];
 }
 
 export interface CreateDepartmentData extends DepartmentFormData {}

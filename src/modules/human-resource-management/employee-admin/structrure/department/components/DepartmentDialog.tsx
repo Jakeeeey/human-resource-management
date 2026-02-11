@@ -34,7 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { DepartmentWithRelations, User } from "../types";
+import type {DepartmentWithRelations, User} from "../types";
 import { SingleDatePicker } from "@/modules/human-resource-management/employee-admin/structrure/department/components/SingleDatePicker";
 
 
@@ -47,6 +47,7 @@ interface DepartmentFormData {
     department_description: string;
     department_head: string;
     date_added: Date | null;
+    positions: string[];
 }
 
 interface DepartmentDialogProps {
@@ -76,6 +77,7 @@ export function DepartmentDialog({
             department_description: "",
             department_head: "",
             date_added: new Date(),
+            positions: [],
         },
     });
 
@@ -89,6 +91,7 @@ export function DepartmentDialog({
                 date_added: department.date_added
                     ? new Date(department.date_added)
                     : new Date(),
+                positions: department.positions?.map(p => p.position) || [],
             });
         } else if (!open) {
             form.reset({
@@ -96,6 +99,7 @@ export function DepartmentDialog({
                 department_description: "",
                 department_head: "",
                 date_added: new Date(),
+                positions: [],
             });
         }
     }, [open, department, form]);
@@ -108,6 +112,7 @@ export function DepartmentDialog({
                 department_description: data.department_description,
                 department_head: parseInt(data.department_head, 10),
                 date_added: data.date_added?.toISOString(),
+                positions: data.positions.filter(p => p.trim() !== ""),
             });
             onOpenChange(false);
             form.reset();
@@ -196,6 +201,54 @@ export function DepartmentDialog({
                                 </FormItem>
                             )}
                         />
+
+                        {/* Positions */}
+                        <FormField
+                            control={form.control}
+                            name="positions"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Positions</FormLabel>
+
+                                    <div className="space-y-2">
+                                        {field.value.map((pos, idx) => (
+                                            <div key={idx} className="flex gap-2">
+                                                <Input
+                                                    value={pos}
+                                                    onChange={(e) => {
+                                                        const next = [...field.value];
+                                                        next[idx] = e.target.value;
+                                                        field.onChange(next);
+                                                    }}
+                                                    placeholder="e.g. Supervisor"
+                                                />
+
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        field.onChange(field.value.filter((_, i) => i !== idx));
+                                                    }}
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
+                                        ))}
+
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            onClick={() => field.onChange([...(field.value || []), ""])}
+                                        >
+                                            Add Position
+                                        </Button>
+                                    </div>
+
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
 
                         <FormField
                             control={form.control}

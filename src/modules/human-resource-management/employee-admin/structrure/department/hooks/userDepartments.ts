@@ -1,9 +1,7 @@
 "use client";
-
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import type { DepartmentWithRelations, Division, User } from "../types";
 import { useDepartmentFilterContext } from "../providers/DepartmentFilterProvider";
-import { useDebounce } from "../hooks/useDebounce";
 
 interface UseDepartmentsReturn {
     departments: DepartmentWithRelations[];
@@ -20,90 +18,82 @@ interface UseDepartmentsReturn {
 
 export function useDepartments(): UseDepartmentsReturn {
     const { filters } = useDepartmentFilterContext();
-    const debouncedSearch = useDebounce(filters.search, 500);
 
-    const [departments, setDepartments] = useState<DepartmentWithRelations[]>([]);
+    // store ALL data
+    const [allDepartments, setAllDepartments] = useState<DepartmentWithRelations[]>([]);
     const [divisions, setDivisions] = useState<Division[]>([]);
     const [users, setUsers] = useState<User[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+
+    const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
-    const abortRef = useRef<AbortController | null>(null);
-
     // =========================
-    // FETCH CORE
+    // FETCH ONCE
     // =========================
+    const fetchData = useCallback(async () => {
+        try {
+            setIsLoading(true);
+            setIsError(false);
 
-    const fetchData = useCallback(
-        async (activeFilters: typeof filters, searchValue: string) => {
-            try {
-                setIsError(false);
-                setError(null);
+            const res = await fetch(
+                "/api/hrm/employee-admin/structure/department",
+                { cache: "no-store" }
+            );
 
-                abortRef.current?.abort();
-                const controller = new AbortController();
-                abortRef.current = controller;
+            if (!res.ok) throw new Error("Fetch failed");
 
-                const params = new URLSearchParams();
+            const data = await res.json();
 
-                if (searchValue) {
-                    params.append("search", searchValue);
-                }
-
-
-                if (activeFilters.dateRange.from && activeFilters.dateRange.to) {
-                    params.append("from", activeFilters.dateRange.from.toISOString());
-                    params.append("to", activeFilters.dateRange.to.toISOString());
-                }
-
-                const loadingTimer = setTimeout(() => setIsLoading(true), 250);
-
-                const res = await fetch(
-                    `/api/hrm/employee-admin/structure/department?${params}`,
-                    { signal: controller.signal, cache: "no-store" }
-                );
-
-                if (!res.ok) throw new Error("Fetch failed");
-
-                const data = await res.json();
-
-                clearTimeout(loadingTimer);
-                setIsLoading(false);
-
-                setDepartments(data.departments || []);
-                setDivisions(data.divisions || []);
-                setUsers(data.users || []);
-            } catch (err: any) {
-                if (err.name === "AbortError") return;
-                setIsError(true);
-                setError(err);
-                setIsLoading(false);
-            }
-        },
-        []
-    );
-
-    // =========================
-    // EFFECT — SMART TRIGGER
-    // =========================
+            setAllDepartments(data.departments || []);
+            setDivisions(data.divisions || []);
+            setUsers(data.users || []);
+        } catch (err: any) {
+            setIsError(true);
+            setError(err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
-        const { from, to } = filters.dateRange;
+        fetchData();
+    }, [fetchData]);
 
-        // ✅ do not fetch during partial date select
-        if ((from && !to) || (!from && to)) {
-            return;
+    // =========================
+    // CLIENT FILTERING (NO LOADING)
+    // =========================
+    const departments = useMemo(() => {
+        let result = allDepartments;
+
+        if (filters.search) {
+            const s = filters.search.toLowerCase();
+            result = result.filter(d =>
+                d.department_name?.toLowerCase().includes(s)
+            );
         }
 
-        fetchData(filters, debouncedSearch);
+        if (filters.dateRange.from) {
+            const from = new Date(filters.dateRange.from);
+            result = result.filter(
+                d => new Date(d.date_added) >= from
+            );
+        }
 
-    }, [debouncedSearch, filters.dateRange.from, filters.dateRange.to]);
+        if (filters.dateRange.to) {
+            const to = new Date(filters.dateRange.to);
+            to.setHours(23, 59, 59, 999);
+            result = result.filter(
+                d => new Date(d.date_added) <= to
+            );
+        }
+
+        return result;
+    }, [allDepartments, filters]);
 
     // =========================
     // CRUD
     // =========================
-
     const createDepartment = useCallback(async (data: any) => {
         const res = await fetch("/api/hrm/employee-admin/structure/department", {
             method: "POST",
@@ -111,8 +101,8 @@ export function useDepartments(): UseDepartmentsReturn {
             body: JSON.stringify(data),
         });
         if (!res.ok) throw new Error("Create failed");
-        fetchData(filters, debouncedSearch);
-    }, [filters, debouncedSearch, fetchData]);
+        await fetchData();
+    }, [fetchData]);
 
     const updateDepartment = useCallback(async (id: number, data: any) => {
         const res = await fetch("/api/hrm/employee-admin/structure/department", {
@@ -121,20 +111,17 @@ export function useDepartments(): UseDepartmentsReturn {
             body: JSON.stringify({ department_id: id, ...data }),
         });
         if (!res.ok) throw new Error("Update failed");
-        fetchData(filters, debouncedSearch);
-    }, [filters, debouncedSearch, fetchData]);
+        await fetchData();
+    }, [fetchData]);
 
     const deleteDepartment = useCallback(async (id: number) => {
         const res = await fetch(
             `/api/hrm/employee-admin/structure/department?id=${id}`,
             { method: "DELETE" }
         );
-        if (!res.ok) {
-            const msg = await res.text();
-            throw new Error(msg || "Delete failed");
-        }
-        fetchData(filters, debouncedSearch);
-    }, [filters, debouncedSearch, fetchData]);
+        if (!res.ok) throw new Error("Delete failed");
+        await fetchData();
+    }, [fetchData]);
 
     return {
         departments,
@@ -143,7 +130,7 @@ export function useDepartments(): UseDepartmentsReturn {
         isLoading,
         isError,
         error,
-        refetch: () => fetchData(filters, debouncedSearch),
+        refetch: fetchData,
         createDepartment,
         updateDepartment,
         deleteDepartment,

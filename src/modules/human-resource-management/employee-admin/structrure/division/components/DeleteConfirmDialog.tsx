@@ -1,55 +1,80 @@
+/**
+ * Delete Confirmation Dialog Component
+ */
+
 "use client";
 
+import React from "react";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { DivisionWithRelations } from "../types";
 
-interface Props {
+interface DeleteConfirmDialogProps {
     open: boolean;
-    onOpenChange: (v: boolean) => void;
+    onOpenChange: (open: boolean) => void;
     division: DivisionWithRelations | null;
     onConfirm: () => Promise<void>;
 }
 
-export function DeleteDivisionConfirmDialog({
-                                                open,
-                                                onOpenChange,
-                                                division,
-                                                onConfirm,
-                                            }: Props) {
-    if (!division) return null;
+export function DeleteConfirmDialog({
+                                        open,
+                                        onOpenChange,
+                                        division,
+                                        onConfirm,
+                                    }: DeleteConfirmDialogProps) {
+    const [isDeleting, setIsDeleting] = React.useState(false);
 
     const handleConfirm = async () => {
-        await onConfirm();
-        onOpenChange(false);
+        try {
+            setIsDeleting(true);
+            await onConfirm();
+            onOpenChange(false);
+        } catch (error) {
+            console.error("Error deleting division:", error);
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
+    const departmentCount = division?.department_count || 0;
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Delete Division</DialogTitle>
-                </DialogHeader>
-
-                <p className="text-sm text-muted-foreground">
-                    Are you sure you want to delete <b>{division.division_name}</b>?
-                </p>
-
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
-                    <Button variant="destructive" onClick={handleConfirm}>
-                        Delete
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+        <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete the division{" "}
+                        <span className="font-semibold">
+                            "{division?.division_name}"
+                        </span>
+                        {departmentCount > 0 && (
+                            <span>
+                                {" "}and remove its association with {departmentCount} department(s)
+                            </span>
+                        )}
+                        . This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={handleConfirm}
+                        disabled={isDeleting}
+                        className="bg-red-600 hover:bg-red-700"
+                    >
+                        {isDeleting ? "Deleting..." : "Delete"}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }
