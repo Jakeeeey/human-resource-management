@@ -33,7 +33,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Plus } from "lucide-react";
-import type { DivisionWithRelations, User, Department } from "../types";
+import type { DivisionWithRelations, User, Department, BankAccount } from "../types";
 import { createColumns } from "./columns";
 import { DivisionToolbar } from "./DivisionToolbar";
 import { DivisionDialog } from "./DivisionDialog";
@@ -43,6 +43,7 @@ interface DivisionTableProps {
     data: DivisionWithRelations[];
     users: User[];
     departments: Department[];
+    bankAccounts: BankAccount[];
     isLoading?: boolean;
     onCreateDivision: (data: any) => Promise<void>;
     onUpdateDivision: (id: number, data: any) => Promise<void>;
@@ -50,14 +51,21 @@ interface DivisionTableProps {
 }
 
 export function DivisionTable({
-                                  data,
-                                  users,
-                                  departments,
-                                  isLoading = false,
-                                  onCreateDivision,
-                                  onUpdateDivision,
-                                  onDeleteDivision,
-                              }: DivisionTableProps) {
+    data,
+    users,
+    departments,
+    bankAccounts,
+    isLoading = false,
+    onCreateDivision,
+    onUpdateDivision,
+    onDeleteDivision,
+}: DivisionTableProps) {
+    const [isMounted, setIsMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -189,14 +197,20 @@ export function DivisionTable({
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            {flexRender(
+                                                cell.column.columnDef.cell,
+                                                cell.getContext()
+                                            )}
                                         </TableCell>
                                     ))}
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center">
+                                <TableCell
+                                    colSpan={columns.length}
+                                    className="h-24 text-center"
+                                >
                                     No divisions found.
                                 </TableCell>
                             </TableRow>
@@ -235,6 +249,7 @@ export function DivisionTable({
                 onOpenChange={setCreateDialogOpen}
                 users={users}
                 departments={departments}
+                bankAccounts={bankAccounts}
                 onSubmit={onCreateDivision}
             />
 
@@ -244,9 +259,12 @@ export function DivisionTable({
                 division={selectedDivision}
                 users={users}
                 departments={departments}
+                bankAccounts={bankAccounts}
                 onSubmit={async (data) => {
                     if (selectedDivision) {
                         await onUpdateDivision(selectedDivision.division_id, data);
+                        setEditDialogOpen(false);
+                        setSelectedDivision(null);
                     }
                 }}
             />

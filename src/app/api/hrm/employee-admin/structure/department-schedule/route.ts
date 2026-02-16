@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 // CONFIG
 // ============================================================================
 
-const DIRECTUS_URL = "http://100.110.197.61:8056";
+const DIRECTUS_URL = "http://100.110.197.61:8090";
 const LIMIT = 1000;
 
 const COLLECTIONS = {

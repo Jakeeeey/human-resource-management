@@ -12,6 +12,7 @@ const COLLECTIONS = {
     DEPARTMENT: "department",
     USER: "user",
     DEPT_PER_DIV: "department_per_division",
+    BANK_ACCOUNTS: "bank_accounts",
 };
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,15 @@ interface Division {
 interface Department {
     department_id: number;
     department_name: string;
+}
+
+interface BankAccount {
+    bank_id: number;
+    bank_name: string;
+    account_number: string;
+    bank_description: string;
+    branch: string;
+    is_active: boolean;
 }
 
 interface DepartmentPerDivision {
@@ -87,25 +97,29 @@ async function fetchUsers(): Promise<User[]> {
 // ============================================================================
 
 async function buildDivisionRelations() {
-    const [divisions, users, departments, deptPerDiv] = await Promise.all([
+    const [divisions, users, departments, deptPerDiv, bankAccounts] = await Promise.all([
         fetchAll<Division>(COLLECTIONS.DIVISION),
         fetchUsers(),
         fetchAll<Department>(COLLECTIONS.DEPARTMENT),
         fetchAll<DepartmentPerDivision>(COLLECTIONS.DEPT_PER_DIV),
+        fetchAll<BankAccount>(COLLECTIONS.BANK_ACCOUNTS),
     ]);
 
     const userMap = new Map(users.map(u => [u.user_id, u]));
     const deptMap = new Map(departments.map(d => [d.department_id, d]));
 
     // Group departments by division
-    const divisionDepartmentsMap = new Map<number, Department[]>();
+    const divisionDepartmentsMap = new Map<number, (Department & { bank_id: number | null })[]>();
     deptPerDiv.forEach(dpd => {
         if (!divisionDepartmentsMap.has(dpd.division_id)) {
             divisionDepartmentsMap.set(dpd.division_id, []);
         }
         const dept = deptMap.get(dpd.department_id);
         if (dept) {
-            divisionDepartmentsMap.get(dpd.division_id)!.push(dept);
+            divisionDepartmentsMap.get(dpd.division_id)!.push({
+                ...dept,
+                bank_id: dpd.bank_id
+            });
         }
     });
 
@@ -116,7 +130,7 @@ async function buildDivisionRelations() {
         department_count: (divisionDepartmentsMap.get(div.division_id) || []).length,
     }));
 
-    return { enriched, users, departments };
+    return { enriched, users, departments, bankAccounts };
 }
 
 // ============================================================================
@@ -125,12 +139,13 @@ async function buildDivisionRelations() {
 
 export async function GET(req: NextRequest) {
     try {
-        const { enriched, users, departments } = await buildDivisionRelations();
+        const { enriched, users, departments, bankAccounts } = await buildDivisionRelations();
 
         return NextResponse.json({
             divisions: enriched,
             users,
             departments,
+            bank_accounts: bankAccounts,
             metadata: {
                 total: enriched.length,
                 lastUpdated: new Date().toISOString(),
@@ -150,30 +165,55 @@ export async function GET(req: NextRequest) {
 // ============================================================================
 
 export async function POST(req: NextRequest) {
+    if (!process.env.DIRECTUS_STATIC_TOKEN) {
+        return NextResponse.json({ error: "Server Error: DIRECTUS_STATIC_TOKEN is missing" }, { status: 500 });
+    }
+
     try {
         const body = await req.json();
-        const { department_ids, ...divisionData } = body;
+        const { division_name, division_code, division_description, division_head_id, date_added, department_ids } = body;
 
         // 1️⃣ Create division
+        const newDivisionData: any = {
+            division_name,
+            division_code,
+            division_description,
+            division_head_id,
+            date_added: date_added || new Date().toISOString().split("T")[0],
+        };
+
+        // Sanitization
+        if (newDivisionData.division_head_id === "" || newDivisionData.division_head_id === "0") {
+            newDivisionData.division_head_id = null;
+        } else if (newDivisionData.division_head_id) {
+            newDivisionData.division_head_id = Number(newDivisionData.division_head_id);
+        }
+
+        if (typeof newDivisionData.date_added === 'string' && newDivisionData.date_added.includes("T")) {
+            newDivisionData.date_added = newDivisionData.date_added.split("T")[0];
+        }
+
         const divRes = await fetch(
             `${DIRECTUS_URL}/items/${COLLECTIONS.DIVISION}`,
             {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    division_name: divisionData.division_name,
-                    division_code: divisionData.division_code,
-                    division_head_id: divisionData.division_head_id,
-                    division_description: divisionData.division_description,
-                    date_added: new Date().toISOString().split("T")[0],
-                }),
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+                },
+                body: JSON.stringify(newDivisionData),
             }
         );
 
         if (!divRes.ok) {
             const errorText = await divRes.text();
-            console.error("POST division error:", errorText);
-            throw new Error("Directus division create failed");
+            console.error("POST division error:", {
+                status: divRes.status,
+                statusText: divRes.statusText,
+                body: errorText,
+                payload: newDivisionData
+            });
+            throw new Error(`Directus division create failed: ${divRes.statusText} - ${errorText}`);
         }
 
         // ✅ Directus returns single object — not array
@@ -185,17 +225,30 @@ export async function POST(req: NextRequest) {
         }
 
         // 2️⃣ Create department_per_division links
+        // Handle simplified array request (old) or assignment objects (new)
+        let assignments: { department_id: number; bank_id: number | null }[] = [];
+
         if (Array.isArray(department_ids) && department_ids.length > 0) {
-            for (const dept_id of department_ids) {
+            console.warn("Using deprecated department_ids array in POST");
+            assignments = department_ids.map((id: number) => ({ department_id: id, bank_id: null }));
+        } else if (Array.isArray(body.department_assignments)) {
+            assignments = body.department_assignments;
+        }
+
+        if (assignments.length > 0) {
+            for (const assignment of assignments) {
                 await fetch(
                     `${DIRECTUS_URL}/items/${COLLECTIONS.DEPT_PER_DIV}`,
                     {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+                        },
                         body: JSON.stringify({
                             division_id: newDivision.division_id,
-                            department_id: dept_id,
-                            bank_id: null,
+                            department_id: assignment.department_id,
+                            bank_id: assignment.bank_id || null,
                         }),
                     }
                 );
@@ -222,9 +275,13 @@ export async function POST(req: NextRequest) {
 // ============================================================================
 
 export async function PATCH(req: NextRequest) {
+    if (!process.env.DIRECTUS_STATIC_TOKEN) {
+        return NextResponse.json({ error: "Server Error: DIRECTUS_STATIC_TOKEN is missing" }, { status: 500 });
+    }
     try {
         const body = await req.json();
-        const { division_id, department_ids, ...updateData } = body;
+        // Crucial fix: Extract department_assignments so it doesn't get sent to Directus division update
+        const { division_id, department_ids, department_assignments, ...updateData } = body;
 
         if (!division_id) {
             return NextResponse.json(
@@ -234,44 +291,85 @@ export async function PATCH(req: NextRequest) {
         }
 
         // 1. Update division
+        // Sanitization
+        if (updateData.division_head_id === "" || updateData.division_head_id === "0") {
+            updateData.division_head_id = null;
+        } else if (updateData.division_head_id) {
+            updateData.division_head_id = Number(updateData.division_head_id);
+        }
+
+        if (updateData.date_added && typeof updateData.date_added === 'string') {
+            // Ensure it's YYYY-MM-DD if it's a full ISO string
+            updateData.date_added = updateData.date_added.split("T")[0];
+        }
+
+        // Filter out undefined values to avoid sending bad data
+        const cleanUpdateData = Object.fromEntries(
+            Object.entries(updateData).filter(([_, v]) => v !== undefined)
+        );
+
         const divRes = await fetch(
             `${DIRECTUS_URL}/items/${COLLECTIONS.DIVISION}/${division_id}`,
             {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(updateData),
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` // Ensure token is passed
+                },
+                body: JSON.stringify(cleanUpdateData),
             }
         );
 
         if (!divRes.ok) {
+            console.error("Division update failed", {
+                status: divRes.status,
+                statusText: divRes.statusText,
+                url: divRes.url,
+                payload: cleanUpdateData
+            });
+            const text = await divRes.text();
+            console.error("Error body:", text);
             throw new Error(`Failed to update division: ${divRes.statusText}`);
         }
 
         // 2. Update department assignments
-        if (department_ids !== undefined) {
+        if (department_ids !== undefined || body.department_assignments !== undefined) {
             // Delete existing assignments
             const existing = await fetchAll<DepartmentPerDivision>(COLLECTIONS.DEPT_PER_DIV);
-            const toDelete = existing.filter(dpd => dpd.division_id === division_id);
+            // Filter by division_id to only delete relevant assignments
+            const toDelete = existing.filter(dpd => dpd.division_id === Number(division_id));
 
             for (const dpd of toDelete) {
                 await fetch(`${DIRECTUS_URL}/items/${COLLECTIONS.DEPT_PER_DIV}/${dpd.id}`, {
                     method: "DELETE",
+                    headers: {
+                        "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+                    }
                 });
             }
 
             // Create new assignments
-            if (department_ids.length > 0) {
-                const dpdRecords = department_ids.map((dept_id: number) => ({
-                    division_id,
-                    department_id: dept_id,
-                    bank_id: null,
-                }));
+            let assignments: { department_id: number; bank_id: number | null }[] = [];
 
-                for (const record of dpdRecords) {
+            if (Array.isArray(body.department_assignments)) {
+                assignments = body.department_assignments;
+            } else if (Array.isArray(department_ids)) {
+                assignments = department_ids.map((id: number) => ({ department_id: id, bank_id: null }));
+            }
+
+            if (assignments.length > 0) {
+                for (const assignment of assignments) {
                     await fetch(`${DIRECTUS_URL}/items/${COLLECTIONS.DEPT_PER_DIV}`, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(record),
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+                        },
+                        body: JSON.stringify({
+                            division_id,
+                            department_id: assignment.department_id,
+                            bank_id: assignment.bank_id || null,
+                        }),
                     });
                 }
             }
@@ -293,6 +391,9 @@ export async function PATCH(req: NextRequest) {
 // ============================================================================
 
 export async function DELETE(req: NextRequest) {
+    if (!process.env.DIRECTUS_STATIC_TOKEN) {
+        return NextResponse.json({ error: "Server Error: DIRECTUS_STATIC_TOKEN is missing" }, { status: 500 });
+    }
     try {
         const id = req.nextUrl.searchParams.get("id");
 
@@ -310,13 +411,21 @@ export async function DELETE(req: NextRequest) {
         for (const dpd of toDelete) {
             await fetch(`${DIRECTUS_URL}/items/${COLLECTIONS.DEPT_PER_DIV}/${dpd.id}`, {
                 method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+                }
             });
         }
 
         // Delete division
         const res = await fetch(
             `${DIRECTUS_URL}/items/${COLLECTIONS.DIVISION}/${id}`,
-            { method: "DELETE" }
+            {
+                method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+                }
+            }
         );
 
         if (!res.ok) {
