@@ -56,6 +56,8 @@ const data = {
                 { title: "Department", url: "/hrm/employee-admin/structure/department" },
                 { title: "Department Schedule", url: "/hrm/employee-admin/structure/department-schedule" },
                 { title: "Department Accounts", url: "/hrm/employee-admin/structure/department-accounts" },
+                { title: "Role Management", url: "/hrm/employee-admin/structure/role-management" },
+
 
             ],
         },
