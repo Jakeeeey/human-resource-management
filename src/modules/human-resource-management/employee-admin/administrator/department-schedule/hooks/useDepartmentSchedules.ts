@@ -42,7 +42,7 @@ export function useDepartmentSchedules(): UseDepartmentSchedulesReturn {
             setIsError(false);
             setError(null);
 
-            const url = `/api/hrm/employee-admin/structure/department-schedule`;
+            const url = `/api/hrm/employee-admin/administrator/department-schedule`;
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -95,7 +95,7 @@ export function useDepartmentSchedules(): UseDepartmentSchedulesReturn {
 
     const createSchedule = useCallback(async (data: any) => {
         try {
-            const response = await fetch('/api/hrm/employee-admin/structure/department-schedule', {
+            const response = await fetch('/api/hrm/employee-admin/administrator/department-schedule', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -115,7 +115,7 @@ export function useDepartmentSchedules(): UseDepartmentSchedulesReturn {
 
     const updateSchedule = useCallback(async (id: number, data: any) => {
         try {
-            const response = await fetch('/api/hrm/employee-admin/structure/department-schedule', {
+            const response = await fetch('/api/hrm/employee-admin/administrator/department-schedule', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ schedule_id: id, ...data }),
@@ -135,7 +135,7 @@ export function useDepartmentSchedules(): UseDepartmentSchedulesReturn {
 
     const deleteSchedule = useCallback(async (id: number) => {
         try {
-            const response = await fetch(`/api/hrm/employee-admin/structure/department-schedule?id=${id}`, {
+            const response = await fetch(`/api/hrm/employee-admin/administrator/department-schedule?id=${id}`, {
                 method: 'DELETE',
             });
 

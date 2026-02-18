@@ -13,7 +13,7 @@ import { NavUser } from "../../../_components/nav-user";
 import { cookies } from "next/headers";
 
 // ✅ Wire the module you asked for
-import { SalesmanManagementModule } from "@/modules/human-resource-management/salesman-management/SalesmanManagementModule";
+import { SalesmanManagementModule } from "@/modules/human-resource-management/employee-admin/structrure/salesman-management/SalesmanManagementModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

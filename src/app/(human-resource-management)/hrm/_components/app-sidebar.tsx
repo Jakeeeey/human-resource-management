@@ -83,11 +83,6 @@ const data = {
                             icon: Layers,
                         },
                         {
-                            title: "Department Schedule",
-                            url: "/hrm/employee-admin/structure/department-schedule",
-                            icon: CalendarDays,
-                        },
-                        {
                             title: "Department Accounts",
                             url: "/hrm/employee-admin/structure/department-accounts",
                             icon: KeyRound,

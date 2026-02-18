@@ -36,7 +36,7 @@ import { ChevronDown, Plus } from "lucide-react";
 import type { DepartmentScheduleWithRelations, Department } from "../types";
 import { createColumns } from "./columns";
 import { DepartmentScheduleToolbar } from "./DepartmentScheduleToolbar";
-import { DepartmentScheduleDialog } from "@/modules/human-resource-management/employee-admin/structrure/department-schedule/components/DepartmentScheduleDialog";
+import { DepartmentScheduleDialog } from "@/modules/human-resource-management/employee-admin/administrator/department-schedule/components/DepartmentScheduleDialog";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 
 interface DepartmentScheduleTableProps {
