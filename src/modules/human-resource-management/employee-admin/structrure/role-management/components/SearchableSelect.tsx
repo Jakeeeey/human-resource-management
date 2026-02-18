@@ -1,23 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
-
+import { Check, ChevronsUpDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 interface Option {
   value: string;
@@ -42,74 +27,105 @@ export function SearchableSelect({
   className,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const selectedLabel = React.useMemo(() => {
-    return options.find((option) => option.value === value)?.label || placeholder;
-  }, [options, value, placeholder]);
+  const filtered = React.useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, search]);
+
+  const selectedLabel = options.find((o) => o.value === value)?.label;
+
+  // Close on outside click
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            "w-full justify-between font-normal transition-all duration-200",
-            "border-muted-foreground/20 hover:border-primary/50 hover:bg-primary/5 shadow-sm",
-            open && "ring-2 ring-primary/20 border-primary/50",
-            className
-          )}
-        >
-          <span className="truncate text-muted-foreground group-hover:text-foreground">
-            {value ? options.find(o => o.value === value)?.label : placeholder}
-          </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-xl border-muted-foreground/20" align="start">
-        <Command className="rounded-lg">
-          <CommandInput 
-            placeholder={`Search ${placeholder.toLowerCase()}...`} 
-            className="h-11 border-none focus:ring-0"
-          />
-          <CommandList className="max-h-[300px]">
-            <CommandEmpty className="py-6 text-sm text-muted-foreground text-center">
-              {emptyMessage}
-            </CommandEmpty>
-            <CommandGroup className="p-1.5">
-              {options.map((option) => (
-                <CommandItem
+    <div ref={containerRef} className="relative w-full">
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setSearch(""); }}
+        className={cn(
+          "w-full flex items-center justify-between px-3 font-normal transition-all duration-200",
+          "border border-muted-foreground/20 rounded-md bg-background shadow-sm",
+          "hover:border-primary/50 hover:bg-primary/5",
+          open && "ring-2 ring-primary/20 border-primary/50",
+          className
+        )}
+      >
+        <span className={cn("truncate text-sm", selectedLabel ? "text-foreground" : "text-muted-foreground")}>
+          {selectedLabel ?? placeholder}
+        </span>
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-40" />
+      </button>
+
+      {/* Inline dropdown — rendered in normal flow, no portal/overflow conflict */}
+      {open && (
+        <div className="absolute z-[9999] left-0 right-0 mt-1 rounded-lg border border-muted-foreground/20 bg-popover shadow-xl">
+          {/* Search input */}
+          <div className="flex items-center gap-2 border-b border-muted-foreground/10 px-3 py-2">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${placeholder.toLowerCase()}...`}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+            />
+          </div>
+
+          {/* Scrollable list */}
+          <div
+            className="max-h-[220px] overflow-y-auto overscroll-contain p-1.5"
+            onWheel={(e) => e.stopPropagation()}
+          >
+            {filtered.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+            ) : (
+              filtered.map((option) => (
+                <button
                   key={option.value}
-                  value={option.label}
-                  onSelect={() => {
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
                     onValueChange(option.value === value ? "" : option.value);
                     setOpen(false);
+                    setSearch("");
                   }}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-2.5 rounded-md cursor-pointer transition-colors",
-                    "hover:bg-primary/10 aria-selected:bg-primary/5 focus:bg-primary/5",
+                    "flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm transition-colors",
+                    "hover:bg-primary/10",
                     value === option.value && "bg-primary/10 text-primary font-medium"
                   )}
                 >
-                  <div className={cn(
-                    "flex-1 transition-transform duration-200",
-                    value === option.value && "translate-x-1"
-                  )}>
+                  <span className={cn("flex-1 transition-transform duration-150", value === option.value && "translate-x-1")}>
                     {option.label}
-                  </div>
+                  </span>
                   <Check
                     className={cn(
-                      "h-4 w-4 transition-all duration-300",
+                      "h-4 w-4 transition-all duration-200",
                       value === option.value ? "opacity-100 scale-100" : "opacity-0 scale-50"
                     )}
                   />
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

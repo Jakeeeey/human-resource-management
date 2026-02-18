@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { TablePagination, usePagination } from "./TablePagination";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
@@ -32,6 +34,8 @@ interface SupervisorTabProps {
 
 export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divisions }: SupervisorTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
+  const pagination = usePagination(data, 5);
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -41,7 +45,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Field Supervisors</h3>
@@ -63,6 +67,16 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
         users={users}
         divisions={divisions}
         onConfirm={async (divId, supId) => onCreate(divId, supId)}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await onDelete(deleteTarget);
+        }}
+        title="Remove Supervisor?"
+        description="Are you sure you want to remove this supervisor? This will also unassign all linked salesmen."
       />
 
       <Card className="border-muted-foreground/10 shadow-sm overflow-hidden rounded-xl">
@@ -89,7 +103,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => {
+              pagination.paginatedItems.map((item) => {
                 const user = getUser(item.supervisor_id);
                 const division = getDivision(item.division_id);
                 const initials = user ? `${user.user_fname?.[0] || ''}${user.user_lname?.[0] || ''}` : '?';
@@ -129,7 +143,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
-                        onClick={() => onDelete(item.id)}
+                        onClick={() => setDeleteTarget(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -140,6 +154,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
             )}
           </TableBody>
         </Table>
+        <TablePagination {...pagination} />
       </Card>
     </div>
   );

@@ -54,12 +54,10 @@ export interface SalesmanPerSupervisor {
 
 export interface ReviewCommittee {
     id: number;
-    target_period: string;
-    status: "DRAFT" | "APPROVED" | "REJECTED";
-    target_record_id: number;
     approver_id: number | SystemUser;
-    approved_at?: string;
     is_deleted?: number;
+    created_by?: number;
+    created_at?: string;
 }
 
 export type RoleManagementTab =

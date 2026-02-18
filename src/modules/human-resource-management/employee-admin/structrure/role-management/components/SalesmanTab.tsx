@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { TablePagination, usePagination } from "./TablePagination";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
@@ -35,6 +37,8 @@ interface SalesmanTabProps {
 
 export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, supervisors, users }: SalesmanTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
+  const pagination = usePagination(data, 5);
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -44,7 +48,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Sales Force</h3>
@@ -71,6 +75,16 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
         }}
       />
 
+      <DeleteConfirmationDialog 
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await onDelete(deleteTarget);
+        }}
+        title="Unassign Salesman?"
+        description="Are you sure you want to unassign this salesman from the supervisor? This action cannot be undone."
+      />
+
       <Card className="border-muted-foreground/10 shadow-sm overflow-hidden rounded-xl">
         <Table>
           <TableHeader className="bg-muted/30">
@@ -95,7 +109,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => {
+              pagination.paginatedItems.map((item) => {
                 const salesman = getSalesman(item.salesman_id);
                 const supAsmt = getSupervisorAsmt(item.supervisor_per_division_id);
                 const supUser = getUser(supAsmt?.supervisor_id);
@@ -141,7 +155,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
-                        onClick={() => onDelete(item.id)}
+                        onClick={() => setDeleteTarget(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -152,6 +166,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
             )}
           </TableBody>
         </Table>
+        <TablePagination {...pagination} />
       </Card>
     </div>
   );

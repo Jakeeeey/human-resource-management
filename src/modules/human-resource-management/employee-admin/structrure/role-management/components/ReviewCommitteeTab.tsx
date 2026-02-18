@@ -10,13 +10,15 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, UserPlus, Mail, ShieldCheck, Calendar, UserCheck } from "lucide-react";
+import { Trash2, UserPlus, Mail, ShieldCheck, UserCheck } from "lucide-react";
 import { ReviewCommittee, SystemUser } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { TablePagination, usePagination } from "./TablePagination";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
 
@@ -30,6 +32,8 @@ interface ReviewCommitteeTabProps {
 
 export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users }: ReviewCommitteeTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
+  const pagination = usePagination(data, 5);
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -39,7 +43,7 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Review Committee</h3>
@@ -62,13 +66,23 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
         onConfirm={onCreate}
       />
 
+      <DeleteConfirmationDialog 
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await onDelete(deleteTarget);
+        }}
+        title="Remove Committee Member?"
+        description="Are you sure you want to remove this member? This action cannot be undone."
+      />
+
       <Card className="border-muted-foreground/10 shadow-sm overflow-hidden rounded-xl">
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-muted-foreground/10">
               <TableHead className="font-semibold py-4 px-6 text-foreground/80">Approval Authority</TableHead>
               <TableHead className="font-semibold py-4 text-foreground/80">Contact</TableHead>
-              <TableHead className="font-semibold py-4 text-foreground/80">Fiscal Period</TableHead>
+              <TableHead className="font-semibold py-4 text-foreground/80">Added On</TableHead>
               <TableHead className="w-[80px] py-4"></TableHead>
             </TableRow>
           </TableHeader>
@@ -86,7 +100,7 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => {
+              pagination.paginatedItems.map((item) => {
                 const user = getUser(item.approver_id);
                 const initials = user ? `${user.user_fname?.[0] || ''}${user.user_lname?.[0] || ''}` : '?';
 
@@ -116,17 +130,16 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
                       </div>
                     </TableCell>
                     <TableCell className="py-4">
-                      <Badge variant="secondary" className="bg-secondary/30 text-secondary-foreground border-secondary/20 font-bold text-[10px] tracking-wider px-2.5 py-0.5">
-                        <Calendar className="mr-1.5 h-3 w-3 opacity-60" />
-                        {item.target_period}
-                      </Badge>
+                      <div className="text-sm text-muted-foreground font-medium">
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : "—"}
+                      </div>
                     </TableCell>
                     <TableCell className="py-4 pr-6 text-right">
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
-                        onClick={() => onDelete(item.id)}
+                        onClick={() => setDeleteTarget(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -137,6 +150,7 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
             )}
           </TableBody>
         </Table>
+        <TablePagination {...pagination} />
       </Card>
     </div>
   );

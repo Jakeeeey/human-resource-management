@@ -16,6 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import { TablePagination, usePagination } from "./TablePagination";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
@@ -32,6 +34,8 @@ interface DivisionHeadTabProps {
 
 export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, divisions }: DivisionHeadTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
+  const pagination = usePagination(data, 5);
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -47,7 +51,7 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
   const availableDivisions = divisions.filter(d => !assignedDivisionIds.includes(d.division_id));
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Division Leaders</h3>
@@ -70,7 +74,17 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
         type="division-head"
         users={users}
         divisions={availableDivisions}
-        onConfirm={async (divId, userId) => onCreate(divId, userId)}
+        onConfirm={onCreate}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await onDelete(deleteTarget);
+        }}
+        title="Remove Division Head?"
+        description="Are you sure you want to remove this division head? This action cannot be undone."
       />
 
       <Card className="border-muted-foreground/10 shadow-sm overflow-hidden rounded-xl">
@@ -97,7 +111,7 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => {
+              pagination.paginatedItems.map((item) => {
                 const user = getUser(item.user_id);
                 const division = getDivision(item.division_id);
                 const initials = user ? `${user.user_fname?.[0] || ''}${user.user_lname?.[0] || ''}` : '?';
@@ -137,7 +151,7 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
-                        onClick={() => onDelete(item.id)}
+                        onClick={() => setDeleteTarget(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -148,6 +162,7 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
             )}
           </TableBody>
         </Table>
+        <TablePagination {...pagination} />
       </Card>
     </div>
   );
