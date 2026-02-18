@@ -10,7 +10,10 @@ import {
     User,
     KeyRound,
     ShieldCheck,
+    Moon,
+    Sun,
 } from "lucide-react"
+import { useTheme } from "next-themes"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -45,6 +48,20 @@ export function NavUser({ user, onLogout }: NavUserProps) {
     const { isMobile } = useSidebar()
     const router = useRouter()
     const [loggingOut, setLoggingOut] = React.useState(false)
+
+    // ✅ theme toggle support
+    const { theme, setTheme, systemTheme } = useTheme()
+    const [mounted, setMounted] = React.useState(false)
+    React.useEffect(() => setMounted(true), [])
+
+    const currentTheme = theme === "system" ? systemTheme : theme
+    const isDark = currentTheme === "dark"
+
+    const toggleTheme = React.useCallback(() => {
+        // If theme is not resolved yet, default to toggling from light -> dark
+        const next = isDark ? "light" : "dark"
+        setTheme(next)
+    }, [isDark, setTheme])
 
     const initials =
         user?.name
@@ -105,29 +122,47 @@ export function NavUser({ user, onLogout }: NavUserProps) {
                         sideOffset={8}
                     >
                         <DropdownMenuGroup>
+                            {/* ✅ NEW: Theme toggle above My Profile */}
+                            <DropdownMenuItem
+                                className="cursor-pointer"
+                                onSelect={(e) => {
+                                    // prevent dropdown from closing on click (optional; remove if you want it to close)
+                                    e.preventDefault()
+                                    toggleTheme()
+                                }}
+                                disabled={!mounted}
+                            >
+                                {isDark ? (
+                                    <Sun className="mr-2 size-4" />
+                                ) : (
+                                    <Moon className="mr-2 size-4" />
+                                )}
+                                {isDark ? "Light mode" : "Dark mode"}
+                            </DropdownMenuItem>
+
                             <DropdownMenuItem asChild>
-                                <Link href="/profile" className="cursor-pointer">
+                                <Link href="/hrm/my-profile" className="cursor-pointer">
                                     <User className="mr-2 size-4" />
                                     My Profile
                                 </Link>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem asChild>
-                                <Link href="/change-password" className="cursor-pointer">
+                                <Link href="/hrm/change-password" className="cursor-pointer">
                                     <KeyRound className="mr-2 size-4" />
                                     Change Password
                                 </Link>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem asChild>
-                                <Link href="/login-activity" className="cursor-pointer">
+                                <Link href="/hrm/login-activity" className="cursor-pointer">
                                     <ShieldCheck className="mr-2 size-4" />
                                     Login Activity
                                 </Link>
                             </DropdownMenuItem>
 
                             <DropdownMenuItem asChild>
-                                <Link href="/hrm/employee-admin/settings" className="cursor-pointer">
+                                <Link href="/hrm/settings" className="cursor-pointer">
                                     <Settings className="mr-2 size-4" />
                                     Settings
                                 </Link>
