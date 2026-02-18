@@ -63,6 +63,16 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
         onConfirm={onCreate}
       />
 
+      <DeleteConfirmationDialog 
+        isOpen={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await onDelete(deleteTarget);
+        }}
+        title="Remove Executive?"
+        description="Are you sure you want to remove this executive? This action cannot be undone."
+      />
+
       <Card className="border-muted-foreground/10 shadow-sm overflow-hidden rounded-xl">
         <Table>
           <TableHeader className="bg-muted/30">
@@ -127,7 +137,7 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
-                        onClick={() => onDelete(item.id)}
+                        onClick={() => setDeleteTarget(item.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import * as provider from "../providers/fetchProvider";
+import { toast } from "sonner";
 import {
   Executive,
   DivisionSalesHead,
@@ -59,32 +60,66 @@ export function useRoleManagement() {
     setIsLoading(true);
     setIsError(false);
     try {
-      const [ex, rc, dh, sup, sa, u, d, s] = await Promise.all([
-        provider.listExecutives(),
-        provider.listReviewCommittee(),
-        provider.listDivisionHeads(),
-        provider.listSupervisors(),
-        provider.listSalesmanAssignments(),
+      const data = await provider.listDivisionHeads();
+      setDivisionHeads(data);
+    } catch (err) {
+      console.error("Failed to fetch division heads", err);
+    }
+  }, []);
+
+  const fetchSupervisors = useCallback(async () => {
+    try {
+      const data = await provider.listSupervisors();
+      setSupervisors(data);
+    } catch (err) {
+      console.error("Failed to fetch supervisors", err);
+    }
+  }, []);
+
+  const fetchSalesmanAssignments = useCallback(async () => {
+    try {
+      const data = await provider.listSalesmanAssignments();
+      setSalesmanAssignments(data);
+    } catch (err) {
+      console.error("Failed to fetch salesman assignments", err);
+    }
+  }, []);
+
+  const fetchReferenceData = useCallback(async () => {
+    try {
+      const [u, d, s] = await Promise.all([
         provider.listUsers(),
         provider.listDivisions(),
         provider.listSalesmen(),
       ]);
-
-      setExecutives(ex);
-      setReviewCommittee(rc);
-      setDivisionHeads(dh);
-      setSupervisors(sup);
-      setSalesmanAssignments(sa);
       setUsers(u);
       setDivisions(d);
       setSalesmen(s);
     } catch (err) {
+      console.error("Failed to fetch reference data", err);
+    }
+  }, []);
+
+  // Initial Load
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setIsError(false);
+    try {
+      await Promise.all([
+        fetchExecutives(),
+        fetchReviewCommittee(),
+        fetchDivisionHeads(),
+        fetchSupervisors(),
+        fetchSalesmanAssignments(),
+        fetchReferenceData()
+      ]);
+    } catch (err) {
       setIsError(true);
-      setError(err instanceof Error ? err : new Error("Unknown error"));
+      setError(err instanceof Error ? err : new Error("Failed to fetch data"));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [fetchExecutives, fetchReviewCommittee, fetchDivisionHeads, fetchSupervisors, fetchSalesmanAssignments, fetchReferenceData]);
 
   useEffect(() => {
     fetchData();
@@ -164,6 +199,6 @@ export function useRoleManagement() {
     createSupervisor,
     deleteSupervisor,
     createSalesmanAssignment,
-    deleteSalesmanAssignment,
+    deleteSalesmanAssignment
   };
 }
