@@ -17,6 +17,7 @@ import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TablePagination, usePagination } from "./TablePagination";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
 const getDivision = (val: number | Division | undefined) => typeof val === 'object' ? val : null;
@@ -35,6 +36,7 @@ interface SalesmanTabProps {
 
 export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, supervisors, users }: SalesmanTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const pagination = usePagination(data, 5);
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -44,7 +46,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Sales Force</h3>
@@ -95,7 +97,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => {
+              pagination.paginatedItems.map((item) => {
                 const salesman = getSalesman(item.salesman_id);
                 const supAsmt = getSupervisorAsmt(item.supervisor_per_division_id);
                 const supUser = getUser(supAsmt?.supervisor_id);
@@ -152,6 +154,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
             )}
           </TableBody>
         </Table>
+        <TablePagination {...pagination} />
       </Card>
     </div>
   );

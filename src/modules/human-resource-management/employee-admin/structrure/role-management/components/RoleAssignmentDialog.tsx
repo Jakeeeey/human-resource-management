@@ -115,7 +115,7 @@ export function RoleAssignmentDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl rounded-2xl">
+      <DialogContent className="sm:max-w-[450px] p-0 border-none shadow-2xl rounded-2xl overflow-visible">
         <div className={cn("p-6 pb-4 flex items-center gap-4", config.bg)}>
           <div className={cn("p-2.5 rounded-xl bg-white shadow-sm ring-1 ring-black/5", config.color)}>
             <Icon className="h-6 w-6" />

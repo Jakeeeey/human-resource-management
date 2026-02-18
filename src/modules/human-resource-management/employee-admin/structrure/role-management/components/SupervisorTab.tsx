@@ -17,6 +17,7 @@ import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TablePagination, usePagination } from "./TablePagination";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
 const getDivision = (val: number | Division | undefined) => typeof val === 'object' ? val : null;
@@ -32,6 +33,7 @@ interface SupervisorTabProps {
 
 export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divisions }: SupervisorTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const pagination = usePagination(data, 5);
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -41,7 +43,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Field Supervisors</h3>
@@ -89,7 +91,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((item) => {
+              pagination.paginatedItems.map((item) => {
                 const user = getUser(item.supervisor_id);
                 const division = getDivision(item.division_id);
                 const initials = user ? `${user.user_fname?.[0] || ''}${user.user_lname?.[0] || ''}` : '?';
@@ -140,6 +142,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
             )}
           </TableBody>
         </Table>
+        <TablePagination {...pagination} />
       </Card>
     </div>
   );

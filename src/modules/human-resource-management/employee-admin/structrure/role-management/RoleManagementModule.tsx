@@ -115,7 +115,7 @@ export default function RoleManagementModule() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="executive">
+        <TabsContent value="executive" className="mt-0">
           <ExecutiveTab
             data={executives}
             isLoading={isLoading}
@@ -125,26 +125,19 @@ export default function RoleManagementModule() {
           />
         </TabsContent>
 
-        <TabsContent value="review-committee">
+        <TabsContent value="review-committee" className="mt-0">
           <ReviewCommitteeTab
             data={reviewCommittee}
             isLoading={isLoading}
             onDelete={deleteReviewCommittee}
             onCreate={async (userId: number) => {
-              // For Review Committee, we might need more data,
-              // but for now we follow the executive pattern (simple assignment)
-              await createReviewCommittee({
-                approver_id: userId,
-                target_period: new Date().toISOString().split('T')[0], // Default
-                status: 'DRAFT',
-                target_record_id: 0 // Placeholder
-              });
+              await createReviewCommittee({ approver_id: userId });
             }}
             users={users}
           />
         </TabsContent>
 
-        <TabsContent value="division-head">
+        <TabsContent value="division-head" className="mt-0">
           <DivisionHeadTab
             data={divisionHeads}
             isLoading={isLoading}
@@ -155,7 +148,7 @@ export default function RoleManagementModule() {
           />
         </TabsContent>
 
-        <TabsContent value="supervisor">
+        <TabsContent value="supervisor" className="mt-0">
           <SupervisorTab 
             data={supervisors} 
             isLoading={isLoading} 
@@ -166,7 +159,7 @@ export default function RoleManagementModule() {
           />
         </TabsContent>
 
-        <TabsContent value="salesman">
+        <TabsContent value="salesman" className="mt-0">
           <SalesmanTab 
             data={salesmanAssignments} 
             isLoading={isLoading} 

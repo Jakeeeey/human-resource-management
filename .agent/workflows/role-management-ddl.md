@@ -1,6 +1,16 @@
-# Role Management Database Schema (Reference)
+---
+description: DDL reference for the Role Management module (employee-admin > structure > role-management).
+---
 
-## 1. Executive
+# Role Management — Database DDL Reference
+
+All tables used by the Role Management module. Source of truth: `src/modules/human-resource-management/employee-admin/structrure/role-management/DDL.md`
+
+---
+
+## 1. `executive`
+Top-level authority assignment. One row = one user assigned as an executive.
+
 ```sql
 CREATE TABLE `executive` (
 	`id` INT NOT NULL AUTO_INCREMENT,
@@ -20,7 +30,11 @@ CREATE TABLE `executive` (
 );
 ```
 
-## 2. Division Sales Head
+---
+
+## 2. `division_sales_head`
+Assigns a user as the head of a specific division. One division → one head.
+
 ```sql
 CREATE TABLE `division_sales_head` (
 	`id` INT NOT NULL AUTO_INCREMENT,
@@ -43,7 +57,11 @@ CREATE TABLE `division_sales_head` (
 );
 ```
 
-## 3. Supervisor per Division
+---
+
+## 3. `supervisor_per_division`
+Assigns a supervisor (user) to a division. Multiple supervisors can be assigned to the same division.
+
 ```sql
 CREATE TABLE `supervisor_per_division` (
 	`id` INT NOT NULL AUTO_INCREMENT,
@@ -66,7 +84,11 @@ CREATE TABLE `supervisor_per_division` (
 );
 ```
 
-## 4. Salesman per Supervisor
+---
+
+## 4. `salesman_per_supervisor`
+Links a salesman to a specific supervisor-division assignment. Represents the bottom of the hierarchy.
+
 ```sql
 CREATE TABLE `salesman_per_supervisor` (
 	`id` INT NOT NULL AUTO_INCREMENT,
@@ -89,25 +111,45 @@ CREATE TABLE `salesman_per_supervisor` (
 );
 ```
 
-## 5. Target Setting approver (Review Committee)
+---
+
+## 5. `target_setting_approver` (Review Committee)
+Tracks who is authorized to approve target settings. Used by the Review Committee tab.
+
 ```sql
 CREATE TABLE `target_setting_approver` (
 	`id` INT NOT NULL AUTO_INCREMENT,
+	`target_period` DATE NOT NULL COMMENT 'fiscal_period from target_setting_executive',
+	`status` ENUM('DRAFT','APPROVED','REJECTED') NOT NULL DEFAULT 'DRAFT',
+	`target_record_id` INT NOT NULL,
 	`approver_id` INT NULL DEFAULT NULL,
+	`approved_at` DATETIME NULL DEFAULT NULL,
 	`is_deleted` TINYINT NULL DEFAULT '0',
-	`created_by` INT NULL DEFAULT NULL,
-	`created_at` DATETIME NULL DEFAULT NULL,
 	PRIMARY KEY (`id`) USING BTREE,
 	INDEX `FK_approver_user_idx` (`approver_id`) USING BTREE,
 	CONSTRAINT `FK_approval_approver` FOREIGN KEY (`approver_id`) REFERENCES `user` (`user_id`) ON UPDATE NO ACTION ON DELETE NO ACTION
-)
-COLLATE='utf8mb4_0900_ai_ci'
-ENGINE=InnoDB
-AUTO_INCREMENT=16
-;
+);
 ```
 
-## Related Core Tables
-- `user` (user_id, email, names, department, role_id, etc.)
-- `division` (division_id, division_name, etc.)
-- `salesman` (id, employee_id, salesman_name, division_id, etc.)
+---
+
+## Related Core Tables (Referenced, Not Owned by This Module)
+
+| Table | Key Column | Used For |
+|---|---|---|
+| `user` | `user_id` | All role assignments reference this |
+| `division` | `division_id` | Division Head and Supervisor tabs |
+| `salesman` | `id` | Salesman tab |
+
+---
+
+## Organizational Hierarchy
+
+```
+executive
+  └── division_sales_head  (division_id → division)
+        └── supervisor_per_division  (division_id → division, supervisor_id → user)
+              └── salesman_per_supervisor  (supervisor_per_division_id, salesman_id → salesman)
+```
+
+The `target_setting_approver` table is a separate concern — it manages who can approve target records, not the sales hierarchy itself.

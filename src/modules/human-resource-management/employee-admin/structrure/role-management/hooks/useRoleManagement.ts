@@ -28,6 +28,33 @@ export function useRoleManagement() {
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  // --- Granular fetch helpers (only refetch what changed) ---
+  const fetchExecutives = useCallback(async () => {
+    const ex = await provider.listExecutives();
+    setExecutives(ex);
+  }, []);
+
+  const fetchReviewCommittee = useCallback(async () => {
+    const rc = await provider.listReviewCommittee();
+    setReviewCommittee(rc);
+  }, []);
+
+  const fetchDivisionHeads = useCallback(async () => {
+    const dh = await provider.listDivisionHeads();
+    setDivisionHeads(dh);
+  }, []);
+
+  const fetchSupervisors = useCallback(async () => {
+    const sup = await provider.listSupervisors();
+    setSupervisors(sup);
+  }, []);
+
+  const fetchSalesmanAssignments = useCallback(async () => {
+    const sa = await provider.listSalesmanAssignments();
+    setSalesmanAssignments(sa);
+  }, []);
+
+  // --- Full initial load (all 8 in parallel) ---
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setIsError(false);
@@ -40,7 +67,7 @@ export function useRoleManagement() {
         provider.listSalesmanAssignments(),
         provider.listUsers(),
         provider.listDivisions(),
-        provider.listSalesmen()
+        provider.listSalesmen(),
       ]);
 
       setExecutives(ex);
@@ -63,55 +90,56 @@ export function useRoleManagement() {
     fetchData();
   }, [fetchData]);
 
-  // Mutations
+  // --- Mutations: each only refetches its affected table(s) ---
   const createExecutive = async (userId: number) => {
     await provider.createExecutive(userId);
-    await fetchData();
+    await fetchExecutives();
   };
 
   const deleteExecutive = async (id: number) => {
     await provider.deleteExecutive(id);
-    await fetchData();
+    await fetchExecutives();
   };
 
   const createReviewCommittee = async (data: Partial<ReviewCommittee>) => {
     await provider.createReviewCommittee(data);
-    await fetchData();
+    await fetchReviewCommittee();
   };
 
   const deleteReviewCommittee = async (id: number) => {
     await provider.deleteReviewCommittee(id);
-    await fetchData();
+    await fetchReviewCommittee();
   };
 
   const createDivisionHead = async (divisionId: number, userId: number) => {
     await provider.createDivisionHead(divisionId, userId);
-    await fetchData();
+    await fetchDivisionHeads();
   };
 
   const deleteDivisionHead = async (id: number) => {
     await provider.deleteDivisionHead(id);
-    await fetchData();
+    await fetchDivisionHeads();
   };
 
   const createSupervisor = async (divisionId: number, supervisorId: number) => {
     await provider.createSupervisor(divisionId, supervisorId);
-    await fetchData();
+    await fetchSupervisors();
   };
 
   const deleteSupervisor = async (id: number) => {
     await provider.deleteSupervisor(id);
-    await fetchData();
+    // Cascade: supervisor delete also soft-deletes their salesmen, so refetch both
+    await Promise.all([fetchSupervisors(), fetchSalesmanAssignments()]);
   };
 
   const createSalesmanAssignment = async (supDivId: number, salesmanId: number) => {
     await provider.createSalesmanAssignment(supDivId, salesmanId);
-    await fetchData();
+    await fetchSalesmanAssignments();
   };
 
   const deleteSalesmanAssignment = async (id: number) => {
     await provider.deleteSalesmanAssignment(id);
-    await fetchData();
+    await fetchSalesmanAssignments();
   };
 
   return {
