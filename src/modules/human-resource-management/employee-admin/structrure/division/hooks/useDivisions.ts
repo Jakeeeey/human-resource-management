@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import type { DivisionWithRelations, User, Department } from "../types";
+import type { DivisionWithRelations, User, Department, BankAccount } from "../types";
 import { useDivisionFilterContext } from "../providers/DivisionFilterProvider";
 
 interface UseDivisionsReturn {
     divisions: DivisionWithRelations[];
     users: User[];
     departments: Department[];
+    bankAccounts: BankAccount[];
     isLoading: boolean;
     isError: boolean;
     error: Error | null;
@@ -23,15 +24,13 @@ export function useDivisions(): UseDivisionsReturn {
     const [allDivisions, setAllDivisions] = useState<DivisionWithRelations[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
     const hasLoadedRef = useRef(false);
 
-    // =========================
-    // FETCH
-    // =========================
     const fetchData = useCallback(async (showLoading = false) => {
         try {
             if (showLoading || !hasLoadedRef.current) {
@@ -55,6 +54,7 @@ export function useDivisions(): UseDivisionsReturn {
             setAllDivisions(data.divisions || []);
             setUsers(data.users || []);
             setDepartments(data.departments || []);
+            setBankAccounts(data.bank_accounts || []);
             hasLoadedRef.current = true;
 
         } catch (err) {
@@ -66,21 +66,16 @@ export function useDivisions(): UseDivisionsReturn {
         }
     }, []);
 
-    // first load
     useEffect(() => {
         fetchData(true);
     }, [fetchData]);
 
-    // silent focus refresh
     useEffect(() => {
         const handleFocus = () => fetchData(false);
         window.addEventListener("focus", handleFocus);
         return () => window.removeEventListener("focus", handleFocus);
     }, [fetchData]);
 
-    // =========================
-    // CLIENT FILTERING (FAST — no loading on typing)
-    // =========================
     const filteredDivisions = useMemo(() => {
         let result = allDivisions;
 
@@ -106,42 +101,82 @@ export function useDivisions(): UseDivisionsReturn {
         return result;
     }, [allDivisions, filters]);
 
-    // =========================
-    // CRUD
-    // =========================
+    // ✅ FIXED: Better error handling
     const createDivision = useCallback(async (data: any) => {
-        const res = await fetch("/api/hrm/employee-admin/structure/division", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error("Create failed");
-        await fetchData(true);
+        try {
+            console.log('Creating division with data:', data);
+
+            const res = await fetch("/api/hrm/employee-admin/structure/division", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                const errorMessage = errorData.message || errorData.error || `Server error: ${res.status} ${res.statusText}`;
+                console.error('Create division failed:', errorMessage, errorData);
+                throw new Error(errorMessage);
+            }
+
+            await fetchData(true);
+        } catch (err) {
+            console.error('Create division error:', err);
+            throw err;
+        }
     }, [fetchData]);
 
+    // ✅ FIXED: Better error handling
     const updateDivision = useCallback(async (id: number, data: any) => {
-        const res = await fetch("/api/hrm/employee-admin/structure/division", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ division_id: id, ...data }),
-        });
-        if (!res.ok) throw new Error("Update failed");
-        await fetchData(true);
+        try {
+            console.log('Updating division:', id, data);
+
+            const res = await fetch("/api/hrm/employee-admin/structure/division", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ division_id: id, ...data }),
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                const errorMessage = errorData.message || errorData.error || `Server error: ${res.status} ${res.statusText}`;
+                console.error('Update division failed:', errorMessage, errorData);
+                throw new Error(errorMessage);
+            }
+
+            await fetchData(true);
+        } catch (err) {
+            console.error('Update division error:', err);
+            throw err;
+        }
     }, [fetchData]);
 
     const deleteDivision = useCallback(async (id: number) => {
-        const res = await fetch(
-            `/api/hrm/employee-admin/structure/division?id=${id}`,
-            { method: "DELETE" }
-        );
-        if (!res.ok) throw new Error("Delete failed");
-        await fetchData(true);
+        try {
+            const res = await fetch(
+                `/api/hrm/employee-admin/structure/division?id=${id}`,
+                { method: "DELETE" }
+            );
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                const errorMessage = errorData.message || errorData.error || `Server error: ${res.status} ${res.statusText}`;
+                console.error('Delete division failed:', errorMessage, errorData);
+                throw new Error(errorMessage);
+            }
+
+            await fetchData(true);
+        } catch (err) {
+            console.error('Delete division error:', err);
+            throw err;
+        }
     }, [fetchData]);
 
     return {
         divisions: filteredDivisions,
         users,
         departments,
+        bankAccounts,
         isLoading,
         isError,
         error,

@@ -42,9 +42,13 @@ export interface DepartmentPerDivision {
 // ENRICHED TYPES (WITH JOINS)
 // ============================================================================
 
+export interface DepartmentWithBank extends Department {
+    bank_id: number | null;
+}
+
 export interface DivisionWithRelations extends Omit<Division, "division_head"> {
     division_head_user?: User | null; // Joined user
-    departments?: Department[]; // Joined departments via junction
+    departments?: DepartmentWithBank[]; // Joined departments via junction
     department_count?: number; // Count of departments
 }
 
@@ -64,15 +68,20 @@ export interface DivisionFilters {
 // FORM TYPES (For CRUD)
 // ============================================================================
 
+export interface DepartmentAssignment {
+    department_id: number;
+    bank_id: number | null;
+}
+
 export interface DivisionFormData {
     division_name: string;
     division_code: string;
     division_head_id: number; // User ID
     division_description: string;
-    department_ids: number[]; // Array of department IDs
+    department_assignments: DepartmentAssignment[]; // Array of department assignments
 }
 
-export interface CreateDivisionData extends DivisionFormData {}
+export interface CreateDivisionData extends DivisionFormData { }
 
 export interface UpdateDivisionData extends Partial<DivisionFormData> {
     division_id: number;
@@ -82,10 +91,20 @@ export interface UpdateDivisionData extends Partial<DivisionFormData> {
 // API RESPONSE TYPES
 // ============================================================================
 
+export interface BankAccount {
+    bank_id: number;
+    bank_name: string;
+    account_number: string;
+    bank_description: string;
+    branch: string;
+    is_active: boolean;
+}
+
 export interface DivisionsAPIResponse {
     divisions: DivisionWithRelations[];
     users: User[];
     departments: Department[];
+    bank_accounts: BankAccount[];
     metadata: {
         total: number;
         lastUpdated: string;

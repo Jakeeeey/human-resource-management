@@ -19,6 +19,7 @@ function DivisionModuleContent() {
         divisions,
         users,
         departments,
+        bankAccounts,
         isLoading,
         isError,
         error,
@@ -100,6 +101,7 @@ function DivisionModuleContent() {
                 data={divisions}
                 users={users}
                 departments={departments}
+                bankAccounts={bankAccounts}
                 isLoading={isLoading}
                 onCreateDivision={handleCreate}
                 onUpdateDivision={handleUpdate}

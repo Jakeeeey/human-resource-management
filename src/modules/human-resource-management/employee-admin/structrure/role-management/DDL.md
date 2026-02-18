@@ -52,12 +52,18 @@ CREATE TABLE supervisor_per_division (
 
 ### salesman_per_supervisor
 ```sql
-CREATE TABLE salesman_per_supervisor (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  salesman_id INT NOT NULL, -- Links to salesman table
-  supervisor_per_division_id INT NOT NULL,
-  created_by INT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  is_deleted INT DEFAULT 0
-);
+CREATE TABLE `target_setting_approver` (
+	`id` INT NOT NULL AUTO_INCREMENT,
+	`approver_id` INT NULL DEFAULT NULL,
+	`is_deleted` TINYINT NULL DEFAULT '0',
+	`created_by` INT NULL DEFAULT NULL,
+	`created_at` DATETIME NULL DEFAULT NULL,
+	PRIMARY KEY (`id`) USING BTREE,
+	INDEX `FK_approver_user_idx` (`approver_id`) USING BTREE,
+	CONSTRAINT `FK_approval_approver` FOREIGN KEY (`approver_id`) REFERENCES `user` (`user_id`) ON UPDATE NO ACTION ON DELETE NO ACTION
+)
+COLLATE='utf8mb4_0900_ai_ci'
+ENGINE=InnoDB
+AUTO_INCREMENT=16
+;
 ```

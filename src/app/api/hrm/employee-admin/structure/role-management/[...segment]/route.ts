@@ -26,23 +26,36 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
   // Specific field selection for better performance
   switch (segment) {
     case "executives":
-      upstreamPath = id ? `/items/executive/${id}` : "/items/executive?filter[is_deleted][_eq]=0&fields=*.*,user_id.*";
+      upstreamPath = "/items/executive?fields=id,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_email,user_id.user_position,created_at,is_deleted&limit=200";
       break;
     case "review-committees":
-      // Simplified fields for review committee
-      upstreamPath = id ? `/items/target_setting_approver/${id}` : "/items/target_setting_approver?filter[is_deleted][_eq]=0&fields=*.*,approver_id.*";
+      upstreamPath = "/items/target_setting_approver?fields=id,approver_id.user_id,approver_id.user_fname,approver_id.user_lname,approver_id.user_email,approver_id.user_position,is_deleted,created_at&limit=200";
       break;
     case "division-heads":
-      upstreamPath = id ? `/items/division_sales_head/${id}` : "/items/division_sales_head?filter[is_deleted][_eq]=0&fields=*.*,division_id.*,user_id.*";
+      upstreamPath = "/items/division_sales_head?fields=id,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_email,user_id.user_position,division_id.division_id,division_id.division_name,created_at,is_deleted&limit=200";
       break;
     case "supervisors":
-      upstreamPath = id ? `/items/supervisor_per_division/${id}` : "/items/supervisor_per_division?filter[is_deleted][_eq]=0&fields=*.*,division_id.*,supervisor_id.*";
+      upstreamPath = "/items/supervisor_per_division?fields=id,supervisor_id.user_id,supervisor_id.user_fname,supervisor_id.user_lname,supervisor_id.user_email,supervisor_id.user_position,division_id.division_id,division_id.division_name,is_deleted&limit=500";
       break;
     case "salesman-assignments":
-      upstreamPath = id ? `/items/salesman_per_supervisor/${id}` : "/items/salesman_per_supervisor?filter[is_deleted][_eq]=0&fields=*.*,salesman_id.*,supervisor_per_division_id.*,supervisor_per_division_id.supervisor_id.*";
+      upstreamPath = "/items/salesman_per_supervisor?fields=id,salesman_id.id,salesman_id.salesman_name,salesman_id.salesman_code,supervisor_per_division_id.id,supervisor_per_division_id.division_id.division_id,supervisor_per_division_id.division_id.division_name,supervisor_per_division_id.supervisor_id.user_id,supervisor_per_division_id.supervisor_id.user_fname,supervisor_per_division_id.supervisor_id.user_lname,is_deleted&limit=1000";
       break;
     case "users":
-      upstreamPath = "/items/user?limit=1000&fields=*.*";
+      upstreamPath = "/items/user?fields=user_id,user_fname,user_mname,user_lname,user_email,user_position&limit=500";
+      break;
+    case "divisions":
+      upstreamPath = "/items/division?fields=division_id,division_name,division_code&limit=200";
+      break;
+    case "salesmen":
+      upstreamPath = "/items/salesman?fields=id,salesman_name,salesman_code&limit=500";
+      break;
+    default:
+      // Fallback for sub-resources or IDs
+      if (segment.startsWith("executives/")) upstreamPath = `/items/executive/${segments[1]}`;
+      else if (segment.startsWith("division-heads/")) upstreamPath = `/items/division_sales_head/${segments[1]}`;
+      else if (segment.startsWith("supervisors/")) upstreamPath = `/items/supervisor_per_division/${segments[1]}`;
+      else if (segment.startsWith("salesman-assignments/")) upstreamPath = `/items/salesman_per_supervisor/${segments[1]}`;
+      else if (segment.startsWith("review-committees/")) upstreamPath = `/items/target_setting_approver/${segments[1]}`;
       break;
     case "divisions":
       upstreamPath = "/items/division?limit=100&fields=*.*";
@@ -75,10 +88,55 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ seg
   return handleMutation(req, segments, "POST");
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ segment: string[] }> }) {
-  const { segment: segments } = await params;
-  return handleMutation(req, segments, "PATCH");
-}
+  // 1. Convert DELETE to PATCH for soft delete
+  if (method === "DELETE") {
+    method = "PATCH";
+    body = JSON.stringify({ is_deleted: 1 });
+
+    // Cascade: if deleting a supervisor_per_division record,
+    // also soft-delete all salesman_per_supervisor rows that belong to it.
+    if (segments[0] === "supervisors" && segments[1]) {
+      const supervisorPerDivisionId = segments[1];
+      const base = UPSTREAM_BASE!.replace(/\/+$/, "");
+
+      try {
+        // Step 1: Fetch all active salesman_per_supervisor rows for this supervisor_per_division_id
+        const fetchUrl = `${base}/items/salesman_per_supervisor?filter[supervisor_per_division_id][_eq]=${supervisorPerDivisionId}&filter[is_deleted][_eq]=0&fields=id&limit=-1`;
+        console.log(`[Proxy] CASCADE: fetching salesmen for supervisor_per_division_id=${supervisorPerDivisionId}`);
+        const fetchRes = await fetch(fetchUrl, {
+          method: "GET",
+          headers: { "content-type": "application/json" },
+        });
+
+        if (fetchRes.ok) {
+          const fetchJson = await fetchRes.json();
+          const salesmanRows: { id: number }[] = fetchJson.data ?? fetchJson ?? [];
+          const ids = salesmanRows.map((r) => r.id);
+
+          if (ids.length > 0) {
+            // Step 2: Bulk soft-delete using Directus array-body PATCH
+            // Format: PATCH /items/salesman_per_supervisor  body: [{ id, is_deleted: 1 }, ...]
+            const bulkBody = ids.map((id) => ({ id, is_deleted: 1 }));
+            console.log(`[Proxy] CASCADE: soft-deleting ${ids.length} salesman assignment(s): [${ids.join(", ")}]`);
+            await fetch(`${base}/items/salesman_per_supervisor`, {
+              method: "PATCH",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(bulkBody),
+            });
+          } else {
+            console.log(`[Proxy] CASCADE: no active salesman assignments found for supervisor_per_division_id=${supervisorPerDivisionId}`);
+          }
+        } else {
+          console.warn(`[Proxy] CASCADE: failed to fetch salesman assignments (status ${fetchRes.status})`);
+        }
+      } catch (cascadeError) {
+        console.error(`[Proxy] Cascade soft-delete failed:`, cascadeError);
+        // Non-fatal: still proceed with the supervisor soft-delete
+      }
+    }
+  } else {
+    body = ["GET", "HEAD"].includes(method) ? undefined : await req.arrayBuffer();
+  }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ segment: string[] }> }) {
   const { segment: segments } = await params;

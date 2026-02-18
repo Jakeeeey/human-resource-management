@@ -29,27 +29,36 @@ export function useRoleManagement() {
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // --- Granular Fetch Functions ---
-
+  // --- Granular fetch helpers (only refetch what changed) ---
   const fetchExecutives = useCallback(async () => {
-    try {
-      const data = await provider.listExecutives();
-      setExecutives(data);
-    } catch (err) {
-      console.error("Failed to fetch executives", err);
-    }
+    const ex = await provider.listExecutives();
+    setExecutives(ex);
   }, []);
 
   const fetchReviewCommittee = useCallback(async () => {
-    try {
-      const data = await provider.listReviewCommittee();
-      setReviewCommittee(data);
-    } catch (err) {
-      console.error("Failed to fetch review committee", err);
-    }
+    const rc = await provider.listReviewCommittee();
+    setReviewCommittee(rc);
   }, []);
 
   const fetchDivisionHeads = useCallback(async () => {
+    const dh = await provider.listDivisionHeads();
+    setDivisionHeads(dh);
+  }, []);
+
+  const fetchSupervisors = useCallback(async () => {
+    const sup = await provider.listSupervisors();
+    setSupervisors(sup);
+  }, []);
+
+  const fetchSalesmanAssignments = useCallback(async () => {
+    const sa = await provider.listSalesmanAssignments();
+    setSalesmanAssignments(sa);
+  }, []);
+
+  // --- Full initial load (all 8 in parallel) ---
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setIsError(false);
     try {
       const data = await provider.listDivisionHeads();
       setDivisionHeads(data);
@@ -81,7 +90,7 @@ export function useRoleManagement() {
       const [u, d, s] = await Promise.all([
         provider.listUsers(),
         provider.listDivisions(),
-        provider.listSalesmen()
+        provider.listSalesmen(),
       ]);
       setUsers(u);
       setDivisions(d);
@@ -116,130 +125,56 @@ export function useRoleManagement() {
     fetchData();
   }, [fetchData]);
 
-  // --- Mutations with Granular Refetch ---
-
+  // --- Mutations: each only refetches its affected table(s) ---
   const createExecutive = async (userId: number) => {
-    try {
-      await provider.createExecutive(userId);
-      await fetchExecutives(); // Only refetch executives
-      toast.success("Executive assigned successfully");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to assign executive");
-      throw err;
-    }
+    await provider.createExecutive(userId);
+    await fetchExecutives();
   };
 
   const deleteExecutive = async (id: number) => {
-    try {
-      await provider.deleteExecutive(id);
-      await fetchExecutives(); // Only refetch executives
-      toast.success("Executive removed successfully");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to remove executive");
-      throw err;
-    }
+    await provider.deleteExecutive(id);
+    await fetchExecutives();
   };
 
-  const createReviewCommittee = async (payload: Partial<ReviewCommittee>) => {
-    try {
-      await provider.createReviewCommittee(payload);
-      await fetchReviewCommittee(); // Only refetch review committee
-      toast.success("Review committee member added");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to add review committee member");
-      throw err;
-    }
+  const createReviewCommittee = async (data: Partial<ReviewCommittee>) => {
+    await provider.createReviewCommittee(data);
+    await fetchReviewCommittee();
   };
 
   const deleteReviewCommittee = async (id: number) => {
-    try {
-      await provider.deleteReviewCommittee(id);
-      await fetchReviewCommittee(); // Only refetch review committee
-      toast.success("Review committee member removed");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to remove review committee member");
-      throw err;
-    }
+    await provider.deleteReviewCommittee(id);
+    await fetchReviewCommittee();
   };
 
   const createDivisionHead = async (divisionId: number, userId: number) => {
-    try {
-      await provider.createDivisionHead(divisionId, userId);
-      await fetchDivisionHeads(); // Only refetch division heads
-      toast.success("Division head assigned");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to assign division head");
-      throw err;
-    }
+    await provider.createDivisionHead(divisionId, userId);
+    await fetchDivisionHeads();
   };
 
   const deleteDivisionHead = async (id: number) => {
-    try {
-      await provider.deleteDivisionHead(id);
-      await fetchDivisionHeads(); // Only refetch division heads
-      toast.success("Division head removed");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to remove division head");
-      throw err;
-    }
+    await provider.deleteDivisionHead(id);
+    await fetchDivisionHeads();
   };
 
   const createSupervisor = async (divisionId: number, supervisorId: number) => {
-    try {
-      await provider.createSupervisor(divisionId, supervisorId);
-      await fetchSupervisors(); // Only refetch supervisors
-      toast.success("Supervisor assigned");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to assign supervisor");
-      throw err;
-    }
+    await provider.createSupervisor(divisionId, supervisorId);
+    await fetchSupervisors();
   };
 
   const deleteSupervisor = async (id: number) => {
-    try {
-      await provider.deleteSupervisor(id);
-      // Supervisor delete cascades to assignments, so fetch both
-      await Promise.all([
-        fetchSupervisors(),
-        fetchSalesmanAssignments()
-      ]);
-      toast.success("Supervisor removed (and linked salesmen unassigned)");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to remove supervisor");
-      throw err;
-    }
+    await provider.deleteSupervisor(id);
+    // Cascade: supervisor delete also soft-deletes their salesmen, so refetch both
+    await Promise.all([fetchSupervisors(), fetchSalesmanAssignments()]);
   };
 
-  const createSalesmanAssignment = async (supervisorPerDivisionId: number, salesmanId: number) => {
-    try {
-      await provider.createSalesmanAssignment(supervisorPerDivisionId, salesmanId);
-      await fetchSalesmanAssignments(); // Only refetch assignments
-      toast.success("Salesman assigned successfully");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to assign salesman");
-      throw err;
-    }
+  const createSalesmanAssignment = async (supDivId: number, salesmanId: number) => {
+    await provider.createSalesmanAssignment(supDivId, salesmanId);
+    await fetchSalesmanAssignments();
   };
 
   const deleteSalesmanAssignment = async (id: number) => {
-    try {
-      await provider.deleteSalesmanAssignment(id);
-      await fetchSalesmanAssignments(); // Only refetch assignments
-      toast.success("Salesman unassigned successfully");
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to unassign salesman");
-      throw err;
-    }
+    await provider.deleteSalesmanAssignment(id);
+    await fetchSalesmanAssignments();
   };
 
   return {
