@@ -19,7 +19,6 @@ import { Card } from "@/components/ui/card";
 import { TablePagination, usePagination } from "./TablePagination";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 import { Badge } from "@/components/ui/badge";
-import { TablePagination, usePagination } from "./TablePagination";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
 const getDivision = (val: number | Division | undefined) => typeof val === 'object' ? val : null;
@@ -35,6 +34,7 @@ interface SupervisorTabProps {
 
 export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divisions }: SupervisorTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
   const pagination = usePagination(data, 5);
 
   if (isLoading) {
