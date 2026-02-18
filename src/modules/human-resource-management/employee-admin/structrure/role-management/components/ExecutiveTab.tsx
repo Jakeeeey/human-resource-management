@@ -17,6 +17,7 @@ import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TablePagination, usePagination } from "./TablePagination";
+import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
 
@@ -30,6 +31,7 @@ interface ExecutiveTabProps {
 
 export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: ExecutiveTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
   const pagination = usePagination(data, 5);
 
   if (isLoading) {

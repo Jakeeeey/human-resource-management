@@ -55,35 +55,7 @@ export function useRoleManagement() {
     setSalesmanAssignments(sa);
   }, []);
 
-  // --- Full initial load (all 8 in parallel) ---
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setIsError(false);
-    try {
-      const data = await provider.listDivisionHeads();
-      setDivisionHeads(data);
-    } catch (err) {
-      console.error("Failed to fetch division heads", err);
-    }
-  }, []);
 
-  const fetchSupervisors = useCallback(async () => {
-    try {
-      const data = await provider.listSupervisors();
-      setSupervisors(data);
-    } catch (err) {
-      console.error("Failed to fetch supervisors", err);
-    }
-  }, []);
-
-  const fetchSalesmanAssignments = useCallback(async () => {
-    try {
-      const data = await provider.listSalesmanAssignments();
-      setSalesmanAssignments(data);
-    } catch (err) {
-      console.error("Failed to fetch salesman assignments", err);
-    }
-  }, []);
 
   const fetchReferenceData = useCallback(async () => {
     try {
@@ -127,54 +99,124 @@ export function useRoleManagement() {
 
   // --- Mutations: each only refetches its affected table(s) ---
   const createExecutive = async (userId: number) => {
-    await provider.createExecutive(userId);
-    await fetchExecutives();
+    try {
+      await provider.createExecutive(userId);
+      await fetchExecutives();
+      toast.success("Executive assigned successfully");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to assign executive");
+      throw err;
+    }
   };
 
   const deleteExecutive = async (id: number) => {
-    await provider.deleteExecutive(id);
-    await fetchExecutives();
+    try {
+      await provider.deleteExecutive(id);
+      await fetchExecutives();
+      toast.success("Executive removed successfully");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to remove executive");
+      throw err;
+    }
   };
 
   const createReviewCommittee = async (data: Partial<ReviewCommittee>) => {
-    await provider.createReviewCommittee(data);
-    await fetchReviewCommittee();
+    try {
+      await provider.createReviewCommittee(data);
+      await fetchReviewCommittee();
+      toast.success("Review committee member added");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to add review committee member");
+      throw err;
+    }
   };
 
   const deleteReviewCommittee = async (id: number) => {
-    await provider.deleteReviewCommittee(id);
-    await fetchReviewCommittee();
+    try {
+      await provider.deleteReviewCommittee(id);
+      await fetchReviewCommittee();
+      toast.success("Review committee member removed");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to remove review committee member");
+      throw err;
+    }
   };
 
   const createDivisionHead = async (divisionId: number, userId: number) => {
-    await provider.createDivisionHead(divisionId, userId);
-    await fetchDivisionHeads();
+    try {
+      await provider.createDivisionHead(divisionId, userId);
+      await fetchDivisionHeads();
+      toast.success("Division head assigned");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to assign division head");
+      throw err;
+    }
   };
 
   const deleteDivisionHead = async (id: number) => {
-    await provider.deleteDivisionHead(id);
-    await fetchDivisionHeads();
+    try {
+      await provider.deleteDivisionHead(id);
+      await fetchDivisionHeads();
+      toast.success("Division head removed");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to remove division head");
+      throw err;
+    }
   };
 
   const createSupervisor = async (divisionId: number, supervisorId: number) => {
-    await provider.createSupervisor(divisionId, supervisorId);
-    await fetchSupervisors();
+    try {
+      await provider.createSupervisor(divisionId, supervisorId);
+      await fetchSupervisors();
+      toast.success("Supervisor assigned");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to assign supervisor");
+      throw err;
+    }
   };
 
   const deleteSupervisor = async (id: number) => {
-    await provider.deleteSupervisor(id);
-    // Cascade: supervisor delete also soft-deletes their salesmen, so refetch both
-    await Promise.all([fetchSupervisors(), fetchSalesmanAssignments()]);
+    try {
+      await provider.deleteSupervisor(id);
+      // Cascade: supervisor delete also soft-deletes their salesmen, so refetch both
+      await Promise.all([fetchSupervisors(), fetchSalesmanAssignments()]);
+      toast.success("Supervisor removed (and linked salesmen unassigned)");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to remove supervisor");
+      throw err;
+    }
   };
 
   const createSalesmanAssignment = async (supDivId: number, salesmanId: number) => {
-    await provider.createSalesmanAssignment(supDivId, salesmanId);
-    await fetchSalesmanAssignments();
+    try {
+      await provider.createSalesmanAssignment(supDivId, salesmanId);
+      await fetchSalesmanAssignments();
+      toast.success("Salesman assigned successfully");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to assign salesman");
+      throw err;
+    }
   };
 
   const deleteSalesmanAssignment = async (id: number) => {
-    await provider.deleteSalesmanAssignment(id);
-    await fetchSalesmanAssignments();
+    try {
+      await provider.deleteSalesmanAssignment(id);
+      await fetchSalesmanAssignments();
+      toast.success("Salesman unassigned successfully");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to unassign salesman");
+      throw err;
+    }
   };
 
   return {
