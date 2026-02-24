@@ -14,6 +14,7 @@ export interface User {
     user_lname: string;
     user_mname?: string | null;
     user_email?: string;
+    user_department?: number;
     is_deleted?: { data: number[] } | null;
 }
 
@@ -78,7 +79,7 @@ export interface DepartmentFormData {
     positions: string[];
 }
 
-export interface CreateDepartmentData extends DepartmentFormData {}
+export interface CreateDepartmentData extends DepartmentFormData { }
 
 export interface UpdateDepartmentData extends Partial<DepartmentFormData> {
     department_id: number;

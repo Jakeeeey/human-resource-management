@@ -54,7 +54,7 @@ export const fetchAllDivisions = () =>
 
 export async function fetchAllUsers(): Promise<User[]> {
     const res = await fetch(
-        `${DIRECTUS_URL}/items/${COLLECTIONS.USERS}?fields=user_id,user_fname,user_lname,user_email`,
+        `${DIRECTUS_URL}/items/${COLLECTIONS.USERS}?fields=user_id,user_fname,user_lname,user_email,user_department`,
         { cache: "no-store" }
     );
 
