@@ -38,12 +38,12 @@ const data = {
             title: "Employee Admin",
             url: "#",
             icon: Users,
+            isActive: false,
             items: [
                 {
                     title: "Employee Master List",
                     url: "/hrm/employee-admin/employee-master-list",
                     icon: UserRound,
-                    isActive: true,
                 },
                 {
                     title: "Administrator",
@@ -100,6 +100,25 @@ const data = {
                     ],
                 },
             ],
+        },
+        {
+            title: "File Management",
+            url: "#",
+            icon: Users,
+            isActive: false,
+            items: [
+                {
+                    title: "Employee File Record Type",
+                    url: "/hrm/file-management/employee-file-record-type",
+                    icon: Shield,
+                },
+                {
+                    title: "Employee File Record List",
+                    url: "/hrm/file-management/employee-file-record-list",
+                    icon: Shield,
+                },
+            ],
+
         },
     ],
 };
