@@ -55,6 +55,11 @@ const data = {
                             url: "/hrm/employee-admin/administrator/department-schedule",
                             icon: CalendarClock,
                         },
+                        {
+                            title: "On Call",
+                            url: "/hrm/employee-admin/administrator/on-call",
+                            icon: CalendarClock,
+                        },
                     ],
                 },
                 {
