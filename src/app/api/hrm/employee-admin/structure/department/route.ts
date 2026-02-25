@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const DIRECTUS_URL = "http://100.110.197.61:8056";
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+if (!DIRECTUS_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined in environment variables");
+}
 const LIMIT = 1000;
 
 async function dFetch(path: string, options?: RequestInit) {
