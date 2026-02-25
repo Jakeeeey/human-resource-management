@@ -99,6 +99,18 @@ const data = {
                         },
                     ],
                 },
+                {
+                    title: "Approval",
+                    url: "#",
+                    icon: Shield,
+                    items: [
+                        {
+                            title: "Overtime Request",
+                            url: "/hrm/employee-admin/approval/overtime-request",
+                            icon: CalendarClock,
+                        },
+                    ],
+                },
             ],
         },
         {
