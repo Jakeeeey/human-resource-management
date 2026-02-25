@@ -5,8 +5,9 @@
 
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Loader2 } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -66,13 +67,14 @@ interface DepartmentScheduleDialogProps {
 // ============================================================================
 
 export function DepartmentScheduleDialog({
-                                             open,
-                                             onOpenChange,
-                                             schedule,
-                                             departments,
-                                             onSubmit,
-                                         }: DepartmentScheduleDialogProps) {
+    open,
+    onOpenChange,
+    schedule,
+    departments,
+    onSubmit,
+}: DepartmentScheduleDialogProps) {
     const isEdit = !!schedule;
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const form = useForm<ScheduleFormData>({
         defaultValues: {
@@ -117,6 +119,7 @@ export function DepartmentScheduleDialog({
     }, [open, schedule, form]);
 
     const handleSubmit = async (data: ScheduleFormData) => {
+        setIsSubmitting(true);
         try {
             await onSubmit({
                 department_id: parseInt(data.department_id, 10),
@@ -133,6 +136,8 @@ export function DepartmentScheduleDialog({
             form.reset();
         } catch (error) {
             console.error("Error submitting schedule:", error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -349,7 +354,8 @@ export function DepartmentScheduleDialog({
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit">
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isEdit ? "Update" : "Create"} Schedule
                             </Button>
                         </DialogFooter>

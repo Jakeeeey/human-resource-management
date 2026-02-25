@@ -5,8 +5,9 @@
 
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Loader2 } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -34,7 +35,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type {DepartmentWithRelations, User} from "../types";
+import type { DepartmentWithRelations, User } from "../types";
 import { SingleDatePicker } from "@/modules/human-resource-management/employee-admin/structrure/department/components/SingleDatePicker";
 
 
@@ -63,13 +64,14 @@ interface DepartmentDialogProps {
 // ============================================================================
 
 export function DepartmentDialog({
-                                     open,
-                                     onOpenChange,
-                                     department,
-                                     users,
-                                     onSubmit,
-                                 }: DepartmentDialogProps) {
+    open,
+    onOpenChange,
+    department,
+    users,
+    onSubmit,
+}: DepartmentDialogProps) {
     const isEdit = !!department;
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const form = useForm<DepartmentFormData>({
         defaultValues: {
@@ -105,6 +107,7 @@ export function DepartmentDialog({
     }, [open, department, form]);
 
     const handleSubmit = async (data: DepartmentFormData) => {
+        setIsSubmitting(true);
         try {
             // ✅ Fixed: Convert string values to numbers for API
             await onSubmit({
@@ -118,6 +121,8 @@ export function DepartmentDialog({
             form.reset();
         } catch (error) {
             console.error("Error submitting department:", error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -276,7 +281,8 @@ export function DepartmentDialog({
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit">
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isEdit ? "Update" : "Create"} Department
                             </Button>
                         </DialogFooter>

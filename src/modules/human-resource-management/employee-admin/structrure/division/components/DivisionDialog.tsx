@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Loader2 } from "lucide-react";
 
 import {
     Dialog, DialogContent, DialogDescription,
@@ -78,8 +79,8 @@ export function DivisionDialog({
     bankAccounts,
     onSubmit,
 }: DivisionDialogProps) {
-
     const isEdit = !!division;
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const form = useForm<DivisionFormData>({
         defaultValues: {
@@ -172,37 +173,40 @@ export function DivisionDialog({
     // =============================
 
     const handleSubmit = async (data: DivisionFormData) => {
-    try {
-        if (assignments.length === 0) {
-            form.setError("root", {
-                message: "Please select at least one department"
-            });
-            return;
+        setIsSubmitting(true);
+        try {
+            if (assignments.length === 0) {
+                form.setError("root", {
+                    message: "Please select at least one department"
+                });
+                return;
+            }
+
+            const payload = {
+                division_name: data.division_name,
+                division_code: data.division_code,
+                division_head_id: parseInt(data.division_head_id, 10),
+                division_description: data.division_description,
+                date_added: data.date_added?.toISOString(),
+                department_assignments: assignments,
+            };
+
+            // ✅ Log what we're sending
+            console.log('Submitting division:', payload);
+
+            await onSubmit(payload);
+
+            onOpenChange(false);
+            form.reset();
+            setAssignments([]);
+
+        } catch (error) {
+            // ✅ Log the actual error
+            console.error("Error submitting division:", error);
+        } finally {
+            setIsSubmitting(false);
         }
-
-        const payload = {
-            division_name: data.division_name,
-            division_code: data.division_code,
-            division_head_id: parseInt(data.division_head_id, 10),
-            division_description: data.division_description,
-            date_added: data.date_added?.toISOString(),
-            department_assignments: assignments,
-        };
-
-        // ✅ Log what we're sending
-        console.log('Submitting division:', payload);
-
-        await onSubmit(payload);
-
-        onOpenChange(false);
-        form.reset();
-        setAssignments([]);
-
-    } catch (error) {
-        // ✅ Log the actual error
-        console.error("Error submitting division:", error);
-    }
-};
+    };
 
 
     // Helper to get department name
@@ -437,7 +441,8 @@ export function DivisionDialog({
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit">
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isEdit ? "Update" : "Create"} Division
                             </Button>
                         </DialogFooter>
