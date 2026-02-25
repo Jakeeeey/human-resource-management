@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Human Resource Management System (VOS)
 
-## Getting Started
+Modern and responsive HR Management system built with Next.js 15, React 19, and Tailwind CSS.
 
-First, run the development server:
+---
+
+## 🚀 Getting Started
+
+Follow these steps to set up the project locally:
+
+### 1. Installation
+
+After cloning the repository, install the necessary dependencies using NPM:
+
+```bash
+npm install
+```
+
+### 2. Environment Configuration
+
+Create a file named `.env.local` in the root directory of the project and paste the following configuration. Adjust the values as needed for your local or live environments:
+
+```env
+# UI-only development
+NEXT_PUBLIC_AUTH_DISABLED=false
+
+# --- Directus API Configuration ---
+# Dummy Directus
+NEXT_PUBLIC_API_BASE_URL=
+
+# Live Directus
+# NEXT_PUBLIC_API_BASE_URL=
+
+# --- Spring Boot API Configuration ---
+# Jerico Spring Boot
+# SPRING_API_BASE_URL=
+
+# PC Spring Boot
+# SPRING_API_BASE_URL=
+
+# Sir Andrei Spring Boot
+# SPRING_API_BASE_URL=
+
+# Jake Spring Boot
+# SPRING_API_BASE_URL=
+
+# --- Auth Configuration ---
+# Dummy Directus
+DIRECTUS_STATIC_TOKEN=
+
+# Live Directus
+# DIRECTUS_STATIC_TOKEN=
+```
+
+> [!IMPORTANT]
+> Make sure to never commit your `.env.local` file to the repository. It is already included in `.gitignore`.
+
+### 3. Run Development Server
+
+Once the installation and environment setup are complete, you can start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠 Tech Stack
 
-## Learn More
+- **Framework**: [Next.js 16 (App Router)](https://nextjs.org/)
+- **Library**: [React 19](https://react.dev/)
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
+- **State & Forms**: [React Hook Form](https://react-hook-form.com/), [Zod](https://zod.dev/)
+- **UI Components**: [Radix UI](https://www.radix-ui.com/), [Lucide Icons](https://lucide.dev/)
+- **Tables**: [TanStack Table](https://tanstack.com/table)
+- **Charts**: [Recharts](https://recharts.org/)
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
