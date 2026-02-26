@@ -131,7 +131,7 @@ export interface DirectusResponse<T> {
 /**
  * Get full name from user object
  */
-export function getUserFullName(user: User | undefined): string {
+export function getUserFullName(user: User | null | undefined): string {
     if (!user) return "Not assigned";
 
     const parts = [user.user_fname, user.user_mname, user.user_lname]

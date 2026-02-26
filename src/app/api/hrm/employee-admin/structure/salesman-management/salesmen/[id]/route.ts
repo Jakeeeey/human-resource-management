@@ -4,9 +4,12 @@ import { directusFetch } from "../../_lib";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
   try {
-    const id = ctx.params.id;
+    const { id } = await context.params;
 
     const body = await req.json();
     const payload = body?.data;
