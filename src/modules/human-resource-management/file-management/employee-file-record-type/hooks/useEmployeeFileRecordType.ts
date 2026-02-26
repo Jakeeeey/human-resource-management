@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import type { EmployeeFileRecordType } from "../types";
-import { useEmployeeFileRecordTypeFilterContext } from "../providers/fetchProvider";
+import { useEmployeeFileRecordTypeFilterContext } from "../providers/filterProvider";
+import { useEmployeeFileRecordTypeFetchContext } from "../providers/fetchProvider";
 
 interface UseEmployeeFileRecordTypeReturn {
     records: EmployeeFileRecordType[];
@@ -17,37 +18,16 @@ interface UseEmployeeFileRecordTypeReturn {
 
 export function useEmployeeFileRecordType(): UseEmployeeFileRecordTypeReturn {
     const { filters } = useEmployeeFileRecordTypeFilterContext();
-
-    const [allRecords, setAllRecords] = useState<EmployeeFileRecordType[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isError, setIsError] = useState(false);
-    const [error, setError] = useState<Error | null>(null);
-
-    const fetchData = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            setIsError(false);
-
-            const res = await fetch(
-                "/api/hrm/file-management/employee-file-record-type",
-                { cache: "no-store" }
-            );
-
-            if (!res.ok) throw new Error("Fetch failed");
-
-            const data = await res.json();
-            setAllRecords(data.records || []);
-        } catch (err: any) {
-            setIsError(true);
-            setError(err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    const {
+        allRecords,
+        isLoading,
+        isError,
+        error,
+        refetch,
+        createRecord,
+        updateRecord,
+        deleteRecord,
+    } = useEmployeeFileRecordTypeFetchContext();
 
     const records = useMemo(() => {
         let result = allRecords;
@@ -74,56 +54,12 @@ export function useEmployeeFileRecordType(): UseEmployeeFileRecordTypeReturn {
         return result;
     }, [allRecords, filters]);
 
-    const createRecord = useCallback(
-        async (data: any) => {
-            const res = await fetch(
-                "/api/hrm/file-management/employee-file-record-type",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(data),
-                }
-            );
-            if (!res.ok) throw new Error("Create failed");
-            await fetchData();
-        },
-        [fetchData]
-    );
-
-    const updateRecord = useCallback(
-        async (id: number, data: any) => {
-            const res = await fetch(
-                "/api/hrm/file-management/employee-file-record-type",
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id, ...data }),
-                }
-            );
-            if (!res.ok) throw new Error("Update failed");
-            await fetchData();
-        },
-        [fetchData]
-    );
-
-    const deleteRecord = useCallback(
-        async (id: number) => {
-            const res = await fetch(
-                `/api/hrm/file-management/employee-file-record-type?id=${id}`,
-                { method: "DELETE" }
-            );
-            if (!res.ok) throw new Error("Delete failed");
-            await fetchData();
-        },
-        [fetchData]
-    );
-
     return {
         records,
         isLoading,
         isError,
         error,
-        refetch: fetchData,
+        refetch,
         createRecord,
         updateRecord,
         deleteRecord,

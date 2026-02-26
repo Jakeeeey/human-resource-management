@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import type {
     EmployeeFileRecordListWithRelations,
 } from "../types";
 import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
-import { useEmployeeFileRecordListFilterContext } from "../providers/fetchProvider";
+import { useEmployeeFileRecordListFilterContext } from "../providers/filterProvider";
+import { useEmployeeFileRecordListFetchContext } from "../providers/fetchProvider";
 
 interface UseEmployeeFileRecordListReturn {
     records: EmployeeFileRecordListWithRelations[];
@@ -21,39 +22,17 @@ interface UseEmployeeFileRecordListReturn {
 
 export function useEmployeeFileRecordList(): UseEmployeeFileRecordListReturn {
     const { filters } = useEmployeeFileRecordListFilterContext();
-
-    const [allRecords, setAllRecords] = useState<EmployeeFileRecordListWithRelations[]>([]);
-    const [recordTypes, setRecordTypes] = useState<EmployeeFileRecordType[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isError, setIsError] = useState(false);
-    const [error, setError] = useState<Error | null>(null);
-
-    const fetchData = useCallback(async () => {
-        try {
-            setIsLoading(true);
-            setIsError(false);
-
-            const res = await fetch(
-                "/api/hrm/file-management/employee-file-record-list",
-                { cache: "no-store" }
-            );
-
-            if (!res.ok) throw new Error("Fetch failed");
-
-            const data = await res.json();
-            setAllRecords(data.records || []);
-            setRecordTypes(data.recordTypes || []);
-        } catch (err: any) {
-            setIsError(true);
-            setError(err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+    const {
+        allRecords,
+        recordTypes,
+        isLoading,
+        isError,
+        error,
+        refetch,
+        createRecord,
+        updateRecord,
+        deleteRecord,
+    } = useEmployeeFileRecordListFetchContext();
 
     const records = useMemo(() => {
         let result = allRecords;
@@ -87,57 +66,13 @@ export function useEmployeeFileRecordList(): UseEmployeeFileRecordListReturn {
         return result;
     }, [allRecords, filters]);
 
-    const createRecord = useCallback(
-        async (data: any) => {
-            const res = await fetch(
-                "/api/hrm/file-management/employee-file-record-list",
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(data),
-                }
-            );
-            if (!res.ok) throw new Error("Create failed");
-            await fetchData();
-        },
-        [fetchData]
-    );
-
-    const updateRecord = useCallback(
-        async (id: number, data: any) => {
-            const res = await fetch(
-                "/api/hrm/file-management/employee-file-record-list",
-                {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id, ...data }),
-                }
-            );
-            if (!res.ok) throw new Error("Update failed");
-            await fetchData();
-        },
-        [fetchData]
-    );
-
-    const deleteRecord = useCallback(
-        async (id: number) => {
-            const res = await fetch(
-                `/api/hrm/file-management/employee-file-record-list?id=${id}`,
-                { method: "DELETE" }
-            );
-            if (!res.ok) throw new Error("Delete failed");
-            await fetchData();
-        },
-        [fetchData]
-    );
-
     return {
         records,
         recordTypes,
         isLoading,
         isError,
         error,
-        refetch: fetchData,
+        refetch,
         createRecord,
         updateRecord,
         deleteRecord,
