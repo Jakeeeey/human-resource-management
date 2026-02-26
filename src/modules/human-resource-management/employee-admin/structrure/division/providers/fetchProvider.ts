@@ -4,6 +4,7 @@ import type {
     User,
     DepartmentPerDivision,
     DivisionWithRelations,
+    DepartmentWithBank,
     DirectusListResponse,
     DirectusSingleResponse,
 } from "../types";
@@ -73,9 +74,16 @@ export async function fetchDivisionsWithRelations(): Promise<DivisionWithRelatio
             l => Number(l.division_id) === Number(div.division_id)
         );
 
-        const relDepartments = relLinks
-            .map(l => deptMap.get(l.department_id))
-            .filter(Boolean) as Department[];
+        const relDepartments: DepartmentWithBank[] = relLinks
+            .map(l => {
+                const dept = deptMap.get(l.department_id);
+                if (!dept) return null;
+                return {
+                    ...dept,
+                    bank_id: l.bank_id,
+                };
+            })
+            .filter((d): d is DepartmentWithBank => d !== null);
 
         return {
             ...div,

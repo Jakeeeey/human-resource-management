@@ -40,3 +40,12 @@ export type AppShellProps = {
      */
     showFooter?: boolean;
 };
+
+export type AppFooterProps = {
+    appName: string;
+    systemName: string;
+    versionText?: string;
+    leftSlot?: React.ReactNode;
+    rightSlot?: React.ReactNode;
+    showVersion?: boolean;
+};

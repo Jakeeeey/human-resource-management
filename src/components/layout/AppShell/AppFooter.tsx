@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { cn } from "@/lib/utils/cn";
+import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 
 import type { AppFooterProps } from "./types";
@@ -40,7 +40,7 @@ export default function AppFooter(props: AppFooterProps) {
                     {rightSlot ? rightSlot : null}
                     {showVersion ? <span className="opacity-80">{versionText}</span> : null}
                 </div>
-            </div>a
+            </div>
         </footer>
     );
 }
