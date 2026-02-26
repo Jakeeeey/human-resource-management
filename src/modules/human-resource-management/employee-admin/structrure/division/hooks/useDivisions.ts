@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import type { DivisionWithRelations, User, Department, BankAccount } from "../types";
 import { useDivisionFilterContext } from "../providers/DivisionFilterProvider";
+import { toastServerDown } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 
 interface UseDivisionsReturn {
     divisions: DivisionWithRelations[];
@@ -61,6 +62,7 @@ export function useDivisions(): UseDivisionsReturn {
             setIsError(true);
             setError(err instanceof Error ? err : new Error("Unknown error"));
             console.error("Division fetch error:", err);
+            toastServerDown(err);
         } finally {
             setIsLoading(false);
         }

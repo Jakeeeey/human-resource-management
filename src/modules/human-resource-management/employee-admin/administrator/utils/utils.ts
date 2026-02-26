@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { format } from "date-fns"
+import { toast } from "sonner"
 
 /**
  * Global cn utility wrapper or local definition
@@ -78,5 +79,28 @@ export function formatInManilaTime(dateStr: string | null | undefined, formatStr
     } catch (err) {
         console.error("Error formatting Manila time:", err);
         return dateStr;
+    }
+}
+
+/**
+ * Standardized "Server is Down" toast notification.
+ * Used when fetch/network errors occur.
+ */
+export function toastServerDown(error?: any) {
+    const message = error?.message || "";
+    const isNetworkError =
+        message.toLowerCase().includes("fetch failed") ||
+        message.toLowerCase().includes("network error") ||
+        message.toLowerCase().includes("econnrefused") ||
+        message.toLowerCase().includes("failed to fetch");
+
+    if (isNetworkError || !message) {
+        toast.error("Server is down", {
+            description: "Please contact Administrator.",
+        });
+    } else {
+        toast.error("An error occurred", {
+            description: message,
+        });
     }
 }

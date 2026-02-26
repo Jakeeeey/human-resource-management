@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from "rea
 import { useScmFilters } from "@/modules/human-resource-management/employee-admin/administrator/providers/ScmFilterProvider";
 import { EnrichedOnCallSchedule } from "../types/on-call.schema";
 import { toast } from "sonner";
+import { toastServerDown } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 
 interface OnCallContextType {
     data: EnrichedOnCallSchedule[];
@@ -47,7 +48,7 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (err: any) {
             setError(err.message);
-            toast.error(err.message);
+            toastServerDown(err);
         } finally {
             setIsLoading(false);
         }
@@ -72,7 +73,7 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             refresh();
             return true;
         } catch (err: any) {
-            toast.error(err.message);
+            toastServerDown(err);
             return false;
         }
     };
@@ -92,7 +93,7 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             refresh();
             return true;
         } catch (err: any) {
-            toast.error(err.message);
+            toastServerDown(err);
             return false;
         }
     };
@@ -110,7 +111,7 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             refresh();
             return true;
         } catch (err: any) {
-            toast.error(err.message);
+            toastServerDown(err);
             return false;
         }
     };

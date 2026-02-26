@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { DepartmentWithRelations, Division, User } from "../types";
 import { useDepartmentFilterContext } from "../providers/DepartmentFilterProvider";
+import { toastServerDown } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 
 interface UseDepartmentsReturn {
     departments: DepartmentWithRelations[];
@@ -51,6 +52,7 @@ export function useDepartments(): UseDepartmentsReturn {
         } catch (err: any) {
             setIsError(true);
             setError(err);
+            toastServerDown(err);
         } finally {
             setIsLoading(false);
         }
