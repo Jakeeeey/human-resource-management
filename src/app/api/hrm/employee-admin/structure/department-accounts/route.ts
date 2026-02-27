@@ -4,7 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 // CONFIG
 // ============================================================================
 
-const DIRECTUS_URL = "http://100.110.197.61:8056";
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+if (!DIRECTUS_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined in environment variables");
+}
 const LIMIT = 1000;
 
 const COLLECTIONS = {
@@ -78,8 +81,17 @@ interface DirectusResponse<T> {
 
 async function fetchAll<T>(collection: string, offset = 0, acc: T[] = []): Promise<T[]> {
     const url = `${DIRECTUS_URL}/items/${collection}?limit=${LIMIT}&offset=${offset}`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Directus error ${collection}`);
+    const res = await fetch(url, {
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+        }
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        console.error(`DIRECTUS ERROR [${url}]:`, text);
+        throw new Error(`Directus error ${collection}: ${text}`);
+    }
 
     const json: DirectusResponse<T> = await res.json();
     const items = json.data || [];
@@ -103,11 +115,26 @@ export async function GET(req: NextRequest) {
 
         // If dept_div_id is provided, return assigned accounts for that department
         if (deptDivId) {
-            const [assignments, allAccounts, accountTypes] = await Promise.all([
-                fetchAll<DepartmentDivisionCOA>(COLLECTIONS.DEPT_DIV_COA),
+            // Probing for assignments collection
+            let assignments: DepartmentDivisionCOA[] = [];
+            const possibleAssignCollections = ["department_division_coa", "dept_div_coa", "assigned_accounts"];
+            let assignFound = false;
+
+            const [allAccounts, accountTypes] = await Promise.all([
                 fetchAll<ChartOfAccount>(COLLECTIONS.CHART_OF_ACCOUNTS),
                 fetchAll<AccountType>(COLLECTIONS.ACCOUNT_TYPES),
             ]);
+
+            for (const coll of possibleAssignCollections) {
+                try {
+                    assignments = await fetchAll<DepartmentDivisionCOA>(coll);
+                    console.log(`Successfully fetched from assignment collection: ${coll}`);
+                    assignFound = true;
+                    break;
+                } catch (e) {
+                    console.warn(`Failed to fetch from assignment collection: ${coll}, trying next...`);
+                }
+            }
 
             const accountTypeMap = new Map(accountTypes.map(at => [at.id, at]));
 
@@ -134,13 +161,28 @@ export async function GET(req: NextRequest) {
         }
 
         // Otherwise, return all master data
-        const [divisions, departments, deptPerDiv, accounts, accountTypes] = await Promise.all([
+        // Probing for link collection
+        let deptPerDiv: DepartmentPerDivision[] = [];
+        const possibleLinkCollections = ["department_per_division", "division_departments", "dept_div"];
+        let linkFound = false;
+
+        const [divisions, departments, accounts, accountTypes] = await Promise.all([
             fetchAll<Division>(COLLECTIONS.DIVISION),
             fetchAll<Department>(COLLECTIONS.DEPARTMENT),
-            fetchAll<DepartmentPerDivision>(COLLECTIONS.DEPT_PER_DIV),
             fetchAll<ChartOfAccount>(COLLECTIONS.CHART_OF_ACCOUNTS),
             fetchAll<AccountType>(COLLECTIONS.ACCOUNT_TYPES),
         ]);
+
+        for (const coll of possibleLinkCollections) {
+            try {
+                deptPerDiv = await fetchAll<DepartmentPerDivision>(coll);
+                console.log(`Successfully fetched from link collection: ${coll}`);
+                linkFound = true;
+                break;
+            } catch (e) {
+                console.warn(`Failed to fetch from link collection: ${coll}, trying next...`);
+            }
+        }
 
         // Build division -> departments mapping
         const divisionDepartmentsMap = new Map<number, DepartmentPerDivision[]>();

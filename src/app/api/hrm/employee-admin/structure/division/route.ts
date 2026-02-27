@@ -4,7 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 // CONFIG
 // ============================================================================
 
-const DIRECTUS_URL = "http://100.110.197.61:8056";
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+if (!DIRECTUS_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined in environment variables");
+}
 const LIMIT = 1000;
 
 const COLLECTIONS = {
@@ -69,8 +72,17 @@ interface DirectusResponse<T> {
 
 async function fetchAll<T>(collection: string, offset = 0, acc: T[] = []): Promise<T[]> {
     const url = `${DIRECTUS_URL}/items/${collection}?limit=${LIMIT}&offset=${offset}`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Directus error ${collection}`);
+    const res = await fetch(url, {
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+        }
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        console.error(`DIRECTUS ERROR [${url}]:`, text);
+        throw new Error(`Directus error ${collection}: ${text}`);
+    }
 
     const json: DirectusResponse<T> = await res.json();
     const items = json.data || [];
@@ -85,7 +97,12 @@ async function fetchAll<T>(collection: string, offset = 0, acc: T[] = []): Promi
 
 async function fetchUsers(): Promise<User[]> {
     const url = `${DIRECTUS_URL}/items/${COLLECTIONS.USER}?limit=${LIMIT}&fields=user_id,user_fname,user_lname,user_mname`;
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(url, {
+        cache: "no-store",
+        headers: {
+            "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+        }
+    });
     if (!res.ok) return [];
 
     const json: DirectusResponse<User> = await res.json();
@@ -97,13 +114,29 @@ async function fetchUsers(): Promise<User[]> {
 // ============================================================================
 
 async function buildDivisionRelations() {
-    const [divisions, users, departments, deptPerDiv, bankAccounts] = await Promise.all([
+    // Try multiple possible collection names for dept_per_div
+    let deptPerDiv: DepartmentPerDivision[] = [];
+    const possibleLinkCollections = ["department_per_division", "division_departments", "dept_div"];
+    let linkFound = false;
+
+    // Fetch static data first
+    const [divisions, users, departments, bankAccounts] = await Promise.all([
         fetchAll<Division>(COLLECTIONS.DIVISION),
         fetchUsers(),
         fetchAll<Department>(COLLECTIONS.DEPARTMENT),
-        fetchAll<DepartmentPerDivision>(COLLECTIONS.DEPT_PER_DIV),
         fetchAll<BankAccount>(COLLECTIONS.BANK_ACCOUNTS),
     ]);
+
+    for (const coll of possibleLinkCollections) {
+        try {
+            deptPerDiv = await fetchAll<DepartmentPerDivision>(coll);
+            console.log(`Successfully fetched from link collection: ${coll}`);
+            linkFound = true;
+            break;
+        } catch (e) {
+            console.warn(`Failed to fetch from link collection: ${coll}, trying next...`);
+        }
+    }
 
     const userMap = new Map(users.map(u => [u.user_id, u]));
     const deptMap = new Map(departments.map(d => [d.department_id, d]));

@@ -3,12 +3,13 @@ import type {
     Department,
     User,
     DepartmentPerDivision,
+    DepartmentWithBank,
     DivisionWithRelations,
     DirectusListResponse,
     DirectusSingleResponse,
 } from "../types";
 
-const DIRECTUS_URL = "http://100.110.197.61:8056";
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://100.110.197.61:8091";
 const LIMIT = 1000;
 
 // =====================================================
@@ -74,8 +75,15 @@ export async function fetchDivisionsWithRelations(): Promise<DivisionWithRelatio
         );
 
         const relDepartments = relLinks
-            .map(l => deptMap.get(l.department_id))
-            .filter(Boolean) as Department[];
+            .map(l => {
+                const dept = deptMap.get(l.department_id);
+                if (!dept) return null;
+                return {
+                    ...dept,
+                    bank_id: l.bank_id
+                };
+            })
+            .filter(Boolean) as DepartmentWithBank[];
 
         return {
             ...div,
@@ -83,6 +91,7 @@ export async function fetchDivisionsWithRelations(): Promise<DivisionWithRelatio
                 ? userMap.get(div.division_head_id) ?? null
                 : null,
             departments: relDepartments,
+            department_count: relDepartments.length,
         };
     });
 }

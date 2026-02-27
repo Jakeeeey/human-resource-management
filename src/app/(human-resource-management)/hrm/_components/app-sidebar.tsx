@@ -111,6 +111,18 @@ const data = {
                         },
                     ],
                 },
+                {
+                    title: "Report",
+                    url: "#",
+                    icon: Shield,
+                    items: [
+                        {
+                            title: "Overtime Report",
+                            url: "/hrm/employee-admin/report/overtime-report",
+                            icon: CalendarClock,
+                        },
+                    ],
+                },
             ],
         },
         {

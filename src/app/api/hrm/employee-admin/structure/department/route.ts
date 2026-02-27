@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const DIRECTUS_URL = "http://100.110.197.61:8056";
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+if (!DIRECTUS_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined in environment variables");
+}
 const LIMIT = 1000;
 
 async function dFetch(path: string, options?: RequestInit) {
-    const res = await fetch(`${DIRECTUS_URL}${path}`, {
+    const token = process.env.DIRECTUS_STATIC_TOKEN || process.env.DIRECTUS_TOKEN || process.env.NEXT_PUBLIC_DIRECTUS_STATIC_TOKEN;
+    const url = `${DIRECTUS_URL}${path}`;
+
+    const res = await fetch(url, {
         ...options,
         headers: {
             "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
             ...(options?.headers || {}),
         },
     });
 
     if (!res.ok) {
         const text = await res.text();
-        console.error("DIRECTUS ERROR:", text);
+        console.error(`DIRECTUS ERROR [${url}]:`, text);
         throw new Error(text);
     }
 
@@ -45,7 +52,7 @@ async function getRelationsFiltered(req: NextRequest) {
         fetchAll("department"),
         fetchAll("division"),
         fetchAll("user"),
-        fetchAll("department_positions"),
+        fetchAll("positions"),
     ]);
 
     const uMap = new Map(users.map((u: any) => [u.user_id, u]));
@@ -117,7 +124,7 @@ export async function POST(req: NextRequest) {
     const deptId = created.data.department_id;
 
     for (const pos of positions) {
-        await dFetch(`/items/department_positions`, {
+        await dFetch(`/items/positions`, {
             method: "POST",
             body: JSON.stringify({
                 department_id: deptId,
@@ -144,17 +151,17 @@ export async function PATCH(req: NextRequest) {
     });
 
     // delete existing
-    const existing = await fetchAll("department_positions");
+    const existing = await fetchAll("positions");
 
     for (const p of existing.filter((x: any) => x.department_id === department_id)) {
-        await dFetch(`/items/department_positions/${p.id}`, {
+        await dFetch(`/items/positions/${p.id}`, {
             method: "DELETE",
         });
     }
 
     // recreate
     for (const pos of positions) {
-        await dFetch(`/items/department_positions`, {
+        await dFetch(`/items/positions`, {
             method: "POST",
             body: JSON.stringify({
                 department_id,
@@ -170,10 +177,10 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
     const id = req.nextUrl.searchParams.get("id");
 
-    const existing = await fetchAll("department_positions");
+    const existing = await fetchAll("positions");
 
     for (const p of existing.filter((x: any) => x.department_id === Number(id))) {
-        await dFetch(`/items/department_positions/${p.id}`, {
+        await dFetch(`/items/positions/${p.id}`, {
             method: "DELETE",
         });
     }

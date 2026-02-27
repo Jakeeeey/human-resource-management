@@ -30,18 +30,24 @@ export const onCallService = {
             }
 
             const response = await fetch(url, { headers });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`DIRECTUS ERROR [${url}]:`, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             const result = await response.json();
             const schedules: any[] = result.data;
 
             // Fetch assignments for each schedule
             const enrichedSchedules = await Promise.all(
                 schedules.map(async (schedule) => {
-                    const assignmentsResponse = await fetch(
-                        `${API_BASE_URL}/items/oncall_list?filter[dept_sched_id][_eq]=${schedule.id}&fields=*,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_email`,
-                        { headers }
-                    );
-                    if (!assignmentsResponse.ok) throw new Error(`HTTP error! status: ${assignmentsResponse.status}`);
+                    const assignmentsUrl = `${API_BASE_URL}/items/oncall_list?filter[dept_sched_id][_eq]=${schedule.id}&fields=*,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_email`;
+                    const assignmentsResponse = await fetch(assignmentsUrl, { headers });
+                    if (!assignmentsResponse.ok) {
+                        const errorText = await assignmentsResponse.text();
+                        console.error(`DIRECTUS ERROR [${assignmentsUrl}]:`, errorText);
+                        throw new Error(`HTTP error! status: ${assignmentsResponse.status}`);
+                    }
                     const assignmentsResult = await assignmentsResponse.json();
                     const assignments = assignmentsResult.data;
 

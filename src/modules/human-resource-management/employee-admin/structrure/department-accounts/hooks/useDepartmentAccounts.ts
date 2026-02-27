@@ -12,6 +12,7 @@ import {
     AssignAccountsPayload,
     UnassignAccountPayload,
 } from "../types";
+import { toastServerDown } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 
 const API_BASE = "/api/hrm/employee-admin/structure/department-accounts";
 
@@ -56,6 +57,7 @@ export function useDepartmentAccountsMasterData(): UseDepartmentAccountsMasterDa
             setIsError(true);
             setError(err instanceof Error ? err : new Error("Unknown error"));
             console.error("Department Accounts fetch error:", err);
+            toastServerDown(err);
         } finally {
             setIsLoading(false);
         }
@@ -127,6 +129,7 @@ export function useAssignedAccounts(
             setIsError(true);
             setError(err instanceof Error ? err : new Error("Unknown error"));
             console.error("Assigned accounts fetch error:", err);
+            toastServerDown(err);
         } finally {
             setIsLoading(false);
         }
@@ -187,6 +190,7 @@ export function useAssignAccounts(
             } catch (err) {
                 setIsError(true);
                 setError(err instanceof Error ? err : new Error("Unknown error"));
+                toastServerDown(err);
                 throw err;
             } finally {
                 setIsPending(false);
@@ -245,6 +249,7 @@ export function useUnassignAccount(
             } catch (err) {
                 setIsError(true);
                 setError(err instanceof Error ? err : new Error("Unknown error"));
+                toastServerDown(err);
                 throw err;
             } finally {
                 setIsPending(false);
