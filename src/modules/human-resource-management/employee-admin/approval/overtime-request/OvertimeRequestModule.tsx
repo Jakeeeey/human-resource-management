@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { OvertimeTable } from "./components/OvertimeTable";
-import { ApprovalModal } from "./components/ApprovalModal";
 import {
   fetchOvertimeRequests,
   approveOrRejectOvertimeRequest,
