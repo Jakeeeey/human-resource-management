@@ -9,7 +9,7 @@ import type {
     DirectusSingleResponse,
 } from "../types";
 
-const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://100.110.197.61:8091";
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
 
 // =====================================================

@@ -13,7 +13,7 @@ import { NavUser } from "../_components/nav-user";
 import { cookies } from "next/headers";
 
 // ✅ Wire the module you asked for
-import ComingSoon from "../_components/ComingSoon";
+import ChangePasswordPage from "@/modules/human-resource-management/change-password/ChangePasswordPage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,8 +115,8 @@ export default async function Page() {
             </header>
 
             {/* ✅ Only content scrolls inside RIGHT column */}
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
-                <ComingSoon />
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4 bg-muted/20">
+                <ChangePasswordPage />
             </main>
         </div>
     );
