@@ -86,14 +86,6 @@ export default function OvertimeRequestModule() {
     console.log("Data reloaded successfully");
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-100 items-center justify-center">
-        <Spinner className="h-8 w-8" />
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <Card>
@@ -116,6 +108,27 @@ export default function OvertimeRequestModule() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Overtime Request
+          </h1>
+          <p className="text-muted-foreground">
+            View overtime requests for your department
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRetry}
+          disabled={isLoading}
+          className="gap-2"
+        >
+          Refresh
+        </Button>
+      </div>
+
       <OvertimeTable
         data={requests}
         onApprove={handleApprove}

@@ -10,6 +10,7 @@ import type { OvertimeRequestWithUser } from "@/modules/human-resource-managemen
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 export default function OvertimeApprovalContent() {
   const [requests, setRequests] = useState<OvertimeRequestWithUser[]>([]);
@@ -101,12 +102,35 @@ export default function OvertimeApprovalContent() {
   }
 
   return (
-    <OvertimeTable
-      data={requests}
-      onApprove={handleApprove}
-      onReject={handleReject}
-      onRefresh={handleRefresh}
-      isLoading={isLoading}
-    />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Overtime Request
+          </h1>
+          <p className="text-muted-foreground">
+            View overtime requests for your department
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isLoading}
+          className="gap-2"
+        >
+          Refresh
+        </Button>
+      </div>
+
+      <OvertimeTable
+        data={requests}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        onRefresh={handleRefresh}
+        isLoading={isLoading}
+      />
+    </div>
   );
 }

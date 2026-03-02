@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { OvertimeRequestWithUser } from "../type";
 import { ApprovalModal } from "./ApprovalModal";
 
@@ -36,18 +36,6 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
     employeeName: "",
   });
   const [processingId, setProcessingId] = useState<number | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const handleRefreshClick = async () => {
-    try {
-      setIsRefreshing(true);
-      await onRefresh();
-    } catch (error) {
-      console.error("Error refreshing data:", error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   const formatTime = (time: string) => {
     if (!time) return "N/A";
@@ -110,58 +98,28 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="space-y-2">
+        {[...Array(5)].map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full" />
+        ))}
+      </div>
+    );
+  }
+
   if (data.length === 0) {
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
-          <div className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Overtime Request</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              View overtime requests for your department
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefreshClick}
-            disabled={isLoading || isRefreshing}
-            className="gap-2"
-          >
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-muted-foreground">No pending overtime requests found.</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <p className="text-muted-foreground">No pending overtime requests found.</p>
+      </div>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
-          <div className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Overtime Report</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              View overtime requests for your department
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefreshClick}
-            disabled={isLoading || isRefreshing}
-            className="gap-2"
-          >
-            Refresh
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
+      <div className="rounded-md border">
+        <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -233,9 +191,7 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
                 })}
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
       <ApprovalModal
         isOpen={modalState.isOpen}
