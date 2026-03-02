@@ -118,6 +118,7 @@ export default function OvertimeRequestModule() {
         data={requests}
         onApprove={handleApprove}
         onReject={handleReject}
+        onRefresh={handleRetry}
         isLoading={isLoading}
       />
     </div>

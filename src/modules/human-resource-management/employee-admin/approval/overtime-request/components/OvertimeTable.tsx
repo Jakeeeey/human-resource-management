@@ -19,10 +19,11 @@ interface OvertimeTableProps {
   data: OvertimeRequestWithUser[];
   onApprove: (overtimeId: number, remarks: string) => Promise<void>;
   onReject: (overtimeId: number, remarks: string) => Promise<void>;
+  onRefresh: () => void;
   isLoading?: boolean;
 }
 
-export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: OvertimeTableProps) {
+export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading = false }: OvertimeTableProps) {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     action: "approve" | "reject" | null;
@@ -100,8 +101,35 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
   if (data.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Overtime Approval</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Overtime Report</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              View overtime requests for your department
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+            </svg>
+            Refresh
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -115,8 +143,35 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle>Overtime Approval</CardTitle>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-bold">Overtime Report</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              View overtime requests for your department
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+            </svg>
+            Refresh
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
