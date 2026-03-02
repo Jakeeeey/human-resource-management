@@ -78,6 +78,12 @@ export default function OvertimeApprovalContent() {
     }
   };
 
+  const handleRefresh = async () => {
+    console.log("Refresh button clicked - reloading data...");
+    await loadData();
+    console.log("Data reloaded successfully");
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-100 items-center justify-center">
@@ -99,6 +105,7 @@ export default function OvertimeApprovalContent() {
       data={requests}
       onApprove={handleApprove}
       onReject={handleReject}
+      onRefresh={handleRefresh}
       isLoading={isLoading}
     />
   );

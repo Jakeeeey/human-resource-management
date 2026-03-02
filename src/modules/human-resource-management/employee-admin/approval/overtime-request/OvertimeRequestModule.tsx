@@ -80,8 +80,10 @@ export default function OvertimeRequestModule() {
     }
   };
 
-  const handleRetry = () => {
-    loadData();
+  const handleRetry = async () => {
+    console.log("Refresh button clicked - reloading data...");
+    await loadData();
+    console.log("Data reloaded successfully");
   };
 
   if (isLoading) {

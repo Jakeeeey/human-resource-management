@@ -19,7 +19,7 @@ interface OvertimeTableProps {
   data: OvertimeRequestWithUser[];
   onApprove: (overtimeId: number, remarks: string) => Promise<void>;
   onReject: (overtimeId: number, remarks: string) => Promise<void>;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -36,6 +36,18 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
     employeeName: "",
   });
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefreshClick = async () => {
+    try {
+      setIsRefreshing(true);
+      await onRefresh();
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const formatTime = (time: string) => {
     if (!time) return "N/A";
@@ -111,8 +123,8 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
           <Button
             variant="outline"
             size="sm"
-            onClick={onRefresh}
-            disabled={isLoading}
+            onClick={handleRefreshClick}
+            disabled={isLoading || isRefreshing}
             className="gap-2"
           >
             <svg
@@ -125,6 +137,7 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className={isRefreshing ? "animate-spin" : ""}
             >
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
             </svg>
@@ -153,8 +166,8 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
           <Button
             variant="outline"
             size="sm"
-            onClick={onRefresh}
-            disabled={isLoading}
+            onClick={handleRefreshClick}
+            disabled={isLoading || isRefreshing}
             className="gap-2"
           >
             <svg
@@ -167,6 +180,7 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className={isRefreshing ? "animate-spin" : ""}
             >
               <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
             </svg>
