@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { EmployeeFileRecordListFilterProvider } from "./providers/fetchProvider";
+import { EmployeeFileRecordListFilterProvider } from "./providers/filterProvider";
+import { EmployeeFileRecordListFetchProvider } from "./providers/fetchProvider";
 import { useEmployeeFileRecordList } from "./hooks/useEmployeeFileRecordList";
 import { EmployeeFileRecordListTable } from "./components/EmployeeFileRecordListTable";
 import {
@@ -119,8 +120,10 @@ function EmployeeFileRecordListModuleContent() {
 
 export default function EmployeeFileRecordListModule() {
     return (
-        <EmployeeFileRecordListFilterProvider>
-            <EmployeeFileRecordListModuleContent />
-        </EmployeeFileRecordListFilterProvider>
+        <EmployeeFileRecordListFetchProvider>
+            <EmployeeFileRecordListFilterProvider>
+                <EmployeeFileRecordListModuleContent />
+            </EmployeeFileRecordListFilterProvider>
+        </EmployeeFileRecordListFetchProvider>
     );
 }

@@ -48,19 +48,19 @@ export function EmployeeFileRecordListFilterProvider({
         setFilters(DEFAULT_FILTERS);
     }, []);
 
-    return (
-        <EmployeeFileRecordListFilterContext.Provider
-            value={{
+    return React.createElement(
+        EmployeeFileRecordListFilterContext.Provider,
+        {
+            value: {
                 filters,
                 updateSearch,
                 updateRecordTypeId,
                 updateFromDate,
                 updateToDate,
                 resetFilters,
-            }}
-        >
-            {children}
-        </EmployeeFileRecordListFilterContext.Provider>
+            },
+        },
+        children
     );
 }
 

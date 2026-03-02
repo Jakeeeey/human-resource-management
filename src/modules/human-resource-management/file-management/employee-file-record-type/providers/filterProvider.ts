@@ -42,12 +42,10 @@ export function EmployeeFileRecordTypeFilterProvider({
         setFilters(DEFAULT_FILTERS);
     }, []);
 
-    return (
-        <EmployeeFileRecordTypeFilterContext.Provider
-            value={{ filters, updateSearch, updateFromDate, updateToDate, resetFilters }}
-        >
-            {children}
-        </EmployeeFileRecordTypeFilterContext.Provider>
+    return React.createElement(
+        EmployeeFileRecordTypeFilterContext.Provider,
+        { value: { filters, updateSearch, updateFromDate, updateToDate, resetFilters } },
+        children
     );
 }
 

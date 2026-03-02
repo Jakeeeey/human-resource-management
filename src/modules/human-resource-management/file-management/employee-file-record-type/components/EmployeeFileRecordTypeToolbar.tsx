@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, X } from "lucide-react";
-import { useEmployeeFileRecordTypeFilterContext } from "../providers/fetchProvider";
+import { useEmployeeFileRecordTypeFilterContext } from "../providers/filterProvider";
 import { SingleDatePicker } from "@/modules/human-resource-management/employee-admin/structrure/department/components/SingleDatePicker";
 
 export function EmployeeFileRecordTypeToolbar() {
