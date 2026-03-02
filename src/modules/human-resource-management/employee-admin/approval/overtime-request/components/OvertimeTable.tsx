@@ -115,7 +115,7 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
           <div className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Overtime Report</CardTitle>
+            <CardTitle className="text-2xl font-bold">Overtime Request</CardTitle>
             <p className="text-sm text-muted-foreground">
               View overtime requests for your department
             </p>
@@ -127,20 +127,6 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
             disabled={isLoading || isRefreshing}
             className="gap-2"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={isRefreshing ? "animate-spin" : ""}
-            >
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
-            </svg>
             Refresh
           </Button>
         </CardHeader>
@@ -170,20 +156,6 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
             disabled={isLoading || isRefreshing}
             className="gap-2"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={isRefreshing ? "animate-spin" : ""}
-            >
-              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
-            </svg>
             Refresh
           </Button>
         </CardHeader>
