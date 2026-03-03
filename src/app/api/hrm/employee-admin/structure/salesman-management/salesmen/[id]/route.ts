@@ -27,9 +27,10 @@ export async function PATCH(
     });
 
     return NextResponse.json({ data: r?.data ?? r });
-  } catch (e: any) {
+  } catch (e) {
+    const err = e as Error;
     return NextResponse.json(
-      { message: e?.message ?? "Failed to update salesman." },
+      { message: err.message ?? "Failed to update salesman." },
       { status: 500 },
     );
   }

@@ -14,8 +14,8 @@ interface UseDivisionsReturn {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createDivision: (data: any) => Promise<void>;
-    updateDivision: (id: number, data: any) => Promise<void>;
+    createDivision: (data: Record<string, unknown>) => Promise<void>;
+    updateDivision: (id: number, data: Record<string, unknown>) => Promise<void>;
     deleteDivision: (id: number) => Promise<void>;
 }
 
@@ -104,7 +104,7 @@ export function useDivisions(): UseDivisionsReturn {
     }, [allDivisions, filters]);
 
     // ✅ FIXED: Better error handling
-    const createDivision = useCallback(async (data: any) => {
+    const createDivision = useCallback(async (data: Record<string, unknown>) => {
         try {
             console.log('Creating division with data:', data);
 
@@ -129,7 +129,7 @@ export function useDivisions(): UseDivisionsReturn {
     }, [fetchData]);
 
     // ✅ FIXED: Better error handling
-    const updateDivision = useCallback(async (id: number, data: any) => {
+    const updateDivision = useCallback(async (id: number, data: Record<string, unknown>) => {
         try {
             console.log('Updating division:', id, data);
 

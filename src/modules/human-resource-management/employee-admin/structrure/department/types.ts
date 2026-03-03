@@ -79,7 +79,7 @@ export interface DepartmentFormData {
     positions: string[];
 }
 
-export interface CreateDepartmentData extends DepartmentFormData { }
+export type CreateDepartmentData = DepartmentFormData;
 
 export interface UpdateDepartmentData extends Partial<DepartmentFormData> {
     department_id: number;

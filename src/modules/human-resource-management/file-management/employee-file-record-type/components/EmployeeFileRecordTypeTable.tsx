@@ -37,8 +37,8 @@ import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 interface EmployeeFileRecordTypeTableProps {
     data: EmployeeFileRecordType[];
     isLoading?: boolean;
-    onCreateRecord: (data: any) => Promise<void>;
-    onUpdateRecord: (id: number, data: any) => Promise<void>;
+    onCreateRecord: (data: Record<string, unknown>) => Promise<void>;
+    onUpdateRecord: (id: number, data: Record<string, unknown>) => Promise<void>;
     onDeleteRecord: (id: number) => Promise<void>;
 }
 
@@ -85,9 +85,12 @@ export function EmployeeFileRecordTypeTable({
         []
     );
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
@@ -165,9 +168,9 @@ export function EmployeeFileRecordTypeTable({
                                         {header.isPlaceholder
                                             ? null
                                             : flexRender(
-                                                  header.column.columnDef.header,
-                                                  header.getContext()
-                                              )}
+                                                header.column.columnDef.header,
+                                                header.getContext()
+                                            )}
                                     </TableHead>
                                 ))}
                             </TableRow>

@@ -59,7 +59,7 @@ interface DepartmentScheduleDialogProps {
     onOpenChange: (open: boolean) => void;
     schedule?: DepartmentScheduleWithRelations | null;
     departments: Department[];
-    onSubmit: (data: any) => Promise<void>;
+    onSubmit: (data: Record<string, unknown>) => Promise<void>;
 }
 
 // ============================================================================

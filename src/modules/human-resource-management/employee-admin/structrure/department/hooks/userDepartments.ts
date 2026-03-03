@@ -12,8 +12,8 @@ interface UseDepartmentsReturn {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createDepartment: (data: any) => Promise<void>;
-    updateDepartment: (id: number, data: any) => Promise<void>;
+    createDepartment: (data: Record<string, unknown>) => Promise<void>;
+    updateDepartment: (id: number, data: Record<string, unknown>) => Promise<void>;
     deleteDepartment: (id: number) => Promise<void>;
 }
 
@@ -49,10 +49,11 @@ export function useDepartments(): UseDepartmentsReturn {
             setAllDepartments(data.departments || []);
             setDivisions(data.divisions || []);
             setUsers(data.users || []);
-        } catch (err: any) {
+        } catch (err) {
             setIsError(true);
-            setError(err);
-            toastServerDown(err);
+            const error = err as Error;
+            setError(error);
+            toastServerDown(error);
         } finally {
             setIsLoading(false);
         }
@@ -96,7 +97,7 @@ export function useDepartments(): UseDepartmentsReturn {
     // =========================
     // CRUD
     // =========================
-    const createDepartment = useCallback(async (data: any) => {
+    const createDepartment = useCallback(async (data: Record<string, unknown>) => {
         const res = await fetch("/api/hrm/employee-admin/structure/department", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -106,7 +107,7 @@ export function useDepartments(): UseDepartmentsReturn {
         await fetchData();
     }, [fetchData]);
 
-    const updateDepartment = useCallback(async (id: number, data: any) => {
+    const updateDepartment = useCallback(async (id: number, data: Record<string, unknown>) => {
         const res = await fetch("/api/hrm/employee-admin/structure/department", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },

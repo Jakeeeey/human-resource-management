@@ -1,8 +1,8 @@
 export function attachDivisionRelations(
-    divisions: any[],
-    users: any[],
-    departments: any[],
-    dpd: any[]
+    divisions: Record<string, unknown>[],
+    users: Record<string, unknown>[],
+    departments: Record<string, unknown>[],
+    dpd: Record<string, unknown>[]
 ) {
     const uMap = new Map(users.map(u => [u.user_id, u]));
     const dMap = new Map(departments.map(d => [d.department_id, d]));

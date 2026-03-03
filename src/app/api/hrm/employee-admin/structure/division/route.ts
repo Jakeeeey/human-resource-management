@@ -117,7 +117,6 @@ async function buildDivisionRelations() {
     // Try multiple possible collection names for dept_per_div
     let deptPerDiv: DepartmentPerDivision[] = [];
     const possibleLinkCollections = ["department_per_division", "division_departments", "dept_div"];
-    let linkFound = false;
 
     // Fetch static data first
     const [divisions, users, departments, bankAccounts] = await Promise.all([
@@ -131,9 +130,8 @@ async function buildDivisionRelations() {
         try {
             deptPerDiv = await fetchAll<DepartmentPerDivision>(coll);
             console.log(`Successfully fetched from link collection: ${coll}`);
-            linkFound = true;
             break;
-        } catch (e) {
+        } catch {
             console.warn(`Failed to fetch from link collection: ${coll}, trying next...`);
         }
     }
@@ -170,7 +168,7 @@ async function buildDivisionRelations() {
 // GET - List All Divisions
 // ============================================================================
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const { enriched, users, departments, bankAccounts } = await buildDivisionRelations();
 
@@ -206,8 +204,8 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { division_name, division_code, division_description, division_head_id, date_added, department_ids } = body;
 
-        // 1️⃣ Create division
-        const newDivisionData: any = {
+        // 1ï¸âƒ£ Create division
+        const newDivisionData: Record<string, string | number | null> = {
             division_name,
             division_code,
             division_description,
@@ -249,7 +247,7 @@ export async function POST(req: NextRequest) {
             throw new Error(`Directus division create failed: ${divRes.statusText} - ${errorText}`);
         }
 
-        // ✅ Directus returns single object — not array
+        // âœ… Directus returns single object â€” not array
         const divJson = await divRes.json();
         const newDivision: Division = divJson.data;
 
@@ -257,7 +255,7 @@ export async function POST(req: NextRequest) {
             throw new Error("Directus did not return created division");
         }
 
-        // 2️⃣ Create department_per_division links
+        // 2ï¸âƒ£ Create department_per_division links
         // Handle simplified array request (old) or assignment objects (new)
         let assignments: { department_id: number; bank_id: number | null }[] = [];
 
@@ -338,7 +336,7 @@ export async function PATCH(req: NextRequest) {
 
         // Filter out undefined values to avoid sending bad data
         const cleanUpdateData = Object.fromEntries(
-            Object.entries(updateData).filter(([_, v]) => v !== undefined)
+            Object.entries(updateData).filter(([, v]) => v !== undefined)
         );
 
         const divRes = await fetch(
@@ -366,7 +364,7 @@ export async function PATCH(req: NextRequest) {
         }
 
         // 2. Update department assignments
-        if (department_ids !== undefined || body.department_assignments !== undefined) {
+        if (department_ids !== undefined || department_assignments !== undefined) {
             // Delete existing assignments
             const existing = await fetchAll<DepartmentPerDivision>(COLLECTIONS.DEPT_PER_DIV);
             // Filter by division_id to only delete relevant assignments
@@ -384,8 +382,8 @@ export async function PATCH(req: NextRequest) {
             // Create new assignments
             let assignments: { department_id: number; bank_id: number | null }[] = [];
 
-            if (Array.isArray(body.department_assignments)) {
-                assignments = body.department_assignments;
+            if (Array.isArray(department_assignments)) {
+                assignments = department_assignments;
             } else if (Array.isArray(department_ids)) {
                 assignments = department_ids.map((id: number) => ({ department_id: id, bank_id: null }));
             }

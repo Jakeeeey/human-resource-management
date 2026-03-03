@@ -99,10 +99,10 @@ export function SettingsAppearance() {
                                                 active && "ring-2 ring-ring"
                                             )}
                                         >
-                      <span className="inline-flex items-center gap-2">
-                        <AccentSwatch hsl={triplet} />
-                          {a.name}
-                      </span>
+                                            <span className="inline-flex items-center gap-2">
+                                                <AccentSwatch hsl={triplet} />
+                                                {a.name}
+                                            </span>
                                             {active ? <Check className="h-4 w-4 text-primary" /> : null}
                                         </button>
                                     );
@@ -148,7 +148,7 @@ export function SettingsAppearance() {
                                 value={settings.density}
                                 onValueChange={(v) => {
                                     if (!v) return;
-                                    updateSettings({ density: v as any });
+                                    updateSettings({ density: v as "compact" | "comfortable" });
                                 }}
                                 className="justify-start"
                             >
@@ -198,40 +198,40 @@ export function SettingsAppearance() {
                             <div className="overflow-hidden rounded-lg border bg-card">
                                 <table className="data-grid">
                                     <thead>
-                                    <tr>
-                                        <th>Doc No</th>
-                                        <th>Status</th>
-                                        <th className="text-right">Total</th>
-                                    </tr>
+                                        <tr>
+                                            <th>Doc No</th>
+                                            <th>Status</th>
+                                            <th className="text-right">Total</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
-                                    <tr>
-                                        <td className="font-mono text-sm">DSB-000123</td>
-                                        <td>
-                        <span className="inline-flex rounded-full px-2 py-0.5 text-xs badge-neutral">
-                          Unposted
-                        </span>
-                                        </td>
-                                        <td className="td-num">₱ 12,340.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="font-mono text-sm">DSB-000124</td>
-                                        <td>
-                        <span className="inline-flex rounded-full px-2 py-0.5 text-xs badge-success">
-                          Posted
-                        </span>
-                                        </td>
-                                        <td className="td-num">₱ 8,100.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="font-mono text-sm">DSB-000125</td>
-                                        <td>
-                        <span className="inline-flex rounded-full px-2 py-0.5 text-xs badge-warning">
-                          Pending
-                        </span>
-                                        </td>
-                                        <td className="td-num">₱ 2,450.00</td>
-                                    </tr>
+                                        <tr>
+                                            <td className="font-mono text-sm">DSB-000123</td>
+                                            <td>
+                                                <span className="inline-flex rounded-full px-2 py-0.5 text-xs badge-neutral">
+                                                    Unposted
+                                                </span>
+                                            </td>
+                                            <td className="td-num">₱ 12,340.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="font-mono text-sm">DSB-000124</td>
+                                            <td>
+                                                <span className="inline-flex rounded-full px-2 py-0.5 text-xs badge-success">
+                                                    Posted
+                                                </span>
+                                            </td>
+                                            <td className="td-num">₱ 8,100.00</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="font-mono text-sm">DSB-000125</td>
+                                            <td>
+                                                <span className="inline-flex rounded-full px-2 py-0.5 text-xs badge-warning">
+                                                    Pending
+                                                </span>
+                                            </td>
+                                            <td className="td-num">₱ 2,450.00</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>

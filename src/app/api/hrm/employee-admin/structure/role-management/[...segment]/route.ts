@@ -11,7 +11,7 @@ const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 export async function GET(req: NextRequest, { params }: { params: Promise<{ segment: string[] }> }) {
   const { segment: segments } = await params;
   const segment = segments[0]; // e.g., executives
-  const id = segments[1];      // e.g., 5
+  // const id = segments[1]; // No longer used in GET
 
   if (!UPSTREAM_BASE) {
     return NextResponse.json({ error: "Upstream API base not configured" }, { status: 500 });
@@ -70,8 +70,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
 
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }
 
@@ -97,7 +97,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
 
       if (assignmentsData.data && assignmentsData.data.length > 0) {
         // 2. Soft delete them
-        await Promise.all(assignmentsData.data.map((a: any) =>
+        await Promise.all(assignmentsData.data.map((a: { id: number | string }) =>
           fetch(`${UPSTREAM_BASE}/items/salesman_per_supervisor/${a.id}`, {
             method: "PATCH",
             headers: {
@@ -162,7 +162,7 @@ async function handleMutation(req: NextRequest, segments: string[], method: stri
 
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

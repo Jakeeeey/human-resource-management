@@ -5,7 +5,7 @@ export interface SystemUser {
     user_lname: string;
     user_email: string;
     user_position: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface Division {

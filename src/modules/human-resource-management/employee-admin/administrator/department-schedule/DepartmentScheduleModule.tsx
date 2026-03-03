@@ -19,7 +19,7 @@ function DepartmentScheduleModuleContent() {
     const {
         schedules,
         departments,
-        users,
+        // users,
         isLoading,
         isError,
         error,
@@ -30,7 +30,7 @@ function DepartmentScheduleModuleContent() {
     } = useDepartmentSchedules();
 
     // ✅ sonner toast only
-    const handleCreate = async (data: any) => {
+    const handleCreate = async (data: Record<string, unknown>) => {
         try {
             await createSchedule(data);
             toast.success("Schedule created successfully");
@@ -40,7 +40,7 @@ function DepartmentScheduleModuleContent() {
         }
     };
 
-    const handleUpdate = async (id: number, data: any) => {
+    const handleUpdate = async (id: number, data: Record<string, unknown>) => {
         try {
             await updateSchedule(id, data);
             toast.success("Schedule updated successfully");
@@ -66,9 +66,9 @@ function DepartmentScheduleModuleContent() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription className="flex items-center justify-between">
-          <span>
-            Failed to load schedules: {error?.message || "Unknown error"}
-          </span>
+                    <span>
+                        Failed to load schedules: {error?.message || "Unknown error"}
+                    </span>
 
                     <Button
                         variant="outline"

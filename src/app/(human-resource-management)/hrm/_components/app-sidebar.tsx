@@ -13,7 +13,6 @@ import {
     UserCog, // Salesman
     Building, // Company Profile
     Layers, // Department
-    CalendarDays, // Structure > Department Schedule
     KeyRound, // Department Accounts
     BadgeCheck, // Role Management
 } from "lucide-react";
@@ -148,9 +147,9 @@ const data = {
 };
 
 export function AppSidebar({
-                               className,
-                               ...props
-                           }: React.ComponentProps<typeof Sidebar>) {
+    className,
+    ...props
+}: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar
             {...props}
@@ -179,8 +178,8 @@ export function AppSidebar({
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-medium">VOS Web</span>
                                     <span className="truncate text-xs text-muted-foreground">
-                    Human Resource Management
-                  </span>
+                                        Human Resource Management
+                                    </span>
                                 </div>
                             </Link>
                         </SidebarMenuButton>

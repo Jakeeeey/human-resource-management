@@ -22,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useOnCall } from "../hooks/useOnCall";
 import { EnrichedOnCallSchedule } from "../types/on-call.schema";
-import { format, parse } from "date-fns";
+import { format } from "date-fns";
 import { Users, Search, X } from "lucide-react";
 import { useDepartments } from "../../../structrure/department/hooks/userDepartments";
 import { DepartmentFilterProvider } from "../../../structrure/department/providers/DepartmentFilterProvider";
@@ -82,45 +82,51 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
     // Auto-clear staff who become unavailable when date changes
     useEffect(() => {
         if (open) {
-            setFormData(prev => {
-                const filteredStaff = prev.staffIds.filter(id => !unavailableStaffMap.has(id));
-                if (filteredStaff.length !== prev.staffIds.length) {
-                    return { ...prev, staffIds: filteredStaff };
-                }
-                return prev;
-            });
+            setTimeout(() => {
+                setFormData(prev => {
+                    const filteredStaff = prev.staffIds.filter(id => !unavailableStaffMap.has(id));
+                    if (filteredStaff.length !== prev.staffIds.length) {
+                        return { ...prev, staffIds: filteredStaff };
+                    }
+                    return prev;
+                });
+            }, 0);
         }
     }, [formData.schedule_date, unavailableStaffMap, open]);
 
     useEffect(() => {
         if (schedule && open) {
-            setFormData({
-                department_id: schedule.department_id.toString(),
-                group: schedule.group,
-                schedule_date: schedule.schedule_date,
-                work_start: schedule.work_start,
-                work_end: schedule.work_end,
-                lunch_start: schedule.lunch_start || "12:00:00",
-                lunch_end: schedule.lunch_end || "13:00:00",
-                break_start: schedule.break_start || "15:00:00",
-                break_end: schedule.break_end || "15:30:00",
-                workdays: schedule.workdays ? schedule.workdays.split(",") : [],
-                staffIds: schedule.assigned_staff.map((s) => s.user_id),
-            });
+            setTimeout(() => {
+                setFormData({
+                    department_id: schedule.department_id.toString(),
+                    group: schedule.group,
+                    schedule_date: schedule.schedule_date,
+                    work_start: schedule.work_start,
+                    work_end: schedule.work_end,
+                    lunch_start: schedule.lunch_start || "12:00:00",
+                    lunch_end: schedule.lunch_end || "13:00:00",
+                    break_start: schedule.break_start || "15:00:00",
+                    break_end: schedule.break_end || "15:30:00",
+                    workdays: schedule.workdays ? schedule.workdays.split(",") : [],
+                    staffIds: schedule.assigned_staff.map((s) => s.user_id),
+                });
+            }, 0);
         } else if (!schedule && open) {
-            setFormData({
-                department_id: "",
-                group: "",
-                schedule_date: format(new Date(), "yyyy-MM-dd"),
-                work_start: "08:00:00",
-                work_end: "17:00:00",
-                lunch_start: "12:00:00",
-                lunch_end: "13:00:00",
-                break_start: "15:00:00",
-                break_end: "15:30:00",
-                workdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-                staffIds: [],
-            });
+            setTimeout(() => {
+                setFormData({
+                    department_id: "",
+                    group: "",
+                    schedule_date: format(new Date(), "yyyy-MM-dd"),
+                    work_start: "08:00:00",
+                    work_end: "17:00:00",
+                    lunch_start: "12:00:00",
+                    lunch_end: "13:00:00",
+                    break_start: "15:00:00",
+                    break_end: "15:30:00",
+                    workdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                    staffIds: [],
+                });
+            }, 0);
         }
     }, [schedule, open]);
 
@@ -387,7 +393,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                                                 </p>
                                                 {staffSearch && (
                                                     <p className="text-xs text-muted-foreground/60 italic">
-                                                        Try adjusting your search query: "{staffSearch}"
+                                                        Try adjusting your search query: &quot;{staffSearch}&quot;
                                                     </p>
                                                 )}
                                             </div>

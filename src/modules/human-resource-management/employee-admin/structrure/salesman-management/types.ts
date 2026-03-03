@@ -46,7 +46,7 @@ export type UserRow = {
 
   // Sometimes these flags come back as Buffer-like objects
   is_deleted?: { type?: string; data?: number[] } | null;
-  isDeleted?: any;
+  isDeleted?: unknown;
 
   // Sometimes the API includes other ids
   external_id?: string | null;

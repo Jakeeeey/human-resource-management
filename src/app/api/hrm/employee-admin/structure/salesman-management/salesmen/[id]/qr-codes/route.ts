@@ -6,7 +6,7 @@ import { directusFetchRaw } from "../../../_lib";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type AnyRow = Record<string, any>;
+type AnyRow = Record<string, string | number | null | undefined | boolean>;
 
 function parseNullableNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
@@ -88,12 +88,14 @@ async function directusJsonOrThrow(pathname: string, init?: RequestInit) {
 /**
  * ✅ Next.js 16.1.6: ctx.params may be a Promise
  */
-async function getSalesmanIdFromCtx(ctx: any): Promise<number> {
-  const params = await (ctx?.params as any); // <- unwrap Promise
+type RouteContext = { params: Promise<{ id: string }> };
+
+async function getSalesmanIdFromCtx(ctx: RouteContext): Promise<number> {
+  const params = await ctx.params;
   return parseRequiredId(params?.id, "salesman id");
 }
 
-export async function GET(_req: NextRequest, ctx: any) {
+export async function GET(_req: NextRequest, ctx: RouteContext) {
   try {
     const salesmanId = await getSalesmanIdFromCtx(ctx);
 
@@ -103,15 +105,16 @@ export async function GET(_req: NextRequest, ctx: any) {
     const rows = all.filter((r) => Number(r.salesman_id) === salesmanId);
 
     return NextResponse.json({ data: rows });
-  } catch (e: any) {
+  } catch (e) {
+    const err = e as Error & { _directus?: unknown };
     return NextResponse.json(
-      { message: e?.message ?? "Failed to load QR codes.", directus: e?._directus },
+      { message: err.message ?? "Failed to load QR codes.", directus: err._directus },
       { status: 500 },
     );
   }
 }
 
-export async function POST(req: NextRequest, ctx: any) {
+export async function POST(req: NextRequest, ctx: RouteContext) {
   try {
     const salesmanId = await getSalesmanIdFromCtx(ctx);
 
@@ -185,9 +188,10 @@ export async function POST(req: NextRequest, ctx: any) {
     });
 
     return NextResponse.json({ data: created?.data ?? created });
-  } catch (e: any) {
+  } catch (e) {
+    const err = e as Error & { _directus?: unknown };
     return NextResponse.json(
-      { message: e?.message ?? "Failed to save QR code.", directus: e?._directus },
+      { message: err.message ?? "Failed to save QR code.", directus: err._directus },
       { status: 500 },
     );
   }

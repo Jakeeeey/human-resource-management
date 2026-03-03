@@ -23,7 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import type { EmployeeFileRecordType } from "../types";
 
-interface FormData {
+type FormData = {
     name: string;
     description: string;
 }
@@ -32,7 +32,7 @@ interface EmployeeFileRecordTypeDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     record?: EmployeeFileRecordType | null;
-    onSubmit: (data: any) => Promise<void>;
+    onSubmit: (data: Record<string, unknown>) => Promise<void>;
 }
 
 export function EmployeeFileRecordTypeDialog({

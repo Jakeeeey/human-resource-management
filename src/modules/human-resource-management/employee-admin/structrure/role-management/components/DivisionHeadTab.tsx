@@ -1,16 +1,16 @@
 "use client";
 
 import React from "react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, Mail, Shield, LayoutDashboard, User } from "lucide-react";
+import { Trash2, Plus, Mail, LayoutDashboard } from "lucide-react";
 import { DivisionSalesHead, SystemUser, Division } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
@@ -44,7 +44,7 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
     </div>;
   }
 
-  const assignedDivisionIds = data.map(item => 
+  const assignedDivisionIds = data.map(item =>
     typeof item.division_id === 'object' ? item.division_id.division_id : item.division_id
   );
 
@@ -57,12 +57,12 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Division Leaders</h3>
           <p className="text-sm text-muted-foreground font-medium">Strategic heads for business units.</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsDialogOpen(true)}
           disabled={availableDivisions.length === 0}
           className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 disabled:grayscale"
         >
-          <Plus className="mr-2 h-4 w-4" /> 
+          <Plus className="mr-2 h-4 w-4" />
           {availableDivisions.length === 0 ? "All Units Managed" : "Assign Unit Head"}
         </Button>
       </div>
@@ -147,9 +147,9 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pr-6 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
                         onClick={() => setDeleteTarget(item.id)}
                       >

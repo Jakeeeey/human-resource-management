@@ -1,20 +1,20 @@
 "use client";
 
 import React from "react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, UserPlus, Mail, ShieldCheck, UserCheck } from "lucide-react";
+import { Trash2, UserPlus, Mail, ShieldCheck } from "lucide-react";
 import { ReviewCommittee, SystemUser } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
-import { Badge } from "@/components/ui/badge";
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { TablePagination, usePagination } from "./TablePagination";
@@ -49,7 +49,7 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Review Committee</h3>
           <p className="text-sm text-muted-foreground font-medium">Regulatory approval authority for targets.</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsDialogOpen(true)}
           className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
         >
@@ -66,7 +66,7 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
         onConfirm={onCreate}
       />
 
-      <DeleteConfirmationDialog 
+      <DeleteConfirmationDialog
         isOpen={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         onConfirm={async () => {
@@ -135,9 +135,9 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pr-6 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
                         onClick={() => setDeleteTarget(item.id)}
                       >

@@ -8,9 +8,10 @@ export async function GET() {
   try {
     const r = await directusFetch(`/items/salesman?limit=-1&sort=-modified_date`);
     return NextResponse.json({ data: r?.data ?? [] });
-  } catch (e: any) {
+  } catch (e) {
+    const err = e as Error;
     return NextResponse.json(
-      { message: e?.message ?? "Failed to load salesmen." },
+      { message: err.message ?? "Failed to load salesmen." },
       { status: 500 },
     );
   }
@@ -33,9 +34,10 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ data: r?.data ?? r });
-  } catch (e: any) {
+  } catch (e) {
+    const err = e as Error;
     return NextResponse.json(
-      { message: e?.message ?? "Failed to create salesman." },
+      { message: err.message ?? "Failed to create salesman." },
       { status: 500 },
     );
   }

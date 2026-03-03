@@ -29,7 +29,7 @@ function DivisionModuleContent() {
         deleteDivision,
     } = useDivisions();
 
-    const handleCreate = async (data: any) => {
+    const handleCreate = async (data: Record<string, unknown>) => {
         try {
             await createDivision(data);
             toast.success("Division created successfully");
@@ -39,7 +39,7 @@ function DivisionModuleContent() {
         }
     };
 
-    const handleUpdate = async (id: number, data: any) => {
+    const handleUpdate = async (id: number, data: Record<string, unknown>) => {
         try {
             await updateDivision(id, data);
             toast.success("Division updated successfully");

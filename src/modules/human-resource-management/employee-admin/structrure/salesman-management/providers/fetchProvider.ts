@@ -16,6 +16,7 @@ async function http<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T>
   });
 
   const text = await res.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let json: any = null;
   try {
     json = text ? JSON.parse(text) : null;
@@ -88,6 +89,7 @@ export async function upsertSalesmanQrCode(args: {
   );
 
   const text = await res.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let json: any = null;
   try {
     json = text ? JSON.parse(text) : null;
@@ -104,6 +106,6 @@ export async function upsertSalesmanQrCode(args: {
     throw new Error(msg);
   }
 
-  return json as { data: any };
+  return json as { data: Record<string, unknown> };
 }
 

@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/table";
 import { RefreshCcw, QrCode } from "lucide-react";
 
-function safeId(v: any): number | null {
+function safeId(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
@@ -56,8 +56,9 @@ export function SalesmanManagementView() {
       // ✅ IMPORTANT: store rows as-is (do not transform)
       setSalesmen(s?.data ?? []);
       setLookups(l?.data ?? null);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to load salesman data.");
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message ?? "Failed to load salesman data.");
     } finally {
       setLoading(false);
     }

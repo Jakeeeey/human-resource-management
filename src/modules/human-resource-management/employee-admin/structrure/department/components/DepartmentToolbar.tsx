@@ -19,6 +19,7 @@ interface DepartmentToolbarProps {
     divisions: Division[];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function DepartmentToolbar({ divisions }: DepartmentToolbarProps) {
     const {
         filters,
@@ -28,7 +29,7 @@ export function DepartmentToolbar({ divisions }: DepartmentToolbarProps) {
         resetFilters,
     } = useDepartmentFilters();
 
-    const [open, setOpen] = React.useState(false);
+
 
     const hasActiveFilters =
         filters.search ||
@@ -86,9 +87,9 @@ export function DepartmentToolbar({ divisions }: DepartmentToolbarProps) {
 
             {hasActiveFilters && (
                 <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">
-            Active filters:
-          </span>
+                    <span className="text-sm text-muted-foreground">
+                        Active filters:
+                    </span>
 
                     {filters.search && (
                         <Badge variant="secondary">

@@ -6,7 +6,7 @@ type CookieStoreLike = {
 
 async function getCookieStore(): Promise<CookieStoreLike> {
   const maybe = cookies() as unknown;
-  if (maybe && typeof (maybe as any).then === "function") {
+  if (maybe && typeof (maybe as Record<string, unknown>).then === "function") {
     return (await maybe) as CookieStoreLike;
   }
   return maybe as CookieStoreLike;
@@ -34,7 +34,7 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
   if (envToken) return { Authorization: `Bearer ${envToken}` };
 
   // fallback to cookie
-  const cookieStore = await getCookieStore();
+  await getCookieStore();
   const cookieToken = '';
   return cookieToken ? { Authorization: `Bearer ${cookieToken}` } : {};
 }
@@ -87,7 +87,8 @@ export async function directusFetchRaw(path: string, init: RequestInit = {}) {
 export async function directusFetch(path: string, init: RequestInit = {}) {
   const r = await directusFetchRaw(path, init);
 
-  let json: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let json: Record<string, any> | null = null;
   try {
     json = r.text ? JSON.parse(r.text) : null;
   } catch {

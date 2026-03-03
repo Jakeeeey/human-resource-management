@@ -9,7 +9,7 @@ export function fullName(u?: UserRow | null) {
 
 export function isDeletedUser(u: UserRow) {
   // handle weird Buffer-like object
-  const buf = (u.is_deleted as any)?.data;
+  const buf = u.is_deleted?.data;
   if (Array.isArray(buf) && buf.length) return buf[0] === 1;
 
   // fallback

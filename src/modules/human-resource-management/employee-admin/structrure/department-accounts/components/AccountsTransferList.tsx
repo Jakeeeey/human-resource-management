@@ -14,7 +14,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Plus, X, Loader2 } from "lucide-react";
 import {
     ChartOfAccount,
-    formatAccountDisplay,
     filterAccountsBySearch,
 } from "../types";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty";

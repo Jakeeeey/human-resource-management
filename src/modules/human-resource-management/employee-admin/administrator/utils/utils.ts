@@ -86,8 +86,9 @@ export function formatInManilaTime(dateStr: string | null | undefined, formatStr
  * Standardized "Server is Down" toast notification.
  * Used when fetch/network errors occur.
  */
-export function toastServerDown(error?: any) {
-    const message = error?.message || "";
+export function toastServerDown(error?: unknown) {
+    const err = error as Error | undefined;
+    const message = err?.message || "";
     const isNetworkError =
         message.toLowerCase().includes("fetch failed") ||
         message.toLowerCase().includes("network error") ||

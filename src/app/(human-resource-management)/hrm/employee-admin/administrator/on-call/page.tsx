@@ -12,7 +12,7 @@ import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
 
-// ✅ Wire the module you asked for
+// âœ… Wire the module you asked for
 import { OnCallModule } from "@/modules/human-resource-management/employee-admin/administrator/on-call";
 
 export const runtime = "nodejs";
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): any | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
         if (!token || typeof token !== "string") return null;
         const parts = token.split(".");
@@ -37,9 +37,9 @@ function decodeJwtPayload(token: string): any | null {
     }
 }
 
-function pickString(obj: any, keys: string[]): string {
+function pickString(obj: Record<string, unknown> | null | undefined, keys: string[]): string {
     for (const k of keys) {
-        const v = obj?.[k];
+        const v = obj ? obj[k] : undefined;
         if (typeof v === "string" && v.trim()) return v.trim();
     }
     return "";
@@ -74,16 +74,16 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
 }
 
 export default async function Page() {
-    // ✅ Next.js 16: cookies() is async
+    // âœ… Next.js 16: cookies() is async
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
 
     const headerUser = buildHeaderUserFromToken(token);
 
     return (
-        // ✅ This fills the RIGHT column provided by SidebarInset (which is now fixed-height).
+        // âœ… This fills the RIGHT column provided by SidebarInset (which is now fixed-height).
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            {/* ✅ Topbar is fixed in place because ONLY <main> scrolls */}
+            {/* âœ… Topbar is fixed in place because ONLY <main> scrolls */}
             <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16 overflow-hidden">
                 <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
                     <SidebarTrigger className="-ml-1 shrink-0" />
@@ -119,7 +119,7 @@ export default async function Page() {
                 </div>
             </header>
 
-            {/* ✅ Only content scrolls inside RIGHT column */}
+            {/* âœ… Only content scrolls inside RIGHT column */}
             <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
                 <OnCallModule />
             </main>

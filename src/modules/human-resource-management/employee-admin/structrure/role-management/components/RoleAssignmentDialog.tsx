@@ -1,22 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+
 import { Label } from "@/components/ui/label";
 import { SystemUser, Division, Salesman, SupervisorPerDivision } from "../types";
 import { SearchableSelect } from "./SearchableSelect";
@@ -32,7 +25,7 @@ interface RoleAssignmentDialogProps {
   divisions?: Division[];
   salesmen?: Salesman[];
   supervisors?: SupervisorPerDivision[];
-  onConfirm: (...args: any[]) => Promise<void>;
+  onConfirm: (...args: number[]) => Promise<void>;
 }
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
@@ -136,7 +129,7 @@ export function RoleAssignmentDialog({
                   <LayoutDashboard className="h-3.5 w-3.5 opacity-40" />
                   Business Unit
                 </Label>
-                <SearchableSelect 
+                <SearchableSelect
                   options={divisionOptions}
                   value={selectedDivision}
                   onValueChange={setSelectedDivision}
@@ -153,7 +146,7 @@ export function RoleAssignmentDialog({
                   <Users className="h-3.5 w-3.5 opacity-40" />
                   Supervisor Authority
                 </Label>
-                <SearchableSelect 
+                <SearchableSelect
                   options={supervisorAsmtOptions}
                   value={selectedSupervisorAsmt}
                   onValueChange={setSelectedSupervisorAsmt}
@@ -170,7 +163,7 @@ export function RoleAssignmentDialog({
                   <Briefcase className="h-3.5 w-3.5 opacity-40" />
                   Personnel Selection
                 </Label>
-                <SearchableSelect 
+                <SearchableSelect
                   options={userOptions}
                   value={selectedUser}
                   onValueChange={setSelectedUser}
@@ -187,7 +180,7 @@ export function RoleAssignmentDialog({
                   <UserPlus className="h-3.5 w-3.5 opacity-40" />
                   Sales Associate
                 </Label>
-                <SearchableSelect 
+                <SearchableSelect
                   options={salesmanOptions}
                   value={selectedSalesman}
                   onValueChange={setSelectedSalesman}
@@ -200,23 +193,23 @@ export function RoleAssignmentDialog({
           </div>
 
           <div className="bg-primary/5 p-3 rounded-lg border border-primary/10 flex gap-3">
-             <Info className="h-5 w-5 text-primary shrink-0 mt-0.5 opacity-70" />
-             <p className="text-[11px] leading-relaxed text-primary/80 font-medium">
-               This action will take effect immediately across all linked modules and reporting dashboards. Ensure all details are verified.
-             </p>
+            <Info className="h-5 w-5 text-primary shrink-0 mt-0.5 opacity-70" />
+            <p className="text-[11px] leading-relaxed text-primary/80 font-medium">
+              This action will take effect immediately across all linked modules and reporting dashboards. Ensure all details are verified.
+            </p>
           </div>
         </div>
 
         <DialogFooter className="p-6 bg-muted/30 border-t border-muted-foreground/5 gap-3 sm:gap-0">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:bg-transparent font-bold text-xs uppercase tracking-widest"
           >
             Collapse
           </Button>
-          <Button 
-            onClick={handleConfirm} 
+          <Button
+            onClick={handleConfirm}
             disabled={isSubmitting}
             className="rounded-full px-8 bg-foreground text-background hover:bg-foreground/90 shadow-xl transition-all active:scale-95 font-bold"
           >

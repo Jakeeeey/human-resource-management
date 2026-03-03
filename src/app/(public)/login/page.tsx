@@ -115,8 +115,9 @@ function LoginForm() {
             const next = searchParams.get("next") || "/main-dashboard"
             router.replace(next)
             router.refresh()
-        } catch (err: any) {
-            const raw = err?.message ? String(err.message) : "Network error. Please try again."
+        } catch (err: unknown) {
+            const errorInfo = err as { message?: string };
+            const raw = errorInfo?.message ? String(errorInfo.message) : "Network error. Please try again."
             const msg = normalizeLoginErrorMessage(raw)
             toast.error("Sign in failed", { description: msg })
         } finally {

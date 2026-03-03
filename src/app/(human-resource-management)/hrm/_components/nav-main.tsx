@@ -194,10 +194,10 @@ export function NavMain({ items }: { items: NavNode[] }) {
         applyFromStorage();
 
         const onThemeSettingsChanged = () => applyFromStorage();
-        window.addEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as any);
+        window.addEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
 
         return () => {
-            window.removeEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as any);
+            window.removeEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
         };
     }, []);
 

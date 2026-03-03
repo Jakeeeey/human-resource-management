@@ -28,10 +28,11 @@ import { useOnCall } from "../hooks/useOnCall";
 import { OnCallDialog } from "./OnCallDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatInManilaTime } from "../../utils/utils";
+import type { EnrichedOnCallSchedule } from "../types/on-call.schema";
 
 export function OnCallTable() {
     const { data, isLoading, error, deleteSchedule, refresh } = useOnCall();
-    const [selectedSchedule, setSelectedSchedule] = React.useState<any>(null);
+    const [selectedSchedule, setSelectedSchedule] = React.useState<EnrichedOnCallSchedule | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
     const [idToDelete, setIdToDelete] = React.useState<number | null>(null);
@@ -60,7 +61,7 @@ export function OnCallTable() {
         );
     }
 
-    const handleEdit = (schedule: any) => {
+    const handleEdit = (schedule: EnrichedOnCallSchedule) => {
         setSelectedSchedule(schedule);
         setIsEditDialogOpen(true);
     };

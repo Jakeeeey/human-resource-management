@@ -38,7 +38,7 @@ type Props = {
 
 const NULL_TYPE = "__NULL__";
 
-function asId(v: any): number | null {
+function asId(v: unknown): number | null {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
@@ -64,8 +64,9 @@ export function SalesmanQrDialog(props: Props) {
     try {
       const r = await listSalesmanQrCodes(salesmanId);
       setRows(r.data ?? []);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to load QR codes.");
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message ?? "Failed to load QR codes.");
     } finally {
       setLoading(false);
     }
@@ -129,8 +130,9 @@ export function SalesmanQrDialog(props: Props) {
 
       await load();
       props.onSaved?.();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to upload QR code.");
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message ?? "Failed to upload QR code.");
     } finally {
       setSaving(false);
     }
@@ -208,6 +210,7 @@ export function SalesmanQrDialog(props: Props) {
           {savedLink ? (
             <div className="space-y-2">
               {isImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={savedLink}
                   alt="Saved QR"
@@ -229,6 +232,7 @@ export function SalesmanQrDialog(props: Props) {
           {previewUrl ? (
             <div className="mt-4">
               <div className="text-xs text-muted-foreground">New Upload Preview</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewUrl}
                 alt="Preview"

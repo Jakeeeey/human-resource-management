@@ -37,10 +37,8 @@ export async function GET() {
         qrPaymentTypes: qrPaymentTypes?.data ?? [],
       },
     });
-  } catch (e: any) {
-    return NextResponse.json(
-      { message: e?.message ?? "Failed to load lookups." },
-      { status: 500 },
-    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to load lookups.";
+    return NextResponse.json({ message }, { status: 500 });
   }
 }

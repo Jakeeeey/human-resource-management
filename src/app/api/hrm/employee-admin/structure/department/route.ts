@@ -37,7 +37,7 @@ async function fetchAll(collection: string) {
     return r.data || [];
 }
 
-function cleanHead(v: any): number | null {
+function cleanHead(v: unknown): number | null {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
 }
@@ -55,47 +55,48 @@ async function getRelationsFiltered(req: NextRequest) {
         fetchAll("positions"),
     ]);
 
-    const uMap = new Map(users.map((u: any) => [u.user_id, u]));
-    const posMap = new Map<number, any[]>();
+    const uMap = new Map(users.map((u: Record<string, unknown>) => [u.user_id, u]));
+    const posMap = new Map<number, Record<string, unknown>[]>();
 
-    deptPositions.forEach((p: any) => {
-        if (!posMap.has(p.department_id)) posMap.set(p.department_id, []);
-        posMap.get(p.department_id)!.push(p);
+    deptPositions.forEach((p: Record<string, unknown>) => {
+        const deptId = p.department_id as number;
+        if (!posMap.has(deptId)) posMap.set(deptId, []);
+        posMap.get(deptId)!.push(p);
     });
 
-    let result = departments.map((d: any) => {
+    let result = departments.map((d: Record<string, unknown>) => {
         const headId = cleanHead(d.department_head);
         return {
             ...d,
             department_head_user: headId ? uMap.get(headId) || null : null,
             department_head_id: headId,
-            positions: posMap.get(d.department_id) || [],
+            positions: posMap.get(d.department_id as number) || [],
         };
     });
 
     if (search) {
         const s = search.toLowerCase();
-        result = result.filter((d: any) =>
-            d.department_name?.toLowerCase().includes(s)
+        result = result.filter((d: Record<string, unknown>) =>
+            (d.department_name as string)?.toLowerCase().includes(s)
         );
     }
 
     if (divisionParam) {
         const ids = divisionParam.split(",").map(Number);
-        result = result.filter((d: any) =>
+        result = result.filter((d: Record<string, unknown>) =>
             ids.includes(Number(d.parent_division))
         );
     }
 
     if (fromParam) {
         const from = new Date(fromParam);
-        result = result.filter((d: any) => new Date(d.date_added) >= from);
+        result = result.filter((d: Record<string, unknown>) => new Date(d.date_added as string) >= from);
     }
 
     if (toParam) {
         const to = new Date(toParam);
         to.setHours(23, 59, 59, 999);
-        result = result.filter((d: any) => new Date(d.date_added) <= to);
+        result = result.filter((d: Record<string, unknown>) => new Date(d.date_added as string) <= to);
     }
 
     return { departments: result, divisions, users };
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!created?.data) {
-        throw new Error("Department create failed — no data returned");
+        throw new Error("Department create failed Ã¢â‚¬â€ no data returned");
     }
 
     const deptId = created.data.department_id;
@@ -153,7 +154,7 @@ export async function PATCH(req: NextRequest) {
     // delete existing
     const existing = await fetchAll("positions");
 
-    for (const p of existing.filter((x: any) => x.department_id === department_id)) {
+    for (const p of existing.filter((x: Record<string, unknown>) => x.department_id === department_id)) {
         await dFetch(`/items/positions/${p.id}`, {
             method: "DELETE",
         });
@@ -179,7 +180,7 @@ export async function DELETE(req: NextRequest) {
 
     const existing = await fetchAll("positions");
 
-    for (const p of existing.filter((x: any) => x.department_id === Number(id))) {
+    for (const p of existing.filter((x: Record<string, unknown>) => x.department_id === Number(id))) {
         await dFetch(`/items/positions/${p.id}`, {
             method: "DELETE",
         });

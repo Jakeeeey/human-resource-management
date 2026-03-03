@@ -63,7 +63,7 @@ async function proxy(req: NextRequest) {
       status: res.status,
       headers: { "content-type": contentType },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Proxy request failed" }, { status: 502 });
   }
 }

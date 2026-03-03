@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): any | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
         const parts = token.split(".");
         if (parts.length < 2) return null;
@@ -36,9 +36,9 @@ function decodeJwtPayload(token: string): any | null {
     }
 }
 
-function pickString(obj: any, keys: string[]): string {
+function pickString(obj: Record<string, unknown> | null | undefined, keys: string[]): string {
     for (const k of keys) {
-        const v = obj?.[k];
+        const v = obj ? obj[k] : undefined;
         if (typeof v === "string" && v.trim()) return v.trim();
     }
     return "";
@@ -73,7 +73,7 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
 }
 
 export default async function Page() {
-    // ✅ Next.js 16: cookies() is async
+    // âœ… Next.js 16: cookies() is async
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
 

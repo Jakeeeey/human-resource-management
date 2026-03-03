@@ -45,8 +45,8 @@ interface DivisionTableProps {
     departments: Department[];
     bankAccounts: BankAccount[];
     isLoading?: boolean;
-    onCreateDivision: (data: any) => Promise<void>;
-    onUpdateDivision: (id: number, data: any) => Promise<void>;
+    onCreateDivision: (data: Record<string, unknown>) => Promise<void>;
+    onUpdateDivision: (id: number, data: Record<string, unknown>) => Promise<void>;
     onDeleteDivision: (id: number) => Promise<void>;
 }
 
@@ -60,11 +60,7 @@ export function DivisionTable({
     onUpdateDivision,
     onDeleteDivision,
 }: DivisionTableProps) {
-    const [isMounted, setIsMounted] = React.useState(false);
 
-    React.useEffect(() => {
-        setIsMounted(true);
-    }, []);
 
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -98,9 +94,12 @@ export function DivisionTable({
         []
     );
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),

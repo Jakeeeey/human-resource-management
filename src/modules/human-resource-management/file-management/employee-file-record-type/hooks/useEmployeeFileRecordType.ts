@@ -10,8 +10,8 @@ interface UseEmployeeFileRecordTypeReturn {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createRecord: (data: any) => Promise<void>;
-    updateRecord: (id: number, data: any) => Promise<void>;
+    createRecord: (data: Record<string, unknown>) => Promise<void>;
+    updateRecord: (id: number, data: Record<string, unknown>) => Promise<void>;
     deleteRecord: (id: number) => Promise<void>;
 }
 
@@ -37,9 +37,10 @@ export function useEmployeeFileRecordType(): UseEmployeeFileRecordTypeReturn {
 
             const data = await res.json();
             setAllRecords(data.records || []);
-        } catch (err: any) {
+        } catch (err) {
+            const error = err as Error;
             setIsError(true);
-            setError(err);
+            setError(error);
         } finally {
             setIsLoading(false);
         }
@@ -75,7 +76,7 @@ export function useEmployeeFileRecordType(): UseEmployeeFileRecordTypeReturn {
     }, [allRecords, filters]);
 
     const createRecord = useCallback(
-        async (data: any) => {
+        async (data: Record<string, unknown>) => {
             const res = await fetch(
                 "/api/hrm/file-management/employee-file-record-type",
                 {
@@ -91,7 +92,7 @@ export function useEmployeeFileRecordType(): UseEmployeeFileRecordTypeReturn {
     );
 
     const updateRecord = useCallback(
-        async (id: number, data: any) => {
+        async (id: number, data: Record<string, unknown>) => {
             const res = await fetch(
                 "/api/hrm/file-management/employee-file-record-type",
                 {

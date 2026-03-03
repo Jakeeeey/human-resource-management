@@ -1,7 +1,7 @@
 "use client";
 import { Input } from "@/components/ui/input";
 
-export function SingleDatePicker({ value, onChange, placeholder }: any) {
+export function SingleDatePicker({ value, onChange, placeholder }: { value: Date | null | undefined, onChange: (date: Date | null) => void, placeholder?: string }) {
     return (
         <Input
             type="date"

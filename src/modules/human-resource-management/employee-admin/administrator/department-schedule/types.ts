@@ -78,7 +78,7 @@ export interface DepartmentScheduleFormData {
     workdays_note: string;
 }
 
-export interface CreateDepartmentScheduleData extends DepartmentScheduleFormData {}
+export type CreateDepartmentScheduleData = DepartmentScheduleFormData;
 
 export interface UpdateDepartmentScheduleData extends Partial<DepartmentScheduleFormData> {
     schedule_id: number;

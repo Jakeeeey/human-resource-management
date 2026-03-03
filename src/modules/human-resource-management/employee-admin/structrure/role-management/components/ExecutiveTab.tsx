@@ -1,13 +1,13 @@
 "use client";
 
 import React from "react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Trash2, UserPlus, Mail, Briefcase, User } from "lucide-react";
@@ -15,7 +15,7 @@ import { Executive, SystemUser } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { TablePagination, usePagination } from "./TablePagination";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
 
@@ -48,7 +48,7 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
           <h3 className="text-lg font-semibold tracking-tight">Executive Registry</h3>
           <p className="text-sm text-muted-foreground">Highest level authority assignments.</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsDialogOpen(true)}
           className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
         >
@@ -65,7 +65,7 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
         onConfirm={onCreate}
       />
 
-      <DeleteConfirmationDialog 
+      <DeleteConfirmationDialog
         isOpen={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         onConfirm={async () => {
@@ -102,7 +102,7 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
               pagination.paginatedItems.map((item) => {
                 const user = getUser(item.user_id);
                 const initials = user ? `${user.user_fname?.[0] || ''}${user.user_lname?.[0] || ''}` : '?';
-                
+
                 return (
                   <TableRow key={item.id} className="group border-muted-foreground/10 hover:bg-muted/30 transition-colors">
                     <TableCell className="py-4 px-6">
@@ -117,7 +117,7 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
                             {user?.user_fname} {user?.user_lname}
                           </div>
                           <div className="text-[11px] text-muted-foreground uppercase font-bold tracking-widest mt-0.5 opacity-60">
-                             ID: #{item.id}
+                            ID: #{item.id}
                           </div>
                         </div>
                       </div>
@@ -135,9 +135,9 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pr-6 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
                         onClick={() => setDeleteTarget(item.id)}
                       >

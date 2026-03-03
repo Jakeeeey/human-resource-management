@@ -21,8 +21,8 @@ interface UseDepartmentSchedulesReturn {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createSchedule: (data: any) => Promise<void>;
-    updateSchedule: (id: number, data: any) => Promise<void>;
+    createSchedule: (data: Record<string, unknown>) => Promise<void>;
+    updateSchedule: (id: number, data: Record<string, unknown>) => Promise<void>;
     deleteSchedule: (id: number) => Promise<void>;
 }
 
@@ -93,7 +93,7 @@ export function useDepartmentSchedules(): UseDepartmentSchedulesReturn {
         return result;
     }, [allSchedules, filters]);
 
-    const createSchedule = useCallback(async (data: any) => {
+    const createSchedule = useCallback(async (data: Record<string, unknown>) => {
         try {
             const response = await fetch('/api/hrm/employee-admin/administrator/department-schedule', {
                 method: 'POST',
@@ -113,7 +113,7 @@ export function useDepartmentSchedules(): UseDepartmentSchedulesReturn {
         }
     }, [fetchData]);
 
-    const updateSchedule = useCallback(async (id: number, data: any) => {
+    const updateSchedule = useCallback(async (id: number, data: Record<string, unknown>) => {
         try {
             const response = await fetch('/api/hrm/employee-admin/administrator/department-schedule', {
                 method: 'PATCH',

@@ -8,7 +8,8 @@ const SPRING_COOKIE_NAME = "springboot_token";
 /**
  * Utility to decode JWT without a library
  */
-function decodeJwt(token: string): any {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function decodeJwt(token: string): Record<string, any> | null {
     try {
         const base64Url = token.split(".")[1];
         const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -20,7 +21,7 @@ function decodeJwt(token: string): any {
                 .join("")
         );
         return JSON.parse(jsonPayload);
-    } catch (e) {
+    } catch {
         return null;
     }
 }

@@ -62,7 +62,7 @@ interface DivisionDialogProps {
     users: User[];
     departments: Department[];
     bankAccounts: BankAccount[];
-    onSubmit: (data: any) => Promise<void>;
+    onSubmit: (data: Record<string, unknown>) => Promise<void>;
 }
 
 

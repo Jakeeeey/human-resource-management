@@ -1,16 +1,16 @@
 "use client";
 
 import React from "react";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, UserCircle2, UserCircle, Briefcase, Hash } from "lucide-react";
+import { Trash2, Plus, UserCircle2, UserCircle, Hash } from "lucide-react";
 import { SalesmanPerSupervisor, Salesman, SupervisorPerDivision, SystemUser, Division } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
@@ -54,7 +54,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Sales Force</h3>
           <p className="text-sm text-muted-foreground font-medium">Frontline personnel assigned to supervisors.</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsDialogOpen(true)}
           className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
         >
@@ -75,7 +75,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
         }}
       />
 
-      <DeleteConfirmationDialog 
+      <DeleteConfirmationDialog
         isOpen={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         onConfirm={async () => {
@@ -114,8 +114,8 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
                 const supAsmt = getSupervisorAsmt(item.supervisor_per_division_id);
                 const supUser = getUser(supAsmt?.supervisor_id);
                 const division = getDivision(supAsmt?.division_id);
-                
-                const initials = salesman?.salesman_name 
+
+                const initials = salesman?.salesman_name
                   ? salesman.salesman_name.split(' ').map(n => n[0]).join('').slice(0, 2)
                   : '?';
 
@@ -151,9 +151,9 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pr-6 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full opacity-0 group-hover:opacity-100 transition-all active:scale-90"
                         onClick={() => setDeleteTarget(item.id)}
                       >

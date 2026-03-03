@@ -118,7 +118,6 @@ export async function GET(req: NextRequest) {
             // Probing for assignments collection
             let assignments: DepartmentDivisionCOA[] = [];
             const possibleAssignCollections = ["department_division_coa", "dept_div_coa", "assigned_accounts"];
-            let assignFound = false;
 
             const [allAccounts, accountTypes] = await Promise.all([
                 fetchAll<ChartOfAccount>(COLLECTIONS.CHART_OF_ACCOUNTS),
@@ -129,9 +128,8 @@ export async function GET(req: NextRequest) {
                 try {
                     assignments = await fetchAll<DepartmentDivisionCOA>(coll);
                     console.log(`Successfully fetched from assignment collection: ${coll}`);
-                    assignFound = true;
                     break;
-                } catch (e) {
+                } catch {
                     console.warn(`Failed to fetch from assignment collection: ${coll}, trying next...`);
                 }
             }
@@ -164,7 +162,6 @@ export async function GET(req: NextRequest) {
         // Probing for link collection
         let deptPerDiv: DepartmentPerDivision[] = [];
         const possibleLinkCollections = ["department_per_division", "division_departments", "dept_div"];
-        let linkFound = false;
 
         const [divisions, departments, accounts, accountTypes] = await Promise.all([
             fetchAll<Division>(COLLECTIONS.DIVISION),
@@ -177,9 +174,8 @@ export async function GET(req: NextRequest) {
             try {
                 deptPerDiv = await fetchAll<DepartmentPerDivision>(coll);
                 console.log(`Successfully fetched from link collection: ${coll}`);
-                linkFound = true;
                 break;
-            } catch (e) {
+            } catch {
                 console.warn(`Failed to fetch from link collection: ${coll}, trying next...`);
             }
         }

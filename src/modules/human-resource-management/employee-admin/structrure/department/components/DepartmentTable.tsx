@@ -48,20 +48,20 @@ interface DepartmentTableProps {
     divisions: Division[];
     users: User[];
     isLoading?: boolean;
-    onCreateDepartment: (data: any) => Promise<void>;
-    onUpdateDepartment: (id: number, data: any) => Promise<void>;
+    onCreateDepartment: (data: Record<string, unknown>) => Promise<void>;
+    onUpdateDepartment: (id: number, data: Record<string, unknown>) => Promise<void>;
     onDeleteDepartment: (id: number) => Promise<void>;
 }
 
 export function DepartmentTable({
-                                    data,
-                                    divisions,
-                                    users,
-                                    isLoading = false,
-                                    onCreateDepartment,
-                                    onUpdateDepartment,
-                                    onDeleteDepartment,
-                                }: DepartmentTableProps) {
+    data,
+    divisions,
+    users,
+    isLoading = false,
+    onCreateDepartment,
+    onUpdateDepartment,
+    onDeleteDepartment,
+}: DepartmentTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -100,9 +100,12 @@ export function DepartmentTable({
         []
     );
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),

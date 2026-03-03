@@ -6,7 +6,7 @@ import { OnCallScheduleSchema } from "@/modules/human-resource-management/employ
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): any | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
         if (!token) return null;
         const parts = token.split(".");
@@ -21,11 +21,12 @@ function decodeJwtPayload(token: string): any | null {
     }
 }
 
-function handleApiError(error: any) {
+function handleApiError(error: unknown) {
+    const errorInfo = error as { message?: string };
     console.error("API Error:", error);
-    const status = error.message?.includes("VALIDATION_FAILED") ? 400 : 500;
+    const status = errorInfo.message?.includes("VALIDATION_FAILED") ? 400 : 500;
     return NextResponse.json(
-        { error: error.message || "Internal Server Error" },
+        { error: errorInfo.message || "Internal Server Error" },
         { status }
     );
 }
@@ -54,7 +55,7 @@ export async function PATCH(
         // Validate partial data
         const validatedSchedule = OnCallScheduleSchema.partial().parse(scheduleData);
 
-        await onCallService.updateSchedule(id, validatedSchedule as any, staffIds);
+        await onCallService.updateSchedule(id, Object.assign({}, validatedSchedule), staffIds);
         return NextResponse.json({ success: true });
     } catch (error) {
         return handleApiError(error);

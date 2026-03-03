@@ -18,8 +18,9 @@ export function useSalesmanManagement() {
       const [l, s] = await Promise.all([getLookups(), listSalesmen()]);
       setLookups(l.data);
       setSalesmen(s.data ?? []);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to load Salesman Management data.");
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message ?? "Failed to load Salesman Management data.");
     } finally {
       setLoading(false);
     }
@@ -30,8 +31,9 @@ export function useSalesmanManagement() {
     try {
       const s = await listSalesmen();
       setSalesmen(s.data ?? []);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to refresh salesmen.");
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message ?? "Failed to refresh salesmen.");
     } finally {
       setRefreshing(false);
     }

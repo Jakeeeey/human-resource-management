@@ -43,7 +43,7 @@ function DepartmentModuleContent() {
     // CRUD HANDLERS WITH SONNER TOAST
     // ------------------------------------------------------------------------
 
-    const handleCreate = async (data: unknown) => {
+    const handleCreate = async (data: Record<string, unknown>) => {
         try {
             await createDepartment(data);
             toast.success("Department created successfully");
@@ -53,7 +53,7 @@ function DepartmentModuleContent() {
         }
     };
 
-    const handleUpdate = async (id: number, data: unknown) => {
+    const handleUpdate = async (id: number, data: Record<string, unknown>) => {
         try {
             await updateDepartment(id, data);
             toast.success("Department updated successfully");

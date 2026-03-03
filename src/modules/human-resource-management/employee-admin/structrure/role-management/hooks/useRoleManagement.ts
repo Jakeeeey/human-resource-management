@@ -103,7 +103,8 @@ export function useRoleManagement() {
       await provider.createExecutive(userId);
       await fetchExecutives();
       toast.success("Executive assigned successfully");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to assign executive");
       throw err;
@@ -115,7 +116,8 @@ export function useRoleManagement() {
       await provider.deleteExecutive(id);
       await fetchExecutives();
       toast.success("Executive removed successfully");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to remove executive");
       throw err;
@@ -127,7 +129,8 @@ export function useRoleManagement() {
       await provider.createReviewCommittee(data);
       await fetchReviewCommittee();
       toast.success("Review committee member added");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to add review committee member");
       throw err;
@@ -139,7 +142,8 @@ export function useRoleManagement() {
       await provider.deleteReviewCommittee(id);
       await fetchReviewCommittee();
       toast.success("Review committee member removed");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to remove review committee member");
       throw err;
@@ -151,7 +155,8 @@ export function useRoleManagement() {
       await provider.createDivisionHead(divisionId, userId);
       await fetchDivisionHeads();
       toast.success("Division head assigned");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to assign division head");
       throw err;
@@ -163,7 +168,8 @@ export function useRoleManagement() {
       await provider.deleteDivisionHead(id);
       await fetchDivisionHeads();
       toast.success("Division head removed");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to remove division head");
       throw err;
@@ -175,7 +181,8 @@ export function useRoleManagement() {
       await provider.createSupervisor(divisionId, supervisorId);
       await fetchSupervisors();
       toast.success("Supervisor assigned");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to assign supervisor");
       throw err;
@@ -188,7 +195,8 @@ export function useRoleManagement() {
       // Cascade: supervisor delete also soft-deletes their salesmen, so refetch both
       await Promise.all([fetchSupervisors(), fetchSalesmanAssignments()]);
       toast.success("Supervisor removed (and linked salesmen unassigned)");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to remove supervisor");
       throw err;
@@ -200,7 +208,8 @@ export function useRoleManagement() {
       await provider.createSalesmanAssignment(supDivId, salesmanId);
       await fetchSalesmanAssignments();
       toast.success("Salesman assigned successfully");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to assign salesman");
       throw err;
@@ -212,7 +221,8 @@ export function useRoleManagement() {
       await provider.deleteSalesmanAssignment(id);
       await fetchSalesmanAssignments();
       toast.success("Salesman unassigned successfully");
-    } catch (err: any) {
+    } catch (e) {
+      const err = e as Error;
       console.error(err);
       toast.error(err.message || "Failed to unassign salesman");
       throw err;

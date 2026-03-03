@@ -81,7 +81,7 @@ export interface DivisionFormData {
     department_assignments: DepartmentAssignment[]; // Array of department assignments
 }
 
-export interface CreateDivisionData extends DivisionFormData { }
+export type CreateDivisionData = DivisionFormData;
 
 export interface UpdateDivisionData extends Partial<DivisionFormData> {
     division_id: number;

@@ -11,7 +11,7 @@ import {
 
 const PROXY_BASE = "/api/hrm/employee-admin/structure/role-management";
 
-async function request<T>(method: string, endpoint: string, body?: any): Promise<T> {
+async function request<T>(method: string, endpoint: string, body?: Record<string, unknown>): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };

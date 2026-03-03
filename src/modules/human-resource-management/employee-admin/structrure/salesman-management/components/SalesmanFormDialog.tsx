@@ -168,8 +168,9 @@ export function SalesmanFormDialog(props: Props) {
     try {
       await props.onSubmit(draft);
       onOpenChange(false);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to save salesman.");
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message ?? "Failed to save salesman.");
     } finally {
       setSaving(false);
     }
@@ -330,7 +331,7 @@ export function SalesmanFormDialog(props: Props) {
           <div className="md:col-span-2">
             <Label>Inventory Day</Label>
             {/* must be null -> keep UI but disable */}
-            <Select value="" onValueChange={() => {}} disabled>
+            <Select value="" onValueChange={() => { }} disabled>
               <SelectTrigger className="opacity-60">
                 <SelectValue placeholder="(null)" />
               </SelectTrigger>

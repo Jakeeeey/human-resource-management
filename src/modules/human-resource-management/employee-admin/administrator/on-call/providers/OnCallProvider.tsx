@@ -12,8 +12,8 @@ interface OnCallContextType {
     isLoading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
-    createSchedule: (schedule: any, staffIds: number[]) => Promise<boolean>;
-    updateSchedule: (id: number, schedule: any, staffIds: number[]) => Promise<boolean>;
+    createSchedule: (schedule: Record<string, unknown>, staffIds: number[]) => Promise<boolean>;
+    updateSchedule: (id: number, schedule: Record<string, unknown>, staffIds: number[]) => Promise<boolean>;
     deleteSchedule: (id: number) => Promise<boolean>;
 }
 
@@ -46,9 +46,10 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             } else {
                 setData(schedules);
             }
-        } catch (err: any) {
-            setError(err.message);
-            toastServerDown(err);
+        } catch (err) {
+            const error = err as Error;
+            setError(error.message);
+            toastServerDown(error);
         } finally {
             setIsLoading(false);
         }
@@ -58,7 +59,7 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
         refresh();
     }, [refresh]);
 
-    const createSchedule = async (schedule: any, staffIds: number[]) => {
+    const createSchedule = async (schedule: Record<string, unknown>, staffIds: number[]) => {
         try {
             const response = await fetch("/api/hrm/employee-admin/administrator/on-call", {
                 method: "POST",
@@ -72,13 +73,13 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             toast.success("Schedule created successfully");
             refresh();
             return true;
-        } catch (err: any) {
-            toastServerDown(err);
+        } catch (err) {
+            toastServerDown(err as Error);
             return false;
         }
     };
 
-    const updateSchedule = async (id: number, schedule: any, staffIds: number[]) => {
+    const updateSchedule = async (id: number, schedule: Record<string, unknown>, staffIds: number[]) => {
         try {
             const response = await fetch(`/api/hrm/employee-admin/administrator/on-call/${id}`, {
                 method: "PATCH",
@@ -92,8 +93,8 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             toast.success("Schedule updated successfully");
             refresh();
             return true;
-        } catch (err: any) {
-            toastServerDown(err);
+        } catch (err) {
+            toastServerDown(err as Error);
             return false;
         }
     };
@@ -110,8 +111,8 @@ export function OnCallProvider({ children }: { children: React.ReactNode }) {
             toast.success("Schedule deleted successfully");
             refresh();
             return true;
-        } catch (err: any) {
-            toastServerDown(err);
+        } catch (err) {
+            toastServerDown(err as Error);
             return false;
         }
     };

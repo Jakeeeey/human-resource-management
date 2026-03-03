@@ -30,7 +30,7 @@ export default function OnCallPage() {
 
 function OnCallContent() {
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-    const { departments, isLoading: isDeptsLoading } = useDepartments();
+    const { departments } = useDepartments();
     const { refresh, isLoading: isRefreshing } = useOnCall();
 
     return (
@@ -63,7 +63,7 @@ function OnCallContent() {
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">All Schedules</h2>
                     <ScmAdvancedFilters
-                        departments={departments.map((d: any) => ({ id: d.department_name, name: d.department_name }))}
+                        departments={departments.map((d: { department_name: string }) => ({ id: d.department_name, name: d.department_name }))}
                         showDepartment={true}
                         showSupplier={false}
                         showDateRange={false}

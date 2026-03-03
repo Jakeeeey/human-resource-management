@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import type { EmployeeFileRecordListWithRelations } from "../types";
 import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
 
-interface FormData {
+type FormData = {
     record_type_id: string;
     name: string;
     description: string;
@@ -42,7 +42,7 @@ interface EmployeeFileRecordListDialogProps {
     onOpenChange: (open: boolean) => void;
     record?: EmployeeFileRecordListWithRelations | null;
     recordTypes: EmployeeFileRecordType[];
-    onSubmit: (data: any) => Promise<void>;
+    onSubmit: (data: Record<string, unknown>) => Promise<void>;
 }
 
 export function EmployeeFileRecordListDialog({

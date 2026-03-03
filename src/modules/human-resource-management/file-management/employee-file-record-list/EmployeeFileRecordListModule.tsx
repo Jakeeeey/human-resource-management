@@ -30,7 +30,7 @@ function EmployeeFileRecordListModuleContent() {
         deleteRecord,
     } = useEmployeeFileRecordList();
 
-    const handleCreate = async (data: unknown) => {
+    const handleCreate = async (data: Record<string, unknown>) => {
         try {
             await createRecord(data);
             toast.success("Record created successfully");
@@ -40,7 +40,7 @@ function EmployeeFileRecordListModuleContent() {
         }
     };
 
-    const handleUpdate = async (id: number, data: unknown) => {
+    const handleUpdate = async (id: number, data: Record<string, unknown>) => {
         try {
             await updateRecord(id, data);
             toast.success("Record updated successfully");

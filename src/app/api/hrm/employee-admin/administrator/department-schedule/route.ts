@@ -114,7 +114,7 @@ async function buildScheduleRelations() {
 // GET - List All Schedules
 // ============================================================================
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const { enriched, departments, users } = await buildScheduleRelations();
 
