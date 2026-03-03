@@ -49,13 +49,13 @@ interface DepartmentScheduleTableProps {
 }
 
 export function DepartmentScheduleTable({
-                                            data,
-                                            departments,
-                                            isLoading = false,
-                                            onCreateSchedule,
-                                            onUpdateSchedule,
-                                            onDeleteSchedule,
-                                        }: DepartmentScheduleTableProps) {
+    data,
+    departments,
+    isLoading = false,
+    onCreateSchedule,
+    onUpdateSchedule,
+    onDeleteSchedule,
+}: DepartmentScheduleTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -66,15 +66,15 @@ export function DepartmentScheduleTable({
     const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
     const [selectedSchedule, setSelectedSchedule] = React.useState<DepartmentScheduleWithRelations | null>(null);
 
-    const handleEdit = (schedule: DepartmentScheduleWithRelations) => {
+    const handleEdit = React.useCallback((schedule: DepartmentScheduleWithRelations) => {
         setSelectedSchedule(schedule);
         setEditDialogOpen(true);
-    };
+    }, []);
 
-    const handleDelete = (schedule: DepartmentScheduleWithRelations) => {
+    const handleDelete = React.useCallback((schedule: DepartmentScheduleWithRelations) => {
         setSelectedSchedule(schedule);
         setDeleteDialogOpen(true);
-    };
+    }, []);
 
     const handleConfirmDelete = async () => {
         if (selectedSchedule) {
@@ -89,6 +89,7 @@ export function DepartmentScheduleTable({
     );
 
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,

@@ -1,0 +1,17 @@
+C:\Users\Eulysis\Documents\human-resource-management\src\modules\human-resource-management\employee-admin\administrator\on-call\components\OnCallDialog.tsx
+  392:90 react/no-unescaped-entities: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.
+  392:104 react/no-unescaped-entities: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.
+
+C:\Users\Eulysis\Documents\human-resource-management\src\modules\human-resource-management\file-management\employee-file-record-type\components\EmployeeFileRecordTypeTable.tsx
+  88:19 react-hooks/incompatible-library: Compilation Skipped: Use of incompatible library
+
+This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+
+C:\Users\Eulysis\Documents\human-resource-management\src\modules\human-resource-management\file-management\employee-file-record-type\components\EmployeeFileRecordTypeTable.tsx:88:19
+  86 |     );
+  87 |
+> 88 |     const table = useReactTable({
+     |                   ^^^^^^^^^^^^^ TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely
+  89 |         data,
+  90 |         columns,
+  91 |         onSortingChange: setSorting,

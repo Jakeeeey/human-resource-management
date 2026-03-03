@@ -47,7 +47,7 @@ export function DeleteConfirmDialog({
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This will permanently delete the record type{" "}
-                        <span className="font-semibold">"{record?.name}"</span>. This
+                        <span className="font-semibold">&quot;{record?.name}&quot;</span>. This
                         action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
