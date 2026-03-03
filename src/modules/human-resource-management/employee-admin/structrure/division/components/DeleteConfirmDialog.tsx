@@ -25,11 +25,11 @@ interface DeleteConfirmDialogProps {
 }
 
 export function DeleteConfirmDialog({
-                                        open,
-                                        onOpenChange,
-                                        division,
-                                        onConfirm,
-                                    }: DeleteConfirmDialogProps) {
+    open,
+    onOpenChange,
+    division,
+    onConfirm,
+}: DeleteConfirmDialogProps) {
     const [isDeleting, setIsDeleting] = React.useState(false);
 
     const handleConfirm = async () => {
@@ -53,9 +53,7 @@ export function DeleteConfirmDialog({
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This will permanently delete the division{" "}
-                        <span className="font-semibold">
-                            "{division?.division_name}"
-                        </span>
+                        &quot;{division?.division_name}&quot;
                         {departmentCount > 0 && (
                             <span>
                                 {" "}and remove its association with {departmentCount} department(s)

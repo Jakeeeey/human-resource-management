@@ -29,11 +29,11 @@ interface DeleteConfirmDialogProps {
 }
 
 export function DeleteConfirmDialog({
-                                        open,
-                                        onOpenChange,
-                                        department,
-                                        onConfirm,
-                                    }: DeleteConfirmDialogProps) {
+    open,
+    onOpenChange,
+    department,
+    onConfirm,
+}: DeleteConfirmDialogProps) {
     const [isDeleting, setIsDeleting] = React.useState(false);
 
     const handleConfirm = async () => {
@@ -55,9 +55,7 @@ export function DeleteConfirmDialog({
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This will permanently delete the department{" "}
-                        <span className="font-semibold">
-              "{department?.department_name}"
-            </span>
+                        &quot;{department?.department_name}&quot;
                         . This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>

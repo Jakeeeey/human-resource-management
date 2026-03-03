@@ -82,6 +82,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
     // Auto-clear staff who become unavailable when date changes
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData(prev => {
                 const filteredStaff = prev.staffIds.filter(id => !unavailableStaffMap.has(id));
                 if (filteredStaff.length !== prev.staffIds.length) {
@@ -94,6 +95,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
 
     useEffect(() => {
         if (schedule && open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setFormData({
                 department_id: schedule.department_id.toString(),
                 group: schedule.group,
@@ -387,7 +389,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                                                 </p>
                                                 {staffSearch && (
                                                     <p className="text-xs text-muted-foreground/60 italic">
-                                                        Try adjusting your search query: "{staffSearch}"
+                                                        Try adjusting your search query: &quot;{staffSearch}&quot;
                                                     </p>
                                                 )}
                                             </div>

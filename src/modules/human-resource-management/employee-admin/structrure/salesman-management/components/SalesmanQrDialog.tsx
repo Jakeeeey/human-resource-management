@@ -208,6 +208,7 @@ export function SalesmanQrDialog(props: Props) {
           {savedLink ? (
             <div className="space-y-2">
               {isImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={savedLink}
                   alt="Saved QR"
@@ -229,6 +230,7 @@ export function SalesmanQrDialog(props: Props) {
           {previewUrl ? (
             <div className="mt-4">
               <div className="text-xs text-muted-foreground">New Upload Preview</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewUrl}
                 alt="Preview"

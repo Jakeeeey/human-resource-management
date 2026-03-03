@@ -25,11 +25,11 @@ interface DeleteConfirmDialogProps {
 }
 
 export function DeleteConfirmDialog({
-                                        open,
-                                        onOpenChange,
-                                        schedule,
-                                        onConfirm,
-                                    }: DeleteConfirmDialogProps) {
+    open,
+    onOpenChange,
+    schedule,
+    onConfirm,
+}: DeleteConfirmDialogProps) {
     const [isDeleting, setIsDeleting] = React.useState(false);
 
     const handleConfirm = async () => {
@@ -51,9 +51,7 @@ export function DeleteConfirmDialog({
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This will permanently delete the schedule for{" "}
-                        <span className="font-semibold">
-                            "{schedule?.department?.department_name}"
-                        </span>
+                        &quot;{schedule?.department?.department_name}&quot;
                         . This action cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>

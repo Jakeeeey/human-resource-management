@@ -54,14 +54,14 @@ interface DepartmentTableProps {
 }
 
 export function DepartmentTable({
-                                    data,
-                                    divisions,
-                                    users,
-                                    isLoading = false,
-                                    onCreateDepartment,
-                                    onUpdateDepartment,
-                                    onDeleteDepartment,
-                                }: DepartmentTableProps) {
+    data,
+    divisions,
+    users,
+    isLoading = false,
+    onCreateDepartment,
+    onUpdateDepartment,
+    onDeleteDepartment,
+}: DepartmentTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -100,6 +100,7 @@ export function DepartmentTable({
         []
     );
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
