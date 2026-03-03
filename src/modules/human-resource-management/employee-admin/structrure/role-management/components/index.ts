@@ -1,7 +1,0 @@
-export * from "./ExecutiveTab";
-export * from "./ReviewCommitteeTab";
-export * from "./DivisionHeadTab";
-export * from "./SupervisorTab";
-export * from "./SalesmanTab";
-export * from "./RoleAssignmentDialog";
-export * from "./TablePagination";
