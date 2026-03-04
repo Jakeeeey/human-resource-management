@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import type { 
+import type {
     EmployeeFileRecordListWithRelations,
-    EmployeeFileRecordListFormData 
+    EmployeeFileRecordListFormData
 } from "../types";
 import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
 import {
@@ -86,6 +86,7 @@ export function EmployeeFileRecordListTable({
         [handleEdit]
     );
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
@@ -166,9 +167,9 @@ export function EmployeeFileRecordListTable({
                                         {header.isPlaceholder
                                             ? null
                                             : flexRender(
-                                                  header.column.columnDef.header,
-                                                  header.getContext()
-                                              )}
+                                                header.column.columnDef.header,
+                                                header.getContext()
+                                            )}
                                     </TableHead>
                                 ))}
                             </TableRow>
