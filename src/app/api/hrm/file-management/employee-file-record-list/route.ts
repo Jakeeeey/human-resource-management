@@ -30,15 +30,30 @@ async function fetchAll(collection: string) {
     return r.data || [];
 }
 
+interface RecordType {
+    id: number;
+    name: string;
+    description: string | null;
+    [key: string]: unknown;
+}
+
+interface Record {
+    id: number;
+    record_type_id: number;
+    name: string;
+    description: string | null;
+    [key: string]: unknown;
+}
+
 export async function GET() {
     const [records, recordTypes] = await Promise.all([
         fetchAll("employee_file_record_list"),
         fetchAll("employee_file_record_type"),
     ]);
 
-    const typeMap = new Map(recordTypes.map((t: { id: string | number }) => [t.id, t]));
+    const typeMap = new Map(recordTypes.map((t: RecordType) => [t.id, t]));
 
-    const enriched = records.map((r: { record_type_id: string | number } & Record<string, unknown>) => ({
+    const enriched = records.map((r: Record) => ({
         ...r,
         record_type: typeMap.get(r.record_type_id) || null,
     }));

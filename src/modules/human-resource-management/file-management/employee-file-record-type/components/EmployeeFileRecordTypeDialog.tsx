@@ -2,6 +2,10 @@
 
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import type { 
+    EmployeeFileRecordType,
+    EmployeeFileRecordTypeFormData 
+} from "../types";
 import {
     Dialog,
     DialogContent,
@@ -21,9 +25,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import type { EmployeeFileRecordType } from "../types";
 
-type FormData = {
+interface FormData {
     name: string;
     description: string;
 }
@@ -32,7 +35,7 @@ interface EmployeeFileRecordTypeDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     record?: EmployeeFileRecordType | null;
-    onSubmit: (data: Record<string, unknown>) => Promise<void>;
+    onSubmit: (data: EmployeeFileRecordTypeFormData) => Promise<void>;
 }
 
 export function EmployeeFileRecordTypeDialog({

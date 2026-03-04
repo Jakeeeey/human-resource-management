@@ -1,6 +1,11 @@
 "use client";
 
 import React from "react";
+import type { 
+    EmployeeFileRecordListWithRelations,
+    EmployeeFileRecordListFormData 
+} from "../types";
+import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
 import {
     flexRender,
     getCoreRowModel,
@@ -28,8 +33,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Plus } from "lucide-react";
-import type { EmployeeFileRecordListWithRelations } from "../types";
-import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
 import { createColumns } from "./columns";
 import { EmployeeFileRecordListToolbar } from "./EmployeeFileRecordListToolbar";
 import { EmployeeFileRecordListDialog } from "./EmployeeFileRecordListDialog";
@@ -39,8 +42,8 @@ interface EmployeeFileRecordListTableProps {
     data: EmployeeFileRecordListWithRelations[];
     recordTypes: EmployeeFileRecordType[];
     isLoading?: boolean;
-    onCreateRecord: (data: Record<string, unknown>) => Promise<void>;
-    onUpdateRecord: (id: number, data: Record<string, unknown>) => Promise<void>;
+    onCreateRecord: (data: EmployeeFileRecordListFormData) => Promise<void>;
+    onUpdateRecord: (id: number, data: EmployeeFileRecordListFormData) => Promise<void>;
     onDeleteRecord: (id: number) => Promise<void>;
 }
 
@@ -65,15 +68,10 @@ export function EmployeeFileRecordListTable({
     const [selectedRecord, setSelectedRecord] =
         React.useState<EmployeeFileRecordListWithRelations | null>(null);
 
-    const handleEdit = (record: EmployeeFileRecordListWithRelations) => {
+    const handleEdit = React.useCallback((record: EmployeeFileRecordListWithRelations) => {
         setSelectedRecord(record);
         setEditDialogOpen(true);
-    };
-
-    const handleDelete = (record: EmployeeFileRecordListWithRelations) => {
-        setSelectedRecord(record);
-        setDeleteDialogOpen(true);
-    };
+    }, []);
 
     const handleConfirmDelete = async () => {
         if (selectedRecord) {
@@ -84,16 +82,13 @@ export function EmployeeFileRecordListTable({
     };
 
     const columns = React.useMemo(
-        () => createColumns(handleEdit, handleDelete),
-        []
+        () => createColumns(handleEdit),
+        [handleEdit]
     );
 
-    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
         getCoreRowModel: getCoreRowModel(),
@@ -171,9 +166,9 @@ export function EmployeeFileRecordListTable({
                                         {header.isPlaceholder
                                             ? null
                                             : flexRender(
-                                                header.column.columnDef.header,
-                                                header.getContext()
-                                            )}
+                                                  header.column.columnDef.header,
+                                                  header.getContext()
+                                              )}
                                     </TableHead>
                                 ))}
                             </TableRow>

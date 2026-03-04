@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
-import { EmployeeFileRecordTypeFilterProvider } from "./providers/fetchProvider";
+import type { EmployeeFileRecordTypeFormData } from "./types";
+import { EmployeeFileRecordTypeFilterProvider } from "./providers/filterProvider";
+import { EmployeeFileRecordTypeFetchProvider } from "./providers/fetchProvider";
 import { useEmployeeFileRecordType } from "./hooks/useEmployeeFileRecordType";
 import { EmployeeFileRecordTypeTable } from "./components/EmployeeFileRecordTypeTable";
 import {
@@ -29,7 +31,7 @@ function EmployeeFileRecordTypeModuleContent() {
         deleteRecord,
     } = useEmployeeFileRecordType();
 
-    const handleCreate = async (data: Record<string, unknown>) => {
+    const handleCreate = async (data: EmployeeFileRecordTypeFormData) => {
         try {
             await createRecord(data);
             toast.success("Record type created successfully");
@@ -39,7 +41,7 @@ function EmployeeFileRecordTypeModuleContent() {
         }
     };
 
-    const handleUpdate = async (id: number, data: Record<string, unknown>) => {
+    const handleUpdate = async (id: number, data: EmployeeFileRecordTypeFormData) => {
         try {
             await updateRecord(id, data);
             toast.success("Record type updated successfully");
@@ -117,8 +119,10 @@ function EmployeeFileRecordTypeModuleContent() {
 
 export default function EmployeeFileRecordTypeModule() {
     return (
-        <EmployeeFileRecordTypeFilterProvider>
-            <EmployeeFileRecordTypeModuleContent />
-        </EmployeeFileRecordTypeFilterProvider>
+        <EmployeeFileRecordTypeFetchProvider>
+            <EmployeeFileRecordTypeFilterProvider>
+                <EmployeeFileRecordTypeModuleContent />
+            </EmployeeFileRecordTypeFilterProvider>
+        </EmployeeFileRecordTypeFetchProvider>
     );
 }
