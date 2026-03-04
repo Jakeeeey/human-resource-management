@@ -1,7 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import type { EmployeeFileRecordListWithRelations } from "../types";
+import type { 
+    EmployeeFileRecordListWithRelations,
+    EmployeeFileRecordListFormData 
+} from "../types";
 import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
 
 interface EmployeeFileRecordListFetchContextType {
@@ -11,8 +14,8 @@ interface EmployeeFileRecordListFetchContextType {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createRecord: (data: any) => Promise<void>;
-    updateRecord: (id: number, data: any) => Promise<void>;
+    createRecord: (data: EmployeeFileRecordListFormData) => Promise<void>;
+    updateRecord: (id: number, data: EmployeeFileRecordListFormData) => Promise<void>;
     deleteRecord: (id: number) => Promise<void>;
 }
 
@@ -45,9 +48,9 @@ export function EmployeeFileRecordListFetchProvider({
             const data = await res.json();
             setAllRecords(data.records || []);
             setRecordTypes(data.recordTypes || []);
-        } catch (err: any) {
+        } catch (err) {
             setIsError(true);
-            setError(err);
+            setError(err instanceof Error ? err : new Error(String(err)));
         } finally {
             setIsLoading(false);
         }
@@ -58,7 +61,7 @@ export function EmployeeFileRecordListFetchProvider({
     }, [fetchData]);
 
     const createRecord = useCallback(
-        async (data: any) => {
+        async (data: EmployeeFileRecordListFormData) => {
             const res = await fetch(
                 "/api/hrm/file-management/employee-file-record-list",
                 {
@@ -74,7 +77,7 @@ export function EmployeeFileRecordListFetchProvider({
     );
 
     const updateRecord = useCallback(
-        async (id: number, data: any) => {
+        async (id: number, data: EmployeeFileRecordListFormData) => {
             const res = await fetch(
                 "/api/hrm/file-management/employee-file-record-list",
                 {

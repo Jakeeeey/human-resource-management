@@ -27,8 +27,7 @@ function formatDate(value: string): string {
 }
 
 export const createColumns = (
-    onEdit: (record: EmployeeFileRecordType) => void,
-    onDelete: (record: EmployeeFileRecordType) => void
+    onEdit: (record: EmployeeFileRecordType) => void
 ): ColumnDef<EmployeeFileRecordType>[] => [
     {
         accessorKey: "name",

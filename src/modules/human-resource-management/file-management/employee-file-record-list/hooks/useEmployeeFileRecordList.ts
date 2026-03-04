@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type {
     EmployeeFileRecordListWithRelations,
+    EmployeeFileRecordListFormData,
 } from "../types";
 import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
 import { useEmployeeFileRecordListFilterContext } from "../providers/filterProvider";
@@ -15,8 +16,8 @@ interface UseEmployeeFileRecordListReturn {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createRecord: (data: any) => Promise<void>;
-    updateRecord: (id: number, data: any) => Promise<void>;
+    createRecord: (data: EmployeeFileRecordListFormData) => Promise<void>;
+    updateRecord: (id: number, data: EmployeeFileRecordListFormData) => Promise<void>;
     deleteRecord: (id: number) => Promise<void>;
 }
 

@@ -1,6 +1,10 @@
 "use client";
 
 import React from "react";
+import type { 
+    EmployeeFileRecordType,
+    EmployeeFileRecordTypeFormData 
+} from "../types";
 import {
     flexRender,
     getCoreRowModel,
@@ -28,7 +32,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Plus } from "lucide-react";
-import type { EmployeeFileRecordType } from "../types";
 import { createColumns } from "./columns";
 import { EmployeeFileRecordTypeToolbar } from "./EmployeeFileRecordTypeToolbar";
 import { EmployeeFileRecordTypeDialog } from "./EmployeeFileRecordTypeDialog";
@@ -37,8 +40,8 @@ import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 interface EmployeeFileRecordTypeTableProps {
     data: EmployeeFileRecordType[];
     isLoading?: boolean;
-    onCreateRecord: (data: any) => Promise<void>;
-    onUpdateRecord: (id: number, data: any) => Promise<void>;
+    onCreateRecord: (data: EmployeeFileRecordTypeFormData) => Promise<void>;
+    onUpdateRecord: (id: number, data: EmployeeFileRecordTypeFormData) => Promise<void>;
     onDeleteRecord: (id: number) => Promise<void>;
 }
 
@@ -62,15 +65,10 @@ export function EmployeeFileRecordTypeTable({
     const [selectedRecord, setSelectedRecord] =
         React.useState<EmployeeFileRecordType | null>(null);
 
-    const handleEdit = (record: EmployeeFileRecordType) => {
+    const handleEdit = React.useCallback((record: EmployeeFileRecordType) => {
         setSelectedRecord(record);
         setEditDialogOpen(true);
-    };
-
-    const handleDelete = (record: EmployeeFileRecordType) => {
-        setSelectedRecord(record);
-        setDeleteDialogOpen(true);
-    };
+    }, []);
 
     const handleConfirmDelete = async () => {
         if (selectedRecord) {
@@ -81,8 +79,8 @@ export function EmployeeFileRecordTypeTable({
     };
 
     const columns = React.useMemo(
-        () => createColumns(handleEdit, handleDelete),
-        []
+        () => createColumns(handleEdit),
+        [handleEdit]
     );
 
     const table = useReactTable({

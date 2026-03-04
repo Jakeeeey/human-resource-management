@@ -1,7 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import type { EmployeeFileRecordType } from "../types";
+import type { 
+    EmployeeFileRecordType,
+    EmployeeFileRecordTypeFormData 
+} from "../types";
 
 interface EmployeeFileRecordTypeFetchContextType {
     allRecords: EmployeeFileRecordType[];
@@ -9,8 +12,8 @@ interface EmployeeFileRecordTypeFetchContextType {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createRecord: (data: any) => Promise<void>;
-    updateRecord: (id: number, data: any) => Promise<void>;
+    createRecord: (data: EmployeeFileRecordTypeFormData) => Promise<void>;
+    updateRecord: (id: number, data: EmployeeFileRecordTypeFormData) => Promise<void>;
     deleteRecord: (id: number) => Promise<void>;
 }
 
@@ -41,9 +44,9 @@ export function EmployeeFileRecordTypeFetchProvider({
 
             const data = await res.json();
             setAllRecords(data.records || []);
-        } catch (err: any) {
+        } catch (err) {
             setIsError(true);
-            setError(err);
+            setError(err instanceof Error ? err : new Error(String(err)));
         } finally {
             setIsLoading(false);
         }
@@ -54,7 +57,7 @@ export function EmployeeFileRecordTypeFetchProvider({
     }, [fetchData]);
 
     const createRecord = useCallback(
-        async (data: any) => {
+        async (data: EmployeeFileRecordTypeFormData) => {
             const res = await fetch(
                 "/api/hrm/file-management/employee-file-record-type",
                 {
@@ -70,7 +73,7 @@ export function EmployeeFileRecordTypeFetchProvider({
     );
 
     const updateRecord = useCallback(
-        async (id: number, data: any) => {
+        async (id: number, data: EmployeeFileRecordTypeFormData) => {
             const res = await fetch(
                 "/api/hrm/file-management/employee-file-record-type",
                 {

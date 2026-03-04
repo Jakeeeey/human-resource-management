@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import type { EmployeeFileRecordType } from "../types";
+import type { 
+    EmployeeFileRecordType,
+    EmployeeFileRecordTypeFormData 
+} from "../types";
 import { useEmployeeFileRecordTypeFilterContext } from "../providers/filterProvider";
 import { useEmployeeFileRecordTypeFetchContext } from "../providers/fetchProvider";
 
@@ -11,8 +14,8 @@ interface UseEmployeeFileRecordTypeReturn {
     isError: boolean;
     error: Error | null;
     refetch: () => Promise<void>;
-    createRecord: (data: any) => Promise<void>;
-    updateRecord: (id: number, data: any) => Promise<void>;
+    createRecord: (data: EmployeeFileRecordTypeFormData) => Promise<void>;
+    updateRecord: (id: number, data: EmployeeFileRecordTypeFormData) => Promise<void>;
     deleteRecord: (id: number) => Promise<void>;
 }
 
