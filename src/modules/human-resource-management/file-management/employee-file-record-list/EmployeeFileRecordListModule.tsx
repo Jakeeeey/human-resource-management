@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { EmployeeFileRecordListFilterProvider } from "./providers/fetchProvider";
+import { EmployeeFileRecordListFilterProvider } from "./providers/filterProvider";
+import { EmployeeFileRecordListFetchProvider } from "./providers/fetchProvider";
 import { useEmployeeFileRecordList } from "./hooks/useEmployeeFileRecordList";
 import { EmployeeFileRecordListTable } from "./components/EmployeeFileRecordListTable";
 import {
@@ -30,7 +31,7 @@ function EmployeeFileRecordListModuleContent() {
         deleteRecord,
     } = useEmployeeFileRecordList();
 
-    const handleCreate = async (data: Record<string, unknown>) => {
+    const handleCreate = async (data: unknown) => {
         try {
             await createRecord(data);
             toast.success("Record created successfully");
@@ -40,7 +41,7 @@ function EmployeeFileRecordListModuleContent() {
         }
     };
 
-    const handleUpdate = async (id: number, data: Record<string, unknown>) => {
+    const handleUpdate = async (id: number, data: unknown) => {
         try {
             await updateRecord(id, data);
             toast.success("Record updated successfully");
@@ -119,8 +120,10 @@ function EmployeeFileRecordListModuleContent() {
 
 export default function EmployeeFileRecordListModule() {
     return (
-        <EmployeeFileRecordListFilterProvider>
-            <EmployeeFileRecordListModuleContent />
-        </EmployeeFileRecordListFilterProvider>
+        <EmployeeFileRecordListFetchProvider>
+            <EmployeeFileRecordListFilterProvider>
+                <EmployeeFileRecordListModuleContent />
+            </EmployeeFileRecordListFilterProvider>
+        </EmployeeFileRecordListFetchProvider>
     );
 }

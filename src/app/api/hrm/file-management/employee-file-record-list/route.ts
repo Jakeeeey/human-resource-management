@@ -36,9 +36,9 @@ export async function GET() {
         fetchAll("employee_file_record_type"),
     ]);
 
-    const typeMap = new Map(recordTypes.map((t: { id: string | number }) => [t.id, t]));
+    const typeMap = new Map(recordTypes.map((t: any) => [t.id, t]));
 
-    const enriched = records.map((r: { record_type_id: string | number } & Record<string, unknown>) => ({
+    const enriched = records.map((r: any) => ({
         ...r,
         record_type: typeMap.get(r.record_type_id) || null,
     }));

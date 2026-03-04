@@ -12,7 +12,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Search, X } from "lucide-react";
-import { useEmployeeFileRecordListFilterContext } from "../providers/fetchProvider";
+import { useEmployeeFileRecordListFilterContext } from "../providers/filterProvider";
 import { SingleDatePicker } from "@/modules/human-resource-management/employee-admin/structrure/department/components/SingleDatePicker";
 import type { EmployeeFileRecordType } from "../../employee-file-record-type/types";
 
