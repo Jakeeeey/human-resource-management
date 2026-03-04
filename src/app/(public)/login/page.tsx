@@ -134,7 +134,7 @@ function LoginForm() {
                     {/* Left: Brand / intro */}
                     <div className="hidden flex-col justify-center rounded-2xl border bg-card p-10 lg:flex">
                         <div className="flex items-center gap-2">
-                            <div className="text-lg font-semibold">VOS ERP</div>
+                            <div className="text-lg font-semibold">VOS ERP 2</div>
                             <Badge variant="secondary" className="text-[11px]">
                                 vos-web-v2
                             </Badge>
