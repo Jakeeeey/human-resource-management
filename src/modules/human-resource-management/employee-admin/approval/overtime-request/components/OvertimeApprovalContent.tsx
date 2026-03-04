@@ -128,7 +128,6 @@ export default function OvertimeApprovalContent() {
         data={requests}
         onApprove={handleApprove}
         onReject={handleReject}
-        onRefresh={handleRefresh}
         isLoading={isLoading}
       />
     </div>

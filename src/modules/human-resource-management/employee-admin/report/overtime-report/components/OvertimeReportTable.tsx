@@ -23,7 +23,6 @@ interface OvertimeReportTableProps {
   isLoading: boolean;
   pagination: PaginationState;
   onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
 }
 
 // ============================================================================
@@ -69,7 +68,6 @@ export function OvertimeReportTable({
   isLoading,
   pagination,
   onPageChange,
-  onPageSizeChange,
 }: OvertimeReportTableProps) {
   if (isLoading) {
     return (

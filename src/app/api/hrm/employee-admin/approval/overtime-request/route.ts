@@ -8,10 +8,30 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // ============================================================================
+// TYPES
+// ============================================================================
+
+interface JwtPayload {
+  id?: number;
+  user_id?: number;
+  sub?: number;
+  [key: string]: unknown;
+}
+
+interface OvertimeRequest {
+  overtime_id: number;
+  user_id: number;
+  department_id?: number;
+  status: string;
+  filed_at?: string;
+  [key: string]: unknown;
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
-function decodeJwtPayload(token: string): any | null {
+function decodeJwtPayload(token: string): JwtPayload | null {
   try {
     if (!token) return null;
     const parts = token.split(".");
@@ -55,7 +75,7 @@ async function directusFetch(path: string, options: RequestInit = {}) {
 // GET - Fetch Overtime Requests (Pending, filtered by department)
 // ============================================================================
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const token = await getAuthToken();
     const payload = token ? decodeJwtPayload(token) : null;
@@ -92,7 +112,7 @@ export async function GET(req: NextRequest) {
     const requests = overtimeResponse.data || [];
 
     // Fetch user details for each request
-    const userIds = [...new Set(requests.map((r: any) => r.user_id))] as number[];
+    const userIds = [...new Set(requests.map((r: OvertimeRequest) => r.user_id))] as number[];
     const usersPromises = userIds.map((id) =>
       directusFetch(`/items/user/${id}?fields=user_id,user_fname,user_lname,user_mname,user_department`)
         .catch(() => null)
@@ -105,7 +125,7 @@ export async function GET(req: NextRequest) {
     );
 
     // Fetch department details
-    const deptIds = [...new Set(requests.map((r: any) => r.department_id).filter(Boolean))] as number[];
+    const deptIds = [...new Set(requests.map((r: OvertimeRequest) => r.department_id).filter(Boolean))] as number[];
     const deptsPromises = deptIds.map((id) =>
       directusFetch(`/items/department/${id}?fields=department_id,department_name`)
         .catch(() => null)
@@ -118,7 +138,7 @@ export async function GET(req: NextRequest) {
     );
 
     // Combine data
-    const enrichedRequests = requests.map((req: any) => {
+    const enrichedRequests = requests.map((req: OvertimeRequest) => {
       const user = usersMap.get(req.user_id);
       const dept = req.department_id ? deptsMap.get(req.department_id) : null;
 
@@ -172,7 +192,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Update the overtime request
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       status,
       remarks: remarks || null,
       approver_id: userId,

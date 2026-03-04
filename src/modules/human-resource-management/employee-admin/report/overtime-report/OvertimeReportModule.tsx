@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 // ============================================================================
 // INNER COMPONENT (Has access to context)
@@ -25,7 +25,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 function OvertimeReportModuleContent() {
   const {
     requests,
-    filteredRequests,
     departments,
     currentUser,
     isHRAdmin,
@@ -43,7 +42,6 @@ function OvertimeReportModuleContent() {
     employeeNames,
     pagination,
     setCurrentPage,
-    setPageSize,
   } = useOvertimeReport();
 
   if (isError) {
@@ -123,7 +121,6 @@ function OvertimeReportModuleContent() {
         isLoading={isLoading}
         pagination={pagination}
         onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
       />
     </div>
   );

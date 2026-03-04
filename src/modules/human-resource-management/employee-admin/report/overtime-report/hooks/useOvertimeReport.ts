@@ -56,7 +56,6 @@ export function useOvertimeReport() {
   } = filterContext;
 
   const {
-    pagination,
     setCurrentPage,
     setPageSize,
     paginateRequests,

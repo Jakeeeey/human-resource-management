@@ -7,7 +7,33 @@ const COOKIE_NAME = "vos_access_token";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function decodeJwtPayload(token: string): any | null {
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface JwtPayload {
+  id?: number;
+  user_id?: number;
+  sub?: number;
+  [key: string]: unknown;
+}
+
+interface OvertimeRequest {
+  overtime_id: number;
+  user_id: number;
+  department_id?: number;
+  status: string;
+  filed_at?: string;
+  [key: string]: unknown;
+}
+
+interface Department {
+  department_id: number;
+  department_name: string;
+  [key: string]: unknown;
+}
+
+function decodeJwtPayload(token: string): JwtPayload | null {
   try {
     if (!token) return null;
     const parts = token.split(".");
@@ -90,7 +116,7 @@ export async function GET() {
     const requests = overtimeResponse.data || [];
 
     // Fetch all unique users
-    const userIds = [...new Set(requests.map((r: any) => r.user_id))].filter(
+    const userIds = [...new Set(requests.map((r: OvertimeRequest) => r.user_id))].filter(
       (id): id is number => typeof id === "number"
     );
     const usersMap = new Map();
@@ -109,10 +135,10 @@ export async function GET() {
     );
 
     // Enrich overtime requests with user details
-    const enrichedRequests = requests.map((req: any) => {
+    const enrichedRequests = requests.map((req: OvertimeRequest) => {
       const user = usersMap.get(req.user_id);
       const department = departments.find(
-        (d: any) => d.department_id === req.department_id
+        (d: Department) => d.department_id === req.department_id
       );
 
       const fullName = user

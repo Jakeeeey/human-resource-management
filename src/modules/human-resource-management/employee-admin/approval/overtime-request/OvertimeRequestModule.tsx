@@ -6,8 +6,7 @@ import {
   fetchOvertimeRequests,
   approveOrRejectOvertimeRequest,
 } from "./providers/fetchProvider";
-import type { OvertimeRequestWithUser, ApprovalAction } from "./type";
-import { Spinner } from "@/components/ui/spinner";
+import type { OvertimeRequestWithUser } from "./type";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -133,7 +132,6 @@ export default function OvertimeRequestModule() {
         data={requests}
         onApprove={handleApprove}
         onReject={handleReject}
-        onRefresh={handleRetry}
         isLoading={isLoading}
       />
     </div>
