@@ -1,3 +1,33 @@
 /.github/ @Jakeeeey @ECuerdo
 
+/src/app/(human-resource-management)/hrm/_components/ @Jakeeeey
+
+/src/app/(human-resource-management)/layout.tsx @Jakeeeey
+
+/src/app/(human-resource-management)/layout.tsx @Jakeeeey
+
+/src/app/api/auth/@Jakeeeey
+
+/src/app/(public)/ @Jakeeeey
+
+/src/app/globals.css @Jakeeeey
+
+/src/app/layout.tsx @Jakeeeey
+
 /src/components/ui/ @Jakeeeey
+
+/src/hooks/ @Jakeeeey
+
+/src/lib @Jakeeeey
+
+/components.json @Jakeeeey
+
+/eslint.config.mjs @Jakeeeey
+
+/next.config.ts @Jakeeeey
+
+/next-env.d.ts @Jakeeeey
+
+/postcss.config.mjs @Jakeeeey
+
+/tsconfig.json @Jakeeeey
