@@ -13,7 +13,7 @@ import { NavUser } from "../../../_components/nav-user";
 import { cookies } from "next/headers";
 
 // âœ… Wire the module you asked for
-import ComingSoon from "../../../_components/ComingSoon";
+import OvertimeRequestModule from "@/modules/human-resource-management/employee-admin/approval/overtime-request/OvertimeRequestModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,7 +116,7 @@ export default async function Page() {
 
             {/* âœ… Only content scrolls inside RIGHT column */}
             <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
-                <ComingSoon />
+                <OvertimeRequestModule />
             </main>
         </div>
     );
