@@ -143,7 +143,11 @@ export async function POST(req: NextRequest) {
         value: token,
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        // use this for production
+        // secure: process.env.NODE_ENV === "production",
+
+        // for development only to allow cookies to work on http
+        secure: false,
         path: "/",
         maxAge: cookieMaxAgeFromJwt(token),
     });
