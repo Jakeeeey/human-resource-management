@@ -173,7 +173,7 @@ const SUBSYSTEMS: SubsystemItem[] = [
 
     {
         id: "crm",
-        title: "CRM",
+        title: "Customer Relationship Management",
         subtitle: "Customers, accounts, pipeline, quotations, after-sales linkage",
         href: "/crm",
         status: "comingSoon",
