@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 const COOKIE_NAME = "vos_access_token"
-const PROTECTED_PREFIXES = ["/dashboard", "/scm", "/fm", "/hrm", "/bia", "/arf"]
+const PROTECTED_PREFIXES = ["/dashboard", "/scm", "/fm", "/hrm", "/bia", "/arf", "/cafeteria"]
 const PUBLIC_FILE = /\.(.*)$/
 
 function isProtectedPath(pathname: string) {
