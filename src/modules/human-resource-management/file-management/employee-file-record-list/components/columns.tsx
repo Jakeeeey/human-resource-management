@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, Pencil } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -28,7 +28,8 @@ function formatDate(value: string): string {
 }
 
 export const createColumns = (
-    onEdit: (record: EmployeeFileRecordListWithRelations) => void
+    onEdit: (record: EmployeeFileRecordListWithRelations) => void,
+    onDelete: (record: EmployeeFileRecordListWithRelations) => void
 ): ColumnDef<EmployeeFileRecordListWithRelations>[] => [
     {
         accessorKey: "name",
@@ -110,6 +111,13 @@ export const createColumns = (
                         <DropdownMenuItem onClick={() => onEdit(record)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                            onClick={() => onDelete(record)}
+                            className="text-red-600 focus:text-red-600"
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
