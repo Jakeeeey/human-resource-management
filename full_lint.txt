@@ -1,0 +1,29 @@
+
+> human-resource-management@0.1.0 lint
+> eslint --max-warnings=0
+
+
+C:\Users\mark_\human-resource-management-dev\src\modules\human-resource-management\employee-admin\employee-masterlist\components\EditProfileTab.tsx
+    3:35  warning  'useEffect' is defined but never used                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  237:7   warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                    @typescript-eslint/no-unused-expressions
+  239:7   warning  Expected an assignment or function call and instead saw an expression                                                                                                                                                                                                                    @typescript-eslint/no-unused-expressions
+  515:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  561:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\mark_\human-resource-management-dev\src\modules\human-resource-management\employee-admin\employee-masterlist\components\EmployeeTable.tsx
+  76:19  warning  Compilation Skipped: Use of incompatible library
+
+This API returns functions which cannot be memoized without leading to stale UI. To prevent this, by default React Compiler will skip memoizing this component/hook. However, you may see issues if values from this API are passed to other components/hooks that are memoized.
+
+C:\Users\mark_\human-resource-management-dev\src\modules\human-resource-management\employee-admin\employee-masterlist\components\EmployeeTable.tsx:76:19
+  74 |     const columns = React.useMemo(() => createColumns(handleViewDetails, handleDelete, departments), [handleViewDetails, handleDelete, departments]);
+  75 |
+> 76 |     const table = useReactTable({
+     |                   ^^^^^^^^^^^^^ TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely
+  77 |         data,
+  78 |         columns,
+  79 |         onSortingChange: setSorting,  react-hooks/incompatible-library
+
+✖ 6 problems (0 errors, 6 warnings)
+
+ESLint found too many warnings (maximum: 0).

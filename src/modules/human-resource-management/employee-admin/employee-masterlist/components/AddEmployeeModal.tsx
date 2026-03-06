@@ -36,7 +36,6 @@ import {
   UserPlus,
   ShieldCheck,
   X,
-  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Department } from "../types";
@@ -123,7 +122,7 @@ export interface AddEmployeeModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   departments: Department[];
-  onSubmit: (data: NewEmployeeFormData) => Promise<void>;
+  onSubmit: (data: NewEmployeeFormData & { _userImageId?: string; _signatureId?: string }) => Promise<void>;
 }
 
 // ─── Sub-section header ───────────────────────────────────────────────────────
@@ -214,7 +213,6 @@ export function AddEmployeeModal({
 }: AddEmployeeModalProps) {
   const [form, setForm] = useState<NewEmployeeFormData>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // Signature pad
@@ -235,7 +233,6 @@ export function AddEmployeeModal({
       setForm(EMPTY_FORM);
       setImagePreview(null);
       setSigPreview(null);
-      setUploadStatus(null);
       setPasswordError(null);
       clearCanvas();
     }
@@ -269,9 +266,17 @@ export function AddEmployeeModal({
     set(key, file as NewEmployeeFormData[typeof key]);
     if (file) {
       const url = URL.createObjectURL(file);
-      key === "user_image" ? setImagePreview(url) : setSigPreview(url);
+      if (key === "user_image") {
+        setImagePreview(url);
+      } else {
+        setSigPreview(url);
+      }
     } else {
-      key === "user_image" ? setImagePreview(null) : setSigPreview(null);
+      if (key === "user_image") {
+        setImagePreview(null);
+      } else {
+        setSigPreview(null);
+      }
     }
   }
 
@@ -286,37 +291,30 @@ export function AddEmployeeModal({
     }
 
     setIsSubmitting(true);
-    setUploadStatus(null);
     try {
       // ── Step 1: Upload images to Directus /files ──
       let userImageId: string | undefined;
       let signatureId: string | undefined;
 
       if (form.user_image) {
-        setUploadStatus("Uploading profile photo...");
         userImageId = await uploadToDirectus(form.user_image, "profile");
       }
 
       // Prefer uploaded signature file; fall back to drawn pad
       if (form.signature) {
-        setUploadStatus("Uploading signature image...");
         signatureId = await uploadToDirectus(form.signature, "signature");
       } else if (canvasRef.current) {
-        setUploadStatus("Capturing signature pad...");
         const padId = await uploadCanvasToDirectus(canvasRef.current);
         if (padId) signatureId = padId;
       }
 
-      setUploadStatus("Saving employee record...");
-
       // ── Step 2: Pass enriched form data to parent ──
-      await onSubmit({ ...form, user_image: null, signature: null, _userImageId: userImageId, _signatureId: signatureId } as any);
+      await onSubmit({ ...form, user_image: null, signature: null, _userImageId: userImageId, _signatureId: signatureId });
       onOpenChange(false);
     } catch {
       // error handled in parent hook (toast)
     } finally {
       setIsSubmitting(false);
-      setUploadStatus(null);
     }
   }
 

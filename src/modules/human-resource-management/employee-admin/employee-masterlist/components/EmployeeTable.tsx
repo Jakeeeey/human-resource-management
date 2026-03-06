@@ -59,20 +59,21 @@ export function EmployeeTable({
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = React.useState({});
 
-    const handleViewDetails = (user: User) => {
+    const handleViewDetails = React.useCallback((user: User) => {
         if (onViewDetails) {
             onViewDetails(user);
         }
-    };
+    }, [onViewDetails]);
 
-    const handleDelete = async (user: User) => {
+    const handleDelete = React.useCallback(async (user: User) => {
         if (onDeleteEmployee) {
             await onDeleteEmployee(user.id);
         }
-    };
+    }, [onDeleteEmployee]);
 
-    const columns = React.useMemo(() => createColumns(handleViewDetails, handleDelete, departments), [onViewDetails, onDeleteEmployee, departments]);
+    const columns = React.useMemo(() => createColumns(handleViewDetails, handleDelete, departments), [handleViewDetails, handleDelete, departments]);
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,

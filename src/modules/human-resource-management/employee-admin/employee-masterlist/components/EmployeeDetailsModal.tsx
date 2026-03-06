@@ -86,7 +86,7 @@ export function EmployeeDetailsModal({
                       Edit Profile
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Update {user.firstName}'s personal and employment information.
+                      Update {user.firstName}&apos;s personal and employment information.
                     </p>
                   </div>
                   <EditProfileTab user={user} departments={departments} onUpdateEmployee={onUpdateEmployee} />

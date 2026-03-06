@@ -3,9 +3,10 @@
 // ============================================================================
 
 export interface EmployeeFileRecordCategory {
-    // fields to be defined
+    id: string;
+    name: string;
 }
 
 export interface EmployeeFileRecordCategoryFormData {
-    // fields to be defined
+    name: string;
 }

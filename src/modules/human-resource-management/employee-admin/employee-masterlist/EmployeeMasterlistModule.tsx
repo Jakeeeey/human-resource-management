@@ -32,7 +32,6 @@ export default function EmployeeMasterlistModule() {
     error,
     refetch,
     removeEmployee,
-    addEmployee,
     updateEmployee,
   } = useEmployeeMasterlist();
 

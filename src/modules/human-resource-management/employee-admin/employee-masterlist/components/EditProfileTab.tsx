@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState } from "react";
 import imageCompression from "browser-image-compression";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ import {
   Save,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import type { Department, User } from "../types";
 import { UpdateEmployeePayload } from "../providers/springProvider";
 
@@ -234,9 +235,17 @@ export function EditProfileTab({
     set(key, file as EditEmployeeFormData[typeof key]);
     if (file) {
       const url = URL.createObjectURL(file);
-      key === "image" ? setImagePreview(url) : setSigPreview(url);
+      if (key === "image") {
+        setImagePreview(url);
+      } else {
+        setSigPreview(url);
+      }
     } else {
-      key === "image" ? setImagePreview(null) : setSigPreview(null);
+      if (key === "image") {
+        setImagePreview(null);
+      } else {
+        setSigPreview(null);
+      }
     }
   }
 
@@ -512,7 +521,7 @@ export function EditProfileTab({
             >
               {(imagePreview || existingImage) ? (
                 <div className="relative w-full h-full group">
-                  <img src={imagePreview || existingImage!} alt="preview" className="h-full w-full object-cover" />
+                  <Image fill src={imagePreview || existingImage!} alt="preview" className="object-cover" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="text-white text-xs font-bold font-mono">CHANGE PHOTO</span>
                   </div>
@@ -558,7 +567,7 @@ export function EditProfileTab({
             >
               {(sigPreview || existingSignature) ? (
                 <div className="relative w-full h-full group">
-                  <img src={sigPreview || existingSignature!} alt="signature" className="h-full w-full object-contain p-4" />
+                  <Image fill src={sigPreview || existingSignature!} alt="signature" className="object-contain p-4" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="text-white text-xs font-bold font-mono">CHANGE SIGNATURE</span>
                   </div>
