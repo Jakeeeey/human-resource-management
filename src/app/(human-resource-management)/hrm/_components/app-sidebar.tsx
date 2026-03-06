@@ -140,6 +140,11 @@ const data = {
                     url: "/hrm/file-management/employee-file-record-list",
                     icon: Shield,
                 },
+                {
+                    title: "Employee File Record Category",
+                    url: "/hrm/file-management/employee-file-record-category",
+                    icon: Shield,
+                },
             ],
 
         },
