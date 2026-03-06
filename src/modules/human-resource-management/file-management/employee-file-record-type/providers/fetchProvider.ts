@@ -1,9 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import type { 
+import type {
     EmployeeFileRecordType,
-    EmployeeFileRecordTypeFormData 
+    EmployeeFileRecordTypeFormData
 } from "../types";
 
 interface EmployeeFileRecordTypeFetchContextType {
