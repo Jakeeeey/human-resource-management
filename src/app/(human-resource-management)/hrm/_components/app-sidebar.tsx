@@ -40,6 +40,21 @@ const data = {
             isActive: false,
             items: [
                 {
+                    title: "ID Generation",
+                    url: "/hrm/employee-admin/id-generation",
+                    icon: UserRound,
+                },
+                {
+                    title: "201 File",
+                    url: "/hrm/employee-admin/201-file",
+                    icon: UserRound,
+                },
+                {
+                    title: "Asset Assigning",
+                    url: "/hrm/employee-admin/asset-assigning",
+                    icon: UserRound,
+                },
+                {
                     title: "Employee Master List",
                     url: "/hrm/employee-admin/employee-master-list",
                     icon: UserRound,
@@ -96,6 +111,21 @@ const data = {
                             url: "/hrm/employee-admin/structure/role-management",
                             icon: BadgeCheck,
                         },
+                        {
+                            title: "Cluster",
+                            url: "/hrm/employee-admin/structure/cluster",
+                            icon: BadgeCheck,
+                        },
+                        {
+                            title: "Operation",
+                            url: "/hrm/employee-admin/structure/operation",
+                            icon: BadgeCheck,
+                        },
+                        {
+                            title: "Industry",
+                            url: "/hrm/employee-admin/structure/industry",
+                            icon: BadgeCheck,
+                        },
                     ],
                 },
                 {
@@ -106,6 +136,16 @@ const data = {
                         {
                             title: "Overtime Request",
                             url: "/hrm/employee-admin/approval/overtime-request",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Undertime Approval",
+                            url: "/hrm/employee-admin/approval/undertime-approval",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Leave Approval",
+                            url: "/hrm/employee-admin/approval/leave-approval",
                             icon: CalendarClock,
                         },
                     ],
@@ -120,7 +160,128 @@ const data = {
                             url: "/hrm/employee-admin/report/overtime-report",
                             icon: CalendarClock,
                         },
+                        {
+                            title: "Undertime Report",
+                            url: "/hrm/employee-admin/report/undertime-report",
+                            icon: CalendarClock,
+                        },
                     ],
+                },
+            ],
+        },
+        {
+            title: "Workforce",
+            url: "#",
+            icon: Users,
+            isActive: false,
+            items: [
+                {
+                    title: "Attendance Report",
+                    url: "#",
+                    items: [
+                        {
+                            title: "Today's Report",
+                            url: "/hrm/workforce/payroll-and-attendance/attendance-report",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Employee Report",
+                            url: "/hrm/workforce/payroll-and-attendance/employee-report",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Department Report",
+                            url: "/hrm/workforce/payroll-and-attendance/department-report",
+                            icon: CalendarClock,
+                        },
+                    ],
+                },
+                
+                {
+                    title: "Attendance Management",
+                    url: "/hrm/workforce/payroll-and-attendance/attendance-management",
+                    icon: CalendarClock,
+                },
+                {
+                    title: "Employee Records",
+                    url: "#",
+                    items: [
+                        {
+                            title: "Record List Management",
+                            url: "/hrm/workforce/employee-records/record-list-management",
+                            icon: CalendarClock,
+                        },  
+                    ],
+                },
+                {
+                    title: "Job Orders",
+                    url: "#",
+                    items: [
+                        {
+                            title: "Application Management",
+                            url: "/hrm/workforce/job-orders/application-management",
+                            icon: CalendarClock,
+                        },  
+                    ],
+                },
+                {
+                    title: "Asset Tagging",
+                    url: "/hrm/workforce/asset-tagging",
+                    icon: CalendarClock,
+                },
+                {
+                    title: "Asset Investigation",
+                    url: "/hrm/workforce/asset-investigation",
+                    icon: CalendarClock,
+                },
+            ],
+        },
+        {
+            title: "Communications",
+            url: "#",
+            icon: Users,
+            isActive: false,
+            items: [
+                {
+                    title: "Policies",
+                    url: "/hrm/communications/policies",
+                    icon: CalendarClock,
+                },
+                {
+                    title: "Memorandums",
+                    url: "/hrm/communications/memorandums",
+                    icon: CalendarClock,
+                },
+                {
+                    title: "Notices",
+                    url: "#",
+                    items: [
+                        {
+                            title: "NTE",
+                            url: "/hrm/communications/notices/nte",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "NOD",
+                            url: "/hrm/communications/notices/nod",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "CARE",
+                            url: "/hrm/communications/notices/care",
+                            icon: CalendarClock,
+                        },
+                    ],
+                },
+                {
+                    title: "Announcement",
+                    url: "hrm/communications/announcement",
+                    icon: CalendarClock,
+                },
+                {
+                    title: "Cooperatives",
+                    url: "/hrm/communication/cooperatives",
+                    icon: CalendarClock,
                 },
             ],
         },
