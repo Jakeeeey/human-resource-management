@@ -23,22 +23,22 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({
-                                       children,
-                                   }: Readonly<{
+    children,
+}: Readonly<{
     children: React.ReactNode
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
-        <ThemeProvider>
-            <ThemeSettingsProvider>
-                {children}
-            </ThemeSettingsProvider>
+            <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+                <ThemeProvider>
+                    <ThemeSettingsProvider>
+                        {children}
+                    </ThemeSettingsProvider>
 
-            {/* Global toast host (Sonner / shadcn) */}
-            <Toaster position="top-right" richColors />
-        </ThemeProvider>
-        </body>
+                    {/* Global toast host (Sonner / shadcn) */}
+                    <Toaster position="top-right" richColors />
+                </ThemeProvider>
+            </body>
         </html>
     )
 }
