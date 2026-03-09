@@ -137,3 +137,27 @@ export interface AssetAssignment {
   condition_on_return?: string;
   notes?: string;
 }
+
+export interface Company {
+  company_id: number;
+  company_name: string;
+  company_type?: string;
+  company_code: string;
+  company_address?: string;
+  company_brgy?: string;
+  company_city?: string;
+  company_province?: string;
+  company_zipCode?: string;
+  company_registrationNumber?: string;
+  company_tin?: string;
+  company_dateAdmitted?: string;
+  company_contact?: string;
+  company_email?: string;
+  company_outlook?: string;
+  company_gmail?: string;
+  company_department?: string;
+  company_logo?: string;
+  company_facebook?: string;
+  company_website?: string;
+  company_tags?: string;
+}

@@ -46,7 +46,7 @@ import {
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
-import { User, AssetAndEquipment, AssetAssignment, Department } from "../types";
+import { User, AssetAndEquipment, AssetAssignment, Department, Company } from "../types";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
@@ -55,7 +55,8 @@ import {
   assignAssetToEmployeeDirectus,
   getItemsDirectus,
   getEmployeeAssetAssignmentsDirectus,
-  returnAssetDirectus
+  returnAssetDirectus,
+  getCompanyDataDirectus
 } from "../providers/directusProvider";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
   const [receiptPdfUrl, setReceiptPdfUrl] = useState<string | null>(null);
   const [isMultiReceiptModalOpen, setIsMultiReceiptModalOpen] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
+  const [companyData, setCompanyData] = useState<Company | null>(null);
   
   // Return form state
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -110,15 +112,19 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       const userAssignments = await getEmployeeAssetAssignmentsDirectus(user.id);
       const historyIds = Array.from(new Set(userAssignments.map(a => a.asset_id)));
     
-      const [assigned, available, allItems] = await Promise.all([
+      const [assigned, available, allItems, companies] = await Promise.all([
         getEmployeeAssetsDirectus(user.id, historyIds),
         getAvailableAssetsDirectus(),
-        getItemsDirectus()
+        getItemsDirectus(),
+        getCompanyDataDirectus()
       ]);
       setAssignedAssets(assigned);
       setAvailableAssets(available);
       setItemsList(allItems);
       setAssignments(userAssignments);
+      if (companies && companies.length > 0) {
+        setCompanyData(companies[0]);
+      }
     } catch (error) {
       console.error("Failed to load assets data:", error);
       toast.error("Failed to load assets");
@@ -205,29 +211,74 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
 
   const generateReceiptPdf = async (assets: AssetAndEquipment[]) => {
     const doc = new jsPDF();
+    const baseUrl = "/api/hrm/employee-admin/employee-master-list";
     
     try {
-      const logoUrl = '/vertex_logo_black.png';
+      // Use company logo from Directus if available, otherwise fallback
+      const logoId = companyData?.company_logo;
+      const logoUrl = logoId 
+        ? `${baseUrl}/assets/${logoId}`
+        : '/vertex_logo_receipt.png';
+        
       const response = await fetch(logoUrl);
+      if (!response.ok) throw new Error("Logo fetch failed");
       const blob = await response.blob();
       const base64data = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
-      // Header logo: Make it wider but less tall to maintain aspect ratio (e.g. 110x15)
-      doc.addImage(base64data, 'PNG', 50, 10, 110 , 15);
+
+      // Modern Header Design
+      // Logo on the left
+      doc.addImage(base64data, 'PNG', 14, 6, 45, 20); // Maintain a professional size
+      
+      // Company Info on the right
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(33, 37, 41);
+      doc.text((companyData?.company_name || "VERTEX TECHNOLOGIES CORPORATION").toUpperCase(), 65, 16);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      
+      // Build address parts
+      const addrParts = [
+        companyData?.company_address,
+        companyData?.company_brgy,
+        companyData?.company_city,
+        companyData?.company_province,
+        companyData?.company_zipCode
+      ].filter(Boolean);
+      
+      const fullAddress = addrParts.length > 0 ? addrParts.join(", ") : "Digital Hub, Quezon City, Philippines";
+      doc.text(fullAddress, 65, 21);
+      
+      const contactParts = [];
+      if (companyData?.company_contact) contactParts.push(`Tel: ${companyData.company_contact}`);
+      if (companyData?.company_email) contactParts.push(`Email: ${companyData.company_email}`);
+      if (companyData?.company_website) contactParts.push(`Web: ${companyData.company_website}`);
+      
+      doc.text(contactParts.join(" | "), 65, 25);
+
+      // Horizontal line separator
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(14, 30, 196, 30);
+
     } catch(err) {
       console.error("Could not add logo", err);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text("VERTEX TECHNOLOGIES CORPORATION", 105, 18, { align: "center" });
+      doc.text((companyData?.company_name || "VERTEX TECHNOLOGIES CORPORATION").toUpperCase(), 105, 18, { align: "center" });
     }
 
     // Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 36, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 42, { align: "center" });
 
     // Body
     doc.setFontSize(10);
@@ -246,13 +297,11 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     const timeStr = `${hours}:${minutes}`;
 
     let currentX = 14;
-    const line1Y = 46;
+    const line1Y = 52; // Adjusted for new header
     
     const fullFirstLineWidth = doc.getTextWidth(`This is to acknowledge that  `) + doc.getTextWidth(fullName) + 4 + doc.getTextWidth(`  of`);
     
-    // Check if the name pushes "of" too far right
     if (14 + fullFirstLineWidth > 195) {
-      // It overflows! Break "of" to the next line 
       doc.text("This is to acknowledge that ", currentX, line1Y);
       currentX += doc.getTextWidth("This is to acknowledge that ");
       
@@ -262,9 +311,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       doc.setFont("helvetica", "normal");
       currentX += nameWidth + 2;
 
-      // Move "of" and the department line to the next line
       let line2X = 14;
-      const line2YOffset = 54;
+      const line2YOffset = 60;
       
       doc.text("of ", line2X, line2YOffset);
       line2X += doc.getTextWidth("of ");
@@ -277,9 +325,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       
       doc.text(" department has received the following items(s)", line2X, line2YOffset);
 
-      // Shift subsequent lines down
       let currentX3 = 14;
-      const line3Y = 62;
+      const line3Y = 68;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX3, line3Y);
       currentX3 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
@@ -300,12 +347,11 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       
       doc.text(" o'clock", currentX3, line3Y);
       
-      const line4Y = 70;
+      const line4Y = 76;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line4Y);
 
-      // AutoTable needs to be shifted down too
       autoTable(doc, {
-        startY: 78,
+        startY: 84,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
         body: assets.map(asset => [
           getItemName(asset.item_id), 
@@ -320,7 +366,6 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       });
 
     } else {
-      // Original logic fits
       doc.text("This is to acknowledge that ", currentX, line1Y);
       currentX += doc.getTextWidth("This is to acknowledge that ");
       
@@ -342,7 +387,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       doc.text(" department has received the following items(s)", currentX, line1Y);
       
       let currentX2 = 14;
-      const line2Y = 54;
+      const line2Y = 60;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX2, line2Y);
       currentX2 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
@@ -363,12 +408,11 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       
       doc.text(" o'clock", currentX2, line2Y);
       
-      const line3Y = 62;
+      const line3Y = 68;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line3Y);
 
-      // AutoTable
       autoTable(doc, {
-        startY: 70,
+        startY: 76,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
         body: assets.map(asset => [
           getItemName(asset.item_id), 
