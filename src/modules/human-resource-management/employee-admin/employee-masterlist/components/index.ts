@@ -4,3 +4,4 @@ export * from "./AddEmployeeModal";
 export * from "./EmployeeDetailsModal";
 export * from "./EditProfileTab";
 export * from "./EmployeeFilesTab";
+export * from "./EmployeeIdTab";
