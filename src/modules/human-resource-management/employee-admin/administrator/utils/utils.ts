@@ -105,3 +105,17 @@ export function toastServerDown(error?: unknown) {
         });
     }
 }
+
+/**
+ * Constructs a full Directus asset URL from a file ID/UUID.
+ * Uses NEXT_PUBLIC_API_BASE_URL from environment variables.
+ */
+export function getDirectusAssetUrl(fileId: string | null | undefined): string {
+    if (!fileId) return "";
+
+    // If it's already a full URL (legacy or external), return it as is
+    if (fileId.startsWith("http")) return fileId;
+
+    const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+    return `${DIRECTUS_URL}/assets/${fileId}`;
+}
