@@ -100,6 +100,10 @@ async function proxy(req: NextRequest) {
       upstreamGETPath = "/items/department?fields=*&limit=-1";
       upstreamMutatePath = "/items/department";
       break;
+    case "company":
+      upstreamGETPath = "/items/company?fields=*&limit=-1";
+      upstreamMutatePath = "/items/company";
+      break;
     case "file-records":
       upstreamGETPath = "/items/employee_file_records?fields=*.*,list_id.*,list_id.record_type_id.*&limit=-1";
       upstreamMutatePath = "/items/employee_file_records";
@@ -145,6 +149,10 @@ async function proxy(req: NextRequest) {
         const id = segment.split("/")[1];
         upstreamGETPath = `/items/asset_assignments/${id}`;
         upstreamMutatePath = `/items/asset_assignments/${id}`;
+      } else if (segment.startsWith("company/")) {
+        const id = segment.split("/")[1];
+        upstreamGETPath = `/items/company/${id}`;
+        upstreamMutatePath = `/items/company/${id}`;
       } else if (segment.startsWith("assets/")) {
         upstreamGETPath = `/${segment}`;
         upstreamMutatePath = `/${segment}`;

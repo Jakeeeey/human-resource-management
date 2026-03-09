@@ -3,7 +3,8 @@ import {
   EmployeeFileRecordType,
   EmployeeFileRecordList,
   AssetAndEquipment,
-  AssetAssignment
+  AssetAssignment,
+  Company
 } from "../types";
 
 const PROXY_BASE = "/api/hrm/employee-admin/employee-master-list";
@@ -213,4 +214,13 @@ export async function returnAssetDirectus(payload: ReturnAssetPayload) {
   }
 
   return true;
+}
+
+export async function getCompanyDataDirectus(): Promise<Company[]> {
+  const res = await fetch(`${PROXY_BASE}/company`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch company data from Directus");
+  }
+  const json = await res.json();
+  return json.data || [];
 }
