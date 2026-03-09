@@ -40,21 +40,6 @@ const data = {
             isActive: false,
             items: [
                 {
-                    title: "ID Generation",
-                    url: "/hrm/employee-admin/id-generation",
-                    icon: UserRound,
-                },
-                {
-                    title: "201 File",
-                    url: "/hrm/employee-admin/201-file",
-                    icon: UserRound,
-                },
-                {
-                    title: "Asset Assigning",
-                    url: "/hrm/employee-admin/asset-assigning",
-                    icon: UserRound,
-                },
-                {
                     title: "Employee Master List",
                     url: "/hrm/employee-admin/employee-master-list",
                     icon: UserRound,
@@ -196,7 +181,7 @@ const data = {
                         },
                     ],
                 },
-                
+
                 {
                     title: "Attendance Management",
                     url: "/hrm/workforce/payroll-and-attendance/attendance-management",
@@ -210,7 +195,7 @@ const data = {
                             title: "Record List Management",
                             url: "/hrm/workforce/employee-records/record-list-management",
                             icon: CalendarClock,
-                        },  
+                        },
                     ],
                 },
                 {
@@ -221,7 +206,7 @@ const data = {
                             title: "Application Management",
                             url: "/hrm/workforce/job-orders/application-management",
                             icon: CalendarClock,
-                        },  
+                        },
                     ],
                 },
                 {
@@ -292,20 +277,16 @@ const data = {
             isActive: false,
             items: [
                 {
-                    title: "Employee File Record Type",
+                    title: "Employee File Type",
                     url: "/hrm/file-management/employee-file-record-type",
                     icon: Shield,
                 },
                 {
-                    title: "Employee File Record List",
+                    title: "Employee File List",
                     url: "/hrm/file-management/employee-file-record-list",
                     icon: Shield,
                 },
-                {
-                    title: "Employee File Record Category",
-                    url: "/hrm/file-management/employee-file-record-category",
-                    icon: Shield,
-                },
+
             ],
 
         },

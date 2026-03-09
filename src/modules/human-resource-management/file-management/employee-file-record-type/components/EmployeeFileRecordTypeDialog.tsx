@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
+
 interface FormData {
     name: string;
     description: string;
@@ -45,7 +46,6 @@ export function EmployeeFileRecordTypeDialog({
     onSubmit,
 }: EmployeeFileRecordTypeDialogProps) {
     const isEdit = !!record;
-
     const form = useForm<FormData>({
         defaultValues: { name: "", description: "" },
     });

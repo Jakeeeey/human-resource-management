@@ -3,9 +3,11 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { User as UserIcon, Files, IdCard, X } from "lucide-react";
+import { User as UserIcon, Files, IdCard, Laptop, X } from "lucide-react";
 import { User, Department } from "../types";
 import { EditProfileTab } from "./EditProfileTab";
+import { EmployeeFilesTab } from "./EmployeeFilesTab";
+import { EmployeeAssetsTab } from "./EmployeeAssetsTab";
 import { cn } from "@/lib/utils";
 import { UpdateEmployeePayload } from "../providers/springProvider";
 
@@ -17,7 +19,7 @@ interface EmployeeDetailsModalProps {
   onUpdateEmployee: (id: number, data: UpdateEmployeePayload) => Promise<void>;
 }
 
-type TabType = "profile" | "files" | "id";
+type TabType = "profile" | "files" | "id" | "assets";
 
 export function EmployeeDetailsModal({
   isOpen,
@@ -64,6 +66,12 @@ export function EmployeeDetailsModal({
                 icon={<IdCard className="h-4 w-4" />}
                 label="Employee ID" 
               />
+              <TabButton 
+                active={activeTab === "assets"} 
+                onClick={() => setActiveTab("assets")}
+                icon={<Laptop className="h-4 w-4" />}
+                label="Assets & Equipments" 
+              />
             </div>
           </div>
 
@@ -96,14 +104,14 @@ export function EmployeeDetailsModal({
               {activeTab === "files" && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
                   <div className="border-b pb-4">
-                    <h3 className="text-2xl font-bold">201 Files</h3>
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                      201 Files
+                    </h3>
                     <p className="text-sm text-muted-foreground mt-1">
                       Manage documents and records for {user.firstName}.
                     </p>
                   </div>
-                  <div className="p-12 border-2 border-dashed rounded-xl flex items-center justify-center text-muted-foreground bg-muted/20">
-                    201 Files Component Goes Here
-                  </div>
+                  <EmployeeFilesTab user={user} />
                 </div>
               )}
 
@@ -115,9 +123,21 @@ export function EmployeeDetailsModal({
                       Preview and generate ID card for {user.firstName}.
                     </p>
                   </div>
-                  <div className="p-12 border-2 border-dashed rounded-xl flex items-center justify-center text-muted-foreground bg-muted/20">
-                    Employee ID Component Goes Here
+                  <EmployeeAssetsTab user={user} departments={departments} />
+                </div>
+              )}
+
+              {activeTab === "assets" && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                  <div className="border-b pb-4">
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                      Assets & Equipments
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Manage company assets and equipment assigned to {user.firstName}.
+                    </p>
                   </div>
+                  <EmployeeAssetsTab user={user} departments={departments} />
                 </div>
               )}
             </div>
