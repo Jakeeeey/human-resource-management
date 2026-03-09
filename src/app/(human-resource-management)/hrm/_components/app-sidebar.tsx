@@ -292,20 +292,16 @@ const data = {
             isActive: false,
             items: [
                 {
-                    title: "Employee File Record Type",
+                    title: "Employee File Type",
                     url: "/hrm/file-management/employee-file-record-type",
                     icon: Shield,
                 },
                 {
-                    title: "Employee File Record List",
+                    title: "Employee File List",
                     url: "/hrm/file-management/employee-file-record-list",
                     icon: Shield,
                 },
-                {
-                    title: "Employee File Record Category",
-                    url: "/hrm/file-management/employee-file-record-category",
-                    icon: Shield,
-                },
+          
             ],
 
         },

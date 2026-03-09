@@ -1,0 +1,48 @@
+
+> human-resource-management@0.1.0 lint
+> eslint
+
+
+C:\Users\mark_\human-resource-management-dev\src\app\api\hrm\employee-admin\employee-master-list\[...segment]\route.ts
+    9:51  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  178:38  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  181:16  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+C:\Users\mark_\human-resource-management-dev\src\app\api\hrm\file-management\employee-file-record-list\route.ts
+  35:16  warning  'fetchAll' is defined but never used      @typescript-eslint/no-unused-vars
+  80:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\mark_\human-resource-management-dev\src\app\api\hrm\file-management\employee-file-record-type\route.ts
+  66:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\mark_\human-resource-management-dev\src\modules\human-resource-management\employee-admin\employee-masterlist\components\EmployeeAssetsTab.tsx
+    8:3   warning  'CheckCircle2' is defined but never used                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+    9:3   warning  'FolderOpen' is defined but never used                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+   72:46  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   80:10  warning  'selectedAssetForReceipt' is assigned a value but never used                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  102:6   warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array                                                                                                                                                                              react-hooks/exhaustive-deps
+  248:11  warning  'fullFirstLineText' is assigned a value but never used                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+  380:28  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  459:27  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  598:27  warning  'isAssigned' is assigned a value but never used                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  680:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\mark_\human-resource-management-dev\src\modules\human-resource-management\employee-admin\employee-masterlist\components\EmployeeFilesTab.tsx
+  14:3  warning  'ArrowRight' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+  16:3  warning  'X' is defined but never used                                                                                @typescript-eslint/no-unused-vars
+  96:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\mark_\human-resource-management-dev\src\modules\human-resource-management\employee-admin\employee-masterlist\providers\directusProvider.ts
+   18:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  107:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\mark_\human-resource-management-dev\src\modules\human-resource-management\file-management\employee-file-record-type\components\EmployeeFileRecordTypeDialog.tsx
+   3:28  warning  'useState' is defined but never used       @typescript-eslint/no-unused-vars
+  29:5   warning  'Select' is defined but never used         @typescript-eslint/no-unused-vars
+  30:5   warning  'SelectContent' is defined but never used  @typescript-eslint/no-unused-vars
+  31:5   warning  'SelectItem' is defined but never used     @typescript-eslint/no-unused-vars
+  32:5   warning  'SelectTrigger' is defined but never used  @typescript-eslint/no-unused-vars
+  33:5   warning  'SelectValue' is defined but never used    @typescript-eslint/no-unused-vars
+
+✖ 27 problems (8 errors, 19 warnings)
+
