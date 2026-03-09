@@ -3,7 +3,7 @@
 import { useForm, UseFormReturn, Path } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CompanyProfile, CompanyProfileSchema } from "../types/company-profile.schema";
-import { toastServerDown, getDirectusAssetUrl } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
+import { getDirectusAssetUrl } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 import { Button } from "@/components/ui/button";
 import {
     Form,
