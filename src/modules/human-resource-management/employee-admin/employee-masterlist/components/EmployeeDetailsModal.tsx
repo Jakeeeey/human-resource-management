@@ -2,12 +2,12 @@
 
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { User as UserIcon, Files, IdCard, Laptop, X } from "lucide-react";
+import { User as UserIcon, Files, IdCard, Laptop } from "lucide-react";
 import { User, Department } from "../types";
 import { EditProfileTab } from "./EditProfileTab";
 import { EmployeeFilesTab } from "./EmployeeFilesTab";
 import { EmployeeAssetsTab } from "./EmployeeAssetsTab";
+import { EmployeeIdTab } from "./EmployeeIdTab";
 import { cn } from "@/lib/utils";
 import { UpdateEmployeePayload } from "../providers/springProvider";
 
@@ -77,15 +77,6 @@ export function EmployeeDetailsModal({
 
           {/* Main Content Area */}
           <div className="flex-1 min-h-[600px] h-[80vh] overflow-y-auto bg-background p-8 relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-muted/30 hover:bg-muted"
-              onClick={() => onOpenChange(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-
             <div className="max-w-3xl mx-auto">
               {activeTab === "profile" && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
@@ -123,7 +114,7 @@ export function EmployeeDetailsModal({
                       Preview and generate ID card for {user.firstName}.
                     </p>
                   </div>
-                  <EmployeeAssetsTab user={user} departments={departments} />
+                  <EmployeeIdTab user={user} />
                 </div>
               )}
 

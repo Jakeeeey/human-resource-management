@@ -36,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
@@ -78,6 +79,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   const [receiptPdfUrl, setReceiptPdfUrl] = useState<string | null>(null);
+  const [isMultiReceiptModalOpen, setIsMultiReceiptModalOpen] = useState(false);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
   
   // Return form state
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -200,11 +203,11 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     return (found?.item_name as string) || "Unknown Item";
   };
 
-  const generateReceiptPdf = async (asset: AssetAndEquipment) => {
+  const generateReceiptPdf = async (assets: AssetAndEquipment[]) => {
     const doc = new jsPDF();
     
     try {
-      const logoUrl = '/vertex_logo_black.png';
+      const logoUrl = '/vertex_logo_receipt.png';
       const response = await fetch(logoUrl);
       const blob = await response.blob();
       const base64data = await new Promise<string>((resolve) => {
@@ -212,8 +215,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
-      // Header logo: Make it wider but less tall to maintain aspect ratio (e.g. 110x15)
-      doc.addImage(base64data, 'PNG', 50, 10, 110, 15);
+      // Header logo: new image is about 3:1 aspect ratio. Scale to 90 width x 30 height, positioned to center (210/2 - 90/2 = 60)
+      doc.addImage(base64data, 'PNG', 60, 10, 90, 30);
     } catch(err) {
       console.error("Could not add logo", err);
       doc.setFont("helvetica", "bold");
@@ -224,7 +227,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     // Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 36, { align: "center" });
+    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 48, { align: "center" });
 
     // Body
     doc.setFontSize(10);
@@ -243,7 +246,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     const timeStr = `${hours}:${minutes}`;
 
     let currentX = 14;
-    const line1Y = 46;
+    const line1Y = 58;
     
     const fullFirstLineWidth = doc.getTextWidth(`This is to acknowledge that  `) + doc.getTextWidth(fullName) + 4 + doc.getTextWidth(`  of`);
     
@@ -254,61 +257,63 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       currentX += doc.getTextWidth("This is to acknowledge that ");
       
       const nameWidth = doc.getTextWidth(fullName) + 4;
-      doc.text(fullName, currentX + 2, line1Y - 1);
-      doc.line(currentX, line1Y, currentX + nameWidth, line1Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(fullName, currentX + 2, line1Y);
+      doc.setFont("helvetica", "normal");
       currentX += nameWidth + 2;
 
       // Move "of" and the department line to the next line
       let line2X = 14;
-      const line2YOffset = 54;
+      const line2YOffset = 66;
       
       doc.text("of ", line2X, line2YOffset);
       line2X += doc.getTextWidth("of ");
       
       const deptWidth = doc.getTextWidth(deptNameStr) + 4; 
-      doc.text(deptNameStr, line2X + 2, line2YOffset - 1);
-      doc.line(line2X, line2YOffset, line2X + deptWidth, line2YOffset);
+      doc.setFont("helvetica", "bold");
+      doc.text(deptNameStr, line2X + 2, line2YOffset);
+      doc.setFont("helvetica", "normal");
       line2X += deptWidth + 2;
       
       doc.text(" department has received the following items(s)", line2X, line2YOffset);
 
       // Shift subsequent lines down
       let currentX3 = 14;
-      const line3Y = 62;
+      const line3Y = 74;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX3, line3Y);
       currentX3 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
       const dateWidth = doc.getTextWidth(dateStr) + 4;
-      doc.text(dateStr, currentX3 + 2, line3Y - 1);
-      doc.line(currentX3, line3Y, currentX3 + dateWidth, line3Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(dateStr, currentX3 + 2, line3Y);
+      doc.setFont("helvetica", "normal");
       currentX3 += dateWidth + 2;
       
       doc.text(" at ", currentX3, line3Y);
       currentX3 += doc.getTextWidth(" at ");
       
       const timeWidth = doc.getTextWidth(timeStr) + 4;
-      doc.text(timeStr, currentX3 + 2, line3Y - 1);
-      doc.line(currentX3, line3Y, currentX3 + timeWidth, line3Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(timeStr, currentX3 + 2, line3Y);
+      doc.setFont("helvetica", "normal");
       currentX3 += timeWidth + 2;
       
       doc.text(" o'clock", currentX3, line3Y);
       
-      const line4Y = 70;
+      const line4Y = 82;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line4Y);
 
       // AutoTable needs to be shifted down too
       autoTable(doc, {
-        startY: 78,
+        startY: 90,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
-        body: [
-          [
-            getItemName(asset.item_id), 
-            asset.barcode || "N/A", 
-            asset.serial || "N/A",
-            asset.quantity?.toString() || "1", 
-            asset.condition || 'Good'
-          ]
-        ],
+        body: assets.map(asset => [
+          getItemName(asset.item_id), 
+          asset.barcode || "N/A", 
+          asset.serial || "N/A",
+          asset.quantity?.toString() || "1", 
+          asset.condition || 'Good'
+        ]),
         theme: 'grid',
         headStyles: { fillColor: [50, 50, 50] },
         styles: { minCellHeight: 12 }
@@ -320,56 +325,58 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       currentX += doc.getTextWidth("This is to acknowledge that ");
       
       const nameWidth = doc.getTextWidth(fullName) + 4;
-      doc.text(fullName, currentX + 2, line1Y - 1);
-      doc.line(currentX, line1Y, currentX + nameWidth, line1Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(fullName, currentX + 2, line1Y);
+      doc.setFont("helvetica", "normal");
       currentX += nameWidth + 2;
       
       doc.text(" of ", currentX, line1Y);
       currentX += doc.getTextWidth(" of ");
       
       const deptWidth = doc.getTextWidth(deptNameStr) + 4; 
-      doc.text(deptNameStr, currentX + 2, line1Y - 1);
-      doc.line(currentX, line1Y, currentX + deptWidth, line1Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(deptNameStr, currentX + 2, line1Y);
+      doc.setFont("helvetica", "normal");
       currentX += deptWidth + 2;
       
       doc.text(" department has received the following items(s)", currentX, line1Y);
       
       let currentX2 = 14;
-      const line2Y = 54;
+      const line2Y = 66;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX2, line2Y);
       currentX2 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
       const dateWidth = doc.getTextWidth(dateStr) + 4;
-      doc.text(dateStr, currentX2 + 2, line2Y - 1);
-      doc.line(currentX2, line2Y, currentX2 + dateWidth, line2Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(dateStr, currentX2 + 2, line2Y);
+      doc.setFont("helvetica", "normal");
       currentX2 += dateWidth + 2;
       
       doc.text(" at ", currentX2, line2Y);
       currentX2 += doc.getTextWidth(" at ");
       
       const timeWidth = doc.getTextWidth(timeStr) + 4;
-      doc.text(timeStr, currentX2 + 2, line2Y - 1);
-      doc.line(currentX2, line2Y, currentX2 + timeWidth, line2Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(timeStr, currentX2 + 2, line2Y);
+      doc.setFont("helvetica", "normal");
       currentX2 += timeWidth + 2;
       
       doc.text(" o'clock", currentX2, line2Y);
       
-      const line3Y = 62;
+      const line3Y = 74;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line3Y);
 
       // AutoTable
       autoTable(doc, {
-        startY: 70,
+        startY: 82,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
-        body: [
-          [
-            getItemName(asset.item_id), 
-            asset.barcode || "N/A", 
-            asset.serial || "N/A",
-            asset.quantity?.toString() || "1", 
-            asset.condition || 'Good'
-          ]
-        ],
+        body: assets.map(asset => [
+          getItemName(asset.item_id), 
+          asset.barcode || "N/A", 
+          asset.serial || "N/A",
+          asset.quantity?.toString() || "1", 
+          asset.condition || 'Good'
+        ]),
         theme: 'grid',
         headStyles: { fillColor: [50, 50, 50] },
         styles: { minCellHeight: 12 }
@@ -417,13 +424,25 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button 
-          onClick={() => setIsAssignModalOpen(true)}
-          className="h-10 rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Assign Asset
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsMultiReceiptModalOpen(true);
+              setSelectedAssetIds([]);
+            }}
+            className="h-10 rounded-xl gap-2"
+          >
+            Print Receipt
+          </Button>
+          <Button 
+            onClick={() => setIsAssignModalOpen(true)}
+            className="h-10 rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Assign Asset
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border/50 bg-card/50 overflow-hidden shadow-sm">
@@ -519,7 +538,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                           View Details
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => generateReceiptPdf(asset)} 
+                          onClick={() => generateReceiptPdf([asset])} 
                           className="cursor-pointer rounded-lg"
                         >
                           Print Receipt
@@ -785,6 +804,60 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Multi Receipt Modal */}
+      <Dialog open={isMultiReceiptModalOpen} onOpenChange={setIsMultiReceiptModalOpen}>
+        <DialogContent className="sm:max-w-[500px] shadow-2xl rounded-2xl border-none p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>Select Assets for Receipt</DialogTitle>
+            <DialogDescription>Choose which assigned assets to include in the acknowledgement receipt.</DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-2 space-y-2 max-h-[400px] overflow-y-auto">
+            {assignedAssets.filter(a => {
+               const assetAssignments = assignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
+               const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
+               return assignmentStatus === "Assigned";
+            }).map((asset) => (
+              <div key={asset.id} className="flex items-center space-x-3 p-3 rounded-xl border border-border/50 bg-card/30 hover:bg-muted/30 transition-colors">
+                <Checkbox 
+                  id={`asset-${asset.id}`} 
+                  checked={selectedAssetIds.includes(asset.id)}
+                  onCheckedChange={(checked) => {
+                    if (checked) setSelectedAssetIds(prev => [...prev, asset.id]);
+                    else setSelectedAssetIds(prev => prev.filter(id => id !== asset.id));
+                  }}
+                />
+                <label 
+                  htmlFor={`asset-${asset.id}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed cursor-pointer flex-1"
+                >
+                  {getItemName(asset.item_id)} <span className="text-muted-foreground ml-1 font-normal">{asset.serial ? `(${asset.serial})` : ''}</span>
+                </label>
+              </div>
+            ))}
+            {assignedAssets.filter(a => {
+               const assetAssignments = assignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
+               const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
+               return assignmentStatus === "Assigned";
+            }).length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">No active assignments available to print.</div>
+            )}
+          </div>
+          <DialogFooter className="p-6 bg-muted/20 border-t gap-2">
+            <Button variant="ghost" onClick={() => setIsMultiReceiptModalOpen(false)}>Cancel</Button>
+            <Button 
+              className="bg-primary hover:bg-primary/90 rounded-xl"
+              disabled={selectedAssetIds.length === 0}
+              onClick={() => {
+                const assetsToPrint = assignedAssets.filter(a => selectedAssetIds.includes(a.id));
+                setIsMultiReceiptModalOpen(false);
+                generateReceiptPdf(assetsToPrint);
+              }}
+            >
+              Generate Preview
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       {/* Return Asset Modal */}
