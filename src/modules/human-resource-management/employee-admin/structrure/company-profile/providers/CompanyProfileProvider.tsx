@@ -81,14 +81,8 @@ export function CompanyProfileProvider({ children }: { children: React.ReactNode
             }
 
             const result = await response.json();
-            // Assuming Directus returns the file ID or filename_disk
-            // We'll use the URL format: ${API_BASE_URL}/assets/${fileId}
-            const fileId = result.data.id;
-
-            // Actually, usually in this project we store the CID or the asset URL
-            // Let's use the full asset URL from Directus for consistency
-            const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-            return `${DIRECTUS_URL}/assets/${fileId}`;
+            // Store only the file ID (UUID) in the database
+            return result.data.id;
         } catch (err) {
             toastServerDown(err as Error);
             return null;

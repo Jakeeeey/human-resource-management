@@ -18,6 +18,7 @@ import {
     Building
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getDirectusAssetUrl } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 
 interface CompanyProfileViewProps {
     onEdit: () => void;
@@ -68,7 +69,7 @@ export function CompanyProfileView({ onEdit }: CompanyProfileViewProps) {
                                 {data.company_logo ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img
-                                        src={data.company_logo}
+                                        src={getDirectusAssetUrl(data.company_logo)}
                                         alt={data.company_name}
                                         className="w-full h-full object-contain p-2"
                                     />

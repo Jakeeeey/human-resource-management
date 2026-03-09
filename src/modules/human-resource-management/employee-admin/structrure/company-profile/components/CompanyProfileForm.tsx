@@ -3,6 +3,7 @@
 import { useForm, UseFormReturn, Path } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CompanyProfile, CompanyProfileSchema } from "../types/company-profile.schema";
+import { toastServerDown, getDirectusAssetUrl } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 import { Button } from "@/components/ui/button";
 import {
     Form,
@@ -165,7 +166,7 @@ export function CompanyProfileForm({ onCancel }: CompanyProfileFormProps) {
                                                         {form.watch("company_logo") ? (
                                                             // eslint-disable-next-line @next/next/no-img-element
                                                             <img
-                                                                src={form.watch("company_logo")!}
+                                                                src={getDirectusAssetUrl(form.watch("company_logo"))}
                                                                 alt="Logo Preview"
                                                                 className="w-full h-full object-contain p-1"
                                                             />
