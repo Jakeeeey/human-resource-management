@@ -207,7 +207,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     const doc = new jsPDF();
     
     try {
-      const logoUrl = '/vertex_logo_receipt.png';
+      const logoUrl = '/vertex_logo_black.png';
       const response = await fetch(logoUrl);
       const blob = await response.blob();
       const base64data = await new Promise<string>((resolve) => {
@@ -215,8 +215,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
-      // Header logo: new image is about 3:1 aspect ratio. Scale to 90 width x 30 height, positioned to center (210/2 - 90/2 = 60)
-      doc.addImage(base64data, 'PNG', 60, 10, 90, 30);
+      // Header logo: Make it wider but less tall to maintain aspect ratio (e.g. 110x15)
+      doc.addImage(base64data, 'PNG', 50, 10, 110 , 15);
     } catch(err) {
       console.error("Could not add logo", err);
       doc.setFont("helvetica", "bold");
@@ -227,7 +227,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     // Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 48, { align: "center" });
+    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 36, { align: "center" });
 
     // Body
     doc.setFontSize(10);
@@ -246,7 +246,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     const timeStr = `${hours}:${minutes}`;
 
     let currentX = 14;
-    const line1Y = 58;
+    const line1Y = 46;
     
     const fullFirstLineWidth = doc.getTextWidth(`This is to acknowledge that  `) + doc.getTextWidth(fullName) + 4 + doc.getTextWidth(`  of`);
     
@@ -264,7 +264,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
 
       // Move "of" and the department line to the next line
       let line2X = 14;
-      const line2YOffset = 66;
+      const line2YOffset = 54;
       
       doc.text("of ", line2X, line2YOffset);
       line2X += doc.getTextWidth("of ");
@@ -279,7 +279,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
 
       // Shift subsequent lines down
       let currentX3 = 14;
-      const line3Y = 74;
+      const line3Y = 62;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX3, line3Y);
       currentX3 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
@@ -300,12 +300,12 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       
       doc.text(" o'clock", currentX3, line3Y);
       
-      const line4Y = 82;
+      const line4Y = 70;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line4Y);
 
       // AutoTable needs to be shifted down too
       autoTable(doc, {
-        startY: 90,
+        startY: 78,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
         body: assets.map(asset => [
           getItemName(asset.item_id), 
@@ -342,7 +342,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       doc.text(" department has received the following items(s)", currentX, line1Y);
       
       let currentX2 = 14;
-      const line2Y = 66;
+      const line2Y = 54;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX2, line2Y);
       currentX2 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
@@ -363,12 +363,12 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       
       doc.text(" o'clock", currentX2, line2Y);
       
-      const line3Y = 74;
+      const line3Y = 62;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line3Y);
 
       // AutoTable
       autoTable(doc, {
-        startY: 82,
+        startY: 70,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
         body: assets.map(asset => [
           getItemName(asset.item_id), 
@@ -539,6 +539,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           onClick={() => generateReceiptPdf([asset])} 
+
                           className="cursor-pointer rounded-lg"
                         >
                           Print Receipt
