@@ -6,7 +6,7 @@ const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;  // Directus
 const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 const SPRING_BASE = process.env.SPRING_API_BASE_URL;        // Spring Boot
 
-function decodeJwt(token: string): Record<string, any> | null {
+function decodeJwt(token: string): Record<string, unknown> | null {
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -175,16 +175,16 @@ async function proxy(req: NextRequest) {
     } else {
       headers.set("Content-Type", "application/json");
       const rawBody = await req.text();
-      let parsedBody: Record<string, any> | null = null;
+      let parsedBody: Record<string, unknown> | null = null;
       try {
         parsedBody = JSON.parse(rawBody);
-      } catch (e) { }
+      } catch { }
 
       if (parsedBody && segment.startsWith("file-records")) {
         const vosToken = req.cookies.get("vos_access_token")?.value;
         if (vosToken) {
           const payload = decodeJwt(vosToken);
-          const userId = payload?.sub ? parseInt(payload.sub, 10) : null;
+          const userId = payload?.sub ? parseInt(payload.sub as string, 10) : null;
           if (userId) {
             if (method === "POST") {
               parsedBody.created_by = userId;
@@ -199,7 +199,7 @@ async function proxy(req: NextRequest) {
         const vosToken = req.cookies.get("vos_access_token")?.value;
         if (vosToken) {
           const payload = decodeJwt(vosToken);
-          const userId = payload?.sub ? parseInt(payload.sub, 10) : null;
+          const userId = payload?.sub ? parseInt(payload.sub as string, 10) : null;
           if (userId) {
             if (segment === "asset-assignments" && method === "POST") {
               parsedBody.assigned_by = userId;

@@ -63,8 +63,8 @@ export async function GET() {
             return NextResponse.json({ error: r.error }, { status: 500 });
         }
         return NextResponse.json({ records: r.data || [] });
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    } catch (err: unknown) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
     }
 }
 

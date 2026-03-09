@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -5,8 +6,6 @@ import {
   Laptop, 
   Plus, 
   Search, 
-  CheckCircle2,
-  FolderOpen,
   Loader2,
   AlertCircle,
   MoreHorizontal
@@ -69,7 +68,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
   const [assignedAssets, setAssignedAssets] = useState<AssetAndEquipment[]>([]);
   const [availableAssets, setAvailableAssets] = useState<AssetAndEquipment[]>([]);
   const [assignments, setAssignments] = useState<AssetAssignment[]>([]);
-  const [itemsList, setItemsList] = useState<any[]>([]);
+  const [itemsList, setItemsList] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssigning, setIsAssigning] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -77,7 +76,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedAssetForDetails, setSelectedAssetForDetails] = useState<AssetAndEquipment | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [selectedAssetForReceipt, setSelectedAssetForReceipt] = useState<AssetAndEquipment | null>(null);
+
   const [receiptPdfUrl, setReceiptPdfUrl] = useState<string | null>(null);
   
   // Return form state
@@ -99,6 +98,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
   async function loadData() {
@@ -194,10 +194,10 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     }
   }
 
-  const getItemName = (itemId: number | undefined) => {
+  const getItemName = (itemId: number | undefined): string => {
     if (!itemId) return "Unknown Item";
     const found = itemsList.find(i => i.id === itemId);
-    return found?.item_name || "Unknown Item";
+    return (found?.item_name as string) || "Unknown Item";
   };
 
   const generateReceiptPdf = async (asset: AssetAndEquipment) => {
@@ -245,7 +245,6 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     let currentX = 14;
     const line1Y = 46;
     
-    const fullFirstLineText = `This is to acknowledge that  ${fullName}  of`;
     const fullFirstLineWidth = doc.getTextWidth(`This is to acknowledge that  `) + doc.getTextWidth(fullName) + 4 + doc.getTextWidth(`  of`);
     
     // Check if the name pushes "of" too far right
@@ -377,6 +376,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const finalY = (doc as any).lastAutoTable.finalY + 20;
 
     doc.text("Received by:", 14, finalY);
@@ -396,7 +396,6 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     const pdfUrl = URL.createObjectURL(pdfBlob);
     
     setReceiptPdfUrl(pdfUrl);
-    setSelectedAssetForReceipt(asset);
     setIsReceiptModalOpen(true);
   };
 
@@ -595,7 +594,6 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                 </SelectTrigger>
                 <SelectContent className="rounded-xl max-h-[300px]">
                   {availableAssets.map(a => {
-                    const isAssigned = a.employee !== null;
                     const itemName = getItemName(a.item_id);
                     return (
                       <SelectItem 

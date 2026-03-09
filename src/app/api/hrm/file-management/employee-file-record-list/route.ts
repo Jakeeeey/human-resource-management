@@ -32,10 +32,7 @@ async function dFetch(path: string, options?: RequestInit) {
     return res.json();
 }
 
-async function fetchAll(collection: string) {
-    const r = await dFetch(`/items/${collection}?limit=${LIMIT}`);
-    return r.data || [];
-}
+
 
 interface RecordType {
     id: number;
@@ -77,8 +74,8 @@ export async function GET() {
         }));
 
         return NextResponse.json({ records: enriched, recordTypes });
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    } catch (err: unknown) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
     }
 }
 

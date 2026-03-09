@@ -15,7 +15,7 @@ export async function getEmployeeFileRecordsDirectus(userId: number): Promise<Em
   }
   const json = await res.json();
 
-  return (json.data || []).map((r: any) => ({
+  return (json.data || []).map((r: { id: number; record_name: string; file_ref: string; list_id?: { record_type_id?: { name: string }; name: string }; description: string }) => ({
     id: r.id,
     record_name: r.record_name,
     file_ref: r.file_ref,
@@ -104,7 +104,7 @@ export async function getEmployeeAssetAssignmentsDirectus(userId: number): Promi
   return json.data || [];
 }
 
-export async function getItemsDirectus(): Promise<any[]> {
+export async function getItemsDirectus(): Promise<Record<string, unknown>[]> {
   const res = await fetch(`${PROXY_BASE}/items`);
   if (!res.ok) {
     throw new Error("Failed to fetch items from Directus");

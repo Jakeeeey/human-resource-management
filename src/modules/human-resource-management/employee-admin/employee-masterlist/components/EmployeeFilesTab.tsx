@@ -11,9 +11,7 @@ import {
   Loader2, 
   AlertCircle,
   FolderOpen,
-  ArrowRight,
-  CheckCircle2,
-  X
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +91,7 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id]);
 
   async function loadData() {
