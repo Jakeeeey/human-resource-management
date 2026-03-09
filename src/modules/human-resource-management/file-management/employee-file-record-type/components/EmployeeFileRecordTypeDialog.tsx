@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import type { 
     EmployeeFileRecordType,
@@ -25,6 +25,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface FormData {
     name: string;
@@ -45,7 +52,6 @@ export function EmployeeFileRecordTypeDialog({
     onSubmit,
 }: EmployeeFileRecordTypeDialogProps) {
     const isEdit = !!record;
-
     const form = useForm<FormData>({
         defaultValues: { name: "", description: "" },
     });

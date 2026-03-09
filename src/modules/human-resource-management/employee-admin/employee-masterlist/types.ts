@@ -53,3 +53,87 @@ export interface EmployeeMasterlistFilters {
   department_id?: number;
   status?: "active" | "inactive";
 }
+
+// --- 201 Files / Employee File Records ---
+
+export interface EmployeeFileRecord {
+  id: number;
+  user_id: number;
+  list_id: number;
+  record_name: string;
+  description?: string;
+  file_ref: string; // Directus file UUID
+  is_deleted: boolean;
+  created_at: string;
+  created_by?: number;
+  updated_at: string;
+  updated_by?: number;
+}
+
+
+export interface EmployeeFileRecordType {
+  id: number;
+  name: string;
+  description?: string;
+}
+
+export interface EmployeeFileRecordList {
+  id: number;
+  record_type_id: number;
+  name: string;
+  description?: string;
+}
+
+/** Flattened record for UI display, matching the JOIN query provided */
+export interface EmployeeFileRecordDisplay {
+  id: number;
+  record_name: string;
+  file_ref: string;
+  type: string;
+  list_name: string;
+  description?: string;
+}
+
+// --- Assets and Equipments Types ---
+
+export interface Item {
+  id: number;
+  item_name: string;
+  item_type?: number;
+  item_classification?: number;
+}
+
+export interface AssetAndEquipment {
+  id: number;
+  item_image?: string;
+  item_id?: number;
+  quantity?: number;
+  rfid_code?: string;
+  barcode?: string;
+  serial?: string;
+  department?: number;
+  employee?: number; // assigned employee ID
+  cost_per_item?: number;
+  total?: number;
+  condition?: string;
+  life_span?: number;
+  is_active_warning?: boolean;
+  is_active?: boolean | number;
+  encoder?: number;
+  date_acquired?: string;
+  date_created?: string;
+}
+
+export interface AssetAssignment {
+  assignment_id?: number;
+  asset_id: number;
+  user_id: number;
+  assigned_by?: number;
+  assigned_date?: string;
+  expected_return_date?: string | null;
+  actual_return_date?: string | null;
+  assignment_status?: string;
+  condition_on_assignment?: string;
+  condition_on_return?: string;
+  notes?: string;
+}
