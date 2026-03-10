@@ -38,6 +38,8 @@ export interface User {
   signature?: string | null;
   rfId?: string | null;
   isAdmin?: boolean | null;
+  admin?: boolean | null;
+  role?: string | null;
   biometricId?: string | null;
   externalId?: string | null;
   isDeleted?: boolean | null;
@@ -92,6 +94,7 @@ export interface EmployeeFileRecordDisplay {
   type: string;
   list_name: string;
   description?: string;
+  created_at: string;
 }
 
 // --- Assets and Equipments Types ---

@@ -55,6 +55,7 @@ import {
   assignAssetToEmployeeDirectus,
   getItemsDirectus,
   getEmployeeAssetAssignmentsDirectus,
+  getAllAssetAssignmentsDirectus,
   returnAssetDirectus,
   getCompanyDataDirectus
 } from "../providers/directusProvider";
@@ -69,7 +70,8 @@ interface EmployeeAssetsTabProps {
 export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabProps) {
   const [assignedAssets, setAssignedAssets] = useState<AssetAndEquipment[]>([]);
   const [availableAssets, setAvailableAssets] = useState<AssetAndEquipment[]>([]);
-  const [assignments, setAssignments] = useState<AssetAssignment[]>([]);
+  const [userAssignments, setUserAssignments] = useState<AssetAssignment[]>([]);
+  const [allAssignments, setAllAssignments] = useState<AssetAssignment[]>([]);
   const [itemsList, setItemsList] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -112,16 +114,18 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       const userAssignments = await getEmployeeAssetAssignmentsDirectus(user.id);
       const historyIds = Array.from(new Set(userAssignments.map(a => a.asset_id)));
     
-      const [assigned, available, allItems, companies] = await Promise.all([
+      const [assigned, available, allItems, companies, totalAssignments] = await Promise.all([
         getEmployeeAssetsDirectus(user.id, historyIds),
         getAvailableAssetsDirectus(),
         getItemsDirectus(),
-        getCompanyDataDirectus()
+        getCompanyDataDirectus(),
+        getAllAssetAssignmentsDirectus()
       ]);
       setAssignedAssets(assigned);
       setAvailableAssets(available);
       setItemsList(allItems);
-      setAssignments(userAssignments);
+      setUserAssignments(userAssignments);
+      setAllAssignments(totalAssignments);
       if (companies && companies.length > 0) {
         setCompanyData(companies[0]);
       }
@@ -171,7 +175,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
   async function handleReturn() {
     if (!selectedAssetForReturn) return;
 
-    const assetAssignments = assignments
+    const assetAssignments = userAssignments
       .filter(a => a.asset_id === selectedAssetForReturn.id)
       .sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
     
@@ -510,7 +514,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
             </TableHeader>
             <TableBody>
               {filteredAssets.map((asset) => {
-                const assetAssignments = assignments.filter(a => a.asset_id === asset.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
+                const assetAssignments = allAssignments.filter(a => a.asset_id === asset.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
                 const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
                 return (
                 <TableRow key={asset.id} className="hover:bg-muted/20 transition-colors border-border/50">
@@ -553,6 +557,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                         "rounded-md px-2 py-0.5",
                         assignmentStatus === "Assigned" ? "border-blue-500/20 text-blue-600 bg-blue-500/10" :
                         assignmentStatus === "Returned" ? "border-green-500/20 text-green-600 bg-green-500/10" :
+                        assignmentStatus === "Lost" ? "border-red-500/20 text-red-600 bg-red-500/10" :
+                        assignmentStatus === "Damaged" ? "border-yellow-500/20 text-yellow-600 bg-yellow-500/10" :
                         "border-gray-500/20 text-gray-600 bg-gray-500/10"
                     )}>
                       {assignmentStatus || "Unknown"}
@@ -659,18 +665,35 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                 <SelectContent className="rounded-xl max-h-[300px]">
                   {availableAssets.map(a => {
                     const itemName = getItemName(a.item_id);
+                    const assetAssignments = allAssignments
+                      .filter(assign => assign.asset_id === a.id)
+                      .sort((v1, v2) => new Date(v2.assigned_date || 0).getTime() - new Date(v1.assigned_date || 0).getTime());
+                    
+                    const actualStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Unassigned";
+                    const displayStatus = actualStatus === "Returned" ? "Available" : actualStatus;
+
                     return (
                       <SelectItem 
                         key={a.id} 
                         value={a.id.toString()}
+                        disabled={actualStatus !== "Returned" && actualStatus !== "Unassigned"}
+                        className="[&>span:last-child]:w-full pr-8"
                       >
-                        <div className="flex items-center gap-2">
-                          <span>{itemName} {a.serial ? `(${a.serial})` : ''}</span>
-                          {a.is_active ? (
-                            <Badge variant="secondary" className="ml-2 text-[10px] text-green-600 bg-green-500/10 border-green-500/20 hover:bg-green-500/20">Active</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="ml-2 text-[10px] text-muted-foreground bg-muted border-border hover:bg-muted/80">Inactive</Badge>
-                          )}
+                        <div className="flex w-full items-center justify-between gap-4">
+                          <span className="truncate">{itemName} {a.serial ? `(${a.serial})` : ''}</span>
+                          <Badge 
+                            variant="secondary" 
+                            className={cn(
+                              "text-[10px] shrink-0 ml-auto",
+                              displayStatus === "Assigned" ? "text-blue-600 bg-blue-500/10 border-blue-500/20" :
+                              (displayStatus === "Available" || displayStatus === "Unassigned") ? "text-green-600 bg-green-500/10 border-green-500/20" :
+                              displayStatus === "Lost" ? "text-red-600 bg-red-500/10 border-red-500/20" :
+                              displayStatus === "Damaged" ? "text-yellow-600 bg-yellow-500/10 border-yellow-500/20" :
+                              "text-muted-foreground bg-muted border-border"
+                            )}
+                          >
+                            {displayStatus}
+                          </Badge>
                         </div>
                       </SelectItem>
                     );
@@ -783,7 +806,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                 <div className="space-y-4 rounded-xl border p-4 bg-muted/10">
                   <h4 className="font-bold text-sm">Assignment Info</h4>
                   {(() => {
-                    const currentAssignments = assignments.filter(a => a.asset_id === selectedAssetForDetails.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
+                    const currentAssignments = allAssignments.filter(a => a.asset_id === selectedAssetForDetails.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
                     const latestAssignment = currentAssignments[0];
 
                     if (!latestAssignment) {
@@ -860,7 +883,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
           </DialogHeader>
           <div className="px-6 py-2 space-y-2 max-h-[400px] overflow-y-auto">
             {assignedAssets.filter(a => {
-               const assetAssignments = assignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
+               const assetAssignments = allAssignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
                const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
                return assignmentStatus === "Assigned";
             }).map((asset) => (
@@ -882,7 +905,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
               </div>
             ))}
             {assignedAssets.filter(a => {
-               const assetAssignments = assignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
+               const assetAssignments = allAssignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
                const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
                return assignmentStatus === "Assigned";
             }).length === 0 && (

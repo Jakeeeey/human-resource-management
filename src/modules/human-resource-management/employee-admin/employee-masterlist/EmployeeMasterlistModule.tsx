@@ -68,6 +68,7 @@ export default function EmployeeMasterlistModule() {
         philHealthNumber: data.user_philhealth || undefined,
         pagibigNumber:    data.user_pagibig   || undefined,
         admin:        data.isAdmin,
+        role:         data.role,
         // Media — Directus file UUIDs from /files upload
         image:     data._userImageId ?? undefined,
         signature: data._signatureId ?? undefined,
