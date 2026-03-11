@@ -16,7 +16,18 @@ export async function getEmployeeFileRecordsDirectus(userId: number): Promise<Em
   }
   const json = await res.json();
 
-  return (json.data || []).map((r: any) => ({
+  return (json.data || []).map((r: {
+    id: number;
+    record_name?: string;
+    file_ref: string;
+    list_id?: {
+      record_type_id?: { name?: string };
+      name?: string;
+    };
+    description?: string;
+    created_at?: string;
+    date_created?: string;
+  }) => ({
     id: r.id,
     record_name: r.record_name || "Untitled",
     file_ref: r.file_ref,
