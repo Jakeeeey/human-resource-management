@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import imageCompression from "browser-image-compression";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,6 +116,7 @@ export interface EditEmployeeFormData {
   philHealthNumber: string;
   pagibigNumber: string;
   isAdmin: boolean;
+  role: string;
   // Media
   image: File | null;
   signature: File | null;
@@ -192,14 +193,55 @@ export function EditProfileTab({
     sssNumber: user.sssNumber || "",
     philHealthNumber: user.philHealthNumber || "",
     pagibigNumber: user.pagibigNumber || "",
-    isAdmin: user.isAdmin || false,
+    isAdmin: !!(user.admin ?? user.isAdmin),
+    role: user.role || ((user.admin ?? user.isAdmin) ? "ADMIN" : "USER"),
     image: null,
     signature: null,
   });
 
+  // Sync state if user prop changes (e.g. switching employees while modal is open)
+  useEffect(() => {
+    setForm({
+      firstName: user.firstName || "",
+      middleName: user.middleName || "",
+      lastName: user.lastName || "",
+      contact: user.contact || "",
+      birthday: user.birthday || "",
+      province: user.province || "",
+      city: user.city || "",
+      brgy: user.brgy || "",
+      emergencyContactName: user.emergencyContactName || "",
+      emergencyContactNumber: user.emergencyContactNumber || "",
+      department: user.department ? user.department.toString() : "",
+      position: user.position || "",
+      email: user.email || "",
+      password: "",
+      dateOfHire: user.dateOfHire || "",
+      rfId: user.rfId || "",
+      tinNumber: user.tinNumber || "",
+      sssNumber: user.sssNumber || "",
+      philHealthNumber: user.philHealthNumber || "",
+      pagibigNumber: user.pagibigNumber || "",
+      isAdmin: !!(user.admin ?? user.isAdmin),
+      role: user.role || ((user.admin ?? user.isAdmin) ? "ADMIN" : "USER"),
+      image: null,
+      signature: null,
+    });
+    setExistingImage(resolveImageUrl(user.image));
+    setExistingSignature(resolveImageUrl(user.signature));
+    setImagePreview(null);
+    setSigPreview(null);
+    setIsSignatureCleared(false);
+    setPasswordError(null);
+    setPhoneError(null);
+    setEmergencyPhoneError(null);
+  }, [user]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [emergencyPhoneError, setEmergencyPhoneError] = useState<string | null>(null);
 
   // Original Media Previews from server
   const [existingImage, setExistingImage] = useState<string | null>(resolveImageUrl(user.image));
@@ -224,6 +266,13 @@ export function EditProfileTab({
     if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
     if (!/\d/.test(pwd)) return "Password must contain at least one digit.";
     if (!/[@$!%*?&]/.test(pwd)) return "Password must contain at least one special character (@$!%*?&).";
+    return null;
+  }
+
+  function validatePhone(phone: string, required = true): string | null {
+    if (!phone) return required ? "Phone number is required" : null;
+    const cleaned = phone.replace(/\D/g, "");
+    if (cleaned.length !== 11) return "Phone number must be exactly 11 digits.";
     return null;
   }
 
@@ -254,6 +303,18 @@ export function EditProfileTab({
     const pwdErr = validatePassword(form.password || "");
     if (pwdErr) {
       setPasswordError(pwdErr);
+      return;
+    }
+
+    const phoneErr = validatePhone(form.contact);
+    if (phoneErr) {
+      setPhoneError(phoneErr);
+      return;
+    }
+
+    const emergencyErr = validatePhone(form.emergencyContactNumber, false);
+    if (emergencyErr) {
+      setEmergencyPhoneError(emergencyErr);
       return;
     }
 
@@ -303,6 +364,7 @@ export function EditProfileTab({
         philHealthNumber: form.philHealthNumber || undefined,
         pagibigNumber:    form.pagibigNumber || undefined,
         admin:        form.isAdmin,
+        role:         form.role,
         image:        finalImageId ? finalImageId : (existingImage ? (user.image || undefined) : ""),
         signature:    finalSigId ? finalSigId : (isSignatureCleared ? "" : (existingSignature ? (user.signature || undefined) : "")),
       });
@@ -372,13 +434,30 @@ export function EditProfileTab({
           <Field label="Contact Number" required>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
-              <Input className={cn(inputCls, "pl-9")} value={form.contact} onChange={(e) => set("contact", e.target.value)} required />
+              <Input 
+                className={cn(inputCls, "pl-9", phoneError && "border-red-500 focus-visible:ring-red-500/30")} 
+                value={form.contact} 
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  set("contact", val);
+                  setPhoneError(validatePhone(val));
+                }} 
+                placeholder="09XXXXXXXXX"
+                required 
+              />
             </div>
+            {phoneError && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{phoneError}</p>}
           </Field>
-          <Field label="Birthday">
+          <Field label="Birthday" required>
             <div className="relative">
               <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
-              <Input type="date" className={cn(inputCls, "pl-9")} value={form.birthday} onChange={(e) => set("birthday", e.target.value)} />
+              <Input 
+                type="date" 
+                className={cn(inputCls, "pl-9")} 
+                value={form.birthday} 
+                onChange={(e) => set("birthday", e.target.value)} 
+                required
+              />
             </div>
           </Field>
         </div>
@@ -407,7 +486,17 @@ export function EditProfileTab({
             <Input className={inputCls} value={form.emergencyContactName} onChange={(e) => set("emergencyContactName", e.target.value)} />
           </Field>
           <Field label="Emergency Contact Number">
-            <Input className={inputCls} value={form.emergencyContactNumber} onChange={(e) => set("emergencyContactNumber", e.target.value)} />
+            <Input 
+              className={cn(inputCls, emergencyPhoneError && "border-red-500 focus-visible:ring-red-500/30")} 
+              value={form.emergencyContactNumber} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "");
+                set("emergencyContactNumber", val);
+                setEmergencyPhoneError(validatePhone(val, false));
+              }} 
+              placeholder="09XXXXXXXXX"
+            />
+            {emergencyPhoneError && <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{emergencyPhoneError}</p>}
           </Field>
         </div>
       </section>
@@ -491,7 +580,13 @@ export function EditProfileTab({
               <p className="text-xs text-muted-foreground">Grant this user administrative privileges</p>
             </div>
           </div>
-          <Switch checked={form.isAdmin} onCheckedChange={(v) => set("isAdmin", v)} />
+          <Switch 
+            checked={form.isAdmin} 
+            onCheckedChange={(v) => {
+              set("isAdmin", v);
+              set("role", v ? "ADMIN" : "USER");
+            }} 
+          />
         </div>
       </section>
 

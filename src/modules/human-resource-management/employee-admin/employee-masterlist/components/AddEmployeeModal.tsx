@@ -113,6 +113,7 @@ export interface NewEmployeeFormData {
   user_philhealth: string;
   user_pagibig: string;
   isAdmin: boolean;
+  role: string;
   // Media
   user_image: File | null;
   signature: File | null;
@@ -201,6 +202,7 @@ const EMPTY_FORM: NewEmployeeFormData = {
   user_philhealth: "",
   user_pagibig: "",
   isAdmin: false,
+  role: "USER",
   user_image: null,
   signature: null,
 };
@@ -214,6 +216,8 @@ export function AddEmployeeModal({
   const [form, setForm] = useState<NewEmployeeFormData>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [emergencyPhoneError, setEmergencyPhoneError] = useState<string | null>(null);
 
   // Signature pad
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -234,6 +238,8 @@ export function AddEmployeeModal({
       setImagePreview(null);
       setSigPreview(null);
       setPasswordError(null);
+      setPhoneError(null);
+      setEmergencyPhoneError(null);
       clearCanvas();
     }
   }, [isOpen]);
@@ -247,6 +253,13 @@ export function AddEmployeeModal({
     if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
     if (!/\d/.test(pwd))    return "Password must contain at least one digit.";
     if (!/[@$!%*?&]/.test(pwd)) return "Password must contain at least one special character (@$!%*?&).";
+    return null;
+  }
+
+  function validatePhone(phone: string, required = true): string | null {
+    if (!phone) return required ? "Phone number is required" : null;
+    const cleaned = phone.replace(/\D/g, "");
+    if (cleaned.length !== 11) return "Phone number must be exactly 11 digits.";
     return null;
   }
 
@@ -290,6 +303,18 @@ export function AddEmployeeModal({
       return;
     }
 
+    const phoneErr = validatePhone(form.user_contact);
+    if (phoneErr) {
+      setPhoneError(phoneErr);
+      return;
+    }
+
+    const emergencyErr = validatePhone(form.emergency_contact_number, false);
+    if (emergencyErr) {
+      setEmergencyPhoneError(emergencyErr);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // ── Step 1: Upload images to Directus /files ──
@@ -309,7 +334,13 @@ export function AddEmployeeModal({
       }
 
       // ── Step 2: Pass enriched form data to parent ──
-      await onSubmit({ ...form, user_image: null, signature: null, _userImageId: userImageId, _signatureId: signatureId });
+      await onSubmit({ 
+        ...form, 
+        user_image: null, 
+        signature: null, 
+        _userImageId: userImageId, 
+        _signatureId: signatureId 
+      });
       onOpenChange(false);
     } catch {
       // error handled in parent hook (toast)
@@ -441,15 +472,26 @@ export function AddEmployeeModal({
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
                     <Input
-                      className={cn(inputCls, "pl-9")}
+                      className={cn(
+                        inputCls, 
+                        "pl-9",
+                        phoneError && "border-red-500 focus-visible:ring-red-500/30"
+                      )}
                       value={form.user_contact}
-                      onChange={(e) => set("user_contact", e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "");
+                        set("user_contact", val);
+                        setPhoneError(validatePhone(val));
+                      }}
                       placeholder="09XXXXXXXXX"
                       required
                     />
                   </div>
+                  {phoneError && (
+                    <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{phoneError}</p>
+                  )}
                 </Field>
-                <Field label="Birthday">
+                <Field label="Birthday" required>
                   <div className="relative">
                     <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
                     <Input
@@ -457,6 +499,7 @@ export function AddEmployeeModal({
                       className={cn(inputCls, "pl-9")}
                       value={form.user_bday}
                       onChange={(e) => set("user_bday", e.target.value)}
+                      required
                     />
                   </div>
                 </Field>
@@ -512,13 +555,21 @@ export function AddEmployeeModal({
                 </Field>
                 <Field label="Emergency Contact Number">
                   <Input
-                    className={inputCls}
+                    className={cn(
+                      inputCls,
+                      emergencyPhoneError && "border-red-500 focus-visible:ring-red-500/30"
+                    )}
                     value={form.emergency_contact_number}
-                    onChange={(e) =>
-                      set("emergency_contact_number", e.target.value)
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      set("emergency_contact_number", val);
+                      setEmergencyPhoneError(validatePhone(val, false));
+                    }}
                     placeholder="09XXXXXXXXX"
                   />
+                  {emergencyPhoneError && (
+                    <p className="text-[11px] text-red-500 mt-1 ml-1 font-medium">{emergencyPhoneError}</p>
+                  )}
                 </Field>
               </div>
             </section>
@@ -685,7 +736,10 @@ export function AddEmployeeModal({
                 </div>
                 <Switch
                   checked={form.isAdmin}
-                  onCheckedChange={(v) => set("isAdmin", v)}
+                  onCheckedChange={(v) => {
+                    set("isAdmin", v);
+                    set("role", v ? "ADMIN" : "USER");
+                  }}
                 />
               </div>
             </section>

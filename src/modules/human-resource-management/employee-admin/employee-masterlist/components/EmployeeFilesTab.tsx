@@ -40,6 +40,11 @@ import {
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { 
   User, 
   EmployeeFileRecordDisplay, 
@@ -53,7 +58,7 @@ import {
   createEmployeeFileRecordDirectus,
   deleteEmployeeFileRecordDirectus
 } from "../providers/directusProvider";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 import imageCompression from "browser-image-compression";
 import { toast } from "sonner";
 
@@ -197,9 +202,9 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
 
   const filteredRecords = records.filter(r => {
     const matchesSearch = 
-      r.record_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.list_name.toLowerCase().includes(searchTerm.toLowerCase());
+      (r.record_name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+      (r.type?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+      (r.list_name?.toLowerCase() || "").includes(searchTerm.toLowerCase());
       
     const matchesType = filterType === "all" || r.type === filterType;
 
@@ -259,9 +264,10 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow className="hover:bg-transparent border-border/50">
-                <TableHead className="w-[30%] font-bold text-foreground">Record Name</TableHead>
-                <TableHead className="font-bold text-foreground">Document Type</TableHead>
-                <TableHead className="font-bold text-foreground">Document List</TableHead>
+                <TableHead className="w-[25%] font-bold text-foreground">Record Name</TableHead>
+                <TableHead className="w-[15%] font-bold text-foreground">Document Type</TableHead>
+                <TableHead className="w-[30%] font-bold text-foreground">Document List</TableHead>
+                <TableHead className="w-[20%] font-bold text-foreground">Upload Date</TableHead>
                 <TableHead className="text-right font-bold text-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -276,13 +282,30 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
                       <span className="truncate">{record.record_name}</span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="border-primary/20 text-primary/80 font-medium rounded-md px-2 py-0.5">
-                      {record.type}
-                    </Badge>
+                  <TableCell className="max-w-[150px]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline" className="border-primary/20 text-primary/80 font-medium rounded-md px-2 py-0.5 truncate max-w-full block text-center">
+                          {record.type}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent>{record.type}</TooltipContent>
+                    </Tooltip>
+                  </TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-sm font-medium truncate block">{record.list_name}</span>
+                      </TooltipTrigger>
+                      <TooltipContent>{record.list_name}</TooltipContent>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm font-medium">{record.list_name}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {record.created_at && !isNaN(new Date(record.created_at).getTime())
+                        ? formatDateTime(new Date(record.created_at)) 
+                        : "---"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">

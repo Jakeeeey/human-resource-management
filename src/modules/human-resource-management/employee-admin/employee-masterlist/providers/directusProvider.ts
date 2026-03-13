@@ -3,7 +3,8 @@ import {
   EmployeeFileRecordType,
   EmployeeFileRecordList,
   AssetAndEquipment,
-  AssetAssignment
+  AssetAssignment,
+  Company
 } from "../types";
 
 const PROXY_BASE = "/api/hrm/employee-admin/employee-master-list";
@@ -15,13 +16,25 @@ export async function getEmployeeFileRecordsDirectus(userId: number): Promise<Em
   }
   const json = await res.json();
 
-  return (json.data || []).map((r: { id: number; record_name: string; file_ref: string; list_id?: { record_type_id?: { name: string }; name: string }; description: string }) => ({
+  return (json.data || []).map((r: {
+    id: number;
+    record_name?: string;
+    file_ref: string;
+    list_id?: {
+      record_type_id?: { name?: string };
+      name?: string;
+    };
+    description?: string;
+    created_at?: string;
+    date_created?: string;
+  }) => ({
     id: r.id,
-    record_name: r.record_name,
+    record_name: r.record_name || "Untitled",
     file_ref: r.file_ref,
     type: r.list_id?.record_type_id?.name || "Unknown",
     list_name: r.list_id?.name || "Unknown",
-    description: r.description
+    description: r.description || "",
+    created_at: r.created_at || r.date_created || ""
   }));
 }
 
@@ -99,6 +112,15 @@ export async function getEmployeeAssetAssignmentsDirectus(userId: number): Promi
   const res = await fetch(`${PROXY_BASE}/asset-assignments?filter[user_id][_eq]=${userId}`);
   if (!res.ok) {
     throw new Error("Failed to fetch employee asset assignments from Directus");
+  }
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function getAllAssetAssignmentsDirectus(): Promise<AssetAssignment[]> {
+  const res = await fetch(`${PROXY_BASE}/asset-assignments`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch all asset assignments from Directus");
   }
   const json = await res.json();
   return json.data || [];
@@ -213,4 +235,13 @@ export async function returnAssetDirectus(payload: ReturnAssetPayload) {
   }
 
   return true;
+}
+
+export async function getCompanyDataDirectus(): Promise<Company[]> {
+  const res = await fetch(`${PROXY_BASE}/company`);
+  if (!res.ok) {
+    throw new Error("Failed to fetch company data from Directus");
+  }
+  const json = await res.json();
+  return json.data || [];
 }

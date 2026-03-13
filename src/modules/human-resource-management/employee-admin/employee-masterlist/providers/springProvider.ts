@@ -31,6 +31,7 @@ export interface CreateEmployeePayload {
   biometricId?: string;
   rfId?: string;
   admin?: boolean;
+  role?: string;
   emergencyContactName?: string;
   emergencyContactNumber?: string;
 }
