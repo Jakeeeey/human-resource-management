@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PdfLayoutOptions } from './types';
+import { PdfLayoutOptions, Company } from './types';
 
 /**
  * Utility to load an image from a URL or Base64 string.
@@ -50,7 +50,7 @@ export const generatePdfLayout = async ({
                 company_name: 'Unknown Company',
                 company_address: '',
                 company_code: 'ERR',
-            } as any;
+            } as Company;
         }
     }
 
@@ -66,7 +66,7 @@ export const generatePdfLayout = async ({
     });
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    let startY = 15; // Initial Y offset for content
+    const startY = 15; // Initial Y offset for content
 
     let finalLogoHeight = 0;
 
