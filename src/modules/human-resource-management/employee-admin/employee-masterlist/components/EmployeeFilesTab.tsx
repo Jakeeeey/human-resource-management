@@ -12,7 +12,6 @@ import {
   FolderOpen,
   Folder,
   ChevronLeft,
-  CheckCircle2,
   X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -776,7 +775,6 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
                 <Select 
                   value={uploadBatch.listId}
                   onValueChange={(v) => {
-                    const selectedList = filteredLists.find(l => l.id.toString() === v);
                     setUploadBatch({
                       ...uploadBatch, 
                       listId: v
