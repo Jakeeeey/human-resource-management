@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
     DndContext,
     useDraggable,
@@ -9,31 +10,26 @@ import {
     DragEndEvent,
     DragStartEvent
 } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import Moveable from 'react-moveable';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Type,
     Image as ImageIcon,
-    Minus,
     Trash2,
     Download,
     Layout,
     MousePointer2,
-    Lock,
     Eye,
     Settings2,
-    ChevronRight,
     GripVertical,
     PlusCircle,
-    Hash
+    Hash,
+    Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LayoutElement, PdfV2Layout, ElementType } from './types';
+import { Company } from '../pdf-layout/types';
 
-// --- Types & Constants ---
-const PAGE_WIDTH_MM = 210;
-const PAGE_HEIGHT_MM = 297;
 const MM_TO_PX = 3.78;
 
 interface LibraryItemProps {
@@ -75,14 +71,13 @@ const DraggableLibraryItem: React.FC<LibraryItemProps> = ({ id, label, type, ico
     );
 };
 
-export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
+export const PdfEditor: React.FC<PdfEditorProps> = ({ onExport }) => {
     const [elements, setElements] = useState<LayoutElement[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [target, setTarget] = useState<HTMLElement | null>(null);
-    const [companyData, setCompanyData] = useState<any>(null);
-    const [activeDragItem, setActiveDragItem] = useState<any>(null);
-
-    const canvasRef = useRef<HTMLDivElement>(null);
+    const [companyData, setCompanyData] = useState<Company | null>(null);
+    const [activeDragItem, setActiveDragItem] = useState<{ type: ElementType, label: string, fieldKey: string } | null>(null);
+    const [canvasElement, setCanvasElement] = useState<HTMLDivElement | null>(null);
 
     // Load initial company data
     useEffect(() => {
@@ -96,8 +91,8 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
                 if (company) {
                     // Default V1-ish layout converted to V2 elements
                     setElements([
-                        { id: 'logo', type: 'image', x: 15, y: 15, width: 45, height: 25, content: company.company_logo, fieldKey: 'company_logo' },
-                        { id: 'name', type: 'text', x: 70, y: 20, width: 100, height: 10, content: company.company_name, fieldKey: 'company_name', fontSize: 10, fontWeight: 'bold' },
+                        { id: 'logo', type: 'image', x: 15, y: 15, width: 45, height: 25, content: company.company_logo ?? undefined, fieldKey: 'company_logo' },
+                        { id: 'name', type: 'text', x: 70, y: 20, width: 100, height: 10, content: company.company_name ?? undefined, fieldKey: 'company_name', fontSize: 10, fontWeight: 'bold' },
                     ]);
                 }
             } catch (e) {
@@ -112,7 +107,8 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
     };
 
     const handleDragStart = (event: DragStartEvent) => {
-        setActiveDragItem(event.active.data.current);
+        const data = event.active.data.current as { type: ElementType, label: string, fieldKey: string } | undefined;
+        if (data) setActiveDragItem(data);
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
@@ -120,10 +116,14 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
         const { over, active } = event;
 
         if (over && over.id === 'canvas-droppable') {
-            const { type, label, fieldKey } = active.data.current as any;
+            const { type, label, fieldKey } = active.data.current as { type: ElementType, label: string, fieldKey: string };
 
             // Calculate relative position based on where dropped
             // For simplicity, we drop at a default offset or calculate from pointer soon
+            const rawContent = companyData && fieldKey in companyData 
+                ? companyData[fieldKey as keyof Company]
+                : null;
+
             const newEl: LayoutElement = {
                 id: `el-${Math.random().toString(36).substr(2, 9)}`,
                 type,
@@ -131,7 +131,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
                 y: 40,
                 width: type === 'image' ? 40 : 80,
                 height: type === 'image' ? 30 : 10,
-                content: companyData?.[fieldKey] || label,
+                content: typeof rawContent === 'string' ? rawContent : label,
                 fieldKey,
                 fontSize: 9,
             };
@@ -228,7 +228,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
                     </div>
 
                     <div className="flex flex-col items-center">
-                        <CanvasDroppable id="canvas-droppable" canvasRef={canvasRef}>
+                        <CanvasDroppable id="canvas-droppable" onRef={setCanvasElement}>
                             {elements.map((el) => (
                                 <div
                                     key={el.id}
@@ -252,7 +252,14 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
                                 >
                                     <div className="w-full h-full relative pointer-events-none flex items-center justify-center">
                                         {el.type === 'image' && el.content ? (
-                                            <img src={el.content} className="w-full h-full object-contain p-1" alt="element" />
+                                            <Image 
+                                                src={el.content} 
+                                                className="w-full h-full object-contain p-1" 
+                                                alt="element" 
+                                                width={200} 
+                                                height={200} 
+                                                unoptimized 
+                                            />
                                         ) : el.type === 'text' ? (
                                             <div style={{ fontSize: `${el.fontSize || 10}pt`, fontWeight: el.fontWeight || 'normal' }} className="text-slate-900 text-center leading-tight">
                                                 {el.content}
@@ -265,42 +272,44 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
                             ))}
 
                             {/* Moveable overlay */}
-                            <Moveable
-                                target={target}
-                                container={canvasRef.current}
-                                origin={false}
-                                edge={true}
-                                draggable={true}
-                                resizable={true}
-                                keepRatio={selectedElement?.type === 'image'}
-                                snappable={true}
-                                verticalGuidelines={[105]}
-                                snapCenter={true}
-                                onDrag={({ target, left, top }) => {
-                                    target.style.left = `${left}px`;
-                                    target.style.top = `${top}px`;
-                                }}
-                                onDragEnd={({ target }) => {
-                                    const leftMm = parseFloat(target.style.left) / MM_TO_PX;
-                                    const topMm = parseFloat(target.style.top) / MM_TO_PX;
-                                    updateElement(target.id, { x: leftMm, y: topMm });
-                                }}
-                                onResize={({ target, width, height, drag }) => {
-                                    target.style.width = `${width}px`;
-                                    target.style.height = `${height}px`;
-                                    target.style.left = `${drag.left}px`;
-                                    target.style.top = `${drag.top}px`;
-                                }}
-                                onResizeEnd={({ target }) => {
-                                    const id = target.id;
-                                    const w = parseFloat(target.style.width) / MM_TO_PX;
-                                    const h = parseFloat(target.style.height) / MM_TO_PX;
-                                    const x = parseFloat(target.style.left) / MM_TO_PX;
-                                    const y = parseFloat(target.style.top) / MM_TO_PX;
-                                    updateElement(id, { width: w, height: h, x, y });
-                                }}
-                                className="custom-moveable"
-                            />
+                            {canvasElement && (
+                                <Moveable
+                                    target={target}
+                                    container={canvasElement}
+                                    origin={false}
+                                    edge={true}
+                                    draggable={true}
+                                    resizable={true}
+                                    keepRatio={selectedElement?.type === 'image'}
+                                    snappable={true}
+                                    verticalGuidelines={[105]}
+                                    snapCenter={true}
+                                    onDrag={({ target, left, top }) => {
+                                        target.style.left = `${left}px`;
+                                        target.style.top = `${top}px`;
+                                    }}
+                                    onDragEnd={({ target }) => {
+                                        const leftMm = parseFloat(target.style.left) / MM_TO_PX;
+                                        const topMm = parseFloat(target.style.top) / MM_TO_PX;
+                                        updateElement(target.id, { x: leftMm, y: topMm });
+                                    }}
+                                    onResize={({ target, width, height, drag }) => {
+                                        target.style.width = `${width}px`;
+                                        target.style.height = `${height}px`;
+                                        target.style.left = `${drag.left}px`;
+                                        target.style.top = `${drag.top}px`;
+                                    }}
+                                    onResizeEnd={({ target }) => {
+                                        const id = target.id;
+                                        const w = parseFloat(target.style.width) / MM_TO_PX;
+                                        const h = parseFloat(target.style.height) / MM_TO_PX;
+                                        const x = parseFloat(target.style.left) / MM_TO_PX;
+                                        const y = parseFloat(target.style.top) / MM_TO_PX;
+                                        updateElement(id, { width: w, height: h, x, y });
+                                    }}
+                                    className="custom-moveable"
+                                />
+                            )}
                         </CanvasDroppable>
                     </div>
                 </main>
@@ -455,12 +464,12 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({ onSave, onExport }) => {
 /**
  * Droppable area for the canvas
  */
-const CanvasDroppable: React.FC<{ id: string, canvasRef: any, children: React.ReactNode }> = ({ id, canvasRef, children }) => {
+const CanvasDroppable: React.FC<{ id: string, onRef: (el: HTMLDivElement | null) => void, children: React.ReactNode }> = ({ id, onRef, children }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
         <div
-            ref={(node) => { setNodeRef(node); canvasRef.current = node; }}
+            ref={(node) => { setNodeRef(node); onRef(node); }}
             className={cn(
                 "bg-white shadow-[0_60px_100px_-20px_rgba(0,0,0,0.5)] relative border transition-all duration-300",
                 isOver ? "border-blue-500 ring-4 ring-blue-500/20 scale-[1.02]" : "border-slate-800"
