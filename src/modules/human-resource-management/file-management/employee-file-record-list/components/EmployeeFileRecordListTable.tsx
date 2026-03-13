@@ -73,11 +73,6 @@ export function EmployeeFileRecordListTable({
         setEditDialogOpen(true);
     }, []);
 
-    const handleDelete = React.useCallback((record: EmployeeFileRecordListWithRelations) => {
-        setSelectedRecord(record);
-        setDeleteDialogOpen(true);
-    }, []);
-
     const handleConfirmDelete = async () => {
         if (selectedRecord) {
             await onDeleteRecord(selectedRecord.id);
@@ -87,8 +82,8 @@ export function EmployeeFileRecordListTable({
     };
 
     const columns = React.useMemo(
-        () => createColumns(handleEdit, handleDelete),
-        [handleEdit, handleDelete]
+        () => createColumns(handleEdit),
+        [handleEdit]
     );
 
     const table = useReactTable({
