@@ -11,9 +11,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Users, ChevronRight, ClipboardList } from "lucide-react";
+import { Eye, Users, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EmptyState } from "./EmptyState";
 
 export interface EmployeeSummary {
   user_id: number;
@@ -55,12 +54,12 @@ export function EmployeeSummaryTable({
 
   if (data.length === 0) {
     return (
-      <EmptyState 
-        icon={ClipboardList}
-        title="No Summaries Available"
-        description="There are no employee summaries to show for this cutoff period. Ensure that attendance logs exist for the selected date range."
-        className="bg-card/50 rounded-2xl border border-dashed border-primary/20 shadow-inner"
-      />
+      <div className="flex h-64 items-center justify-center text-muted-foreground bg-muted/5 rounded-2xl border border-dashed">
+        <div className="flex flex-col items-center gap-2">
+          <Users className="h-8 w-8 opacity-20" />
+          <span>No employee summaries found for this cutoff.</span>
+        </div>
+      </div>
     );
   }
 

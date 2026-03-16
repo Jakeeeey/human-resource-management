@@ -21,9 +21,8 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Check, X, Loader2, Save, CalendarCheck } from "lucide-react";
+import { Check, X, Loader2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EmptyState } from "./EmptyState";
 
 interface AttendanceTableProps {
   data: AttendanceLogWithUser[];
@@ -85,12 +84,9 @@ export function AttendanceTable({
 
   if (data.length === 0) {
     return (
-      <EmptyState 
-        icon={CalendarCheck}
-        title="No Attendance Logs"
-        description="We couldn't find any attendance logs for the selected criteria. Try adjusting your filters or checking a different date."
-        className="bg-card/50 rounded-2xl border border-dashed border-primary/20 shadow-inner"
-      />
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
+        No pending attendance logs found.
+      </div>
     );
   }
 
