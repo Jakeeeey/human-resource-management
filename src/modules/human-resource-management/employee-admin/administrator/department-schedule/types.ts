@@ -37,6 +37,7 @@ export interface DepartmentSchedule {
     break_start: string; // TIME format "HH:MM:SS"
     break_end: string; // TIME format "HH:MM:SS"
     workdays_note: string | null;
+    grace_period: number;
     created_at: string;
     updated_at: string | null;
 }
@@ -76,6 +77,7 @@ export interface DepartmentScheduleFormData {
     break_start: string; // "HH:MM" format
     break_end: string; // "HH:MM" format
     workdays_note: string;
+    grace_period: string;
 }
 
 export type CreateDepartmentScheduleData = DepartmentScheduleFormData;
