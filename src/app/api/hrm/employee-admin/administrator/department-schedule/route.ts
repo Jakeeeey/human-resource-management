@@ -47,6 +47,7 @@ interface DepartmentSchedule {
     break_start: string;
     break_end: string;
     workdays_note: string | null;
+    grace_period: number;
     created_at: string;
     updated_at: string | null;
 }
@@ -154,6 +155,7 @@ export async function POST(req: NextRequest) {
             break_start: body.break_start || "15:00:00",
             break_end: body.break_end || "15:30:00",
             workdays_note: body.workdays_note || null,
+            grace_period: body.grace_period || 5,
         };
 
         const res = await fetch(`${DIRECTUS_URL}/items/${COLLECTIONS.SCHEDULE}`, {

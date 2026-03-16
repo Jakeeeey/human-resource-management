@@ -138,6 +138,14 @@ export const createColumns = (
             },
         },
         {
+            accessorKey: "grace_period",
+            header: "Grace Period",
+            cell: ({ row }) => {
+                const gp = row.getValue("grace_period") as number;
+                return <div className="text-sm">{gp} min</div>;
+            },
+        },
+        {
             accessorKey: "workdays_note",
             header: "Notes",
             cell: ({ row }) => {
