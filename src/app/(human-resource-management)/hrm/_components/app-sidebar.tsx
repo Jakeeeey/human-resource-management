@@ -119,6 +119,11 @@ const data = {
                     icon: Shield,
                     items: [
                         {
+                            title: "Attendance Approval",
+                            url: "/hrm/employee-admin/approval/attendance-approval",
+                            icon: CalendarClock,
+                        },
+                        {
                             title: "Overtime Request",
                             url: "/hrm/employee-admin/approval/overtime-request",
                             icon: CalendarClock,
