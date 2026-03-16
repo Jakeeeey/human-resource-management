@@ -17,6 +17,7 @@ export const OnCallScheduleSchema = z.object({
     break_end: z.string().nullable(),
     working_days: z.number().default(6),
     workdays: z.string().nullable(), // e.g., "Mon,Tue,Wed,Thu,Fri,Sat"
+    grace_period: z.number().default(5),
     created_at: z.string().optional(),
     updated_at: z.string().nullable().optional(),
     encoder_id: z.number().optional(),

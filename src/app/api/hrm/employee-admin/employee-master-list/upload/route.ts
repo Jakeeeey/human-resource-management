@@ -23,6 +23,7 @@ export async function POST(req: Request) {
     const FOLDER_IDS: Record<string, string | undefined> = {
       profile: process.env.DIRECTUS_FOLDER_PROFILE_IMAGES,
       signature: process.env.DIRECTUS_FOLDER_EMPLOYEE_SIGNATURES,
+      employee_file: "f5049617-71e1-422a-9c94-12c3ddc27d7c",
     };
 
     if (!DIRECTUS_URL) {

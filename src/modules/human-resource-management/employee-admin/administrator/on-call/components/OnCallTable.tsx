@@ -153,6 +153,12 @@ export function OnCallTable() {
                                                     <span>{formatTime(item.break_start)} - {formatTime(item.break_end)}</span>
                                                 </div>
                                             )}
+                                            {item.grace_period !== undefined && (
+                                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                                                    <span className="font-semibold uppercase text-[9px] bg-blue-50 text-blue-700 px-1 rounded border border-blue-100">Grace:</span>
+                                                    <span>{item.grace_period} min</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
