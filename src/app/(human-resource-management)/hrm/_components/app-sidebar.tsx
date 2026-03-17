@@ -109,6 +109,11 @@ const data = {
                             url: "/hrm/employee-admin/approval/overtime-request",
                             icon: CalendarClock,
                         },
+                         {
+                            title: "Undertime Request",
+                            url: "/hrm/employee-admin/approval/undertime-request",
+                            icon: CalendarClock,
+                        },
                     ],
                 },
                 {
@@ -119,6 +124,11 @@ const data = {
                         {
                             title: "Overtime Report",
                             url: "/hrm/employee-admin/report/overtime-report",
+                            icon: CalendarClock,
+                        },
+                          {
+                            title: "Undertime Report",
+                            url: "/hrm/employee-admin/report/undertime-report",
                             icon: CalendarClock,
                         },
                     ],
