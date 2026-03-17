@@ -171,17 +171,17 @@ const data = {
                     items: [
                         {
                             title: "Today's Report",
-                            url: "/hrm/workforce/payroll-and-attendance/attendance-report",
+                            url: "/hrm/workforce/attendance-report/todays-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Employee Report",
-                            url: "/hrm/workforce/payroll-and-attendance/employee-report",
+                            url: "/hrm/workforce/attendance-report/employee-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Department Report",
-                            url: "/hrm/workforce/payroll-and-attendance/department-report",
+                            url: "/hrm/workforce/attendance-report/department-report",
                             icon: CalendarClock,
                         },
                     ],
@@ -189,7 +189,7 @@ const data = {
 
                 {
                     title: "Attendance Management",
-                    url: "/hrm/workforce/payroll-and-attendance/attendance-management",
+                    url: "/hrm/workforce/attendance-management",
                     icon: CalendarClock,
                 },
                 {
