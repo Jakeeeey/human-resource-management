@@ -382,10 +382,15 @@ export async function GET(req: NextRequest) {
             }
           } else {
             // MISSING TIME OUT LOGIC: 
-            // Pay for the whole day (480), but deduct half day (240 undertime)
-            undertime_minutes = 240;
+            // Pay for the whole day (480), but deduct half day (at least 240 undertime)
+            // Balancing logic: Late + UT should not exceed 480.
+            if (late_minutes > 240) {
+              undertime_minutes = 480 - late_minutes;
+            } else {
+              undertime_minutes = 240;
+            }
             overtime_minutes = 0;
-            console.log(`[DEBUG] Missing time_out for user ${log.user_id}: setting 480 work, 240 undertime - route.ts:388`);
+            console.log(`[DEBUG] Missing time_out for user ${log.user_id}: setting 480 work, ${late_minutes} late, ${undertime_minutes} undertime - route.ts:388`);
           }
         }
       }
