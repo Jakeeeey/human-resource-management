@@ -35,6 +35,7 @@ interface OvertimeReportFiltersProps {
   onDateToChange: (date: Date | undefined) => void;
   onDepartmentChange: (id: number | null) => void;
   onNameFilterChange: (name: string | null) => void;
+  onStatusChange: (status: string | null) => void;
   onResetFilters: () => void;
 }
 
@@ -52,6 +53,7 @@ export function OvertimeReportFilters({
   onDateToChange,
   onDepartmentChange,
   onNameFilterChange,
+  onStatusChange,
   onResetFilters,
 }: OvertimeReportFiltersProps) {
   const hasActiveFilters =
@@ -59,12 +61,13 @@ export function OvertimeReportFilters({
     filters.dateFrom ||
     filters.dateTo ||
     filters.departmentId !== null ||
-    filters.nameFilter !== null;
+    filters.nameFilter !== null ||
+    filters.statusFilter !== null;
 
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Search Bar */}
-      <div className="relative w-[300px]">
+      <div className="relative w-[250px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by name, purpose..."
@@ -80,7 +83,7 @@ export function OvertimeReportFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-[180px] justify-start text-left font-normal",
+              "w-[160px] justify-start text-left font-normal",
               !filters.dateFrom && "text-muted-foreground"
             )}
           >
@@ -108,7 +111,7 @@ export function OvertimeReportFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-[180px] justify-start text-left font-normal",
+              "w-[160px] justify-start text-left font-normal",
               !filters.dateTo && "text-muted-foreground"
             )}
           >
@@ -142,7 +145,7 @@ export function OvertimeReportFilters({
             onDepartmentChange(value === "all" ? null : Number(value))
           }
         >
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[170px]">
             <SelectValue placeholder="All Departments" />
           </SelectTrigger>
           <SelectContent>
@@ -166,7 +169,7 @@ export function OvertimeReportFilters({
           onNameFilterChange(value === "all" ? null : value)
         }
       >
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className="w-[170px]">
           <SelectValue placeholder="All Employees" />
         </SelectTrigger>
         <SelectContent>
@@ -176,6 +179,24 @@ export function OvertimeReportFilters({
               {name}
             </SelectItem>
           ))}
+        </SelectContent>
+      </Select>
+
+      {/* Status Filter */}
+      <Select
+        value={filters.statusFilter !== null ? filters.statusFilter : "all"}
+        onValueChange={(value) =>
+          onStatusChange(value === "all" ? null : value)
+        }
+      >
+        <SelectTrigger className="w-[170px]">
+          <SelectValue placeholder="All Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="approved">Approved</SelectItem>
+          <SelectItem value="rejected">Rejected</SelectItem>
         </SelectContent>
       </Select>
 

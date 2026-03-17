@@ -51,6 +51,7 @@ export function useOvertimeReport() {
     setDateTo,
     setDepartmentId,
     setNameFilter,
+    setStatusFilter,
     resetFilters,
     filterRequests,
   } = filterContext;
@@ -114,6 +115,7 @@ export function useOvertimeReport() {
     setDateTo,
     setDepartmentId,
     setNameFilter,
+    setStatusFilter,
     resetFilters,
     employeeNames,
 

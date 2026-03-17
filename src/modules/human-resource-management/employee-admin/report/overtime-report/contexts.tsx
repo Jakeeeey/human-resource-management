@@ -95,6 +95,7 @@ const initialFilters: OvertimeReportFilters = {
   dateTo: undefined,
   departmentId: null,
   nameFilter: null,
+  statusFilter: null,
 };
 
 export function OvertimeReportFilterProvider({
@@ -122,6 +123,10 @@ export function OvertimeReportFilterProvider({
 
   const setNameFilter = (name: string | null) => {
     setFilters((prev) => ({ ...prev, nameFilter: name }));
+  };
+
+  const setStatusFilter = (status: string | null) => {
+    setFilters((prev) => ({ ...prev, statusFilter: status }));
   };
 
   const resetFilters = () => {
@@ -172,6 +177,12 @@ export function OvertimeReportFilterProvider({
         );
       }
 
+      if (filters.statusFilter !== null) {
+        filtered = filtered.filter(
+          (req) => req.status === filters.statusFilter
+        );
+      }
+
       return filtered;
     };
   }, [filters]);
@@ -183,6 +194,7 @@ export function OvertimeReportFilterProvider({
     setDateTo,
     setDepartmentId,
     setNameFilter,
+    setStatusFilter,
     resetFilters,
     filterRequests,
   };
