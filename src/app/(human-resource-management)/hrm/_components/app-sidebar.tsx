@@ -114,6 +114,11 @@ const data = {
                             url: "/hrm/employee-admin/approval/undertime-request",
                             icon: CalendarClock,
                         },
+                         {
+                            title: "Leave Request",
+                            url: "/hrm/employee-admin/approval/leave-request",
+                            icon: CalendarClock,
+                        },
                     ],
                 },
                 {
@@ -129,6 +134,11 @@ const data = {
                           {
                             title: "Undertime Report",
                             url: "/hrm/employee-admin/report/undertime-report",
+                            icon: CalendarClock,
+                        },
+                         {
+                            title: "Leave Report",
+                            url: "/hrm/employee-admin/report/leave-report",
                             icon: CalendarClock,
                         },
                     ],
