@@ -335,42 +335,58 @@ export async function GET(req: NextRequest) {
       let undertime_minutes = 0;
       let overtime_minutes = 0;
 
-      if (log.time_in && log.time_out && schedule) {
+      if (log.time_in && schedule) {
         const actualIn = parseLocalISO(log.time_in);
-        const actualOut = parseLocalISO(log.time_out);
         const schedIn = timeToDate(log.log_date, schedule.time_in);
         const schedOut = timeToDate(log.log_date, schedule.time_out);
 
-        // Lateness Calculation with Grace Period
-        const diffInMs = actualIn.getTime() - schedIn.getTime();
-        const diffInMins = Math.floor(diffInMs / 60000);
-
-        console.log(`[DEBUG] User: ${log.user_id} | SchedIn: ${schedIn.toISOString()} | ActualIn: ${actualIn.toISOString()} | Diff: ${diffInMins}m | Grace: ${schedule.grace_period}m`);
-
-        if (diffInMins > schedule.grace_period) {
-          late_minutes = diffInMins;
-        } else {
-          late_minutes = 0;
-        }
-
-        // Undertime
-        if (actualOut < schedOut) {
-          undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
-        }
-
-        // Base Work Time (Fixed 480 for HR system compliance)
-        // Even if late or undertime, the base is 480. Deductions are handled via the Late and Undertime columns.
-        work_minutes = 480;
-
-        // Overtime: if timed out 90m (1.5h) excess AND has approved overtime_request
-        const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
-        const dayKey = log.log_date.split('T')[0];
-        const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
-        
-        if (excessOut >= 90 && otReq?.status === 'approved') {
-          overtime_minutes = excessOut;
-        } else {
+        if (actualIn > schedOut) {
+          // LATE TIME IN BEYOND TIME OUT LOGIC:
+          // Cap late and undertime to 240 each, work 480 (Total 480 deduction, net 0)
+          late_minutes = 240;
+          undertime_minutes = 240;
+          work_minutes = 480;
           overtime_minutes = 0;
+          console.log(`[DEBUG] Time in beyond time out for user ${log.user_id}: setting 240 late, 240 undertime`);
+        } else {
+          // ALWAYS calculate Lateness if they timed in before scheduled time out
+          const diffInMs = actualIn.getTime() - schedIn.getTime();
+          const diffInMins = Math.floor(diffInMs / 60000);
+
+          if (diffInMins > schedule.grace_period) {
+            late_minutes = diffInMins;
+          } else {
+            late_minutes = 0;
+          }
+
+          // Base Work Time (Fixed 480 for HR system compliance)
+          work_minutes = 480;
+
+          if (log.time_out) {
+            const actualOut = parseLocalISO(log.time_out);
+            
+            // Undertime
+            if (actualOut < schedOut) {
+              undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
+            }
+
+            // Overtime: if timed out 90m (1.5h) excess AND has approved overtime_request
+            const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
+            const dayKey = log.log_date.split('T')[0];
+            const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
+            
+            if (excessOut >= 90 && otReq?.status === 'approved') {
+              overtime_minutes = excessOut;
+            } else {
+              overtime_minutes = 0;
+            }
+          } else {
+            // MISSING TIME OUT LOGIC: 
+            // Pay for the whole day (480), but deduct half day (240 undertime)
+            undertime_minutes = 240;
+            overtime_minutes = 0;
+            console.log(`[DEBUG] Missing time_out for user ${log.user_id}: setting 480 work, 240 undertime`);
+          }
         }
       }
 

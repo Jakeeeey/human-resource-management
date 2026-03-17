@@ -209,15 +209,16 @@ export function AttendanceApprovalCutoff() {
     try {
       setIsProcessing(true);
       const employeeLogs = logs.filter(log => log.user_id === userId);
+      const pendingLogs = employeeLogs.filter(log => log.approval_status === "pending" || !log.approval_status);
       
-      if (employeeLogs.length === 0) {
-        toast.info("No logs found for this employee.");
+      if (pendingLogs.length === 0) {
+        toast.info("No pending logs found for this employee to approve.");
         return;
       }
 
-      toast.info(`Approving all logs for employee ${userId}...`);
+      toast.info(`Approving ${pendingLogs.length} pending logs for employee ${userId}...`);
 
-      const updates = employeeLogs.map(log => ({
+      const updates = pendingLogs.map(log => ({
         log_id: log.log_id,
         employee_id: log.user_id,
         date_schedule: log.log_date,
@@ -230,7 +231,7 @@ export function AttendanceApprovalCutoff() {
       }));
 
       await approveOrRejectAttendance(updates);
-      toast.success("All logs approved successfully");
+      toast.success(`${pendingLogs.length} logs approved successfully`);
       loadLogs();
     } catch (error) {
       console.error("Failed to approve all logs:", error);
@@ -277,6 +278,76 @@ export function AttendanceApprovalCutoff() {
       loadLogs();
     } catch {
       toast.error("Rejection failed");
+    }
+  };
+
+  const handleBatchApprove = async (selectedLogs: AttendanceLogWithUser[]) => {
+    try {
+      setIsProcessing(true);
+      const pendingLogs = selectedLogs.filter(log => log.approval_status === "pending" || !log.approval_status);
+      
+      if (pendingLogs.length === 0) {
+        toast.info("No pending logs in selection to approve.");
+        return;
+      }
+
+      toast.info(`Approving ${pendingLogs.length} logs...`);
+
+      const updates = pendingLogs.map(log => ({
+        log_id: log.log_id,
+        employee_id: log.user_id,
+        date_schedule: log.log_date,
+        status: "approved" as const,
+        remarks: log.status || "Batch approved",
+        work_minutes: log.work_minutes,
+        late_minutes: log.late_minutes,
+        undertime_minutes: log.undertime_minutes,
+        overtime_minutes: log.overtime_minutes
+      }));
+
+      await approveOrRejectAttendance(updates);
+      toast.success(`${pendingLogs.length} logs approved successfully`);
+      loadLogs();
+    } catch (error) {
+      console.error("Batch approval failed:", error);
+      toast.error("Batch approval failed");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBatchReject = async (selectedLogs: AttendanceLogWithUser[]) => {
+    try {
+      setIsProcessing(true);
+      const pendingLogs = selectedLogs.filter(log => log.approval_status === "pending" || !log.approval_status);
+      
+      if (pendingLogs.length === 0) {
+        toast.info("No pending logs in selection to reject.");
+        return;
+      }
+
+      toast.info(`Rejecting ${pendingLogs.length} logs...`);
+
+      const updates = pendingLogs.map(log => ({
+        log_id: log.log_id,
+        employee_id: log.user_id,
+        date_schedule: log.log_date,
+        status: "rejected" as const,
+        remarks: log.status || "Batch rejected",
+        work_minutes: log.work_minutes,
+        late_minutes: log.late_minutes,
+        undertime_minutes: log.undertime_minutes,
+        overtime_minutes: log.overtime_minutes
+      }));
+
+      await approveOrRejectAttendance(updates);
+      toast.success(`${pendingLogs.length} logs rejected successfully`);
+      loadLogs();
+    } catch (error) {
+      console.error("Batch rejection failed:", error);
+      toast.error("Batch rejection failed");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -504,7 +575,6 @@ export function AttendanceApprovalCutoff() {
       <EmployeeSummaryTable 
         data={employeeSummaries}
         onViewDetails={handleViewDetails}
-        onApproveAll={handleApproveAll}
         isLoading={isLoading}
         isProcessing={isProcessing}
       />
@@ -556,7 +626,10 @@ export function AttendanceApprovalCutoff() {
                 onSaveRow={handleSaveRow}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onBatchApprove={handleBatchApprove}
+                onBatchReject={handleBatchReject}
                 isLoading={isLoading}
+                isProcessing={isProcessing}
               />
             </div>
           </div>

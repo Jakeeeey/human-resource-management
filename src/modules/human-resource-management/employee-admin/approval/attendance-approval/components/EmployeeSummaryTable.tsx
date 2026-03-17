@@ -30,7 +30,6 @@ export interface EmployeeSummary {
 interface EmployeeSummaryTableProps {
   data: EmployeeSummary[];
   onViewDetails: (userId: number) => void;
-  onApproveAll: (userId: number) => void;
   isLoading: boolean;
   isProcessing?: boolean;
 }
@@ -38,7 +37,6 @@ interface EmployeeSummaryTableProps {
 export function EmployeeSummaryTable({
   data,
   onViewDetails,
-  onApproveAll,
   isLoading,
   isProcessing,
 }: EmployeeSummaryTableProps) {
@@ -156,18 +154,6 @@ export function EmployeeSummaryTable({
 
               <TableCell className="px-6 py-4 text-right">
                 <div className="flex justify-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="rounded-xl h-9 px-3 gap-2 text-green-600 hover:bg-green-50 hover:text-green-700 transition-all active:scale-95 border border-transparent hover:border-green-200"
-                    onClick={() => onApproveAll(summary.user_id)}
-                    disabled={isProcessing}
-                  >
-                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100 p-1 border-none">
-                      <ChevronRight className="h-3 w-3" />
-                    </Badge>
-                    <span className="text-xs font-bold uppercase tracking-tight">Approve All</span>
-                  </Button>
                   <Button
                     size="sm"
                     variant="ghost"
