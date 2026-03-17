@@ -77,7 +77,7 @@ async function getAuthToken(): Promise<string | null> {
 
 async function directusFetch(path: string, options: RequestInit = {}) {
   const token = process.env.DIRECTUS_STATIC_TOKEN || "";
-  
+
   const response = await fetch(`${DIRECTUS_URL}${path}`, {
     ...options,
     headers: {
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
   try {
     const token = await getAuthToken();
     const payload = token ? decodeJwtPayload(token) : null;
-    
+
     if (!payload) {
       return NextResponse.json(
         { error: "Unauthorized: No valid token" },
@@ -114,11 +114,11 @@ export async function GET(req: NextRequest) {
     const userId = payload?.id || payload?.user_id || payload?.sub;
 
     // Fetch user details to get department
-    console.log(`[DEBUG] Fetching current user: /items/user/${userId}`);
+    console.log(`[DEBUG] Fetching current user: /items/user/${userId} - route.ts:117`);
     const userResponse = await directusFetch(
       `/items/user/${userId}?fields=user_id,user_department,isAdmin,role`
     );
-    
+
     const currentUserDepartment = userResponse.data?.user_department;
     const isAdmin = userResponse.data?.isAdmin || userResponse.data?.role === 'ADMIN';
 
@@ -127,15 +127,15 @@ export async function GET(req: NextRequest) {
     const approvalStatus = searchParams.get("approvalStatus") || "all";
     const selectedDepartmentId = searchParams.get("departmentId");
     const filterParts = [];
-    
+
     if (approvalStatus && approvalStatus !== "all") {
       filterParts.push(`filter[approval_status][_eq]=${approvalStatus}`);
     }
-    
+
     // Add date range filter if provided
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
-    
+
     if (startDate) filterParts.push(`filter[log_date][_gte]=${startDate}`);
     if (endDate) filterParts.push(`filter[log_date][_lte]=${endDate}`);
 
@@ -153,11 +153,11 @@ export async function GET(req: NextRequest) {
     // Calculations like work_minutes, late_minutes etc. are done in the mapping function.
     const logFields = "log_id,user_id,department_id,log_date,time_in,time_out,approval_status,status";
     const finalUrl = `/items/attendance_log?${filter}${filter ? "&" : ""}sort=-log_date&limit=1000&fields=${logFields}`;
-    console.log(`[DEBUG] Fetching logs: ${finalUrl}`);
+    console.log(`[DEBUG] Fetching logs: ${finalUrl} - route.ts:156`);
 
     // Fetch attendance logs
     const attendanceResponse = await directusFetch(finalUrl);
-    console.log(`[DEBUG] Logs fetched: ${attendanceResponse.data?.length || 0} items`);
+    console.log(`[DEBUG] Logs fetched: ${attendanceResponse.data?.length || 0} items - route.ts:160`);
 
     const logs = attendanceResponse.data || [];
 
@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
     const usersResponse = await directusFetch(
       `/items/user?filter[user_id][_in]=${userIds.join(",")}&fields=user_id,user_fname,user_lname,user_mname,user_department`
     ).catch(() => ({ data: [] }));
-    
+
     interface UserDetails {
       user_id: number;
       user_fname: string;
@@ -201,7 +201,7 @@ export async function GET(req: NextRequest) {
     // Optimized metadata fetches with specific fields and filtered by userIds/deptIds where possible
     // Only perform filtered fetches if we have IDs, otherwise fetch with default limit
     const userIdsFilter = userIds.length > 0 ? `filter[user_id][_in]=${userIds.join(",")}` : "";
-    
+
     const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes] = await Promise.all([
       directusFetch(`/items/department_schedule?limit=1000&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
@@ -209,7 +209,7 @@ export async function GET(req: NextRequest) {
       directusFetch(`/items/attendance_approval?${userIds.length > 0 ? `filter[employee_id][_in]=${userIds.join(",")}` : ""}&limit=1000&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
       directusFetch(`/items/overtime_request?${userIdsFilter}&filter[status][_eq]=approved&limit=1000&fields=user_id,request_date,status`)
     ]);
- 
+
     const deptSchedules = deptSchedulesRes.data || [];
     const oncallList = oncallListsRes.data || [];
     const oncallSchedules = oncallSchedulesRes.data || [];
@@ -252,21 +252,21 @@ export async function GET(req: NextRequest) {
     const enrichedLogs = logs.map((log: AttendanceLog) => {
       const user = usersMap.get(log.user_id);
       const dept = log.department_id ? deptsMap.get(log.department_id) : null;
-      
+
       // const dayOfWeek = format(new Date(log.log_date), "EEEE");
       const userDeptId = user?.user_department;
-      
-      console.log(`[DEBUG] Processing Log ID: ${log.log_id} | User: ${log.user_id} | LogDate: ${log.log_date} | UserDept: ${userDeptId}`);
+
+      console.log(`[DEBUG] Processing Log ID: ${log.log_id} | User: ${log.user_id} | LogDate: ${log.log_date} | UserDept: ${userDeptId} - route.ts:259`);
 
       // 1. Check Oncall Priority
-      const userOncallEntries = oncallList.filter((entry: { user_id: number; dept_sched_id: number }) => 
+      const userOncallEntries = oncallList.filter((entry: { user_id: number; dept_sched_id: number }) =>
         String(entry.user_id) === String(log.user_id)
       );
 
       let schedule: Sched | null = null;
 
       if (userOncallEntries.length > 0) {
-        console.log(`[DEBUG] Found ${userOncallEntries.length} oncall_list entries for user ${log.user_id}`);
+        console.log(`[DEBUG] Found ${userOncallEntries.length} oncall_list entries for user ${log.user_id} - route.ts:269`);
         for (const entry of userOncallEntries) {
           // As verified by user example (Turn 446): oncall_list.dept_sched_id connects to oncall_schedule.id
           // We remove the date requirement here because the oncall_list mapping is the explicit assignment.
@@ -282,18 +282,18 @@ export async function GET(req: NextRequest) {
             break_end: string;
             grace_period: number;
           }
-          const ocSched = oncallSchedules.find((s: OncallScheduleRecord) => 
+          const ocSched = oncallSchedules.find((s: OncallScheduleRecord) =>
             String(s.id) === String(entry.dept_sched_id)
           );
-          
+
           if (ocSched) {
-            console.log(`[DEBUG] Found ONCALL mapping via list: User ${log.user_id} -> SchedID ${ocSched.id} (${ocSched.work_start}-${ocSched.work_end})`);
+            console.log(`[DEBUG] Found ONCALL mapping via list: User ${log.user_id} > SchedID ${ocSched.id} (${ocSched.work_start}${ocSched.work_end}) - route.ts:290`);
             schedule = {
               time_in: ocSched.work_start,
               time_out: ocSched.work_end,
               grace_period: Number(ocSched.grace_period ?? 5)
             };
-            console.log(`[DEBUG] Final Schedule Object (ONCALL):`, schedule);
+            console.log(`[DEBUG] Final Schedule Object (ONCALL): - route.ts:296`, schedule);
             break;
           }
         }
@@ -311,23 +311,23 @@ export async function GET(req: NextRequest) {
           break_end: string;
           grace_period: number;
         }
-        const deptSched = deptSchedules.find((s: DepartmentScheduleRecord) => 
+        const deptSched = deptSchedules.find((s: DepartmentScheduleRecord) =>
           String(s.department_id) === String(userDeptId)
         );
 
         if (deptSched) {
-          console.log(`[DEBUG] FOUND DEPT SCHED: ${JSON.stringify(deptSched)}`);
+          console.log(`[DEBUG] FOUND DEPT SCHED: ${JSON.stringify(deptSched)} - route.ts:319`);
           schedule = {
             time_in: deptSched.work_start,
             time_out: deptSched.work_end,
             grace_period: Number(deptSched.grace_period ?? 5)
           };
-          console.log(`[DEBUG] Final Schedule Object (DEPT):`, schedule);
+          console.log(`[DEBUG] Final Schedule Object (DEPT): - route.ts:325`, schedule);
         }
       }
 
       if (!schedule) {
-        console.log(`[DEBUG] !!! NO SCHEDULE FOUND for user ${log.user_id} on date ${log.log_date}`);
+        console.log(`[DEBUG] !!! NO SCHEDULE FOUND for user ${log.user_id} on date ${log.log_date} - route.ts:330`);
       }
 
       let work_minutes = 0;
@@ -335,42 +335,58 @@ export async function GET(req: NextRequest) {
       let undertime_minutes = 0;
       let overtime_minutes = 0;
 
-      if (log.time_in && log.time_out && schedule) {
+      if (log.time_in && schedule) {
         const actualIn = parseLocalISO(log.time_in);
-        const actualOut = parseLocalISO(log.time_out);
         const schedIn = timeToDate(log.log_date, schedule.time_in);
         const schedOut = timeToDate(log.log_date, schedule.time_out);
 
-        // Lateness Calculation with Grace Period
-        const diffInMs = actualIn.getTime() - schedIn.getTime();
-        const diffInMins = Math.floor(diffInMs / 60000);
-
-        console.log(`[DEBUG] User: ${log.user_id} | SchedIn: ${schedIn.toISOString()} | ActualIn: ${actualIn.toISOString()} | Diff: ${diffInMins}m | Grace: ${schedule.grace_period}m`);
-
-        if (diffInMins > schedule.grace_period) {
-          late_minutes = diffInMins;
-        } else {
-          late_minutes = 0;
-        }
-
-        // Undertime
-        if (actualOut < schedOut) {
-          undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
-        }
-
-        // Base Work Time (Fixed 480 for HR system compliance)
-        // Even if late or undertime, the base is 480. Deductions are handled via the Late and Undertime columns.
-        work_minutes = 480;
-
-        // Overtime: if timed out 90m (1.5h) excess AND has approved overtime_request
-        const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
-        const dayKey = log.log_date.split('T')[0];
-        const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
-        
-        if (excessOut >= 90 && otReq?.status === 'approved') {
-          overtime_minutes = excessOut;
-        } else {
+        if (actualIn > schedOut) {
+          // LATE TIME IN BEYOND TIME OUT LOGIC:
+          // Cap late and undertime to 240 each, work 480 (Total 480 deduction, net 0)
+          late_minutes = 240;
+          undertime_minutes = 240;
+          work_minutes = 480;
           overtime_minutes = 0;
+          console.log(`[DEBUG] Time in beyond time out for user ${log.user_id}: setting 240 late, 240 undertime - route.ts:350`);
+        } else {
+          // ALWAYS calculate Lateness if they timed in before scheduled time out
+          const diffInMs = actualIn.getTime() - schedIn.getTime();
+          const diffInMins = Math.floor(diffInMs / 60000);
+
+          if (diffInMins > schedule.grace_period) {
+            late_minutes = diffInMins;
+          } else {
+            late_minutes = 0;
+          }
+
+          // Base Work Time (Fixed 480 for HR system compliance)
+          work_minutes = 480;
+
+          if (log.time_out) {
+            const actualOut = parseLocalISO(log.time_out);
+
+            // Undertime
+            if (actualOut < schedOut) {
+              undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
+            }
+
+            // Overtime: if timed out 90m (1.5h) excess AND has approved overtime_request
+            const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
+            const dayKey = log.log_date.split('T')[0];
+            const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
+
+            if (excessOut >= 90 && otReq?.status === 'approved') {
+              overtime_minutes = excessOut;
+            } else {
+              overtime_minutes = 0;
+            }
+          } else {
+            // MISSING TIME OUT LOGIC: 
+            // Pay for the whole day (480), but deduct half day (240 undertime)
+            undertime_minutes = 240;
+            overtime_minutes = 0;
+            console.log(`[DEBUG] Missing time_out for user ${log.user_id}: setting 480 work, 240 undertime - route.ts:388`);
+          }
         }
       }
 
@@ -379,14 +395,14 @@ export async function GET(req: NextRequest) {
       const manualAdjustments = approvalsMap.get(approvalKey);
 
       if (manualAdjustments) {
-        console.log(`[DEBUG] Found manual adjustments for user ${log.user_id} on ${log.log_date}:`, manualAdjustments);
-        
+        console.log(`[DEBUG] Found manual adjustments for user ${log.user_id} on ${log.log_date}: - route.ts:398`, manualAdjustments);
+
         // If it's a pending log, we might want to favor calculation if the manual record
         // looks like it was saved with 'stale' values due to the previous calculation bug.
         // If calculation shows more minutes and there are no manual remarks, we favor calculation.
-        const isStaleManualRecord = 
-          log.approval_status === "pending" && 
-          manualAdjustments.work_minutes < work_minutes && 
+        const isStaleManualRecord =
+          log.approval_status === "pending" &&
+          manualAdjustments.work_minutes < work_minutes &&
           !manualAdjustments.remarks;
 
         if (!isStaleManualRecord) {
@@ -395,7 +411,7 @@ export async function GET(req: NextRequest) {
           undertime_minutes = manualAdjustments.undertime_minutes ?? undertime_minutes;
           overtime_minutes = manualAdjustments.overtime_minutes ?? overtime_minutes;
         } else {
-          console.log(`[DEBUG] Ignoring likely stale manual record for user ${log.user_id}`);
+          console.log(`[DEBUG] Ignoring likely stale manual record for user ${log.user_id} - route.ts:414`);
         }
       }
 
@@ -421,7 +437,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
-    console.error("GET attendance_log error:", error);
+    console.error("GET attendance_log error: - route.ts:440", error);
     return NextResponse.json(
       { error: "Failed to fetch attendance logs", details: errorMsg },
       { status: 500 }
@@ -446,7 +462,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const userId = payload?.id || payload?.user_id || payload?.sub;
-    
+
     if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized: Invalid token payload" },
@@ -454,17 +470,17 @@ export async function PATCH(req: NextRequest) {
       );
     }
     const body = await req.json();
-    
+
     // Support both single object and array of objects
     const items = Array.isArray(body) ? body : [body];
-    console.log(`[BACKEND] Processing ${items.length} items in PATCH request`);
+    console.log(`[BACKEND] Processing ${items.length} items in PATCH request - route.ts:476`);
 
     if (items.length === 0) {
       return NextResponse.json({ error: "No items provided" }, { status: 400 });
     }
 
     const results = [];
-    
+
     // For large batches, we could optimize this further with Directus batch endpoints,
     // but for now, we'll process them in the most stable way.
     for (const item of items) {
@@ -525,7 +541,7 @@ export async function PATCH(req: NextRequest) {
           body: JSON.stringify(approvalData),
         });
       }
-      
+
       results.push({ log_id, success: true });
     }
 
@@ -535,7 +551,7 @@ export async function PATCH(req: NextRequest) {
       results
     });
   } catch (error) {
-    console.error("PATCH attendance_log error:", error);
+    console.error("PATCH attendance_log error: - route.ts:554", error);
     return NextResponse.json(
       { error: "Failed to update attendance logs" },
       { status: 500 }
