@@ -607,7 +607,7 @@ export function AttendanceApprovalCutoff() {
             <div className="flex items-center gap-3 mr-8">
               {selectedUserId && (
                 <Button
-                  onClick={() => handleApproveAll(selectedUserId)}
+                  onClick={() => selectedUserId && handleApproveAll(selectedUserId)}
                   disabled={isProcessing}
                   className="rounded-2xl h-12 px-6 gap-2 bg-green-500 hover:bg-green-600 text-white font-bold shadow-lg shadow-green-500/20 transition-all active:scale-95"
                 >

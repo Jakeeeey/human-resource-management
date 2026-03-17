@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Users, ChevronRight, ClipboardList } from "lucide-react";
+import { Eye, ChevronRight, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "./EmptyState";
 
@@ -159,9 +159,12 @@ export function EmployeeSummaryTable({
                     variant="ghost"
                     className="rounded-xl h-9 px-4 gap-2 text-primary hover:bg-primary/10 transition-all active:scale-95 border border-transparent hover:border-primary/20"
                     onClick={() => onViewDetails(summary.user_id)}
+                    disabled={isProcessing}
                   >
                     <Eye className="h-4 w-4" />
-                    <span className="text-xs font-bold uppercase tracking-tight">View Details</span>
+                    <span className="text-xs font-bold uppercase tracking-tight">
+                      {isProcessing ? "Processing..." : "View Details"}
+                    </span>
                     <ChevronRight className="h-3 w-3 opacity-50" />
                   </Button>
                 </div>
