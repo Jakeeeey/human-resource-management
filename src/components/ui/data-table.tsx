@@ -6,6 +6,10 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
+  HeaderGroup,
+  Header,
+  Row,
+  Cell,
 } from "@tanstack/react-table"
 
 import {
@@ -38,9 +42,9 @@ export function DataTable<TData, TValue>({
     <div className="w-full">
       <Table>
         <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
+          {table.getHeaderGroups().map((headerGroup: HeaderGroup<TData>) => (
             <TableRow key={headerGroup.id} className="bg-slate-50/50 hover:bg-slate-50/50">
-              {headerGroup.headers.map((header) => {
+              {headerGroup.headers.map((header: Header<TData, unknown>) => {
                 return (
                   <TableHead key={header.id} className="h-10 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     {header.isPlaceholder
@@ -57,13 +61,13 @@ export function DataTable<TData, TValue>({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
+            table.getRowModel().rows.map((row: Row<TData>) => (
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
                 className="hover:bg-slate-50/50 data-[state=selected]:bg-slate-50"
               >
-                {row.getVisibleCells().map((cell) => (
+                {row.getVisibleCells().map((cell: Cell<TData, unknown>) => (
                   <TableCell key={cell.id} className="py-2">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
