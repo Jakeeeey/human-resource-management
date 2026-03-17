@@ -100,6 +100,10 @@ async function proxy(req: NextRequest) {
       upstreamGETPath = "/items/department?fields=*&limit=-1";
       upstreamMutatePath = "/items/department";
       break;
+    case "company":
+      upstreamGETPath = "/items/company?fields=*&limit=-1";
+      upstreamMutatePath = "/items/company";
+      break;
     case "file-records":
       upstreamGETPath = "/items/employee_file_records?fields=*.*,list_id.*,list_id.record_type_id.*&limit=-1";
       upstreamMutatePath = "/items/employee_file_records";
@@ -145,6 +149,10 @@ async function proxy(req: NextRequest) {
         const id = segment.split("/")[1];
         upstreamGETPath = `/items/asset_assignments/${id}`;
         upstreamMutatePath = `/items/asset_assignments/${id}`;
+      } else if (segment.startsWith("company/")) {
+        const id = segment.split("/")[1];
+        upstreamGETPath = `/items/company/${id}`;
+        upstreamMutatePath = `/items/company/${id}`;
       } else if (segment.startsWith("assets/")) {
         upstreamGETPath = `/${segment}`;
         upstreamMutatePath = `/${segment}`;
@@ -224,11 +232,41 @@ async function proxy(req: NextRequest) {
     });
 
     const data = await res.arrayBuffer();
-    const contentType = res.headers.get("content-type") || "application/json";
+    const contentType = res.headers.get("content-type") || "application/octet-stream";
+    const responseHeaders: Record<string, string> = { "content-type": contentType };
+
+    // Force download with proper filename for asset requests
+    if (segment.startsWith("assets/")) {
+      const downloadFilename = url.searchParams.get("filename");
+      // Try to get extension from content-type
+      const mimeType = contentType.split(";")[0].trim();
+      const mimeMap: Record<string, string> = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "application/pdf": "pdf",
+        "application/msword": "doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/vnd.ms-excel": "xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx"
+      };
+      const ext = mimeMap[mimeType] || mimeType.split("/")[1] || "";
+      
+      let safeName = downloadFilename
+        ? downloadFilename.replace(/[^\w\s.\-()]/gi, "_").trim()
+        : "file";
+
+      // Append extension if missing (case-insensitive check)
+      if (ext && !safeName.toLowerCase().endsWith("." + ext.toLowerCase())) {
+        safeName += "." + ext;
+      }
+
+      responseHeaders["Content-Disposition"] = `attachment; filename="${safeName}"`;
+    }
 
     return new NextResponse(data, {
       status: res.status,
-      headers: { "content-type": contentType },
+      headers: responseHeaders,
     });
   } catch (err) {
     console.error(`[Proxy Error] ${method} ${upstreamUrl}:`, err);

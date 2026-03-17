@@ -59,6 +59,7 @@ export async function POST(request: Request) {
         const now = getManilaTimeISO();
         scheduleData.created_at = now;
         scheduleData.updated_at = now;
+        scheduleData.grace_period = body.grace_period;
 
         if (userId) {
             scheduleData.encoder_id = typeof userId === "string" ? parseInt(userId) : userId;

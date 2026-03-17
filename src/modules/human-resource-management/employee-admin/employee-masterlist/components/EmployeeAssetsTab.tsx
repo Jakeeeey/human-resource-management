@@ -36,6 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { 
   Dialog, 
@@ -45,7 +46,7 @@ import {
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
-import { User, AssetAndEquipment, AssetAssignment, Department } from "../types";
+import { User, AssetAndEquipment, AssetAssignment, Department, Company } from "../types";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { 
@@ -54,7 +55,9 @@ import {
   assignAssetToEmployeeDirectus,
   getItemsDirectus,
   getEmployeeAssetAssignmentsDirectus,
-  returnAssetDirectus
+  getAllAssetAssignmentsDirectus,
+  returnAssetDirectus,
+  getCompanyDataDirectus
 } from "../providers/directusProvider";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -67,7 +70,8 @@ interface EmployeeAssetsTabProps {
 export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabProps) {
   const [assignedAssets, setAssignedAssets] = useState<AssetAndEquipment[]>([]);
   const [availableAssets, setAvailableAssets] = useState<AssetAndEquipment[]>([]);
-  const [assignments, setAssignments] = useState<AssetAssignment[]>([]);
+  const [userAssignments, setUserAssignments] = useState<AssetAssignment[]>([]);
+  const [allAssignments, setAllAssignments] = useState<AssetAssignment[]>([]);
   const [itemsList, setItemsList] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -78,6 +82,9 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   const [receiptPdfUrl, setReceiptPdfUrl] = useState<string | null>(null);
+  const [isMultiReceiptModalOpen, setIsMultiReceiptModalOpen] = useState(false);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
+  const [companyData, setCompanyData] = useState<Company | null>(null);
   
   // Return form state
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -107,15 +114,21 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       const userAssignments = await getEmployeeAssetAssignmentsDirectus(user.id);
       const historyIds = Array.from(new Set(userAssignments.map(a => a.asset_id)));
     
-      const [assigned, available, allItems] = await Promise.all([
+      const [assigned, available, allItems, companies, totalAssignments] = await Promise.all([
         getEmployeeAssetsDirectus(user.id, historyIds),
         getAvailableAssetsDirectus(),
-        getItemsDirectus()
+        getItemsDirectus(),
+        getCompanyDataDirectus(),
+        getAllAssetAssignmentsDirectus()
       ]);
       setAssignedAssets(assigned);
       setAvailableAssets(available);
       setItemsList(allItems);
-      setAssignments(userAssignments);
+      setUserAssignments(userAssignments);
+      setAllAssignments(totalAssignments);
+      if (companies && companies.length > 0) {
+        setCompanyData(companies[0]);
+      }
     } catch (error) {
       console.error("Failed to load assets data:", error);
       toast.error("Failed to load assets");
@@ -162,7 +175,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
   async function handleReturn() {
     if (!selectedAssetForReturn) return;
 
-    const assetAssignments = assignments
+    const assetAssignments = userAssignments
       .filter(a => a.asset_id === selectedAssetForReturn.id)
       .sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
     
@@ -200,31 +213,76 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     return (found?.item_name as string) || "Unknown Item";
   };
 
-  const generateReceiptPdf = async (asset: AssetAndEquipment) => {
+  const generateReceiptPdf = async (assets: AssetAndEquipment[]) => {
     const doc = new jsPDF();
+    const baseUrl = "/api/hrm/employee-admin/employee-master-list";
     
     try {
-      const logoUrl = '/vertex_logo_black.png';
+      // Use company logo from Directus if available, otherwise fallback
+      const logoId = companyData?.company_logo;
+      const logoUrl = logoId 
+        ? `${baseUrl}/assets/${logoId}`
+        : '/vertex_logo_receipt.png';
+        
       const response = await fetch(logoUrl);
+      if (!response.ok) throw new Error("Logo fetch failed");
       const blob = await response.blob();
       const base64data = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
       });
-      // Header logo: Make it wider but less tall to maintain aspect ratio (e.g. 110x15)
-      doc.addImage(base64data, 'PNG', 50, 10, 110, 15);
+
+      // Modern Header Design
+      // Logo on the left
+      doc.addImage(base64data, 'PNG', 14, 6, 45, 20); // Maintain a professional size
+      
+      // Company Info on the right
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(33, 37, 41);
+      doc.text((companyData?.company_name || "VERTEX TECHNOLOGIES CORPORATION").toUpperCase(), 65, 16);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      
+      // Build address parts
+      const addrParts = [
+        companyData?.company_address,
+        companyData?.company_brgy,
+        companyData?.company_city,
+        companyData?.company_province,
+        companyData?.company_zipCode
+      ].filter(Boolean);
+      
+      const fullAddress = addrParts.length > 0 ? addrParts.join(", ") : "Digital Hub, Quezon City, Philippines";
+      doc.text(fullAddress, 65, 21);
+      
+      const contactParts = [];
+      if (companyData?.company_contact) contactParts.push(`Tel: ${companyData.company_contact}`);
+      if (companyData?.company_email) contactParts.push(`Email: ${companyData.company_email}`);
+      if (companyData?.company_website) contactParts.push(`Web: ${companyData.company_website}`);
+      
+      doc.text(contactParts.join(" | "), 65, 25);
+
+      // Horizontal line separator
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(14, 30, 196, 30);
+
     } catch(err) {
       console.error("Could not add logo", err);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(16);
-      doc.text("VERTEX TECHNOLOGIES CORPORATION", 105, 18, { align: "center" });
+      doc.text((companyData?.company_name || "VERTEX TECHNOLOGIES CORPORATION").toUpperCase(), 105, 18, { align: "center" });
     }
 
     // Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 36, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    doc.text("ACKNOWLEDGEMENT RECEIPT", 105, 42, { align: "center" });
 
     // Body
     doc.setFontSize(10);
@@ -243,133 +301,130 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
     const timeStr = `${hours}:${minutes}`;
 
     let currentX = 14;
-    const line1Y = 46;
+    const line1Y = 52; // Adjusted for new header
     
     const fullFirstLineWidth = doc.getTextWidth(`This is to acknowledge that  `) + doc.getTextWidth(fullName) + 4 + doc.getTextWidth(`  of`);
     
-    // Check if the name pushes "of" too far right
     if (14 + fullFirstLineWidth > 195) {
-      // It overflows! Break "of" to the next line 
       doc.text("This is to acknowledge that ", currentX, line1Y);
       currentX += doc.getTextWidth("This is to acknowledge that ");
       
       const nameWidth = doc.getTextWidth(fullName) + 4;
-      doc.text(fullName, currentX + 2, line1Y - 1);
-      doc.line(currentX, line1Y, currentX + nameWidth, line1Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(fullName, currentX + 2, line1Y);
+      doc.setFont("helvetica", "normal");
       currentX += nameWidth + 2;
 
-      // Move "of" and the department line to the next line
       let line2X = 14;
-      const line2YOffset = 54;
+      const line2YOffset = 60;
       
       doc.text("of ", line2X, line2YOffset);
       line2X += doc.getTextWidth("of ");
       
       const deptWidth = doc.getTextWidth(deptNameStr) + 4; 
-      doc.text(deptNameStr, line2X + 2, line2YOffset - 1);
-      doc.line(line2X, line2YOffset, line2X + deptWidth, line2YOffset);
+      doc.setFont("helvetica", "bold");
+      doc.text(deptNameStr, line2X + 2, line2YOffset);
+      doc.setFont("helvetica", "normal");
       line2X += deptWidth + 2;
       
       doc.text(" department has received the following items(s)", line2X, line2YOffset);
 
-      // Shift subsequent lines down
       let currentX3 = 14;
-      const line3Y = 62;
+      const line3Y = 68;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX3, line3Y);
       currentX3 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
       const dateWidth = doc.getTextWidth(dateStr) + 4;
-      doc.text(dateStr, currentX3 + 2, line3Y - 1);
-      doc.line(currentX3, line3Y, currentX3 + dateWidth, line3Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(dateStr, currentX3 + 2, line3Y);
+      doc.setFont("helvetica", "normal");
       currentX3 += dateWidth + 2;
       
       doc.text(" at ", currentX3, line3Y);
       currentX3 += doc.getTextWidth(" at ");
       
       const timeWidth = doc.getTextWidth(timeStr) + 4;
-      doc.text(timeStr, currentX3 + 2, line3Y - 1);
-      doc.line(currentX3, line3Y, currentX3 + timeWidth, line3Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(timeStr, currentX3 + 2, line3Y);
+      doc.setFont("helvetica", "normal");
       currentX3 += timeWidth + 2;
       
       doc.text(" o'clock", currentX3, line3Y);
       
-      const line4Y = 70;
+      const line4Y = 76;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line4Y);
 
-      // AutoTable needs to be shifted down too
       autoTable(doc, {
-        startY: 78,
+        startY: 84,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
-        body: [
-          [
-            getItemName(asset.item_id), 
-            asset.barcode || "N/A", 
-            asset.serial || "N/A",
-            asset.quantity?.toString() || "1", 
-            asset.condition || 'Good'
-          ]
-        ],
+        body: assets.map(asset => [
+          getItemName(asset.item_id), 
+          asset.barcode || "N/A", 
+          asset.serial || "N/A",
+          asset.quantity?.toString() || "1", 
+          asset.condition || 'Good'
+        ]),
         theme: 'grid',
         headStyles: { fillColor: [50, 50, 50] },
         styles: { minCellHeight: 12 }
       });
 
     } else {
-      // Original logic fits
       doc.text("This is to acknowledge that ", currentX, line1Y);
       currentX += doc.getTextWidth("This is to acknowledge that ");
       
       const nameWidth = doc.getTextWidth(fullName) + 4;
-      doc.text(fullName, currentX + 2, line1Y - 1);
-      doc.line(currentX, line1Y, currentX + nameWidth, line1Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(fullName, currentX + 2, line1Y);
+      doc.setFont("helvetica", "normal");
       currentX += nameWidth + 2;
       
       doc.text(" of ", currentX, line1Y);
       currentX += doc.getTextWidth(" of ");
       
       const deptWidth = doc.getTextWidth(deptNameStr) + 4; 
-      doc.text(deptNameStr, currentX + 2, line1Y - 1);
-      doc.line(currentX, line1Y, currentX + deptWidth, line1Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(deptNameStr, currentX + 2, line1Y);
+      doc.setFont("helvetica", "normal");
       currentX += deptWidth + 2;
       
       doc.text(" department has received the following items(s)", currentX, line1Y);
       
       let currentX2 = 14;
-      const line2Y = 54;
+      const line2Y = 60;
       doc.text("from Vertex Technologies Corporation on this day, ", currentX2, line2Y);
       currentX2 += doc.getTextWidth("from Vertex Technologies Corporation on this day, ");
       
       const dateWidth = doc.getTextWidth(dateStr) + 4;
-      doc.text(dateStr, currentX2 + 2, line2Y - 1);
-      doc.line(currentX2, line2Y, currentX2 + dateWidth, line2Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(dateStr, currentX2 + 2, line2Y);
+      doc.setFont("helvetica", "normal");
       currentX2 += dateWidth + 2;
       
       doc.text(" at ", currentX2, line2Y);
       currentX2 += doc.getTextWidth(" at ");
       
       const timeWidth = doc.getTextWidth(timeStr) + 4;
-      doc.text(timeStr, currentX2 + 2, line2Y - 1);
-      doc.line(currentX2, line2Y, currentX2 + timeWidth, line2Y);
+      doc.setFont("helvetica", "bold");
+      doc.text(timeStr, currentX2 + 2, line2Y);
+      doc.setFont("helvetica", "normal");
       currentX2 += timeWidth + 2;
       
       doc.text(" o'clock", currentX2, line2Y);
       
-      const line3Y = 62;
+      const line3Y = 68;
       doc.text(`AM [${ampm === 'AM' ? 'X' : ' '}] PM [${ampm === 'PM' ? 'X' : ' '}]`, 14, line3Y);
 
-      // AutoTable
       autoTable(doc, {
-        startY: 70,
+        startY: 76,
         head: [['Name of Item', 'Barcode', 'Serial No.', 'Quantity', 'Condition']],
-        body: [
-          [
-            getItemName(asset.item_id), 
-            asset.barcode || "N/A", 
-            asset.serial || "N/A",
-            asset.quantity?.toString() || "1", 
-            asset.condition || 'Good'
-          ]
-        ],
+        body: assets.map(asset => [
+          getItemName(asset.item_id), 
+          asset.barcode || "N/A", 
+          asset.serial || "N/A",
+          asset.quantity?.toString() || "1", 
+          asset.condition || 'Good'
+        ]),
         theme: 'grid',
         headStyles: { fillColor: [50, 50, 50] },
         styles: { minCellHeight: 12 }
@@ -417,13 +472,25 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button 
-          onClick={() => setIsAssignModalOpen(true)}
-          className="h-10 rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Assign Asset
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsMultiReceiptModalOpen(true);
+              setSelectedAssetIds([]);
+            }}
+            className="h-10 rounded-xl gap-2"
+          >
+            Print Receipt
+          </Button>
+          <Button 
+            onClick={() => setIsAssignModalOpen(true)}
+            className="h-10 rounded-xl bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Assign Asset
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border/50 bg-card/50 overflow-hidden shadow-sm">
@@ -447,7 +514,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
             </TableHeader>
             <TableBody>
               {filteredAssets.map((asset) => {
-                const assetAssignments = assignments.filter(a => a.asset_id === asset.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
+                const assetAssignments = allAssignments.filter(a => a.asset_id === asset.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
                 const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
                 return (
                 <TableRow key={asset.id} className="hover:bg-muted/20 transition-colors border-border/50">
@@ -490,6 +557,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                         "rounded-md px-2 py-0.5",
                         assignmentStatus === "Assigned" ? "border-blue-500/20 text-blue-600 bg-blue-500/10" :
                         assignmentStatus === "Returned" ? "border-green-500/20 text-green-600 bg-green-500/10" :
+                        assignmentStatus === "Lost" ? "border-red-500/20 text-red-600 bg-red-500/10" :
+                        assignmentStatus === "Damaged" ? "border-yellow-500/20 text-yellow-600 bg-yellow-500/10" :
                         "border-gray-500/20 text-gray-600 bg-gray-500/10"
                     )}>
                       {assignmentStatus || "Unknown"}
@@ -519,7 +588,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                           View Details
                         </DropdownMenuItem>
                         <DropdownMenuItem 
-                          onClick={() => generateReceiptPdf(asset)} 
+                          onClick={() => generateReceiptPdf([asset])} 
+
                           className="cursor-pointer rounded-lg"
                         >
                           Print Receipt
@@ -595,18 +665,35 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                 <SelectContent className="rounded-xl max-h-[300px]">
                   {availableAssets.map(a => {
                     const itemName = getItemName(a.item_id);
+                    const assetAssignments = allAssignments
+                      .filter(assign => assign.asset_id === a.id)
+                      .sort((v1, v2) => new Date(v2.assigned_date || 0).getTime() - new Date(v1.assigned_date || 0).getTime());
+                    
+                    const actualStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Unassigned";
+                    const displayStatus = actualStatus === "Returned" ? "Available" : actualStatus;
+
                     return (
                       <SelectItem 
                         key={a.id} 
                         value={a.id.toString()}
+                        disabled={actualStatus !== "Returned" && actualStatus !== "Unassigned"}
+                        className="[&>span:last-child]:w-full pr-8"
                       >
-                        <div className="flex items-center gap-2">
-                          <span>{itemName} {a.serial ? `(${a.serial})` : ''}</span>
-                          {a.is_active ? (
-                            <Badge variant="secondary" className="ml-2 text-[10px] text-green-600 bg-green-500/10 border-green-500/20 hover:bg-green-500/20">Active</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="ml-2 text-[10px] text-muted-foreground bg-muted border-border hover:bg-muted/80">Inactive</Badge>
-                          )}
+                        <div className="flex w-full items-center justify-between gap-4">
+                          <span className="truncate">{itemName} {a.serial ? `(${a.serial})` : ''}</span>
+                          <Badge 
+                            variant="secondary" 
+                            className={cn(
+                              "text-[10px] shrink-0 ml-auto",
+                              displayStatus === "Assigned" ? "text-blue-600 bg-blue-500/10 border-blue-500/20" :
+                              (displayStatus === "Available" || displayStatus === "Unassigned") ? "text-green-600 bg-green-500/10 border-green-500/20" :
+                              displayStatus === "Lost" ? "text-red-600 bg-red-500/10 border-red-500/20" :
+                              displayStatus === "Damaged" ? "text-yellow-600 bg-yellow-500/10 border-yellow-500/20" :
+                              "text-muted-foreground bg-muted border-border"
+                            )}
+                          >
+                            {displayStatus}
+                          </Badge>
                         </div>
                       </SelectItem>
                     );
@@ -719,7 +806,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
                 <div className="space-y-4 rounded-xl border p-4 bg-muted/10">
                   <h4 className="font-bold text-sm">Assignment Info</h4>
                   {(() => {
-                    const currentAssignments = assignments.filter(a => a.asset_id === selectedAssetForDetails.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
+                    const currentAssignments = allAssignments.filter(a => a.asset_id === selectedAssetForDetails.id).sort((a, b) => new Date(b.assigned_date || 0).getTime() - new Date(a.assigned_date || 0).getTime());
                     const latestAssignment = currentAssignments[0];
 
                     if (!latestAssignment) {
@@ -785,6 +872,60 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Multi Receipt Modal */}
+      <Dialog open={isMultiReceiptModalOpen} onOpenChange={setIsMultiReceiptModalOpen}>
+        <DialogContent className="sm:max-w-[500px] shadow-2xl rounded-2xl border-none p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>Select Assets for Receipt</DialogTitle>
+            <DialogDescription>Choose which assigned assets to include in the acknowledgement receipt.</DialogDescription>
+          </DialogHeader>
+          <div className="px-6 py-2 space-y-2 max-h-[400px] overflow-y-auto">
+            {assignedAssets.filter(a => {
+               const assetAssignments = allAssignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
+               const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
+               return assignmentStatus === "Assigned";
+            }).map((asset) => (
+              <div key={asset.id} className="flex items-center space-x-3 p-3 rounded-xl border border-border/50 bg-card/30 hover:bg-muted/30 transition-colors">
+                <Checkbox 
+                  id={`asset-${asset.id}`} 
+                  checked={selectedAssetIds.includes(asset.id)}
+                  onCheckedChange={(checked) => {
+                    if (checked) setSelectedAssetIds(prev => [...prev, asset.id]);
+                    else setSelectedAssetIds(prev => prev.filter(id => id !== asset.id));
+                  }}
+                />
+                <label 
+                  htmlFor={`asset-${asset.id}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed cursor-pointer flex-1"
+                >
+                  {getItemName(asset.item_id)} <span className="text-muted-foreground ml-1 font-normal">{asset.serial ? `(${asset.serial})` : ''}</span>
+                </label>
+              </div>
+            ))}
+            {assignedAssets.filter(a => {
+               const assetAssignments = allAssignments.filter(as => as.asset_id === a.id).sort((as1, as2) => new Date(as2.assigned_date || 0).getTime() - new Date(as1.assigned_date || 0).getTime());
+               const assignmentStatus = assetAssignments.length > 0 ? assetAssignments[0].assignment_status : "Assigned";
+               return assignmentStatus === "Assigned";
+            }).length === 0 && (
+              <div className="py-6 text-center text-sm text-muted-foreground">No active assignments available to print.</div>
+            )}
+          </div>
+          <DialogFooter className="p-6 bg-muted/20 border-t gap-2">
+            <Button variant="ghost" onClick={() => setIsMultiReceiptModalOpen(false)}>Cancel</Button>
+            <Button 
+              className="bg-primary hover:bg-primary/90 rounded-xl"
+              disabled={selectedAssetIds.length === 0}
+              onClick={() => {
+                const assetsToPrint = assignedAssets.filter(a => selectedAssetIds.includes(a.id));
+                setIsMultiReceiptModalOpen(false);
+                generateReceiptPdf(assetsToPrint);
+              }}
+            >
+              Generate Preview
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       {/* Return Asset Modal */}

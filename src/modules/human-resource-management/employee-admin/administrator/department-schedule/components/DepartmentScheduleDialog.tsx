@@ -52,6 +52,7 @@ interface ScheduleFormData {
     break_start: string;
     break_end: string;
     workdays_note: string;
+    grace_period: string;
 }
 
 interface DepartmentScheduleDialogProps {
@@ -87,6 +88,7 @@ export function DepartmentScheduleDialog({
             break_start: "15:00",
             break_end: "15:30",
             workdays_note: "",
+            grace_period: "5",
         },
     });
 
@@ -102,6 +104,7 @@ export function DepartmentScheduleDialog({
                 break_start: schedule.break_start.substring(0, 5),
                 break_end: schedule.break_end.substring(0, 5),
                 workdays_note: schedule.workdays_note || "",
+                grace_period: schedule.grace_period.toString(),
             });
         } else if (!open) {
             form.reset({
@@ -114,6 +117,7 @@ export function DepartmentScheduleDialog({
                 break_start: "15:00",
                 break_end: "15:30",
                 workdays_note: "",
+                grace_period: "5",
             });
         }
     }, [open, schedule, form]);
@@ -131,6 +135,7 @@ export function DepartmentScheduleDialog({
                 break_start: formatTime24Hour(data.break_start),
                 break_end: formatTime24Hour(data.break_end),
                 workdays_note: data.workdays_note,
+                grace_period: parseInt(data.grace_period, 10),
             });
             onOpenChange(false);
             form.reset();
@@ -228,7 +233,35 @@ export function DepartmentScheduleDialog({
                                 </FormItem>
                             )}
                         />
-
+ 
+                        {/* Grace Period */}
+                        <FormField
+                            control={form.control}
+                            name="grace_period"
+                            rules={{
+                                required: "Grace period is required",
+                                min: { value: 0, message: "Must be at least 0" },
+                                max: { value: 60, message: "Cannot exceed 60 minutes" }
+                            }}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Grace Period (minutes) *</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            max="60"
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormDescription>
+                                        Allowed late time in minutes
+                                    </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+ 
                         {/* Work Hours */}
                         <div className="grid grid-cols-2 gap-4">
                             <FormField

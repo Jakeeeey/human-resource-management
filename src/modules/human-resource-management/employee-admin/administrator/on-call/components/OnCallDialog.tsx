@@ -64,6 +64,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
         break_end: "15:30:00",
         workdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
         staffIds: [] as number[],
+        grace_period: "5",
     });
 
     // staff who already have a schedule on selected date
@@ -109,6 +110,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                     break_end: schedule.break_end || "15:30:00",
                     workdays: schedule.workdays ? schedule.workdays.split(",") : [],
                     staffIds: schedule.assigned_staff.map((s) => s.user_id),
+                    grace_period: (schedule.grace_period ?? 5).toString(),
                 });
             }, 0);
         } else if (!schedule && open) {
@@ -125,6 +127,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                     break_end: "15:30:00",
                     workdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
                     staffIds: [],
+                    grace_period: "5",
                 });
             }, 0);
         }
@@ -139,6 +142,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
             department_id: parseInt(formData.department_id),
             workdays: formData.workdays.join(","),
             working_days: formData.workdays.length,
+            grace_period: parseInt(formData.grace_period, 10) || 5,
         };
 
         let success = false;
@@ -305,6 +309,19 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                                     value={formData.break_end.substring(0, 5)}
                                     onChange={(e) => setFormData({ ...formData, break_end: `${e.target.value}:00` })}
                                     className="bg-muted/30 border-none h-11 shadow-sm"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="grace_period">Grace Period (minutes) *</Label>
+                                <Input
+                                    id="grace_period"
+                                    type="number"
+                                    min="0"
+                                    max="60"
+                                    value={formData.grace_period}
+                                    onChange={(e) => setFormData({ ...formData, grace_period: e.target.value })}
+                                    className="bg-muted/30 border-none h-11 shadow-sm"
+                                    required
                                 />
                             </div>
                         </div>
