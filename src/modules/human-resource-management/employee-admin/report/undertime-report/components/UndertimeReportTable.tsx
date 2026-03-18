@@ -9,6 +9,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -139,8 +145,23 @@ export function UndertimeReportTable({
                 <TableCell>{getStatusBadge(request.status)}</TableCell>
 
                 {/* Remarks */}
-                <TableCell className="max-w-xs truncate">
-                  {request.remarks || "—"}
+                <TableCell className="max-w-xs">
+                  {request.remarks ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="truncate block cursor-help">
+                            {request.remarks}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-md">
+                          <p>{request.remarks}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
               </TableRow>
             ))}
