@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Users, ChevronRight } from "lucide-react";
+import { Eye, ChevronRight, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "./EmptyState";
 
 export interface EmployeeSummary {
   user_id: number;
@@ -29,7 +30,6 @@ export interface EmployeeSummary {
 interface EmployeeSummaryTableProps {
   data: EmployeeSummary[];
   onViewDetails: (userId: number) => void;
-  onApproveAll: (userId: number) => void;
   isLoading: boolean;
   isProcessing?: boolean;
 }
@@ -37,7 +37,6 @@ interface EmployeeSummaryTableProps {
 export function EmployeeSummaryTable({
   data,
   onViewDetails,
-  onApproveAll,
   isLoading,
   isProcessing,
 }: EmployeeSummaryTableProps) {
@@ -54,12 +53,12 @@ export function EmployeeSummaryTable({
 
   if (data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-muted-foreground bg-muted/5 rounded-2xl border border-dashed">
-        <div className="flex flex-col items-center gap-2">
-          <Users className="h-8 w-8 opacity-20" />
-          <span>No employee summaries found for this cutoff.</span>
-        </div>
-      </div>
+      <EmptyState 
+        icon={ClipboardList}
+        title="No Summaries Available"
+        description="There are no employee summaries to show for this cutoff period. Ensure that attendance logs exist for the selected date range."
+        className="bg-card/50 rounded-2xl border border-dashed border-primary/20 shadow-inner"
+      />
     );
   }
 
@@ -158,23 +157,14 @@ export function EmployeeSummaryTable({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="rounded-xl h-9 px-3 gap-2 text-green-600 hover:bg-green-50 hover:text-green-700 transition-all active:scale-95 border border-transparent hover:border-green-200"
-                    onClick={() => onApproveAll(summary.user_id)}
-                    disabled={isProcessing}
-                  >
-                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100 p-1 border-none">
-                      <ChevronRight className="h-3 w-3" />
-                    </Badge>
-                    <span className="text-xs font-bold uppercase tracking-tight">Approve All</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
                     className="rounded-xl h-9 px-4 gap-2 text-primary hover:bg-primary/10 transition-all active:scale-95 border border-transparent hover:border-primary/20"
                     onClick={() => onViewDetails(summary.user_id)}
+                    disabled={isProcessing}
                   >
                     <Eye className="h-4 w-4" />
-                    <span className="text-xs font-bold uppercase tracking-tight">View Details</span>
+                    <span className="text-xs font-bold uppercase tracking-tight">
+                      {isProcessing ? "Processing..." : "View Details"}
+                    </span>
                     <ChevronRight className="h-3 w-3 opacity-50" />
                   </Button>
                 </div>
