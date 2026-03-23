@@ -67,7 +67,7 @@ export function OvertimeReportFilters({
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Search Bar */}
-      <div className="relative w-62.5">
+      <div className="relative w-[250px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by name, purpose..."
@@ -83,7 +83,7 @@ export function OvertimeReportFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-40 justify-start text-left font-normal",
+              "w-[160px] justify-start text-left font-normal",
               !filters.dateFrom && "text-muted-foreground"
             )}
           >
@@ -111,7 +111,7 @@ export function OvertimeReportFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-40 justify-start text-left font-normal",
+              "w-[160px] justify-start text-left font-normal",
               !filters.dateTo && "text-muted-foreground"
             )}
           >
@@ -145,7 +145,7 @@ export function OvertimeReportFilters({
             onDepartmentChange(value === "all" ? null : Number(value))
           }
         >
-          <SelectTrigger className="w-42.5">
+          <SelectTrigger className="w-[170px]">
             <SelectValue placeholder="All Departments" />
           </SelectTrigger>
           <SelectContent>
@@ -169,7 +169,7 @@ export function OvertimeReportFilters({
           onNameFilterChange(value === "all" ? null : value)
         }
       >
-        <SelectTrigger className="w-42.5">
+        <SelectTrigger className="w-[170px]">
           <SelectValue placeholder="All Employees" />
         </SelectTrigger>
         <SelectContent>
@@ -189,7 +189,7 @@ export function OvertimeReportFilters({
           onStatusChange(value === "all" ? null : value)
         }
       >
-        <SelectTrigger className="w-42.5">
+        <SelectTrigger className="w-[170px]">
           <SelectValue placeholder="All Status" />
         </SelectTrigger>
         <SelectContent>

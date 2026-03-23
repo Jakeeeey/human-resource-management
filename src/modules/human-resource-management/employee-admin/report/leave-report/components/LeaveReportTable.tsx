@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -17,8 +17,10 @@ import {
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import type { LeaveRequestWithDetails, PaginationState } from "../type";
+import { ViewDetailsModal } from "./ViewDetailsModal";
 
 // ============================================================================
 // PROPS
@@ -61,6 +63,27 @@ export function LeaveReportTable({
   pagination,
   onPageChange,
 }: LeaveReportTableProps) {
+  const [viewModalState, setViewModalState] = useState<{
+    isOpen: boolean;
+    data: LeaveRequestWithDetails | null;
+  }>({
+    isOpen: false,
+    data: null,
+  });
+
+  const handleOpenViewModal = (request: LeaveRequestWithDetails) => {
+    setViewModalState({
+      isOpen: true,
+      data: request,
+    });
+  };
+
+  const handleCloseViewModal = () => {
+    setViewModalState({
+      isOpen: false,
+      data: null,
+    });
+  };
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -101,6 +124,7 @@ export function LeaveReportTable({
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Remarks</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,16 +191,34 @@ export function LeaveReportTable({
                     "—"
                   )}
                 </TableCell>
+
+                {/* Action */}
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleOpenViewModal(request)}
+                    className="border dark:border-gray-600"
+                  >
+                    View
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
 
+      <ViewDetailsModal
+        isOpen={viewModalState.isOpen}
+        onClose={handleCloseViewModal}
+        data={viewModalState.data}
+      />
+
       {/* Pagination Controls */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          0 of {pagination.totalItems} row(s) selected.
+          Showing {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)} of {pagination.totalItems} rows
         </p>
         {pagination.totalPages > 1 && (
           <div className="flex items-center gap-2">
