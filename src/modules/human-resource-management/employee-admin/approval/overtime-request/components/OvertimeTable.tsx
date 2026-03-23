@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OvertimeRequestWithUser } from "../type";
 import { ApprovalModal } from "./ApprovalModal";
+import { ViewDetailsModal } from "./ViewDetailsModal";
 
 interface OvertimeTableProps {
   data: OvertimeRequestWithUser[];
@@ -35,7 +36,23 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
     overtimeId: null,
     employeeName: "",
   });
+  const [viewModalState, setViewModalState] = useState<{
+    isOpen: boolean;
+    data: OvertimeRequestWithUser | null;
+  }>({
+    isOpen: false,
+    data: null,
+  });
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  // Calculate pagination
+  const totalItems = data.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const displayedData = data.slice(startIndex, endIndex);
 
   const formatTime = (time: string) => {
     if (!time) return "N/A";
@@ -75,6 +92,20 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
       action: null,
       overtimeId: null,
       employeeName: "",
+    });
+  };
+
+  const handleOpenViewModal = (request: OvertimeRequestWithUser) => {
+    setViewModalState({
+      isOpen: true,
+      data: request,
+    });
+  };
+
+  const handleCloseViewModal = () => {
+    setViewModalState({
+      isOpen: false,
+      data: null,
     });
   };
 
@@ -118,8 +149,9 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
 
   return (
     <>
-      <div className="rounded-md border">
-        <Table>
+      <div className="space-y-4">
+        <div className="rounded-md border">
+          <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -133,7 +165,7 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.map((request) => {
+                {displayedData.map((request) => {
                   const fullName = [
                     request.user_fname,
                     request.user_mname,
@@ -166,6 +198,15 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
+                            variant="secondary"
+                            onClick={() => handleOpenViewModal(request)}
+                            disabled={isLoading || isProcessing}
+                            className="border dark:border-gray-600"
+                          >
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
                             variant="default"
                             onClick={() =>
                               handleOpenModal("approve", request.overtime_id, fullName)
@@ -192,6 +233,48 @@ export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading 
               </TableBody>
             </Table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {Math.min(currentPage * pageSize, totalItems)} of {totalItems} rows
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (currentPage > 1) {
+                    setCurrentPage(currentPage - 1);
+                  }
+                }}
+                disabled={currentPage === 1}
+                className="px-3 py-2 text-sm border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => {
+                  if (currentPage < totalPages) {
+                    setCurrentPage(currentPage + 1);
+                  }
+                }}
+                disabled={currentPage === totalPages}
+                className="px-3 py-2 text-sm border rounded hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      </div>
+
+      <ViewDetailsModal
+        isOpen={viewModalState.isOpen}
+        onClose={handleCloseViewModal}
+        data={viewModalState.data}
+      />
 
       <ApprovalModal
         isOpen={modalState.isOpen}
