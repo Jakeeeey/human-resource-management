@@ -207,10 +207,15 @@ export function EmployeeFileRecordTypeTable({
                 </Table>
             </div>
 
-            <div className="flex items-center justify-end space-x-2">
+            <div className="flex items-center justify-between space-x-2">
                 <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                    {table.getFilteredRowModel().rows.length} row(s) selected.
+                    Showing {table.getRowModel().rows.length} of{" "}
+                    {table.getFilteredRowModel().rows.length} row(s)
+                    {table.getFilteredSelectedRowModel().rows.length > 0 && (
+                        <span className="ml-2">
+                            ({table.getFilteredSelectedRowModel().rows.length} selected)
+                        </span>
+                    )}
                 </div>
                 <div className="space-x-2">
                     <Button
