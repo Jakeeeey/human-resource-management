@@ -184,6 +184,11 @@ const data = {
                             url: "/hrm/workforce/attendance-report/department-report",
                             icon: CalendarClock,
                         },
+                        {
+                            title: "Logistics Report",
+                            url: "/hrm/workforce/attendance-report/logistics-report",
+                            icon: CalendarClock,
+                        },
                     ],
                 },
 
