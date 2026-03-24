@@ -8,12 +8,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../../_components/nav-user";
+import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
 
 // âœ… Wire the module you asked for
-import ComingSoon from "../../_components/ComingSoon";
+import ComingSoon from "../../../_components/ComingSoon";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,12 +96,12 @@ export default async function Page() {
                         <Breadcrumb>
                             <BreadcrumbList className="min-w-0 overflow-hidden">
                                 <BreadcrumbItem className="hidden md:block shrink-0">
-                                    <BreadcrumbLink href="#">HRM</BreadcrumbLink>
+                                    <BreadcrumbLink href="#">Workforce</BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Department Report
+                                        Today&apos;s Report
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
