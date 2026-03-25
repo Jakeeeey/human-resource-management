@@ -183,7 +183,6 @@ export async function generateMasterlistPdf(data: PdfData): Promise<jsPDF> {
   const deptValues  = sortedDepts.map(([, v]) => v);
 
   const activeCount   = employees.filter((e) => !e.isDeleted).length;
-  const inactiveCount = employees.length - activeCount;
 
   // ─── Header banner ────────────────────────────────────────────────────────
   // Background gradient strip

@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, Loader2, Printer, X } from "lucide-react";
+import { Download, Loader2, Printer } from "lucide-react";
 import type { User, Department } from "../types";
 import { generateMasterlistPdf } from "../utils/masterlistPdfService";
 
