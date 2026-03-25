@@ -5,3 +5,4 @@ export * from "./EmployeeDetailsModal";
 export * from "./EditProfileTab";
 export * from "./EmployeeFilesTab";
 export * from "./EmployeeIdTab";
+export * from "./MasterlistPreviewModal";
