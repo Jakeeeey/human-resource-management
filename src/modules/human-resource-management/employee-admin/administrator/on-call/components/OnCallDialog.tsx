@@ -22,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useOnCall } from "../hooks/useOnCall";
 import { EnrichedOnCallSchedule } from "../types/on-call.schema";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Users, Search, X } from "lucide-react";
 import { useDepartments } from "../../../structrure/department/hooks/userDepartments";
 import { DepartmentFilterProvider } from "../../../structrure/department/providers/DepartmentFilterProvider";
@@ -55,14 +55,14 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
     const [formData, setFormData] = React.useState({
         department_id: "",
         group: "",
-        schedule_date: format(new Date(), "yyyy-MM-dd"),
+        schedule_date: "",
         work_start: "08:00:00",
         work_end: "17:00:00",
         lunch_start: "12:00:00",
         lunch_end: "13:00:00",
         break_start: "15:00:00",
         break_end: "15:30:00",
-        workdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        workdays: [] as string[],
         staffIds: [] as number[],
         grace_period: "5",
     });
@@ -81,13 +81,25 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
     }, [allSchedules, formData.schedule_date, schedule?.id]);
 
     // Auto-clear staff who become unavailable when date changes
+    // AND Autofill workday checkbox for the selected schedule date
     useEffect(() => {
-        if (open) {
+        if (open && formData.schedule_date) {
             setTimeout(() => {
+                const date = parseISO(formData.schedule_date);
+                const dayName = format(date, "EEEE");
+
                 setFormData(prev => {
+                    // Update staff availability
                     const filteredStaff = prev.staffIds.filter(id => !unavailableStaffMap.has(id));
-                    if (filteredStaff.length !== prev.staffIds.length) {
-                        return { ...prev, staffIds: filteredStaff };
+                    
+                    // Update workdays autofill: Clear previous and only set the new day
+                    const newWorkdays = [dayName];
+
+                    const hasChanges = filteredStaff.length !== prev.staffIds.length || 
+                                     JSON.stringify(newWorkdays) !== JSON.stringify(prev.workdays);
+
+                    if (hasChanges) {
+                        return { ...prev, staffIds: filteredStaff, workdays: newWorkdays };
                     }
                     return prev;
                 });
@@ -118,14 +130,14 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                 setFormData({
                     department_id: "",
                     group: "",
-                    schedule_date: format(new Date(), "yyyy-MM-dd"),
+                    schedule_date: "",
                     work_start: "08:00:00",
                     work_end: "17:00:00",
                     lunch_start: "12:00:00",
                     lunch_end: "13:00:00",
                     break_start: "15:00:00",
                     break_end: "15:30:00",
-                    workdays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                    workdays: [],
                     staffIds: [],
                     grace_period: "5",
                 });

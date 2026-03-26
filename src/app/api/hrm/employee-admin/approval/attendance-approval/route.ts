@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { format, isSameISOWeek, parseISO } from "date-fns";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const COOKIE_NAME = "vos_access_token";
@@ -205,7 +206,7 @@ export async function GET(req: NextRequest) {
     const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes] = await Promise.all([
       directusFetch(`/items/department_schedule?limit=1000&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
-      directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
+      directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,schedule_date,workdays`),
       directusFetch(`/items/attendance_approval?${userIds.length > 0 ? `filter[employee_id][_in]=${userIds.join(",")}` : ""}&limit=1000&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
       directusFetch(`/items/overtime_request?${userIdsFilter}&filter[status][_eq]=approved&limit=1000&fields=user_id,request_date,status`)
     ]);
@@ -269,7 +270,7 @@ export async function GET(req: NextRequest) {
         console.log(`[DEBUG] Found ${userOncallEntries.length} oncall_list entries for user ${log.user_id} - route.ts:269`);
         for (const entry of userOncallEntries) {
           // As verified by user example (Turn 446): oncall_list.dept_sched_id connects to oncall_schedule.id
-          // We remove the date requirement here because the oncall_list mapping is the explicit assignment.
+          // The oncall schedule must only apply if its schedule_date matches the log's date
           interface OncallScheduleRecord {
             id: number;
             department_id: number;
@@ -281,10 +282,31 @@ export async function GET(req: NextRequest) {
             break_start: string;
             break_end: string;
             grace_period: number;
+            schedule_date: string | null;
+            workdays: string | null;
           }
-          const ocSched = oncallSchedules.find((s: OncallScheduleRecord) =>
-            String(s.id) === String(entry.dept_sched_id)
-          );
+          const ocSched = oncallSchedules.find((s: OncallScheduleRecord) => {
+            if (String(s.id) !== String(entry.dept_sched_id)) return false;
+            
+            if (s.schedule_date && log.log_date) {
+              const schedDateOnly = s.schedule_date.split('T')[0];
+              const logDateOnly = log.log_date.split('T')[0];
+              
+              // 1. Strict Date Match: If exactly the same date, it applies.
+              if (schedDateOnly === logDateOnly) return true;
+
+              // 2. Weekly Catchment Logic (User example: March 25 Start + Thu/Fri selected)
+              // Match if in the same ISO week AND the specific day is checked in the record.
+              const schedDate = parseISO(schedDateOnly);
+              const logDate = parseISO(logDateOnly);
+
+              if (isSameISOWeek(schedDate, logDate)) {
+                const dayOfWeek = format(logDate, "EEEE"); // e.g., "Thursday"
+                return s.workdays?.includes(dayOfWeek);
+              }
+            }
+            return false;
+          });
 
           if (ocSched) {
             console.log(`[DEBUG] Found ONCALL mapping via list: User ${log.user_id} > SchedID ${ocSched.id} (${ocSched.work_start}${ocSched.work_end}) - route.ts:290`);
