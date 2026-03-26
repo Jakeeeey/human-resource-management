@@ -262,7 +262,7 @@ export default function TodaysReportModule() {
         )}
 
         <Button variant="outline" size="sm" className="h-9 px-3 text-xs gap-1.5 ml-auto"
-          onClick={() => handleExportPDF(filtered as AttendanceRecord[])}>
+          onClick={() => handleExportPDF(filtered as unknown as AttendanceRecord[])}>
           <Download className="h-3.5 w-3.5" /> Export PDF
         </Button>
       </div>

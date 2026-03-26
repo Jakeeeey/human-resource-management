@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const DIRECTUS_BASE = 'http://192.168.0.143:9874';
+const DIRECTUS_BASE = process.env.NEXT_PUBLIC_DIRECTUS_BASE_URL;
 const COOKIE_NAME   = 'vos_access_token';
 const AUTH_DISABLED = process.env.NEXT_PUBLIC_AUTH_DISABLED === 'true';
 

@@ -274,7 +274,7 @@ export default function DepartmentReportModule() {
         <Button variant="outline" size="sm" className="h-9 px-4 text-sm gap-2"
           onClick={() => {
             const dept = departments.find(d => d.department_id === deptId);
-            if (dept) handleExportDeptPDF(dept.department_name, filtered as TableRow[], from, to);
+            if (dept) handleExportDeptPDF(dept.department_name, filtered as unknown as TableRow[], from, to);
           }}
         >
           <Download className="h-4 w-4" /> Export PDF
