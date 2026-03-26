@@ -1,6 +1,6 @@
 // employee-report/components/EmployeeListView.tsx
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,20 +16,6 @@ const PAGE_SIZE = 10;
 
 export function getInitials(fname: string, lname: string): string {
   return `${(fname[0] ?? "").toUpperCase()}${(lname[0] ?? "").toUpperCase()}`;
-}
-
-/** Converts "HH:MM" or "HH:MM:SS" to "h:mmam/pm" e.g. "08:30" → "8:30am" */
-function formatScheduleTime(t: string): string {
-  const [hStr, mStr] = t.slice(0, 5).split(":");
-  const h      = parseInt(hStr, 10);
-  const period = h >= 12 ? "pm" : "am";
-  const hour   = h % 12 === 0 ? 12 : h % 12;
-  return `${hour}:${mStr}${period}`;
-}
-
-/** Converts two HH:MM strings to "8:30am - 5:30pm" */
-function formatSchedule(start: string, end: string): string {
-  return `${formatScheduleTime(start)} - ${formatScheduleTime(end)}`;
 }
 
 interface Props { onSelect: (e: Employee) => void }
@@ -52,8 +38,16 @@ export function EmployeeListView({ onSelect }: Props) {
     [employees, deptFilter, search]
   );
 
-  // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [deptFilter, search]);
+  // Use a ref to track the previous filter key so we only call setPage
+  // when filters genuinely change — avoids the setState-in-effect lint error
+  const prevFilterKey = useRef(`${deptFilter}|${search}`);
+  useEffect(() => {
+    const key = `${deptFilter}|${search}`;
+    if (prevFilterKey.current !== key) {
+      prevFilterKey.current = key;
+      setPage(1);
+    }
+  }, [deptFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -76,13 +70,11 @@ export function EmployeeListView({ onSelect }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Employee Reports</h1>
         <p className="text-sm text-muted-foreground mt-1">View individual attendance history per employee</p>
       </div>
 
-      {/* Filters above Pie Chart */}
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <Select value={deptFilter} onValueChange={setDeptFilter}>
           <SelectTrigger className="h-9 w-[180px] text-xs">
@@ -109,10 +101,8 @@ export function EmployeeListView({ onSelect }: Props) {
         )}
       </div>
 
-      {/* Department Pie Chart */}
       <DepartmentPieChart employees={employees} />
 
-      {/* Table */}
       <Card className="shadow-none border-border overflow-hidden">
         <CardHeader className="bg-muted/30 border-b border-border/50 pb-3">
           <CardTitle className="text-sm font-bold uppercase flex items-center gap-2">
@@ -159,7 +149,6 @@ export function EmployeeListView({ onSelect }: Props) {
             </TableBody>
           </Table>
 
-          {/* Footer: count + pagination */}
           <div className="px-6 py-3 border-t border-border/50 flex items-center justify-between gap-4 flex-wrap">
             <span className="text-xs text-muted-foreground">
               Showing{" "}
@@ -170,23 +159,15 @@ export function EmployeeListView({ onSelect }: Props) {
               <span className="font-semibold text-foreground">{filtered.length}</span> employee{filtered.length !== 1 ? "s" : ""}
             </span>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline" size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-              >
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0"
+                onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}>
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
               <span className="text-xs font-medium text-foreground min-w-[60px] text-center">
                 Page {safePage} / {totalPages}
               </span>
-              <Button
-                variant="outline" size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage === totalPages}
-              >
+              <Button variant="outline" size="sm" className="h-7 w-7 p-0"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>

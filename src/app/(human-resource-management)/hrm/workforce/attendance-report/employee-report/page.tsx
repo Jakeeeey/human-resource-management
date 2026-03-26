@@ -8,12 +8,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../../../_components/nav-user";
+import { NavUser } from "../../_components/nav-user";
 
 import { cookies } from "next/headers";
 
-// âœ… Wire the module you asked for
-import ComingSoon from "../../_components/ComingSoon";
+
+import EmployeeReportModule from "@/modules/human-resource-management/workforce/attendance-report/employee-report/EmployeeReportModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,12 +96,12 @@ export default async function Page() {
                         <Breadcrumb>
                             <BreadcrumbList className="min-w-0 overflow-hidden">
                                 <BreadcrumbItem className="hidden md:block shrink-0">
-                                    <BreadcrumbLink href="#">Workforce</BreadcrumbLink>
+                                    <BreadcrumbLink href="#">File Management</BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Employee Report
+                                        Employee File Record List
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -114,7 +114,8 @@ export default async function Page() {
                 </div>
             </header>
 
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4 bg-muted/20">
+            {/* âœ… Only content scrolls inside RIGHT column */}
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
                 <EmployeeReportModule />
             </main>
         </div>

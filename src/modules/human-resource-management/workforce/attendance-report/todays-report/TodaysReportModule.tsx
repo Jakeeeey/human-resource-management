@@ -19,6 +19,8 @@ import { DepartmentBarChart }   from "./components/DepartmentBarChart";
 import { TimeLogsTable }        from "./components/TimeLogsTable";
 import { applyFilters }         from "./utils";
 
+type AttendanceRecord = Record<string, unknown>;
+
 function PageSkeleton() {
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -34,21 +36,15 @@ function PageSkeleton() {
   );
 }
 
-/**
- * Helper to format time
- */
 function formatTime(t: string | null): string {
   if (!t) return '—';
   const [hStr, mStr] = t.slice(0, 5).split(':');
-  const h = parseInt(hStr, 10);
+  const h      = parseInt(hStr, 10);
   const period = h >= 12 ? 'pm' : 'am';
-  const hour = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  const hour   = h > 12 ? h - 12 : h === 0 ? 12 : h;
   return `${hour}:${mStr}${period}`;
 }
 
-/**
- * Fetch company data from API
- */
 async function fetchCompanyData() {
   try {
     const res = await fetch('/api/pdf/company', { credentials: 'include' });
@@ -62,50 +58,43 @@ async function fetchCompanyData() {
   }
 }
 
-/**
- * Handle PDF export with PdfEngine directly
- */
-async function handleExportPDF(records: any[], allRecords: any[]) {
-  const today = new Date().toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+async function handleExportPDF(records: AttendanceRecord[]) {
+  const today = new Date().toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
   });
 
   const tableData = records.slice(0, 100).map((r) => [
     `${r.user_fname} ${r.user_lname}`,
-    r.user_department,
-    r.user_position,
-    formatTime(r.time_in),
-    formatTime(r.time_out),
-    r.punctuality ?? '—',
-    r.presentStatus,
+    String(r.user_department ?? '—'),
+    String(r.user_position   ?? '—'),
+    formatTime(r.time_in  as string | null),
+    formatTime(r.time_out as string | null),
+    String(r.punctuality  ?? '—'),
+    String(r.presentStatus ?? '—'),
   ]);
 
   const fileName = `Attendance_Report_${new Date().toISOString().split('T')[0]}.pdf`;
 
   try {
-    // Fetch both company data and templates
     const [companyData, templates] = await Promise.all([
       fetchCompanyData(),
       pdfTemplateService.fetchTemplates(),
     ]);
 
-    // Use first available template (preferring "Header" if it exists)
-    const templateName = templates.find(t => t.name === 'Header')?.name || 
-                        templates.find(t => t.name.includes('Letter'))?.name ||
-                        templates[0]?.name || 
-                        'Attendance Report';
+    const templateName = templates.find(t => t.name === 'Header')?.name ||
+                         templates.find(t => t.name.includes('Letter'))?.name ||
+                         templates[0]?.name ||
+                         'Attendance Report';
 
     const doc = await PdfEngine.generateWithFrame(
       templateName,
       companyData,
       (doc, startY, config) => {
         const margins = config.margins || { top: 10, bottom: 10, left: 10, right: 10 };
-        
+
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text('TODAY\'S ATTENDANCE REPORT', margins.left, startY, { baseline: 'top' });
+        doc.text("TODAY'S ATTENDANCE REPORT", margins.left, startY, { baseline: 'top' });
 
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
@@ -115,39 +104,24 @@ async function handleExportPDF(records: any[], allRecords: any[]) {
 
         if (records.length > 0) {
           const presentCount = records.filter(r => r.presentStatus === 'Present').length;
-          const absentCount = records.filter(r => r.presentStatus === 'Absent').length;
+          const absentCount  = records.filter(r => r.presentStatus === 'Absent').length;
           doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
           doc.text(
             `Total: ${records.length} | Present: ${presentCount} | Absent: ${absentCount}`,
-            margins.left,
-            startY + 13,
-            { baseline: 'top' }
+            margins.left, startY + 13, { baseline: 'top' }
           );
         }
 
-        
         autoTable(doc, {
           startY: startY + 20,
           head: [['Employee Name', 'Department', 'Position', 'Time In', 'Time Out', 'Punctuality', 'Status']],
           body: tableData,
           margin: { ...margins, bottom: 15 },
           theme: 'striped',
-          headStyles: {
-            fillColor: [41, 128, 185],
-            textColor: 255,
-            fontSize: 8,
-            fontStyle: 'bold',
-            halign: 'center',
-            valign: 'middle',
-          },
-          bodyStyles: {
-            fontSize: 8,
-            valign: 'middle',
-          },
-          alternateRowStyles: {
-            fillColor: [245, 245, 245],
-          },
+          headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 8, fontStyle: 'bold', halign: 'center', valign: 'middle' },
+          bodyStyles: { fontSize: 8, valign: 'middle' },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
           columnStyles: {
             0: { cellWidth: 42, halign: 'left' },
             1: { cellWidth: 32, halign: 'left' },
@@ -157,37 +131,32 @@ async function handleExportPDF(records: any[], allRecords: any[]) {
             5: { cellWidth: 23, halign: 'center' },
             6: { cellWidth: 23, halign: 'center' },
           },
-          didDrawCell: (data: any) => {
-            const { cell, column } = data;
-            // Remove right border for all columns except the last one
-            if (column && column.index < 6) {
+          didDrawCell: (data: { cell: { x: number; y: number; width: number; height: number }; column: { index: number } }) => {
+            if (data.column.index < 6) {
               doc.setDrawColor(255, 255, 255);
               doc.setLineWidth(0);
-              // Draw invisible line over the right border
-              doc.line(cell.x + cell.width, cell.y, cell.x + cell.width, cell.y + cell.height);
+              doc.line(
+                data.cell.x + data.cell.width, data.cell.y,
+                data.cell.x + data.cell.width, data.cell.y + data.cell.height
+              );
             }
           },
-          didDrawPage: function (data) {
-            const pageSize = doc.internal.pageSize;
+          didDrawPage: (data: { pageNumber: number }) => {
+            const pageSize   = doc.internal.pageSize;
             const pageHeight = pageSize.height;
-            const pageWidth = pageSize.width;
+            const pageWidth  = pageSize.width;
             doc.setFontSize(7);
             doc.setTextColor(150, 150, 150);
-            doc.text(
-              `Page ${data.pageNumber}`,
-              pageWidth - 15,
-              pageHeight - 10,
-              { align: 'right' }
-            );
+            doc.text(`Page ${data.pageNumber}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
           },
         });
       }
     );
 
     const blob = doc.output('blob');
-    const url = URL.createObjectURL(blob);
+    const url  = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
+    link.href  = url;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
@@ -215,7 +184,6 @@ export default function TodaysReportModule() {
     [records, statusFilter, punctualityFilter, deptFilter, search]
   );
 
-  // Charts react to filters
   const chartRecords = isFiltered ? filtered : records;
 
   const clearFilters = () => {
@@ -235,7 +203,6 @@ export default function TodaysReportModule() {
   return (
     <div className="p-4 md:p-6 bg-background text-foreground min-h-screen space-y-6 w-full box-border overflow-hidden">
 
-      {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Attendance Report</h1>
@@ -244,7 +211,6 @@ export default function TodaysReportModule() {
         <LiveClock />
       </div>
 
-      {/* ── Filters ── */}
       <div className="flex flex-wrap items-center gap-2 w-full min-w-0">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
@@ -295,12 +261,12 @@ export default function TodaysReportModule() {
           </p>
         )}
 
-        <Button variant="outline" size="sm" className="h-9 px-3 text-xs gap-1.5 ml-auto" onClick={() => handleExportPDF(filtered, records)}>
+        <Button variant="outline" size="sm" className="h-9 px-3 text-xs gap-1.5 ml-auto"
+          onClick={() => handleExportPDF(filtered as AttendanceRecord[])}>
           <Download className="h-3.5 w-3.5" /> Export PDF
         </Button>
       </div>
 
-      {/* ── Metrics — driven by filtered data ── */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4 w-full">
         <MetricCard
           title="Present"
@@ -328,15 +294,12 @@ export default function TodaysReportModule() {
         />
       </div>
 
-      {/* ── Charts — driven by filtered data ── */}
       <div className="grid gap-4 md:grid-cols-2 w-full">
         <PunctualityPieChart records={chartRecords} isFiltered={isFiltered} />
         <DepartmentBarChart  records={chartRecords} isFiltered={isFiltered} />
       </div>
 
-      {/* ── Table ── */}
       <TimeLogsTable records={filtered} total={records.length} />
-
     </div>
   );
 }

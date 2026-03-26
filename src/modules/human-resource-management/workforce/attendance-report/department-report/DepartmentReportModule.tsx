@@ -15,6 +15,8 @@ import { minsToHM } from './utils';
 import { SummaryCards }    from './components/SummaryCards';
 import { AttendanceTable } from './components/AttendanceTable';
 
+type TableRow = Record<string, unknown>;
+
 /** Returns YYYY-MM-DD for yesterday using local time (avoids UTC+8 offset issues) */
 function getYesterdayStr(): string {
   const d = new Date();
@@ -46,9 +48,6 @@ function PageSkeleton() {
   );
 }
 
-/**
- * Fetch company data from API
- */
 async function fetchCompanyData() {
   try {
     const res = await fetch('/api/pdf/company', { credentials: 'include' });
@@ -62,24 +61,16 @@ async function fetchCompanyData() {
   }
 }
 
-/**
- * Format date helper
- */
 function formatDate(ymd: string): string {
   const d = new Date(ymd + 'T00:00:00');
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/**
- * Handle PDF export with PdfEngine directly
- */
-async function handleExportDeptPDF(deptName: string, rows: any[], from: string, to: string) {
-
-  // Group rows by date (to match UI)
-  const groupByDate = (rows: any[]) => {
-    const map = new Map<string, any[]>();
-    rows.forEach(row => {
-      const date = row.log_date;
+async function handleExportDeptPDF(deptName: string, rows: TableRow[], from: string, to: string) {
+  const groupByDate = (r: TableRow[]) => {
+    const map = new Map<string, TableRow[]>();
+    r.forEach(row => {
+      const date = String(row.log_date ?? '');
       if (!map.has(date)) map.set(date, []);
       map.get(date)!.push(row);
     });
@@ -88,43 +79,39 @@ async function handleExportDeptPDF(deptName: string, rows: any[], from: string, 
 
   const grouped = groupByDate(rows);
 
-  // Prepare table data: one row per employee per day, grouped by date
-  const tableData: any[] = [];
+  const tableData: string[][] = [];
   Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b)).forEach(([date, dateRows]) => {
     dateRows.forEach(row => {
       tableData.push([
         `${row.user_fname} ${row.user_lname}`,
-        row.user_position || '—',
-        minsToHM(row.work_hours),
-        minsToHM(row.overtime),
-        minsToHM(row.late),
-        row.punctuality || '—',
-        ['On Time', 'Late'].includes(row.status) ? 'Present' : row.status,
-        date
+        String(row.user_position ?? '—'),
+        minsToHM(Number(row.work_hours ?? 0)),
+        minsToHM(Number(row.overtime ?? 0)),
+        minsToHM(Number(row.late ?? 0)),
+        String(row.punctuality ?? '—'),
+        ['On Time', 'Late'].includes(String(row.status)) ? 'Present' : String(row.status ?? '—'),
+        date,
       ]);
     });
   });
 
-  // Calculate department totals (summary)
-  const presentStatus = rows.filter(r => ['On Time', 'Late'].includes(r.status));
-  const absent = rows.filter(r => r.status === 'Absent');
-  const totalOvertMin = rows.reduce((s, r) => s + r.overtime, 0);
-  const totalLateMins = rows.reduce((s, r) => s + r.late, 0);
+  const presentStatus = rows.filter(r => ['On Time', 'Late'].includes(String(r.status)));
+  const absent        = rows.filter(r => r.status === 'Absent');
+  const totalOvertMin = rows.reduce((s, r) => s + Number(r.overtime ?? 0), 0);
+  const totalLateMins = rows.reduce((s, r) => s + Number(r.late ?? 0), 0);
 
   const fileName = `${deptName}_Report_${from}_to_${to}.pdf`;
 
   try {
-    // Fetch both company data and templates
     const [companyData, templates] = await Promise.all([
       fetchCompanyData(),
       pdfTemplateService.fetchTemplates(),
     ]);
 
-    // Use first available template (preferring "Header" if it exists)
-    const templateName = templates.find(t => t.name === 'Header')?.name || 
-                        templates.find(t => t.name.includes('Letter'))?.name ||
-                        templates[0]?.name || 
-                        'Department Attendance Report';
+    const templateName = templates.find(t => t.name === 'Header')?.name ||
+                         templates.find(t => t.name.includes('Letter'))?.name ||
+                         templates[0]?.name ||
+                         'Department Attendance Report';
 
     const doc = await PdfEngine.generateWithFrame(
       templateName,
@@ -136,9 +123,7 @@ async function handleExportDeptPDF(deptName: string, rows: any[], from: string, 
         doc.setFont('helvetica', 'bold');
         doc.text(`${deptName}`, margins.left, startY, { baseline: 'top' });
 
-        // Add space below header line
         const headerLineY = startY + 8;
-
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 100, 100);
@@ -146,17 +131,15 @@ async function handleExportDeptPDF(deptName: string, rows: any[], from: string, 
         doc.setTextColor(0, 0, 0);
 
         doc.setFontSize(9);
-        doc.text(
-          `Period: ${formatDate(from)} to ${formatDate(to)}`,
-          margins.left,
-          headerLineY + 6
-        );
+        doc.text(`Period: ${formatDate(from)} to ${formatDate(to)}`, margins.left, headerLineY + 6);
 
         const summaryY = headerLineY + 12;
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
-        const summaryText = `Total Present Days: ${presentStatus.length} | Total Absent Days: ${absent.length} | Total OT: ${minsToHM(totalOvertMin)} | Total Late: ${minsToHM(totalLateMins)}`;
-        doc.text(summaryText, margins.left, summaryY);
+        doc.text(
+          `Total Present Days: ${presentStatus.length} | Total Absent Days: ${absent.length} | Total OT: ${minsToHM(totalOvertMin)} | Total Late: ${minsToHM(totalLateMins)}`,
+          margins.left, summaryY
+        );
 
         autoTable(doc, {
           startY: summaryY + 4,
@@ -165,29 +148,16 @@ async function handleExportDeptPDF(deptName: string, rows: any[], from: string, 
           margin: margins,
           theme: 'striped',
           tableWidth: 'auto',
-          headStyles: {
-            fillColor: [41, 128, 185],
-            textColor: 255,
-            fontSize: 8,
-            fontStyle: 'bold',
-            halign: 'center',
-          },
+          headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 8, fontStyle: 'bold', halign: 'center' },
           bodyStyles: { fontSize: 7.5, valign: 'middle' },
           alternateRowStyles: { fillColor: [245, 245, 245] },
-          // No fixed columnStyles: let autoTable expand to fill width
-          didDrawPage: (data: any) => {
-            const pageSize = doc.internal.pageSize;
+          didDrawPage: (data: { pageNumber: number }) => {
+            const pageSize   = doc.internal.pageSize;
             const pageHeight = pageSize.getHeight();
-            const pageWidth = pageSize.getWidth();
-
+            const pageWidth  = pageSize.getWidth();
             doc.setFontSize(8);
             doc.setTextColor(150);
-            doc.text(
-              `Page ${doc.internal.pages.length - 1}`,
-              pageWidth / 2,
-              pageHeight - 5,
-              { align: 'center' }
-            );
+            doc.text(`Page ${data.pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
             doc.setTextColor(0);
           },
         });
@@ -195,9 +165,9 @@ async function handleExportDeptPDF(deptName: string, rows: any[], from: string, 
     );
 
     const blob = doc.output('blob');
-    const url = URL.createObjectURL(blob);
+    const url  = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
+    link.href  = url;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
@@ -211,7 +181,6 @@ async function handleExportDeptPDF(deptName: string, rows: any[], from: string, 
 export default function DepartmentReportModule() {
   const yesterday = getYesterdayStr();
 
-  // deptId starts as null; once departments load we default to the first one
   const [deptId, setDeptId] = useState<number | null>(null);
   const [from,   setFrom]   = useState(yesterday);
   const [to,     setTo]     = useState(yesterday);
@@ -219,12 +188,13 @@ export default function DepartmentReportModule() {
 
   const { loading, error, rows, departments, refetch } = useDepartmentReport(deptId, from, to);
 
-  // Once departments are loaded, default to the first department (e.g. Administrator)
+  // Default to first department once loaded — use functional update to avoid
+  // reading deptId in the dependency array (prevents the setState-in-effect warning)
   useEffect(() => {
-    if (departments.length > 0 && deptId === null) {
-      setDeptId(departments[0].department_id);
+    if (departments.length > 0) {
+      setDeptId((prev) => (prev === null ? departments[0].department_id : prev));
     }
-  }, [departments, deptId]);
+  }, [departments]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
@@ -246,16 +216,12 @@ export default function DepartmentReportModule() {
   return (
     <div className="p-6 bg-background text-foreground min-h-screen space-y-6 w-full box-border overflow-hidden">
 
-      {/* ── Page Title ── */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Department Reports</h1>
         <p className="text-sm text-muted-foreground mt-1">Attendance summary grouped by department and date</p>
       </div>
 
-      {/* ── Inline Filter Bar ── */}
       <div className="flex flex-wrap items-center gap-2">
-
-        {/* Department dropdown — no "All Departments" option */}
         <Select
           value={deptId ? String(deptId) : ''}
           onValueChange={(v) => setDeptId(Number(v))}
@@ -265,40 +231,31 @@ export default function DepartmentReportModule() {
           </SelectTrigger>
           <SelectContent className="max-h-60">
             {departments.map((d) => (
-              <SelectItem
-                key={`dept-${d.department_id}`}
-                value={String(d.department_id)}
-                className="text-sm"
-              >
+              <SelectItem key={`dept-${d.department_id}`} value={String(d.department_id)} className="text-sm">
                 {d.department_name}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {/* From date */}
         <div className="flex items-center gap-1.5 rounded-md border border-border bg-background h-9 px-3 min-w-0">
           <span className="text-sm text-muted-foreground font-medium shrink-0">From</span>
           <Input
-            type="date"
-            value={from}
+            type="date" value={from}
             onChange={(e) => setFrom(e.target.value)}
             className="h-auto border-0 p-0 text-sm focus-visible:ring-0 shadow-none w-[130px] bg-transparent"
           />
         </div>
 
-        {/* To date */}
         <div className="flex items-center gap-1.5 rounded-md border border-border bg-background h-9 px-3 min-w-0">
           <span className="text-sm text-muted-foreground font-medium shrink-0">To</span>
           <Input
-            type="date"
-            value={to}
+            type="date" value={to}
             onChange={(e) => setTo(e.target.value)}
             className="h-auto border-0 p-0 text-sm focus-visible:ring-0 shadow-none w-[130px] bg-transparent"
           />
         </div>
 
-        {/* Search by name */}
         <Input
           placeholder="Search by name…"
           value={search}
@@ -307,41 +264,25 @@ export default function DepartmentReportModule() {
         />
 
         {search && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSearch('')}
-            className="h-9 px-2.5 text-sm text-muted-foreground hover:text-foreground"
-          >
+          <Button variant="ghost" size="sm" onClick={() => setSearch('')}
+            className="h-9 px-2.5 text-sm text-muted-foreground hover:text-foreground">
             ✕ Clear
           </Button>
         )}
 
-        {/* Push PDF Export to far right */}
         <div className="flex-1" />
-        {/* PDF Export button */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9 px-4 text-sm gap-2"
+        <Button variant="outline" size="sm" className="h-9 px-4 text-sm gap-2"
           onClick={() => {
             const dept = departments.find(d => d.department_id === deptId);
-            if (dept) {
-              handleExportDeptPDF(dept.department_name, filtered, from, to);
-            }
+            if (dept) handleExportDeptPDF(dept.department_name, filtered as TableRow[], from, to);
           }}
         >
-          <Download className="h-4 w-4" />
-          Export PDF
+          <Download className="h-4 w-4" /> Export PDF
         </Button>
       </div>
 
-      {/* ── Summary Cards ── */}
       <SummaryCards rows={filtered} />
-
-      {/* ── Attendance Table grouped by date ── */}
       <AttendanceTable rows={filtered} />
-
     </div>
   );
 }

@@ -4,17 +4,11 @@ import autoTable from 'jspdf-autotable';
 import type { DeptAttendanceRow } from '../hooks/useDepartmentReport';
 import { minsToHM } from '.';
 
-/**
- * Helper to format date  
- */
 function formatDate(ymd: string): string {
   const d = new Date(ymd + 'T00:00:00');
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/**
- * Fetch company data from API
- */
 async function fetchCompanyData(): Promise<CompanyData | null> {
   try {
     const res = await fetch('/api/pdf/company', { credentials: 'include' });
@@ -28,38 +22,30 @@ async function fetchCompanyData(): Promise<CompanyData | null> {
   }
 }
 
-/**
- * Export department attendance report to PDF with professional formatting
- */
 export const exportDepartmentReportToPDF = async (
   departmentName: string,
   rows: DeptAttendanceRow[],
   fromDate: string,
-  toDate: string
+  toDate: string,
 ) => {
-  // Calculate totals for summary
   const presentStatus = rows.filter(r => ['On Time', 'Late'].includes(r.status));
-  const absent = rows.filter(r => r.status === 'Absent');
-  const onTime = rows.filter(r => r.status === 'On Time');
+  const absent        = rows.filter(r => r.status === 'Absent');
+  const onTime        = rows.filter(r => r.status === 'On Time');
 
-  // Group by employee and prepare table data
   const employeeMap = new Map<number, DeptAttendanceRow[]>();
   rows.forEach(row => {
     const id = row.user_id;
-    if (!employeeMap.has(id)) {
-      employeeMap.set(id, []);
-    }
+    if (!employeeMap.has(id)) employeeMap.set(id, []);
     employeeMap.get(id)!.push(row);
   });
 
   const tableData = Array.from(employeeMap.entries())
     .slice(0, 50)
-    .map(([userId, logs]) => {
-      const firstRow = logs[0];
+    .map(([_userId, logs]) => {
+      const firstRow    = logs[0];
       const presentDays = logs.filter(l => ['On Time', 'Late'].includes(l.status)).length;
       const totalOvertime = logs.reduce((s, l) => s + l.overtime, 0);
-      const totalLate = logs.reduce((s, l) => s + l.late, 0);
-
+      const totalLate     = logs.reduce((s, l) => s + l.late,     0);
       return [
         `${firstRow.user_fname} ${firstRow.user_lname}`,
         firstRow.user_position,
@@ -81,7 +67,6 @@ export const exportDepartmentReportToPDF = async (
       (doc, startY, config) => {
         const margins = config.margins || { top: 10, bottom: 10, left: 10, right: 10 };
 
-        // Department header
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text(`${departmentName}`, margins.left, startY);
@@ -92,35 +77,24 @@ export const exportDepartmentReportToPDF = async (
         doc.text(`Department Attendance Summary`, margins.left, startY + 6);
         doc.setTextColor(0, 0, 0);
 
-        // Period info
         doc.setFontSize(9);
-        doc.text(
-          `Period: ${formatDate(fromDate)} to ${formatDate(toDate)}`,
-          margins.left,
-          startY + 12
-        );
+        doc.text(`Period: ${formatDate(fromDate)} to ${formatDate(toDate)}`, margins.left, startY + 12);
 
-        // Summary metrics
         const summaryY = startY + 19;
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
-        const summaryText = `Present: ${presentStatus.length} | On Time: ${onTime.length} | Absent: ${absent.length}`;
-        doc.text(summaryText, margins.left, summaryY);
+        doc.text(
+          `Present: ${presentStatus.length} | On Time: ${onTime.length} | Absent: ${absent.length}`,
+          margins.left, summaryY
+        );
 
-        // Table
         autoTable(doc, {
           startY: summaryY + 7,
           head: [['Employee', 'Position', 'Present Days', 'Absent Days', 'Total OT', 'Total Late']],
           body: tableData,
           margin: margins,
           theme: 'striped',
-          headStyles: {
-            fillColor: [41, 128, 185],
-            textColor: 255,
-            fontSize: 8,
-            fontStyle: 'bold',
-            halign: 'center',
-          },
+          headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 8, fontStyle: 'bold', halign: 'center' },
           bodyStyles: { fontSize: 7.5, valign: 'middle' },
           alternateRowStyles: { fillColor: [245, 245, 245] },
           columnStyles: {
@@ -131,31 +105,23 @@ export const exportDepartmentReportToPDF = async (
             4: { cellWidth: 25, halign: 'right' },
             5: { cellWidth: 25, halign: 'right' },
           },
-          didDrawPage: (data: any) => {
-            const pageSize = doc.internal.pageSize;
+          didDrawPage: (data: { pageNumber: number }) => {
+            const pageSize   = doc.internal.pageSize;
             const pageHeight = pageSize.getHeight();
-            const pageWidth = pageSize.getWidth();
-
-            // Footer page number
+            const pageWidth  = pageSize.getWidth();
             doc.setFontSize(8);
             doc.setTextColor(150);
-            doc.text(
-              `Page ${doc.internal.pages.length - 1}`,
-              pageWidth / 2,
-              pageHeight - 5,
-              { align: 'center' }
-            );
+            doc.text(`Page ${data.pageNumber}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
             doc.setTextColor(0);
           },
         });
       }
     );
 
-    // Download the PDF
     const blob = doc.output('blob');
-    const url = URL.createObjectURL(blob);
+    const url  = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
+    link.href  = url;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
