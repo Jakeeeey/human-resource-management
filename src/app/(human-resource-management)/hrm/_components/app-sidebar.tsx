@@ -15,6 +15,7 @@ import {
     Layers, // Department
     KeyRound, // Department Accounts
     BadgeCheck, // Role Management
+    Boxes, // Subsystem Registration
 } from "lucide-react";
 
 import { NavMain } from "./nav-main";
@@ -97,11 +98,6 @@ const data = {
                             icon: BadgeCheck,
                         },
                         {
-                            title: "Cluster",
-                            url: "/hrm/employee-admin/structure/cluster",
-                            icon: BadgeCheck,
-                        },
-                        {
                             title: "Operation",
                             url: "/hrm/employee-admin/structure/operation",
                             icon: BadgeCheck,
@@ -160,6 +156,16 @@ const data = {
             ],
         },
         {
+            title: "User Configuration",
+            url: "/hrm/user-configuration",
+            icon: UserCog,
+        },
+        {
+            title: "Subsystem Registration",
+            url: "/hrm/subsystem-registration",
+            icon: Boxes,
+        },
+        {
             title: "Workforce",
             url: "#",
             icon: Users,
@@ -196,17 +202,6 @@ const data = {
                     title: "Attendance Management",
                     url: "/hrm/workforce/attendance-management",
                     icon: CalendarClock,
-                },
-                {
-                    title: "Employee Records",
-                    url: "#",
-                    items: [
-                        {
-                            title: "Record List Management",
-                            url: "/hrm/workforce/employee-records/record-list-management",
-                            icon: CalendarClock,
-                        },
-                    ],
                 },
                 {
                     title: "Job Orders",
