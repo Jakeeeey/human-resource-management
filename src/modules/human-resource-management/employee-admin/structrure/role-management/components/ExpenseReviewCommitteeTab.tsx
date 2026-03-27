@@ -10,30 +10,43 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, UserPlus, Mail, ShieldCheck } from "lucide-react";
-import { ReviewCommittee, SystemUser } from "../types";
+import { Trash2, Plus, Mail, LayoutDashboard } from "lucide-react";
+import { ExpenseReviewCommittee, SystemUser, Division } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
-
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { TablePagination, usePagination } from "./TablePagination";
 import { DeleteConfirmationDialog } from "./DeleteConfirmationDialog";
+import { Badge } from "@/components/ui/badge";
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
+const getDivision = (val: number | Division | undefined) => typeof val === 'object' ? val : null;
 
-interface ReviewCommitteeTabProps {
-  data: ReviewCommittee[];
+interface ExpenseReviewCommitteeTabProps {
+  data: ExpenseReviewCommittee[];
   isLoading: boolean;
   onDelete: (id: number) => Promise<void>;
-  onCreate: (userId: number) => Promise<void>;
+  onCreate: (divisionId: number, userId: number, hierarchy: number) => Promise<void>;
   users: SystemUser[];
+  divisions: Division[];
 }
 
-export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users }: ReviewCommitteeTabProps) {
+export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users, divisions }: ExpenseReviewCommitteeTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
   const pagination = usePagination(data, 5);
+
+  const getHierarchyColor = (level: number) => {
+    switch (level) {
+      case 1: return "bg-primary/10 text-primary ring-primary/20";
+      case 2: return "bg-primary/30 text-primary ring-primary/40";
+      case 3: return "bg-primary/60 text-primary-foreground ring-primary/70";
+      default: 
+        if (level >= 4) return "bg-primary text-primary-foreground ring-primary/90 shadow-md";
+        return "bg-primary/10 text-primary ring-primary/20";
+    }
+  };
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -42,27 +55,34 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
     </div>;
   }
 
+  // We pass all divisions because a division can have multiple approvers (different hierarchies).
+  const availableDivisions = divisions;
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
-          <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Target Review Committee</h3>
-          <p className="text-sm text-muted-foreground font-medium">Regulatory approval authority for targets.</p>
+          <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Expense Review Committee</h3>
+          <p className="text-sm text-muted-foreground font-medium">Approval authority for financial disbursements and expenses.</p>
         </div>
         <Button
           onClick={() => setIsDialogOpen(true)}
-          className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
+          disabled={availableDivisions.length === 0}
+          className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 disabled:grayscale"
         >
-          <UserPlus className="mr-2 h-4 w-4" /> Add Target Approver
+          <Plus className="mr-2 h-4 w-4" />
+          Assign Reviewer
         </Button>
       </div>
 
       <RoleAssignmentDialog
         isOpen={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        title="Add Target Review Committee Approver"
-        type="review-committee"
+        title="Assign Expense Review Committee Approver"
+        type="expense-review-committee" 
         users={users}
+        divisions={availableDivisions}
+        expenseReviewers={data}
         onConfirm={onCreate}
       />
 
@@ -72,44 +92,51 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
         onConfirm={async () => {
           if (deleteTarget) await onDelete(deleteTarget);
         }}
-        title="Remove Committee Member?"
-        description="Are you sure you want to remove this member? This action cannot be undone."
+        title="Remove Expense Review Committee Member?"
+        description="Are you sure you want to remove this approver? This action cannot be undone."
       />
 
       <Card className="border-muted-foreground/10 shadow-sm overflow-hidden rounded-xl">
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-muted-foreground/10">
-              <TableHead className="font-semibold py-4 px-6 text-foreground/80">Approval Authority</TableHead>
+              <TableHead className="font-semibold py-4 px-6 text-foreground/80">Managing Unit</TableHead>
+              <TableHead className="font-semibold py-4 text-foreground/80">Committee Member Name</TableHead>
               <TableHead className="font-semibold py-4 text-foreground/80">Contact</TableHead>
-              <TableHead className="font-semibold py-4 text-foreground/80">Added On</TableHead>
+              <TableHead className="font-semibold py-4 text-center text-foreground/80">Hierarchy Level</TableHead>
               <TableHead className="w-[80px] py-4"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="h-64 text-center pointer-events-none">
+                <TableCell colSpan={5} className="h-64 text-center pointer-events-none">
                   <div className="flex flex-col items-center justify-center space-y-3 opacity-40">
                     <div className="p-4 bg-muted rounded-full">
-                      <ShieldCheck className="h-10 w-10" />
+                      <LayoutDashboard className="h-10 w-10" />
                     </div>
-                    <p className="text-base font-medium">No committee members</p>
-                    <p className="text-sm">Designate target setting approvers here.</p>
+                    <p className="text-base font-medium">No expense review committee members assigned</p>
+                    <p className="text-sm">Start by assigning an approver to a business unit.</p>
                   </div>
                 </TableCell>
               </TableRow>
             ) : (
               pagination.paginatedItems.map((item) => {
                 const user = getUser(item.approver_id);
+                const division = getDivision(item.division_id);
                 const initials = user ? `${user.user_fname?.[0] || ''}${user.user_lname?.[0] || ''}` : '?';
 
                 return (
                   <TableRow key={item.id} className="group border-muted-foreground/10 hover:bg-muted/30 transition-colors">
                     <TableCell className="py-4 px-6">
+                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 px-3 py-1 font-bold text-[11px] tracking-wider uppercase">
+                        {division?.division_name || `ID #${item.division_id}`}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-4">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9 border border-muted-foreground/10 shadow-sm transition-transform group-hover:scale-105">
-                          <AvatarFallback className="bg-primary/5 text-primary font-bold text-[10px] tracking-tight">
+                          <AvatarFallback className="bg-primary/10 text-primary font-bold text-[10px] tracking-tight">
                             {initials}
                           </AvatarFallback>
                         </Avatar>
@@ -129,9 +156,9 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
                         {user?.user_email}
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
-                      <div className="text-sm text-muted-foreground font-medium">
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : "—"}
+                    <TableCell className="py-4 text-center">
+                      <div className={`inline-flex items-center justify-center w-7 h-7 rounded-full font-bold text-xs ring-1 transition-all ${getHierarchyColor(item.approver_heirarchy || 1)}`}>
+                        {item.approver_heirarchy || 1}
                       </div>
                     </TableCell>
                     <TableCell className="py-4 pr-6 text-right">
@@ -155,4 +182,3 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
     </div>
   );
 }
-
