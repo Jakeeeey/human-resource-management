@@ -11,20 +11,22 @@ import {
 import { Button } from "@/components/ui/button";
 
 import { Label } from "@/components/ui/label";
-import { SystemUser, Division, Salesman, SupervisorPerDivision } from "../types";
+import { Input } from "@/components/ui/input";
+import { SystemUser, Division, Salesman, SupervisorPerDivision, ExpenseReviewCommittee } from "../types";
 import { SearchableSelect } from "./SearchableSelect";
-import { Shield, Users, UserPlus, Settings, LayoutDashboard, Briefcase, Info, Loader2 } from "lucide-react";
+import { Shield, Users, UserPlus, Settings, LayoutDashboard, Briefcase, Info, Loader2, CircleDollarSign, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RoleAssignmentDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  type: "executive" | "division-head" | "supervisor" | "salesman" | "review-committee";
+  type: "executive" | "division-head" | "supervisor" | "salesman" | "review-committee" | "expense-review-committee";
   users: SystemUser[];
   divisions?: Division[];
   salesmen?: Salesman[];
   supervisors?: SupervisorPerDivision[];
+  expenseReviewers?: ExpenseReviewCommittee[];
   onConfirm: (...args: number[]) => Promise<void>;
 }
 
@@ -36,7 +38,8 @@ const typeConfig = {
   "division-head": { icon: LayoutDashboard, color: "text-indigo-500", bg: "bg-indigo-50/50" },
   supervisor: { icon: Users, color: "text-emerald-500", bg: "bg-emerald-50/50" },
   salesman: { icon: UserPlus, color: "text-orange-500", bg: "bg-orange-50/50" },
-  "review-committee": { icon: Settings, color: "text-violet-500", bg: "bg-violet-50/50" }
+  "review-committee": { icon: Settings, color: "text-violet-500", bg: "bg-violet-50/50" },
+  "expense-review-committee": { icon: CircleDollarSign, color: "text-rose-500", bg: "bg-rose-50/50" }
 };
 
 export function RoleAssignmentDialog({
@@ -48,12 +51,14 @@ export function RoleAssignmentDialog({
   divisions = [],
   salesmen = [],
   supervisors = [],
+  expenseReviewers = [],
   onConfirm
 }: RoleAssignmentDialogProps) {
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedDivision, setSelectedDivision] = useState<string>("");
   const [selectedSalesman, setSelectedSalesman] = useState<string>("");
   const [selectedSupervisorAsmt, setSelectedSupervisorAsmt] = useState<string>("");
+  const [selectedHierarchy, setSelectedHierarchy] = useState<string>("1");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const config = typeConfig[type];
@@ -61,7 +66,7 @@ export function RoleAssignmentDialog({
 
   const handleConfirm = async () => {
     if (!selectedUser && type !== "salesman") return;
-    if (type === "division-head" && !selectedDivision) return;
+    if ((type === "division-head" || type === "expense-review-committee") && !selectedDivision) return;
     if (type === "supervisor" && !selectedDivision) return;
     if (type === "salesman" && (!selectedSupervisorAsmt || !selectedSalesman)) return;
 
@@ -71,6 +76,8 @@ export function RoleAssignmentDialog({
         await onConfirm(Number(selectedUser));
       } else if (type === "division-head" || type === "supervisor") {
         await onConfirm(Number(selectedDivision), Number(selectedUser));
+      } else if (type === "expense-review-committee") {
+        await onConfirm(Number(selectedDivision), Number(selectedUser), Number(selectedHierarchy));
       } else if (type === "salesman") {
         await onConfirm(Number(selectedSupervisorAsmt), Number(selectedSalesman));
       }
@@ -79,6 +86,7 @@ export function RoleAssignmentDialog({
       setSelectedDivision("");
       setSelectedSalesman("");
       setSelectedSupervisorAsmt("");
+      setSelectedHierarchy("1");
     } catch (error) {
       console.error("Failed to save assignment:", error);
     } finally {
@@ -106,6 +114,19 @@ export function RoleAssignmentDialog({
     label: `${s.salesman_name} (${s.salesman_code})`
   }));
 
+  const existingLevels = selectedDivision && type === "expense-review-committee"
+    ? expenseReviewers
+        .filter(r => {
+          const divId = typeof r.division_id === 'object' ? r.division_id.division_id : r.division_id;
+          return divId.toString() === selectedDivision;
+        })
+        .map(r => r.approver_heirarchy)
+        .filter(Boolean)
+        .sort((a, b) => a - b)
+    : [];
+
+  const isHierarchyTaken = existingLevels.includes(Number(selectedHierarchy));
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px] p-0 border-none shadow-2xl rounded-2xl overflow-visible">
@@ -123,7 +144,7 @@ export function RoleAssignmentDialog({
 
         <div className="p-6 pt-2 space-y-6">
           <div className="space-y-4">
-            {(type === "division-head" || type === "supervisor") && (
+            {(type === "division-head" || type === "supervisor" || type === "expense-review-committee") && (
               <div className="space-y-2">
                 <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
                   <LayoutDashboard className="h-3.5 w-3.5 opacity-40" />
@@ -137,6 +158,44 @@ export function RoleAssignmentDialog({
                   className="h-12 border-muted-foreground/10 bg-muted/5 font-medium"
                 />
                 <p className="text-[11px] text-muted-foreground ml-1">Assign this role to a specific vertical.</p>
+              </div>
+            )}
+
+            {type === "expense-review-committee" && (
+              <div className="space-y-2">
+                <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 opacity-40" />
+                  Approval Hierarchy Level
+                </Label>
+                <div className="flex flex-col gap-1.5">
+                  <Input 
+                    type="number" 
+                    min={1} 
+                    value={selectedHierarchy} 
+                    onChange={e => setSelectedHierarchy(e.target.value)} 
+                    placeholder="E.g. 1" 
+                    className="h-12 border-muted-foreground/10 bg-muted/5 font-bold"
+                  />
+                  {selectedDivision ? (
+                    <p className="text-[11px] text-muted-foreground ml-1">
+                      {existingLevels.length > 0 
+                        ? <>Existing levels in this unit: <strong className="text-foreground/80">{Array.from(new Set(existingLevels)).join(', ')}</strong>.</>
+                        : "No existing levels in this unit."}
+                      <br/>
+                      <strong className="text-foreground/70">Note: As the level goes up, the approval authority is higher.</strong>
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground ml-1">
+                      Select a business unit first to see existing levels.<br/>
+                      <strong className="text-foreground/70">Note: As the level goes up, the approval authority is higher.</strong>
+                    </p>
+                  )}
+                  {isHierarchyTaken && (
+                    <p className="text-[11px] font-bold text-destructive ml-1 animate-in fade-in slide-in-from-top-1">
+                      Level {selectedHierarchy} is already assigned for this business unit. Please choose another level.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -157,7 +216,7 @@ export function RoleAssignmentDialog({
               </div>
             )}
 
-            {(type === "executive" || type === "division-head" || type === "supervisor" || type === "review-committee") && (
+            {(type === "executive" || type === "division-head" || type === "supervisor" || type === "review-committee" || type === "expense-review-committee") && (
               <div className="space-y-2">
                 <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
                   <Briefcase className="h-3.5 w-3.5 opacity-40" />
@@ -210,8 +269,8 @@ export function RoleAssignmentDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isSubmitting}
-            className="rounded-full px-8 bg-foreground text-background hover:bg-foreground/90 shadow-xl transition-all active:scale-95 font-bold"
+            disabled={isSubmitting || (type === "expense-review-committee" && isHierarchyTaken)}
+            className="rounded-full px-8 bg-foreground text-background hover:bg-foreground/90 shadow-xl transition-all active:scale-95 font-bold disabled:opacity-50 disabled:pointer-events-none"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalize Assignment"}
           </Button>

@@ -9,6 +9,7 @@ import {
   SupervisorPerDivision,
   SalesmanPerSupervisor,
   ReviewCommittee,
+  ExpenseReviewCommittee,
   SystemUser,
   Division,
   Salesman
@@ -18,6 +19,7 @@ export function useRoleManagement() {
   const [executives, setExecutives] = useState<Executive[]>([]);
   const [reviewCommittee, setReviewCommittee] = useState<ReviewCommittee[]>([]);
   const [divisionHeads, setDivisionHeads] = useState<DivisionSalesHead[]>([]);
+  const [expenseReviewCommittee, setExpenseReviewCommittee] = useState<ExpenseReviewCommittee[]>([]);
   const [supervisors, setSupervisors] = useState<SupervisorPerDivision[]>([]);
   const [salesmanAssignments, setSalesmanAssignments] = useState<SalesmanPerSupervisor[]>([]);
 
@@ -43,6 +45,11 @@ export function useRoleManagement() {
   const fetchDivisionHeads = useCallback(async () => {
     const dh = await provider.listDivisionHeads();
     setDivisionHeads(dh);
+  }, []);
+
+  const fetchExpenseReviewCommittee = useCallback(async () => {
+    const erc = await provider.listExpenseReviewCommittee();
+    setExpenseReviewCommittee(erc);
   }, []);
 
   const fetchSupervisors = useCallback(async () => {
@@ -80,6 +87,7 @@ export function useRoleManagement() {
       await Promise.all([
         fetchExecutives(),
         fetchReviewCommittee(),
+        fetchExpenseReviewCommittee(),
         fetchDivisionHeads(),
         fetchSupervisors(),
         fetchSalesmanAssignments(),
@@ -91,7 +99,7 @@ export function useRoleManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchExecutives, fetchReviewCommittee, fetchDivisionHeads, fetchSupervisors, fetchSalesmanAssignments, fetchReferenceData]);
+  }, [fetchExecutives, fetchReviewCommittee, fetchExpenseReviewCommittee, fetchDivisionHeads, fetchSupervisors, fetchSalesmanAssignments, fetchReferenceData]);
 
   useEffect(() => {
     fetchData();
@@ -147,6 +155,41 @@ export function useRoleManagement() {
       console.error(err);
       toast.error(err.message || "Failed to remove review committee member");
       throw err;
+    }
+  };
+
+  const createExpenseReviewCommittee = async (divisionId: number, userId: number, hierarchy: number) => {
+    setIsLoading(true);
+    try {
+      await provider.createExpenseReviewCommittee({ division_id: divisionId, approver_id: userId, approver_heirarchy: hierarchy });
+      // Small delay to ensure database consistency before refetch
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await fetchExpenseReviewCommittee();
+      toast.success("Expense review committee member assigned");
+    } catch (e) {
+      const err = e as Error;
+      console.error(err);
+      toast.error(err.message || "Failed to assign expense review committee member");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteExpenseReviewCommittee = async (id: number) => {
+    setIsLoading(true);
+    try {
+      await provider.deleteExpenseReviewCommittee(id);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await fetchExpenseReviewCommittee();
+      toast.success("Expense review committee member removed");
+    } catch (e) {
+      const err = e as Error;
+      console.error(err);
+      toast.error(err.message || "Failed to remove expense review committee member");
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -232,6 +275,7 @@ export function useRoleManagement() {
   return {
     executives,
     reviewCommittee,
+    expenseReviewCommittee,
     divisionHeads,
     supervisors,
     salesmanAssignments,
@@ -246,6 +290,8 @@ export function useRoleManagement() {
     deleteExecutive,
     createReviewCommittee,
     deleteReviewCommittee,
+    createExpenseReviewCommittee,
+    deleteExpenseReviewCommittee,
     createDivisionHead,
     deleteDivisionHead,
     createSupervisor,
