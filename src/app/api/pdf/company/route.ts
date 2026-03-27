@@ -13,7 +13,7 @@ export async function GET() {
         }
 
         const staticToken = process.env.DIRECTUS_STATIC_TOKEN;
-        const response = await fetch(`${API_BASE_URL}/items/company?filter[company_id]=1`, {
+        const response = await fetch(`${API_BASE_URL}/items/company?filter[company_id][_eq]=1`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -49,6 +49,10 @@ export async function GET() {
                     // Keep original UUID or handle as needed
                 }
             }
+        }
+
+        if (!company) {
+            console.warn('Company with ID 1 not found in Directus.');
         }
 
         return NextResponse.json(data);
