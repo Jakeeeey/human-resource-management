@@ -10,10 +10,11 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, Mail, LayoutDashboard } from "lucide-react";
+import { Trash2, Plus, Mail, LayoutDashboard, Filter, XCircle } from "lucide-react";
 import { ExpenseReviewCommittee, SystemUser, Division } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
+import { SearchableSelect } from "./SearchableSelect";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { TablePagination, usePagination } from "./TablePagination";
@@ -35,7 +36,22 @@ interface ExpenseReviewCommitteeTabProps {
 export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users, divisions }: ExpenseReviewCommitteeTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
-  const pagination = usePagination(data, 5);
+  const [filterDivision, setFilterDivision] = React.useState<string>("all");
+
+  const filteredData = React.useMemo(() => {
+    if (filterDivision === "all") return data;
+    return data.filter(item => {
+      const divId = typeof item.division_id === 'object' ? item.division_id.division_id : item.division_id;
+      return divId.toString() === filterDivision;
+    });
+  }, [data, filterDivision]);
+
+  const pagination = usePagination(filteredData, 5);
+
+  const divisionOptions = React.useMemo(() => [
+    { value: "all", label: "All Business Units" },
+    ...divisions.map(d => ({ value: d.division_id.toString(), label: d.division_name }))
+  ], [divisions]);
 
   const getHierarchyColor = (level: number) => {
     switch (level) {
@@ -55,8 +71,7 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
     </div>;
   }
 
-  // We pass all divisions because a division can have multiple approvers (different hierarchies).
-  const availableDivisions = divisions;
+
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -67,12 +82,40 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
         </div>
         <Button
           onClick={() => setIsDialogOpen(true)}
-          disabled={availableDivisions.length === 0}
+          disabled={divisions.length === 0}
           className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 disabled:grayscale"
         >
           <Plus className="mr-2 h-4 w-4" />
           Assign Reviewer
         </Button>
+      </div>
+
+      {/* Filter Row */}
+      <div className="flex items-center gap-3 bg-muted/20 p-3 rounded-xl border border-muted-foreground/5 shadow-inner">
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-background rounded-lg border border-muted-foreground/10 shadow-sm w-full md:w-[320px]">
+          <Filter className="h-4 w-4 text-muted-foreground opacity-60" />
+          <SearchableSelect
+            options={divisionOptions}
+            value={filterDivision}
+            onValueChange={setFilterDivision}
+            placeholder="Filter by Business Unit"
+            className="border-none bg-transparent h-7 focus:ring-0 shadow-none font-bold text-xs"
+          />
+          {filterDivision !== "all" && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setFilterDivision("all")}
+              className="h-6 w-6 text-muted-foreground hover:text-foreground rounded-full"
+            >
+              <XCircle className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        <div className="hidden md:block h-4 w-[1px] bg-muted-foreground/10 mx-2" />
+        <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-widest hidden md:block">
+          Showing <span className="text-foreground">{filteredData.length}</span> Members
+        </p>
       </div>
 
       <RoleAssignmentDialog
@@ -81,7 +124,7 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
         title="Assign Expense Review Committee Approver"
         type="expense-review-committee" 
         users={users}
-        divisions={availableDivisions}
+        divisions={divisions}
         expenseReviewers={data}
         onConfirm={onCreate}
       />
@@ -108,15 +151,19 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 ? (
+            {filteredData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-64 text-center pointer-events-none">
                   <div className="flex flex-col items-center justify-center space-y-3 opacity-40">
                     <div className="p-4 bg-muted rounded-full">
                       <LayoutDashboard className="h-10 w-10" />
                     </div>
-                    <p className="text-base font-medium">No expense review committee members assigned</p>
-                    <p className="text-sm">Start by assigning an approver to a business unit.</p>
+                    <p className="text-base font-medium">
+                      {filterDivision !== "all" ? "No members for this business unit" : "No expense review committee members assigned"}
+                    </p>
+                    <p className="text-sm">
+                      {filterDivision !== "all" ? "Try adjusting your filter or assign a new member." : "Start by assigning an approver to a business unit."}
+                    </p>
                   </div>
                 </TableCell>
               </TableRow>

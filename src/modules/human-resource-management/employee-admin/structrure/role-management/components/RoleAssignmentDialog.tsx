@@ -64,6 +64,36 @@ export function RoleAssignmentDialog({
   const config = typeConfig[type];
   const Icon = config.icon;
 
+  // Sequential Hierarchy Logic
+  const existingLevels = React.useMemo(() => {
+    if (selectedDivision && type === "expense-review-committee") {
+      return expenseReviewers
+        .filter(r => {
+          const divId = typeof r.division_id === 'object' ? r.division_id.division_id : r.division_id;
+          return divId.toString() === selectedDivision;
+        })
+        .map(r => r.approver_heirarchy)
+        .filter(Boolean)
+        .sort((a, b) => a - b);
+    }
+    return [];
+  }, [selectedDivision, type, expenseReviewers]);
+
+  const nextRequiredLevel = React.useMemo(() => {
+    let level = 1;
+    while (existingLevels.includes(level)) {
+      level++;
+    }
+    return level;
+  }, [existingLevels]);
+
+  // Auto-set hierarchy when division changes
+  React.useEffect(() => {
+    if (type === "expense-review-committee" && selectedDivision) {
+      setSelectedHierarchy(nextRequiredLevel.toString());
+    }
+  }, [selectedDivision, type, nextRequiredLevel]);
+
   const handleConfirm = async () => {
     if (!selectedUser && type !== "salesman") return;
     if ((type === "division-head" || type === "expense-review-committee") && !selectedDivision) return;
@@ -114,18 +144,7 @@ export function RoleAssignmentDialog({
     label: `${s.salesman_name} (${s.salesman_code})`
   }));
 
-  const existingLevels = selectedDivision && type === "expense-review-committee"
-    ? expenseReviewers
-        .filter(r => {
-          const divId = typeof r.division_id === 'object' ? r.division_id.division_id : r.division_id;
-          return divId.toString() === selectedDivision;
-        })
-        .map(r => r.approver_heirarchy)
-        .filter(Boolean)
-        .sort((a, b) => a - b)
-    : [];
-
-  const isHierarchyTaken = existingLevels.includes(Number(selectedHierarchy));
+  const isHierarchyInvalid = type === "expense-review-committee" && Number(selectedHierarchy) !== nextRequiredLevel;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -179,20 +198,20 @@ export function RoleAssignmentDialog({
                   {selectedDivision ? (
                     <p className="text-[11px] text-muted-foreground ml-1">
                       {existingLevels.length > 0 
-                        ? <>Existing levels in this unit: <strong className="text-foreground/80">{Array.from(new Set(existingLevels)).join(', ')}</strong>.</>
-                        : "No existing levels in this unit."}
+                        ? <>Levels assigned: <strong className="text-foreground/80">{Array.from(new Set(existingLevels)).join(', ')}</strong>. Next required: <strong className="text-primary">{nextRequiredLevel}</strong></>
+                        : <>No levels assigned yet. Next required: <strong className="text-primary">1</strong></>}
                       <br/>
-                      <strong className="text-foreground/70">Note: As the level goes up, the approval authority is higher.</strong>
+                      <strong className="text-foreground/70">Note: Levels must be assigned sequentially (1, 2, 3...) with no gaps.</strong>
                     </p>
                   ) : (
                     <p className="text-[11px] text-muted-foreground ml-1">
-                      Select a business unit first to see existing levels.<br/>
+                      Select a business unit first to calculate the next sequence.<br/>
                       <strong className="text-foreground/70">Note: As the level goes up, the approval authority is higher.</strong>
                     </p>
                   )}
-                  {isHierarchyTaken && (
+                  {isHierarchyInvalid && selectedDivision && (
                     <p className="text-[11px] font-bold text-destructive ml-1 animate-in fade-in slide-in-from-top-1">
-                      Level {selectedHierarchy} is already assigned for this business unit. Please choose another level.
+                      Invalid Level. You must assign Level {nextRequiredLevel} before moving to higher levels.
                     </p>
                   )}
                 </div>
@@ -269,7 +288,7 @@ export function RoleAssignmentDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isSubmitting || (type === "expense-review-committee" && isHierarchyTaken)}
+            disabled={isSubmitting || isHierarchyInvalid}
             className="rounded-full px-8 bg-foreground text-background hover:bg-foreground/90 shadow-xl transition-all active:scale-95 font-bold disabled:opacity-50 disabled:pointer-events-none"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalize Assignment"}
