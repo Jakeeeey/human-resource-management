@@ -71,8 +71,7 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
     </div>;
   }
 
-  // We pass all divisions because a division can have multiple approvers (different hierarchies).
-  const availableDivisions = divisions;
+
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
