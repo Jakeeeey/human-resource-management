@@ -8,11 +8,9 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../../../_components/nav-user";
-
+import { NavUser } from "../_components/nav-user";
 import { cookies } from "next/headers";
-
-import LogisticsReportModule from "@/modules/human-resource-management/workforce/attendance-report/logistics-report/LogisticsReportModule";
+import { PdfEditor } from "@/modules/human-resource-management/pdf-layout/PdfEditor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,36 +69,27 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
     };
 }
 
-export default async function Page() {
-    // âœ… Next.js 16: cookies() is async
+export default async function PdfLayoutPage() {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
-
     const headerUser = buildHeaderUserFromToken(token);
 
     return (
-        // âœ… This fills the RIGHT column provided by SidebarInset (which is now fixed-height).
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            {/* âœ… Topbar is fixed in place because ONLY <main> scrolls */}
             <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16 overflow-hidden">
                 <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
                     <SidebarTrigger className="-ml-1 shrink-0" />
-
-                    <Separator
-                        orientation="vertical"
-                        className="hidden sm:block mr-2 data-[orientation=vertical]:h-4 shrink-0"
-                    />
-
+                    <Separator orientation="vertical" className="hidden sm:block mr-2 data-[orientation=vertical]:h-4 shrink-0" />
                     <div className="min-w-0 overflow-hidden">
                         <Breadcrumb>
                             <BreadcrumbList className="min-w-0 overflow-hidden">
                                 <BreadcrumbItem className="hidden md:block shrink-0">
-                                    <BreadcrumbLink href="#">Workforce</BreadcrumbLink>
+                                    <BreadcrumbLink href="#">HRM</BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Logistics Report
+                                        PDF Layout Designer
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -113,8 +102,8 @@ export default async function Page() {
                 </div>
             </header>
 
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4 bg-muted/20">
-                <LogisticsReportModule />
+            <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-slate-100">
+                <PdfEditor />
             </main>
         </div>
     );
