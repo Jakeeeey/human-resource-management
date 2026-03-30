@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { QrPaymentTypeRow, SalesmanQrCodeRow, SalesmanRow } from "../types";
-import { listSalesmanQrCodes, upsertSalesmanQrCode } from "../providers/fetchProvider";
+import { listSalesmanQrCodes, upsertSalesmanQrCode } from "../../providers/fetchProvider";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
