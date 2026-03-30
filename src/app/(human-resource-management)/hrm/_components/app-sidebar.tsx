@@ -15,6 +15,7 @@ import {
     Layers, // Department
     KeyRound, // Department Accounts
     BadgeCheck, // Role Management
+    Boxes, // Subsystem Registration
 } from "lucide-react";
 
 import { NavMain } from "./nav-main";
@@ -97,11 +98,6 @@ const data = {
                             icon: BadgeCheck,
                         },
                         {
-                            title: "Cluster",
-                            url: "/hrm/employee-admin/structure/cluster",
-                            icon: BadgeCheck,
-                        },
-                        {
                             title: "Operation",
                             url: "/hrm/employee-admin/structure/operation",
                             icon: BadgeCheck,
@@ -118,6 +114,11 @@ const data = {
                     url: "#",
                     icon: Shield,
                     items: [
+                        {
+                            title: "Attendance Approval",
+                            url: "/hrm/employee-admin/approval/attendance-approval",
+                            icon: CalendarClock,
+                        },
                         {
                             title: "Overtime Request",
                             url: "/hrm/employee-admin/approval/overtime-request",
@@ -155,6 +156,16 @@ const data = {
             ],
         },
         {
+            title: "User Configuration",
+            url: "/hrm/user-configuration",
+            icon: UserCog,
+        },
+        {
+            title: "Subsystem Registration",
+            url: "/hrm/subsystem-registration",
+            icon: Boxes,
+        },
+        {
             title: "Workforce",
             url: "#",
             icon: Users,
@@ -166,17 +177,22 @@ const data = {
                     items: [
                         {
                             title: "Today's Report",
-                            url: "/hrm/workforce/payroll-and-attendance/attendance-report",
+                            url: "/hrm/workforce/attendance-report/todays-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Employee Report",
-                            url: "/hrm/workforce/payroll-and-attendance/employee-report",
+                            url: "/hrm/workforce/attendance-report/employee-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Department Report",
-                            url: "/hrm/workforce/payroll-and-attendance/department-report",
+                            url: "/hrm/workforce/attendance-report/department-report",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Logistics Report",
+                            url: "/hrm/workforce/attendance-report/logistics-report",
                             icon: CalendarClock,
                         },
                     ],
@@ -184,19 +200,8 @@ const data = {
 
                 {
                     title: "Attendance Management",
-                    url: "/hrm/workforce/payroll-and-attendance/attendance-management",
+                    url: "/hrm/workforce/attendance-management",
                     icon: CalendarClock,
-                },
-                {
-                    title: "Employee Records",
-                    url: "#",
-                    items: [
-                        {
-                            title: "Record List Management",
-                            url: "/hrm/workforce/employee-records/record-list-management",
-                            icon: CalendarClock,
-                        },
-                    ],
                 },
                 {
                     title: "Job Orders",

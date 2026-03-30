@@ -6,7 +6,8 @@ import {
   SystemUser,
   Division,
   Salesman,
-  ReviewCommittee
+  ReviewCommittee,
+  ExpenseReviewCommittee
 } from "../types";
 
 const PROXY_BASE = "/api/hrm/employee-admin/structure/role-management";
@@ -16,10 +17,15 @@ async function request<T>(method: string, endpoint: string, body?: Record<string
     "Content-Type": "application/json",
   };
 
-  const res = await fetch(endpoint, {
+  const url = method === "GET" 
+    ? (endpoint.includes('?') ? `${endpoint}&_t=${Date.now()}` : `${endpoint}?_t=${Date.now()}`)
+    : endpoint;
+
+  const res = await fetch(url, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -70,6 +76,19 @@ export async function createReviewCommittee(data: Partial<ReviewCommittee>): Pro
 
 export async function deleteReviewCommittee(id: number): Promise<void> {
   await request("DELETE", `${PROXY_BASE}/review-committees/${id}`);
+}
+
+// --- Expense Review Committee ---
+export async function listExpenseReviewCommittee(): Promise<ExpenseReviewCommittee[]> {
+  return request<ExpenseReviewCommittee[]>("GET", `${PROXY_BASE}/expense-review-committees`);
+}
+
+export async function createExpenseReviewCommittee(data: Partial<ExpenseReviewCommittee>): Promise<void> {
+  await request("POST", `${PROXY_BASE}/expense-review-committees`, data);
+}
+
+export async function deleteExpenseReviewCommittee(id: number): Promise<void> {
+  await request("DELETE", `${PROXY_BASE}/expense-review-committees/${id}`);
 }
 
 // --- Division Heads ---

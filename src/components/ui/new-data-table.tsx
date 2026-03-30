@@ -12,6 +12,12 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  HeaderGroup,
+  Header,
+  Row,
+  Cell,
+  PaginationState,
+  Updater,
 } from "@tanstack/react-table";
 
 import {
@@ -181,7 +187,7 @@ export function DataTable<TData, TValue>({
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    onSortingChange: (updater) => {
+    onSortingChange: (updater: Updater<SortingState>) => {
       const nextSorting =
         typeof updater === "function" ? updater(actualSorting) : updater;
       if (onExternalSortingChange) {
@@ -207,7 +213,7 @@ export function DataTable<TData, TValue>({
         ? (pagination ?? internalPagination)
         : internalPagination,
     },
-    onPaginationChange: (updater) => {
+    onPaginationChange: (updater: Updater<PaginationState>) => {
       const nextPagination =
         typeof updater === "function"
           ? updater(
@@ -287,9 +293,9 @@ export function DataTable<TData, TValue>({
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
+            {table.getHeaderGroups().map((headerGroup: HeaderGroup<TData>) => (
               <TableRow key={headerGroup.id} className="bg-muted/10">
-                {headerGroup.headers.map((header) => {
+                {headerGroup.headers.map((header: Header<TData, unknown>) => {
                   return (
                     <TableHead key={header.id} className="font-bold py-2">
                       {header.isPlaceholder
@@ -325,13 +331,13 @@ export function DataTable<TData, TValue>({
                 </TableRow>
               ))
             ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row: Row<TData>) => (
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   className="group hover:bg-muted/10 transition-colors"
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getVisibleCells().map((cell: Cell<TData, unknown>) => (
                     <TableCell key={cell.id} className="py-3">
                       {flexRender(
                         cell.column.columnDef.cell,

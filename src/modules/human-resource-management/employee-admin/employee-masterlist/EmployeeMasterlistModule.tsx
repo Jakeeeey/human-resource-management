@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Users, 
   UserPlus, 
-  FileSpreadsheet,
+  FileText,
   AlertCircle, 
   RefreshCw 
 } from "lucide-react";
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { EmployeeTable } from "./components/EmployeeTable";
 import { AddEmployeeModal, type NewEmployeeFormData } from "./components/AddEmployeeModal";
 import { EmployeeDetailsModal } from "./components/EmployeeDetailsModal";
+import { MasterlistPreviewModal } from "./components/MasterlistPreviewModal";
 import type { User } from "./types";
 import { useEmployeeMasterlist } from "./hooks/useEmployeeMasterlist";
 import { createEmployeeSpring } from "./providers/springProvider";
@@ -37,6 +38,7 @@ export default function EmployeeMasterlistModule() {
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
 
   const handleAddEmployee = async (data: NewEmployeeFormData & { _userImageId?: string; _signatureId?: string }) => {
@@ -142,9 +144,14 @@ export default function EmployeeMasterlistModule() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" className="rounded-xl shadow-sm border-muted-foreground/20 hover:bg-muted/50 h-10 px-4">
-            <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
-            Export CSV
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsPreviewModalOpen(true)}
+            className="rounded-xl shadow-sm border-muted-foreground/20 hover:bg-muted/50 h-10 px-4"
+          >
+            <FileText className="mr-2 h-4 w-4 text-indigo-600" />
+            Export Masterlist Summary
           </Button>
           <Button
             size="sm"
@@ -194,6 +201,13 @@ export default function EmployeeMasterlistModule() {
         user={selectedEmployee}
         departments={departments}
         onUpdateEmployee={updateEmployee}
+      />
+
+      <MasterlistPreviewModal
+        isOpen={isPreviewModalOpen}
+        onOpenChange={setIsPreviewModalOpen}
+        employees={employees}
+        departments={departments}
       />
     </div>
   );
