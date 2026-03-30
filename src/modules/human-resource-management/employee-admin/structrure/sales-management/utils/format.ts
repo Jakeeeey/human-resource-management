@@ -1,4 +1,4 @@
-import type { UserRow } from "../types";
+import type { UserRow } from "../salesman-qr-code/types";
 
 export function fullName(u?: UserRow | null) {
   if (!u) return "—";

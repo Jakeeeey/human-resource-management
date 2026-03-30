@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import type { Lookups, SalesmanRow } from "../types";
-import { getLookups, listSalesmen } from "../providers/fetchProvider";
+import { getLookups, listSalesmen } from "../../providers/fetchProvider";
 import { toast } from "sonner";
 
-export function useSalesmanManagement() {
+export function useSalesmanQRCode() {
   const [loading, setLoading] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -20,7 +20,7 @@ export function useSalesmanManagement() {
       setSalesmen(s.data ?? []);
     } catch (e) {
       const err = e as Error;
-      toast.error(err.message ?? "Failed to load Salesman Management data.");
+      toast.error(err.message ?? "Failed to load Salesman QR Code data.");
     } finally {
       setLoading(false);
     }

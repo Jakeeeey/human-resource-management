@@ -4,9 +4,11 @@ import * as React from "react";
 import type { Lookups, SalesmanRow } from "../types";
 
 import { SalesmanQrDialog } from "./SalesmanQrDialog";
+import { SalesmanFormDialog } from "../../salesman-creation/components/SalesmanFormDialog";
 
 // Provider functions (rename if your file exports different names)
-import { listSalesmen, getLookups } from "../providers/fetchProvider";
+import { listSalesmen, getLookups, createSalesman, updateSalesman } from "../../providers/fetchProvider";
+import type { SalesmanDraft } from "../types";
 
 import { toast } from "sonner";
 
@@ -22,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RefreshCcw, QrCode } from "lucide-react";
+import { RefreshCcw, QrCode, UserPlus, Edit2 } from "lucide-react";
 
 function safeId(v: unknown): number | null {
   const n = Number(v);
@@ -33,27 +35,22 @@ function textIncludes(hay: string, needle: string) {
   return hay.toLowerCase().includes(needle.toLowerCase());
 }
 
-export function SalesmanManagementView() {
+export function SalesmanQRCodeView() {
   const [loading, setLoading] = React.useState(false);
-
-  // ✅ This must be the raw rows from Directus. Do not map away `id`.
   const [salesmen, setSalesmen] = React.useState<SalesmanRow[]>([]);
-
   const [lookups, setLookups] = React.useState<Lookups | null>(null);
-
-  // simple search
   const [q, setQ] = React.useState("");
-
-  // QR dialog state
   const [qrOpen, setQrOpen] = React.useState(false);
   const [qrSalesman, setQrSalesman] = React.useState<SalesmanRow | null>(null);
+
+  const [formOpen, setFormOpen] = React.useState(false);
+  const [formMode, setFormMode] = React.useState<"create" | "edit">("create");
+  const [formInitial, setFormInitial] = React.useState<SalesmanRow | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
       const [s, l] = await Promise.all([listSalesmen(), getLookups()]);
-
-      // ✅ IMPORTANT: store rows as-is (do not transform)
       setSalesmen(s?.data ?? []);
       setLookups(l?.data ?? null);
     } catch (e) {
@@ -68,16 +65,32 @@ export function SalesmanManagementView() {
     void load();
   }, [load]);
 
-  // ✅ This is the ONLY place that opens the QR dialog.
-  // It passes the EXACT row from the table (raw Directus row).
   const openQr = (row: SalesmanRow) => {
-    const id = safeId(row?.id);
-    if (!id) {
-      toast.error("Salesman ID is missing. Please refresh the list.");
-      return;
-    }
     setQrSalesman(row);
     setQrOpen(true);
+  };
+
+  const openCreate = () => {
+    setFormMode("create");
+    setFormInitial(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (row: SalesmanRow) => {
+    setFormMode("edit");
+    setFormInitial(row);
+    setFormOpen(true);
+  };
+
+  const handleFormSubmit = async (draft: SalesmanDraft) => {
+    if (formMode === "edit" && formInitial?.id) {
+      await updateSalesman(formInitial.id, draft);
+      toast.success("Salesman updated successfully.");
+    } else {
+      await createSalesman(draft);
+      toast.success("Salesman registered successfully.");
+    }
+    void load();
   };
 
   const filtered = React.useMemo(() => {
@@ -114,7 +127,6 @@ export function SalesmanManagementView() {
 
   return (
     <div className="space-y-3">
-      {/* Header actions */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Input
@@ -128,13 +140,15 @@ export function SalesmanManagementView() {
           </Button>
         </div>
 
-        {/* Add/Edit buttons can stay here (not included since you asked QR pass fix only) */}
         <div className="flex items-center gap-2">
+          <Button onClick={openCreate} className="cursor-pointer">
+            <UserPlus className="mr-2 h-4 w-4" />
+            Register Salesman
+          </Button>
           <Badge variant="secondary">{filtered.length} rows</Badge>
         </div>
       </div>
 
-      {/* Table */}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
@@ -185,7 +199,15 @@ export function SalesmanManagementView() {
 
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-2">
-                          {/* ✅ QR button passes the RAW row */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="cursor-pointer"
+                            onClick={() => openEdit(row)}
+                            disabled={!id}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -197,8 +219,6 @@ export function SalesmanManagementView() {
                             <QrCode className="mr-2 h-4 w-4" />
                             QR
                           </Button>
-
-                          {/* Add your Edit button here if you have it */}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -210,7 +230,6 @@ export function SalesmanManagementView() {
         </div>
       </Card>
 
-      {/* ✅ QR Dialog receives the exact row from Directus */}
       <SalesmanQrDialog
         open={qrOpen}
         onOpenChange={setQrOpen}
@@ -218,8 +237,16 @@ export function SalesmanManagementView() {
         qrTypes={lookups?.qrPaymentTypes ?? []}
         onSaved={() => void load()}
       />
+      <SalesmanFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        lookups={lookups ?? { employees: [], companies: [], suppliers: [], divisions: [], operations: [], branches: [], qrPaymentTypes: [] }}
+        mode={formMode}
+        initial={formInitial}
+        onSubmit={handleFormSubmit}
+      />
     </div>
   );
 }
 
-export default SalesmanManagementView;
+export default SalesmanQRCodeView;

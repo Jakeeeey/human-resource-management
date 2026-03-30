@@ -1,4 +1,4 @@
-// src/modules/human-resource-management/salesman-management/types.ts
+// src/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-qr-code/types.ts
 
 export type PriceType = "A" | "B" | "C" | "D" | "E";
 export type SalesmanId = number;
