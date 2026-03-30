@@ -16,6 +16,7 @@ import {
     KeyRound, // Department Accounts
     BadgeCheck, // Role Management
     Boxes, // Subsystem Registration
+    Brush, // PDF Layout Designer
 } from "lucide-react";
 
 import { NavMain } from "./nav-main";
@@ -178,6 +179,11 @@ const data = {
             title: "Subsystem Registration",
             url: "/hrm/subsystem-registration",
             icon: Boxes,
+        },
+        {
+            title: "PDF Layout",
+            url: "/hrm/pdf-layout",
+            icon: Brush,
         },
         {
             title: "Workforce",

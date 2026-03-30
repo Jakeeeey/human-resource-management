@@ -3,12 +3,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
     PdfConfig,
-    PaperSize,
     PdfElementConfig,
-    PageNumberConfig
-} from "@/components/pdf-layout-design/types";
+    PdfTemplate,
+    PageNumberConfig,
+    PaperSize
+} from "../types";
 import { PAPER_SIZES, DEFAULT_CONFIG } from "@/components/pdf-layout-design/constants";
-import { PdfTemplate } from "@/components/pdf-layout-design/services/pdf-template";
 import {
     Download, Trash2, Type, Square, Save, Database, LayoutGrid, MousePointer2,
     Eye, EyeOff, AlignLeft, AlignCenter, AlignRight, Maximize2, Minus, Image as ImageIcon
@@ -57,8 +57,6 @@ export const PdfSidebar: React.FC<PdfSidebarProps> = ({
 
     // Sync saveName with selected template name
     useEffect(() => {
-        // Use a microtask/setTimeout to avoid the react-hooks/set-state-in-effect warning
-        // but still keep the behavior of updating state when template changes
         const timer = setTimeout(() => {
             if (selectedTemplateId) {
                 const tpl = templates.find(t => t.id === selectedTemplateId);
@@ -108,8 +106,6 @@ export const PdfSidebar: React.FC<PdfSidebarProps> = ({
     };
 
     const handleStyleChange = (id: string, field: string, value: string | number) => {
-        // Since style changes can be frequent (typing), we might want to capture only on focus
-        // but for now we'll rely on the specific triggers in the UI
         setConfig((prev) => ({
             ...prev,
             elements: {
@@ -270,7 +266,6 @@ export const PdfSidebar: React.FC<PdfSidebarProps> = ({
                             </div>
                         </div>
 
-                        {/* Page Margins (Inches) */}
                         <div className="flex flex-col gap-2 mt-2">
                             <label className="text-[10px] text-slate-500 font-medium border-t pt-2 mt-2">Page Margins (Inches)</label>
                             <div className="grid grid-cols-2 gap-2">
@@ -538,14 +533,33 @@ export const PdfSidebar: React.FC<PdfSidebarProps> = ({
                                             </div>
 
                                             {el.type !== 'shape' && el.type !== 'image' && (
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[9px] text-slate-400 font-bold uppercase">Size (pt)</label>
-                                                        <input type="number" className="p-1 border rounded bg-white" value={el.style.fontSize} onChange={e => handleStyleChange(el.id, 'fontSize', Number(e.target.value))} />
+                                                <div className="flex flex-col gap-3 border-b pb-3 mb-1">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[9px] text-slate-400 font-bold uppercase">Size (pt)</label>
+                                                            <input type="number" className="p-1 border rounded bg-white text-xs" value={el.style.fontSize} onChange={e => handleStyleChange(el.id, 'fontSize', Number(e.target.value))} />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[9px] text-slate-400 font-bold uppercase">Height (mm)</label>
+                                                            <input 
+                                                                type="number" 
+                                                                step="0.1" 
+                                                                className="p-1 border rounded bg-white text-xs font-mono" 
+                                                                value={(el.style.fontSize * 0.3528).toFixed(1)} 
+                                                                onChange={e => handleStyleChange(el.id, 'fontSize', Number((Number(e.target.value) / 0.3528).toFixed(1)))} 
+                                                            />
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <label className="text-[9px] text-slate-400 font-bold uppercase">Spacing</label>
-                                                        <input type="number" step="0.5" className="p-1 border rounded bg-white" value={el.style.letterSpacing || 0} onChange={e => handleStyleChange(el.id, 'letterSpacing', Number(e.target.value))} />
+
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[9px] text-slate-400 font-bold uppercase">Spacing (Char)</label>
+                                                            <input type="number" step="0.5" className="p-1 border rounded bg-white text-xs" value={el.style.letterSpacing || 0} onChange={e => handleStyleChange(el.id, 'letterSpacing', Number(e.target.value))} />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <label className="text-[9px] text-slate-400 font-bold uppercase">Line H (Ratio)</label>
+                                                            <input type="number" step="0.05" className="p-1 border rounded bg-white text-xs" value={el.style.lineHeight || 1.15} onChange={e => handleStyleChange(el.id, 'lineHeight', Number(e.target.value))} />
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
