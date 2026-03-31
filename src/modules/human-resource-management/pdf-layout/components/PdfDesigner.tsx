@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import { Rnd } from "react-rnd";
-import { PdfConfig, CompanyData, PdfElementConfig } from "@/components/pdf-layout-design/types";
+import { PdfConfig, CompanyData, PdfElementConfig } from "../types";
 import { PAPER_SIZES } from "@/components/pdf-layout-design/constants";
 
 interface PdfDesignerProps {
@@ -208,7 +209,7 @@ export const PdfDesigner: React.FC<PdfDesignerProps> = ({ config, setConfig, dat
                     onScroll={handleScroll}
                 >
                     <div 
-                        className="bg-white shadow-2xl relative border border-slate-300"
+                        className="bg-white shadow-2xl relative outline outline-1 outline-slate-300"
                         style={{ width: widthPx, height: heightPx, minWidth: widthPx, minHeight: heightPx }}
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -332,25 +333,40 @@ export const PdfDesigner: React.FC<PdfDesignerProps> = ({ config, setConfig, dat
                                             fontWeight: el.style.fontWeight,
                                             color: el.style.color,
                                             letterSpacing: `${(el.style.letterSpacing || 0) * scale}px`,
-                                            lineHeight: 1.15,
+                                            lineHeight: el.style.lineHeight || 1.15,
                                             width: '100%',
                                             height: '100%',
-                                            backgroundColor: el.type === 'shape' && el.shapeType === 'rectangle' ? el.fillColor : (el.type === 'shape' && el.shapeType === 'line') ? el.borderColor : 'transparent',
-                                            borderWidth: (el.type === 'shape' && el.shapeType === 'rectangle') ? `${(el.borderWidth || 1) * scale}px` : undefined,
-                                            borderColor: (el.type === 'shape' && el.shapeType === 'line') ? 'transparent' : el.borderColor,
-                                            borderStyle: el.type === 'shape' ? 'solid' : isSelected ? 'solid' : 'dashed',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: el.align === 'center' ? 'center' : el.align === 'right' ? 'flex-end' : 'flex-start',
+                                            textAlign: el.align,
+                                            backgroundColor: el.type === 'shape' && el.shapeType === 'rectangle' ? el.fillColor : 'transparent',
+                                            borderWidth: (el.type === 'shape' && el.shapeType === 'rectangle') ? `${(el.borderWidth || 1) * scale}px` : '1px',
+                                            borderColor: isSelected ? '#3b82f6' : (el.type === 'shape' && el.shapeType === 'line') ? 'transparent' : (el.borderColor || '#cbd5e1'),
+                                            borderStyle: el.type === 'shape' && el.shapeType === 'rectangle' ? 'solid' : 'dashed',
+                                            boxSizing: 'border-box',
                                         }}
                                     >
                                         {el.type === 'image' && (
-                                            data.company_logo ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img src={data.company_logo} alt="Logo" className="w-full h-full object-fill pointer-events-none" />
-                                            ) : (
-                                                <div className="bg-slate-100 w-full h-full flex items-center justify-center text-[10px]">LOGO</div>
-                                            )
+                                            <Image 
+                                                src={(el.id === 'company_logo' ? data?.company_logo : (data as unknown as Record<string, string>)?.[el.id]) || el.content || ''} 
+                                                alt={el.label} 
+                                                fill
+                                                unoptimized
+                                                className="object-fill pointer-events-none" 
+                                            />
+                                        )}
+                                        {el.type === 'shape' && el.shapeType === 'line' && (
+                                            <div 
+                                                className="w-full pointer-events-none" 
+                                                style={{ 
+                                                    height: `${(el.borderWidth || 1) * scale}px`, 
+                                                    backgroundColor: el.borderColor || '#000000' 
+                                                }} 
+                                            />
                                         )}
                                         {(el.type === 'text' || el.type === 'custom_text') && (
-                                            <div className="w-full truncate pointer-events-none">
+                                            <div className="w-full pointer-events-none whitespace-nowrap overflow-hidden">
                                                 {getElementDisplayValue(el)}
                                             </div>
                                         )}

@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "../_components/nav-user";
 import { cookies } from "next/headers";
-// import { UserConfigurationModule } from "@/modules/human-resource-management/user-configuration";
+// import { SubsystemRegistrationModule } from "@/modules/human-resource-management/subsystem-registration";
 import ComingSoon from "../_components/ComingSoon";
 
 export const runtime = "nodejs";
@@ -19,8 +19,8 @@ export const dynamic = "force-dynamic";
 const COOKIE_NAME = "vos_access_token";
 
 export const metadata = {
-    title: "User Configuration | VOS ERP",
-    description: "Manage system-wide user permissions and access controls.",
+    title: "Subsystem Registration | VOS ERP",
+    description: "Manage system-wide subsystems and module hierarchies.",
 };
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -75,7 +75,7 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
     };
 }
 
-export default async function UserConfigurationPage() {
+export default async function SubsystemRegistrationPage() {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
     const headerUser = buildHeaderUserFromToken(token);
@@ -95,7 +95,7 @@ export default async function UserConfigurationPage() {
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        User Configuration
+                                        Subsystem Registration
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
