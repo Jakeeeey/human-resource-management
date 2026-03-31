@@ -53,11 +53,12 @@ async function proxy(req: NextRequest) {
       status: 200,
       headers: { "content-type": "application/json" },
     });
-  } catch (err: any) {
-    console.error("[Proxy] Fetch fatal error:", err.message);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[Proxy] Fetch fatal error:", message);
     return NextResponse.json({ 
         error: "Failed to connect to upstream API", 
-        message: err.message 
+        message: message 
     }, { status: 502 });
   }
 }
