@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "../_components/nav-user";
 import { cookies } from "next/headers";
-import { PdfEditor } from "@/modules/human-resource-management/pdf-layout/PdfEditor";
+import { PdfLayoutModule } from "@/modules/human-resource-management/pdf-layout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,7 +103,7 @@ export default async function PdfLayoutPage() {
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-hidden bg-slate-100">
-                <PdfEditor />
+                <PdfLayoutModule />
             </main>
         </div>
     );
