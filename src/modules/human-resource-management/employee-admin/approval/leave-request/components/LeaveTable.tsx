@@ -149,7 +149,7 @@ export function LeaveTable({ data, onApprove, onReject, isLoading = false }: Lea
                 <TableHead>From</TableHead>
                 <TableHead>To</TableHead>
                 <TableHead>Days</TableHead>
-                <TableHead>Purpose</TableHead>
+                <TableHead>Reason</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Action</TableHead>
