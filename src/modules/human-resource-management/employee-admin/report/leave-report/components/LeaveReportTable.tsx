@@ -111,7 +111,7 @@ export function LeaveReportTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border **:data-[slot=table-container]:overflow-x-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -120,10 +120,10 @@ export function LeaveReportTable({
               <TableHead>From</TableHead>
               <TableHead>To</TableHead>
               <TableHead>Days</TableHead>
-              <TableHead>Purpose</TableHead>
+              <TableHead className="w-48">Reason</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Remarks</TableHead>
+              <TableHead className="w-40">Remarks</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -160,8 +160,23 @@ export function LeaveReportTable({
                 <TableCell>{request.total_days || "0"}</TableCell>
 
                 {/* Purpose */}
-                <TableCell className="max-w-xs truncate">
-                  {request.reason || "N/A"}
+                <TableCell className="max-w-48">
+                  {request.reason ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="block truncate cursor-help">
+                            {request.reason}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-md">
+                          <p>{request.reason}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    "N/A"
+                  )}
                 </TableCell>
 
                 {/* Type */}
@@ -173,7 +188,7 @@ export function LeaveReportTable({
                 <TableCell>{getStatusBadge(request.status)}</TableCell>
 
                 {/* Remarks */}
-                <TableCell className="max-w-xs">
+                <TableCell className="max-w-40">
                   {request.remarks ? (
                     <TooltipProvider>
                       <Tooltip>

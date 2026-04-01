@@ -103,7 +103,7 @@ export function ViewDetailsModal({ isOpen, onClose, data }: ViewDetailsModalProp
           {/* Purpose and Remarks */}
           <div className="space-y-3">
             <div>
-              <p className="text-xs text-muted-foreground mb-2">Purpose/Reason</p>
+              <p className="text-xs text-muted-foreground mb-2">Reason</p>
               <p className="font-medium text-sm bg-muted p-2 rounded whitespace-pre-wrap break-all overflow-hidden">
                 {data.reason || "N/A"}
               </p>
