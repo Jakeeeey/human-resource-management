@@ -46,21 +46,21 @@ export function ReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users 
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
-          <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Review Committee</h3>
+          <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Target Review Committee</h3>
           <p className="text-sm text-muted-foreground font-medium">Regulatory approval authority for targets.</p>
         </div>
         <Button
           onClick={() => setIsDialogOpen(true)}
           className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
         >
-          <UserPlus className="mr-2 h-4 w-4" /> Add Approver
+          <UserPlus className="mr-2 h-4 w-4" /> Add Target Approver
         </Button>
       </div>
 
       <RoleAssignmentDialog
         isOpen={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        title="Add Review Committee Approver"
+        title="Add Target Review Committee Approver"
         type="review-committee"
         users={users}
         onConfirm={onCreate}

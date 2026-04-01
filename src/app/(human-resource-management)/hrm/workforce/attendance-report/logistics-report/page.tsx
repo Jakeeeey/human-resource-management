@@ -12,8 +12,7 @@ import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
 
-// âœ… Wire the module you asked for
-import ComingSoon from "../../../_components/ComingSoon";
+import LogisticsReportModule from "@/modules/human-resource-management/workforce/attendance-report/logistics-report/LogisticsReportModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,7 +114,7 @@ export default async function Page() {
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4 bg-muted/20">
-                <ComingSoon />
+                <LogisticsReportModule />
             </main>
         </div>
     );

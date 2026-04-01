@@ -16,6 +16,7 @@ import {
     KeyRound, // Department Accounts
     BadgeCheck, // Role Management
     Boxes, // Subsystem Registration
+    Brush, // PDF Layout Designer
 } from "lucide-react";
 
 import { NavMain } from "./nav-main";
@@ -73,11 +74,6 @@ const data = {
                             icon: Building2,
                         },
                         {
-                            title: "Salesman Management",
-                            url: "/hrm/employee-admin/structure/salesman-management/",
-                            icon: UserCog,
-                        },
-                        {
                             title: "Company Profile",
                             url: "/hrm/employee-admin/structure/company-profile",
                             icon: Building,
@@ -107,8 +103,27 @@ const data = {
                             url: "/hrm/employee-admin/structure/industry",
                             icon: BadgeCheck,
                         },
+
                     ],
                 },
+                {
+                    title: "Sales Management",
+                    url: "#",
+                    icon: UserCog,
+                    items: [
+                        {
+                            title: "Salesman Creation",
+                            url: "/hrm/employee-admin/structure/sales-management/salesman-creation",
+                            icon: UserCog,
+                        },
+                        {
+                            title: "Salesman QR Code",
+                            url: "/hrm/employee-admin/structure/sales-management/salesman-qr-code",
+                            icon: UserCog,
+                        },
+                    ],
+                },
+
                 {
                     title: "Approval",
                     url: "#",
@@ -164,6 +179,11 @@ const data = {
             title: "Subsystem Registration",
             url: "/hrm/subsystem-registration",
             icon: Boxes,
+        },
+        {
+            title: "PDF Layout",
+            url: "/hrm/pdf-layout",
+            icon: Brush,
         },
         {
             title: "Workforce",

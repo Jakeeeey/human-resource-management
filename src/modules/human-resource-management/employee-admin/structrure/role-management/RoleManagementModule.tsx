@@ -15,7 +15,8 @@ import {
   UserPlus, 
   UserCircle2,
   AlertCircle, 
-  RefreshCw 
+  RefreshCw,
+  CircleDollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRoleManagement } from "./hooks/useRoleManagement";
@@ -24,13 +25,15 @@ import {
   ReviewCommitteeTab,
   DivisionHeadTab,
   SupervisorTab,
-  SalesmanTab
+  SalesmanTab,
+  ExpenseReviewCommitteeTab
 } from "./components/index";
 
 export default function RoleManagementModule() {
   const {
     executives,
     reviewCommittee,
+    expenseReviewCommittee,
     divisionHeads,
     supervisors,
     salesmanAssignments,
@@ -45,6 +48,8 @@ export default function RoleManagementModule() {
     createExecutive,
     deleteReviewCommittee,
     createReviewCommittee,
+    deleteExpenseReviewCommittee,
+    createExpenseReviewCommittee,
     deleteDivisionHead,
     createDivisionHead,
     deleteSupervisor,
@@ -102,7 +107,10 @@ export default function RoleManagementModule() {
             <Users className="h-4 w-4" /> Executive
           </TabsTrigger>
           <TabsTrigger value="review-committee" className="after:bottom-0 gap-2 text-base data-[state=active]:text-primary">
-            <ShieldCheck className="h-4 w-4" /> Review Committee
+            <ShieldCheck className="h-4 w-4" /> Target Review Committee
+          </TabsTrigger>
+          <TabsTrigger value="expense-review-committee" className="after:bottom-0 gap-2 text-base data-[state=active]:text-primary">
+            <CircleDollarSign className="h-4 w-4" /> Expense Review Committee
           </TabsTrigger>
           <TabsTrigger value="division-head" className="after:bottom-0 gap-2 text-base data-[state=active]:text-primary">
             <Briefcase className="h-4 w-4" /> Division Head
@@ -134,6 +142,17 @@ export default function RoleManagementModule() {
               await createReviewCommittee({ approver_id: userId });
             }}
             users={users}
+          />
+        </TabsContent>
+
+        <TabsContent value="expense-review-committee" className="mt-0">
+          <ExpenseReviewCommitteeTab
+            data={expenseReviewCommittee}
+            isLoading={isLoading}
+            users={users}
+            divisions={divisions}
+            onDelete={deleteExpenseReviewCommittee}
+            onCreate={createExpenseReviewCommittee}
           />
         </TabsContent>
 
