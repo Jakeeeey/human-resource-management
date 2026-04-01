@@ -50,6 +50,7 @@ export interface OvertimeReportFilters {
   dateTo: Date | undefined;
   departmentId: number | null;
   nameFilter: string | null;
+  statusFilter: string | null;
 }
 
 export interface PaginationState {
@@ -80,6 +81,7 @@ export interface OvertimeReportFilterContextType {
   setDateTo: (date: Date | undefined) => void;
   setDepartmentId: (id: number | null) => void;
   setNameFilter: (name: string | null) => void;
+  setStatusFilter: (status: string | null) => void;
   resetFilters: () => void;
   filterRequests: (requests: OvertimeRequestWithDetails[]) => OvertimeRequestWithDetails[];
 }

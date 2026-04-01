@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Table,
   TableBody,
@@ -9,10 +9,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import type { OvertimeRequestWithDetails, PaginationState } from "../type";
+import { ViewDetailsModal } from "./ViewDetailsModal";
 
 // ============================================================================
 // PROPS
@@ -69,6 +77,27 @@ export function OvertimeReportTable({
   pagination,
   onPageChange,
 }: OvertimeReportTableProps) {
+  const [viewModalState, setViewModalState] = useState<{
+    isOpen: boolean;
+    data: OvertimeRequestWithDetails | null;
+  }>({
+    isOpen: false,
+    data: null,
+  });
+
+  const handleOpenViewModal = (request: OvertimeRequestWithDetails) => {
+    setViewModalState({
+      isOpen: true,
+      data: request,
+    });
+  };
+
+  const handleCloseViewModal = () => {
+    setViewModalState({
+      isOpen: false,
+      data: null,
+    });
+  };
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -84,7 +113,7 @@ export function OvertimeReportTable({
       <div className="flex h-64 items-center justify-center rounded-lg border border-dashed">
         <div className="text-center">
           <p className="text-lg font-semibold text-muted-foreground">
-            No overtime requests found
+            No overtime reports found
           </p>
           <p className="text-sm text-muted-foreground">
             Try adjusting your filters or search query
@@ -108,6 +137,7 @@ export function OvertimeReportTable({
               <TableHead>Purpose</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Remarks</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,8 +173,35 @@ export function OvertimeReportTable({
                 <TableCell>{getStatusBadge(request.status)}</TableCell>
 
                 {/* Remarks */}
-                <TableCell className="max-w-xs truncate">
-                  {request.remarks || "—"}
+                <TableCell className="max-w-xs">
+                  {request.remarks ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="truncate block cursor-help">
+                            {request.remarks}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-md">
+                          <p>{request.remarks}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+
+                {/* Action */}
+                <TableCell className="text-right">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleOpenViewModal(request)}
+                    className="border dark:border-gray-600"
+                  >
+                    View
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -152,10 +209,16 @@ export function OvertimeReportTable({
         </Table>
       </div>
 
+      <ViewDetailsModal
+        isOpen={viewModalState.isOpen}
+        onClose={handleCloseViewModal}
+        data={viewModalState.data}
+      />
+
       {/* Pagination Controls */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          0 of {pagination.totalItems} row(s) selected.
+          Showing {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)} of {pagination.totalItems} rows
         </p>
         {pagination.totalPages > 1 && (
           <div className="flex items-center gap-2">
