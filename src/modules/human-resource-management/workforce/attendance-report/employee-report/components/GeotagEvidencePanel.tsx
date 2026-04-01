@@ -1,6 +1,7 @@
 // employee-report/components/GeotagEvidencePanel.tsx
 "use client";
 import { useEffect, useState } from "react";
+import Image from "next/image"; // ✅ Replaced <img> with Next.js <Image>
 
 const IMAGE_PROXY = "/api/hrm/attendance-report/employee-report/geotag/image";
 
@@ -99,13 +100,18 @@ function GeoCard({ tag, label }: { tag: GeotagRecord | undefined; label: string 
         {/* Photo */}
         <div className="w-[180px] shrink-0">
           {imageUrl && !imgError ? (
-            <img
-              src={imageUrl}
-              alt={`${label} photo`}
-              className="w-full h-[240px] object-cover"
-              onError={() => setImgError(true)}
-              loading="lazy"
-            />
+            // ✅ Replaced <img> with Next.js <Image> to fix @next/next/no-img-element warning
+            <div className="relative w-full h-[240px]">
+              <Image
+                src={imageUrl}
+                alt={`${label} photo`}
+                fill
+                className="object-cover"
+                onError={() => setImgError(true)}
+                loading="lazy"
+                unoptimized // proxy URLs aren't processed by Next.js image optimizer
+              />
+            </div>
           ) : (
             <div className="w-full h-[240px] flex flex-col items-center justify-center bg-muted/20 gap-2 px-4">
               <svg
@@ -164,7 +170,6 @@ export function GeotagEvidencePanel({ logId, logDate, employeeName }: Props) {
       setLoading(true);
       setError(null);
       try {
-        // logId here is directus_id (big Directus PK like 4195300336)
         const res = await fetch(
           `/api/hrm/attendance-report/employee-report/geotag?logId=${logId}`,
           { credentials: "include" }

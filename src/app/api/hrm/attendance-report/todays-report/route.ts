@@ -1,35 +1,43 @@
 // src/app/api/hrm/attendance-report/todays-report/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getActiveOncall, extractScheduleFields } from '../../../../../modules/human-resource-management/workforce/attendance-report/todays-report/utils/oncall';
+
+function isDeleted(val: unknown): boolean {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (val && typeof val === 'object') {
+    const buf = val as { type?: string; data?: number[] };
+    if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+      return buf.data[0] === 1;
+    }
+  }
+  return false;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const DIRECTUS_BASE = 'http://192.168.0.143:9874';
-const COOKIE_NAME   = 'vos_access_token';
-const AUTH_DISABLED = process.env.NEXT_PUBLIC_AUTH_DISABLED === 'true';
+const DIRECTUS_BASE  = process.env.NEXT_PUBLIC_API_BASE_URL;
+const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 
 async function fetchCollection(
   collection: string,
   params: Record<string, string>,
-  sessionToken: string | undefined,
 ) {
   const query = new URLSearchParams({ limit: '-1', ...params });
-  const url   = `${DIRECTUS_BASE}/api/items/${collection}?${query}`;
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  };
-
-  if (sessionToken) {
-    headers['Cookie'] = `${COOKIE_NAME}=${sessionToken}`;
-  }
+  const url   = `${DIRECTUS_BASE}/items/${collection}?${query}`;
 
   console.log(`[HRM] GET ${url}`);
-  const res = await fetch(url, { method: 'GET', headers, cache: 'no-store' });
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept':       'application/json',
+      'Authorization': `Bearer ${DIRECTUS_TOKEN}`,
+    },
+    cache: 'no-store',
+  });
 
   if (!res.ok) {
     const body = await res.text();
@@ -46,7 +54,6 @@ function toLocalYMD(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-// Departments with BOTH Saturday AND Sunday as rest days.
 const DOUBLE_RESTDAY_DEPTS = [
   'technical support-afternoon shift',
   'hr department',
@@ -62,18 +69,12 @@ function isRestDay(dateStr: string, departmentName: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
-  const cookieStore  = await cookies();
-  const sessionToken = cookieStore.get(COOKIE_NAME)?.value;
-
-  if (!AUTH_DISABLED && !sessionToken) {
-    return NextResponse.json(
-      { ok: false, message: 'Unauthorized: Missing access token' },
-      { status: 401 }
-    );
+  if (!DIRECTUS_BASE || !DIRECTUS_TOKEN) {
+    console.error('[HRM/Attendance] Missing NEXT_PUBLIC_API_BASE_URL or DIRECTUS_STATIC_TOKEN');
+    return NextResponse.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
   }
 
   const { searchParams } = new URL(request.url);
-  // Use local date to avoid UTC shift in Philippines (UTC+8)
   const date = searchParams.get('date') ?? toLocalYMD(new Date());
   console.log('[HRM/Attendance] Date:', date);
 
@@ -86,16 +87,16 @@ export async function GET(request: NextRequest) {
       oncallListRes,
       oncallSchedRes,
     ] = await Promise.all([
-      fetchCollection('attendance_log',      { 'filter[log_date][_eq]': date }, sessionToken),
-      fetchCollection('user',                {}, sessionToken),
-      fetchCollection('department',          {}, sessionToken),
+      fetchCollection('attendance_log', { 'filter[log_date][_eq]': date }),
+      fetchCollection('user',                {}),
+      fetchCollection('department',          {}),
       fetchCollection('department_schedule', {
-        'fields': 'schedule_id,department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,working_days,workdays_note',
-      }, sessionToken),
-      fetchCollection('oncall_list',         {}, sessionToken),
+        fields: 'schedule_id,department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,working_days,workdays_note',
+      }),
+      fetchCollection('oncall_list',         {}),
       fetchCollection('oncall_schedule',     {
-        'fields': 'id,department_id,group,working_days,work_start,work_end,lunch_start,lunch_end,break_start,break_end,workdays,grace_period,schedule_date',
-      }, sessionToken),
+        fields: 'id,department_id,group,working_days,work_start,work_end,lunch_start,lunch_end,break_start,break_end,workdays,grace_period,schedule_date',
+      }),
     ]);
 
     const logs:         Record<string, unknown>[] = attendanceRes.data  ?? [];
@@ -104,18 +105,18 @@ export async function GET(request: NextRequest) {
     const scheds:       Record<string, unknown>[] = schedRes.data       ?? [];
     const oncallList:   Record<string, unknown>[] = oncallListRes.data  ?? [];
     const oncallScheds: Record<string, unknown>[] = oncallSchedRes.data ?? [];
-
-    console.log('[oncall-list raw]', JSON.stringify(oncallList.slice(0, 5)));
-console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
+    // Temporarily in route.ts
+const testRes = await fetchCollection('attendance_log', { limit: '3' });
+console.log('[DEBUG] sample log_dates:', testRes.data.map((l: Record<string,unknown>) => l.log_date));
 
     console.log(`[HRM/Attendance] logs=${logs.length} users=${users.length} depts=${depts.length} scheds=${scheds.length}`);
 
-    // ── Build lookup maps ─────────────────────────────────────────────────
-    const userMap  = new Map(users.map((u) => [u.user_id,       u]));
+    // Filter out deleted users
+    const filteredUsers = users.filter((u) => !isDeleted(u.is_deleted));
+    const userMap  = new Map(filteredUsers.map((u) => [u.user_id, u]));
     const deptMap  = new Map(depts.map((d) => [d.department_id, d]));
     const schedMap = new Map(scheds.map((s) => [s.department_id, s]));
 
-    // ── Helper to build a merged record from log + user data ──────────────
     function buildRecord(
       log: Record<string, unknown>,
       userId: unknown,
@@ -124,14 +125,7 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
       const dept        = deptMap.get(log.department_id)   ?? {};
       const deptSched   = schedMap.get(log.department_id)  ?? {};
       const oncallSched = getActiveOncall(userId, date, oncallList, oncallScheds);
-
       const schedFields = extractScheduleFields(oncallSched, deptSched as Record<string, unknown>);
-
-      // ── Oncall debug log ──────────────────────────────────────────────
-      console.log(`[oncall-check] user=${userId} date=${date}`, {
-        matched: oncallSched ? `schedule_id=${oncallSched.id} group=${oncallSched.group}` : 'none',
-        is_oncall: schedFields.is_oncall,
-      });
 
       const record: Record<string, unknown> = {
         log_id:          log.log_id,
@@ -148,14 +142,12 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
         approval_status: log.approval_status ?? '',
         image_time_in:   log.image_time_in   ?? null,
         image_time_out:  log.image_time_out  ?? null,
-        // user
-        user_fname:      user.user_fname    ?? '—',
-        user_lname:      user.user_lname    ?? '—',
-        user_mname:      user.user_mname    ?? null,
-        user_email:      user.user_email    ?? '—',
-        user_position:   user.user_position ?? '—',
-        user_image:      user.user_image    ?? null,
-        // department
+        user_fname:      (user as Record<string, unknown>).user_fname    ?? '—',
+        user_lname:      (user as Record<string, unknown>).user_lname    ?? '—',
+        user_mname:      (user as Record<string, unknown>).user_mname    ?? null,
+        user_email:      (user as Record<string, unknown>).user_email    ?? '—',
+        user_position:   (user as Record<string, unknown>).user_position ?? '—',
+        user_image:      (user as Record<string, unknown>).user_image    ?? null,
         department_name: (dept as Record<string, unknown>).department_name ?? '—',
         grace_period:    schedFields.grace_period,
         working_days:    schedFields.working_days,
@@ -163,11 +155,9 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
         is_oncall:       schedFields.is_oncall,
       };
 
-      // Set schedule fields with proper naming for hook compatibility
       if (schedFields.is_oncall) {
-        // If user is on oncall, use oncall_ prefix for hook compatibility
-        record.work_start   = null;
-        record.work_end     = null;
+        record.work_start          = null;
+        record.work_end            = null;
         record.oncall_work_start   = schedFields.work_start;
         record.oncall_work_end     = schedFields.work_end;
         record.oncall_lunch_start  = schedFields.lunch_start;
@@ -175,9 +165,8 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
         record.oncall_break_start  = schedFields.break_start;
         record.oncall_break_end    = schedFields.break_end;
       } else {
-        // Regular department schedule
-        record.work_start   = schedFields.work_start;
-        record.work_end     = schedFields.work_end;
+        record.work_start          = schedFields.work_start;
+        record.work_end            = schedFields.work_end;
         record.oncall_work_start   = null;
         record.oncall_work_end     = null;
         record.oncall_lunch_start  = null;
@@ -189,29 +178,21 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
       return record;
     }
 
-    // ── Merge existing logs ───────────────────────────────────────────────
     const loggedUserIds = new Set(logs.map((l) => l.user_id));
     const merged: Record<string, unknown>[] = logs.map((log) =>
       buildRecord(log, log.user_id)
     );
 
-    // ── Synthesize Absent / Rest Day rows for users with no log today ─────
-    for (const user of users) {
-      if (loggedUserIds.has(user.user_id)) continue; // already has a log
+    for (const user of filteredUsers) {
+      if (loggedUserIds.has(user.user_id)) continue;
 
       const dept      = deptMap.get(user.user_department)  ?? {};
       const deptSched = schedMap.get(user.user_department) ?? {};
       const deptName  = String((dept as Record<string, unknown>).department_name ?? '');
       const restDay   = isRestDay(date, deptName);
 
-      const oncallSched  = getActiveOncall(user.user_id, date, oncallList, oncallScheds);
-      const schedFields  = extractScheduleFields(oncallSched, deptSched as Record<string, unknown>);
-
-      // ── Oncall debug log (synthesized rows) ───────────────────────────
-      console.log(`[oncall-check synth] user=${user.user_id} date=${date}`, {
-        matched: oncallSched ? `schedule_id=${oncallSched.id} group=${oncallSched.group}` : 'none',
-        is_oncall: schedFields.is_oncall,
-      });
+      const oncallSched = getActiveOncall(user.user_id, date, oncallList, oncallScheds);
+      const schedFields = extractScheduleFields(oncallSched, deptSched as Record<string, unknown>);
 
       const synthRecord: Record<string, unknown> = {
         log_id:          null,
@@ -224,14 +205,12 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
         approval_status: '',
         image_time_in:   null,
         image_time_out:  null,
-        // user
         user_fname:      user.user_fname    ?? '—',
         user_lname:      user.user_lname    ?? '—',
         user_mname:      user.user_mname    ?? null,
         user_email:      user.user_email    ?? '—',
         user_position:   user.user_position ?? '—',
         user_image:      user.user_image    ?? null,
-        // department
         department_name: deptName || '—',
         grace_period:    schedFields.grace_period,
         working_days:    schedFields.working_days,
@@ -239,11 +218,9 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
         is_oncall:       schedFields.is_oncall,
       };
 
-      // Set schedule fields with proper naming for hook compatibility
       if (schedFields.is_oncall) {
-        // If user is on oncall, use oncall_ prefix for hook compatibility
-        synthRecord.work_start   = null;
-        synthRecord.work_end     = null;
+        synthRecord.work_start          = null;
+        synthRecord.work_end            = null;
         synthRecord.oncall_work_start   = schedFields.work_start;
         synthRecord.oncall_work_end     = schedFields.work_end;
         synthRecord.oncall_lunch_start  = schedFields.lunch_start;
@@ -251,9 +228,8 @@ console.log('[oncall-sched raw]', JSON.stringify(oncallScheds.slice(0, 3)));
         synthRecord.oncall_break_start  = schedFields.break_start;
         synthRecord.oncall_break_end    = schedFields.break_end;
       } else {
-        // Regular department schedule
-        synthRecord.work_start   = schedFields.work_start;
-        synthRecord.work_end     = schedFields.work_end;
+        synthRecord.work_start          = schedFields.work_start;
+        synthRecord.work_end            = schedFields.work_end;
         synthRecord.oncall_work_start   = null;
         synthRecord.oncall_work_end     = null;
         synthRecord.oncall_lunch_start  = null;

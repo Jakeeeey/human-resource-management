@@ -199,8 +199,8 @@ export function useEmployeeAttendance(
           status:       l.status as string,
           approval_status: l.approval_status as string,
           work_hours:   wh,
-          overtime:     computeOvertime(to_, logWorkEnd, ti, ls, le),
-          late:         computeLate(ti, logWorkStart, logGracePeriod),
+          overtime:     (l.overtime as number) ?? 0,  // Use overtime from backend
+          late:         (l.late as number) ?? 0,      // Use late from backend
           undertime:    computeUndertime(to_, logWorkEnd),
           is_rest_day:  (l.status as string) === 'Holiday',
           is_oncall:    !!(l.is_oncall),

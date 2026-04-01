@@ -197,17 +197,17 @@ const data = {
                     items: [
                         {
                             title: "Today's Report",
-                            url: "/hrm/attendance-report/todays-report",
+                            url: "/hrm/workforce/attendance-report/todays-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Employee Report",
-                            url: "/hrm/attendance-report/employee-report",
+                            url: "/hrm/workforce/attendance-report/employee-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Department Report",
-                            url: "/hrm/attendance-report/department-report",
+                            url: "/hrm/workforce/attendance-report/department-report",
                             icon: CalendarClock,
                         },
                         {

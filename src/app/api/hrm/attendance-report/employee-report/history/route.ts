@@ -1,17 +1,14 @@
 // src/app/api/hrm/attendance-report/employee-report/history/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { getActiveOncall, extractScheduleFields } from '../../../../../../modules/human-resource-management/workforce/attendance-report/todays-report/utils/oncall';
+import { getActiveOncall, extractScheduleFields } from '../../../../../../modules/human-resource-management/workforce/attendance-report/employee-report/utils/oncall';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const DIRECTUS_BASE = 'http://192.168.0.143:9874';
-const COOKIE_NAME   = 'vos_access_token';
-const AUTH_DISABLED = process.env.NEXT_PUBLIC_AUTH_DISABLED === 'true';
+const DIRECTUS_BASE  = process.env.NEXT_PUBLIC_API_BASE_URL;
+const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 
-/** Format a Date to YYYY-MM-DD using LOCAL time — avoids UTC timezone shift (e.g. UTC+8). */
 function toLocalYMD(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -19,20 +16,33 @@ function toLocalYMD(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/**
- * Normalize any date string to YYYY-MM-DD.
- * Handles: "2026-02-25", "2026-02-25T00:00:00", "2026-02-25 00:00:00"
- */
 function toDateOnly(val: unknown): string {
   if (!val) return '';
   return String(val).slice(0, 10);
 }
 
-async function fetchCollection(path: string, token: string | undefined) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Cookie'] = `${COOKIE_NAME}=${token}`;
-  const res = await fetch(`${DIRECTUS_BASE}/api/items/${path}`, { headers, cache: 'no-store' });
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+async function fetchCollection(
+  collection: string,
+  params: Record<string, string>,
+) {
+  const query = new URLSearchParams({ limit: '-1', ...params });
+  const url   = `${DIRECTUS_BASE}/items/${collection}?${query}`;
+
+  console.log(`[HRM/EmployeeHistory] GET ${url}`);
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type':  'application/json',
+      'Accept':        'application/json',
+      'Authorization': `Bearer ${DIRECTUS_TOKEN}`,
+    },
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${collection} → ${res.status}: ${body.slice(0, 200)}`);
+  }
   return res.json();
 }
 
@@ -50,11 +60,61 @@ function isRestDay(dateStr: string, departmentName: string): boolean {
   return day === 0;
 }
 
+// ── Time helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Extract HH:MM from a full datetime string or plain HH:MM / HH:MM:SS.
+ * Directus returns time fields as "2026-02-25T09:07:00" or "09:07:00" —
+ * both forms need to be normalised before arithmetic.
+ */
+function extractTime(dt: string | null | undefined): string | null {
+  if (!dt) return null;
+  if (dt.includes('T')) return dt.split('T')[1].slice(0, 5);
+  if (dt.includes(' ') && dt.includes('-')) return dt.split(' ')[1].slice(0, 5);
+  return dt.slice(0, 5);
+}
+
+function timeToMins(t: string | null): number {
+  if (!t) return 0;
+  const [h, m] = t.slice(0, 5).split(':').map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * Returns how many minutes after (work_start + grace_period) the employee clocked in.
+ * Normalises full datetime strings to HH:MM before comparing.
+ */
+function calculateLate(
+  timeIn:      string | null,
+  workStart:   string | null,
+  gracePeriod: number = 5,
+): number {
+  const ti = extractTime(timeIn);
+  const ws = extractTime(workStart);
+  if (!ti || !ws) return 0;
+  return Math.max(0, timeToMins(ti) - (timeToMins(ws) + gracePeriod));
+}
+
+/**
+ * Returns how many minutes after work_end the employee clocked out.
+ * Normalises full datetime strings to HH:MM before comparing.
+ */
+function calculateOvertime(
+  timeOut: string | null,
+  workEnd: string | null,
+): number {
+  const to = extractTime(timeOut);
+  const we = extractTime(workEnd);
+  if (!to || !we) return 0;
+  return Math.max(0, timeToMins(to) - timeToMins(we));
+}
+
+// ── Route handler ─────────────────────────────────────────────────────────────
+
 export async function GET(request: NextRequest) {
-  const cookieStore  = await cookies();
-  const sessionToken = cookieStore.get(COOKIE_NAME)?.value;
-  if (!AUTH_DISABLED && !sessionToken) {
-    return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
+  if (!DIRECTUS_BASE || !DIRECTUS_TOKEN) {
+    console.error('[HRM/EmployeeHistory] Missing NEXT_PUBLIC_API_BASE_URL or DIRECTUS_STATIC_TOKEN');
+    return NextResponse.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -65,16 +125,32 @@ export async function GET(request: NextRequest) {
   if (!userId) return NextResponse.json({ ok: false, message: 'Missing userId' }, { status: 400 });
 
   try {
-    const logsPath = `attendance_log?filter[user_id][_eq]=${userId}${from ? `&filter[log_date][_gte]=${from}` : ''}${to ? `&filter[log_date][_lte]=${to}` : ''}&limit=-1&sort=-log_date`;
-    const userPath = `user?filter[user_id][_eq]=${userId}&limit=1&fields=user_id,user_fname,user_lname,user_email,user_position,user_image,user_department`;
+    const logParams: Record<string, string> = {
+      'filter[user_id][_eq]': userId,
+      sort: '-log_date',
+    };
+    if (from) logParams['filter[log_date][_gte]'] = from;
+    if (to)   logParams['filter[log_date][_lte]'] = to;
+
+    console.log('[HRM/EmployeeHistory] Starting fetch with params:', logParams);
 
     const [logsRes, userRes, deptsRes, schedRes, oncallListRes, oncallSchedRes] = await Promise.all([
-      fetchCollection(logsPath, sessionToken),
-      fetchCollection(userPath, sessionToken),
-      fetchCollection('department?limit=-1&fields=department_id,department_name', sessionToken),
-      fetchCollection('department_schedule?limit=-1&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,working_days,workdays_note,grace_period', sessionToken),
-      fetchCollection(`oncall_list?filter[user_id][_eq]=${userId}&limit=-1`, sessionToken),
-      fetchCollection('oncall_schedule?limit=-1&fields=id,department_id,group,working_days,work_start,work_end,lunch_start,lunch_end,break_start,break_end,workdays,grace_period,schedule_date', sessionToken),
+      fetchCollection('attendance_log', { ...logParams, fields: '*' }),
+      fetchCollection('user', {
+        'filter[user_id][_eq]': userId,
+        limit: '1',
+        fields: 'user_id,user_fname,user_lname,user_email,user_position,user_image,user_department',
+      }),
+      fetchCollection('department', {
+        fields: 'department_id,department_name',
+      }),
+      fetchCollection('department_schedule', {
+        fields: 'department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,working_days,workdays_note,grace_period',
+      }),
+      fetchCollection('oncall_list', {
+        'filter[user_id][_eq]': userId,
+      }),
+      fetchCollection('oncall_schedule', { fields: '*' }),
     ]);
 
     const rawUser      = (userRes.data ?? [])[0] ?? {};
@@ -82,6 +158,11 @@ export async function GET(request: NextRequest) {
     const scheds       = schedRes.data   ?? [];
     const oncallList:   Record<string, unknown>[] = oncallListRes.data  ?? [];
     const oncallScheds: Record<string, unknown>[] = oncallSchedRes.data ?? [];
+
+    console.log(
+      `[HRM/EmployeeHistory] userId=${userId} logs=${(logsRes.data ?? []).length}`,
+      `depts=${depts.length} scheds=${scheds.length}`,
+    );
 
     const deptMap   = new Map(depts.map((d: Record<string, unknown>) => [d.department_id, d]));
     const schedMap  = new Map(scheds.map((s: Record<string, unknown>) => [s.department_id, s]));
@@ -99,18 +180,17 @@ export async function GET(request: NextRequest) {
       user_image:      rawUser.user_image ?? null,
       department_id:   rawUser.user_department,
       department_name: (dept as Record<string, unknown>).department_name ?? '—',
-      work_start:      deptSchedFields.work_start   ?? null,
-      work_end:        deptSchedFields.work_end     ?? null,
-      lunch_start:     deptSchedFields.lunch_start  ?? null,
-      lunch_end:       deptSchedFields.lunch_end    ?? null,
-      break_start:     deptSchedFields.break_start  ?? null,
-      break_end:       deptSchedFields.break_end    ?? null,
-      working_days:    deptSchedFields.working_days ?? 5,
+      work_start:      deptSchedFields.work_start    ?? null,
+      work_end:        deptSchedFields.work_end      ?? null,
+      lunch_start:     deptSchedFields.lunch_start   ?? null,
+      lunch_end:       deptSchedFields.lunch_end     ?? null,
+      break_start:     deptSchedFields.break_start   ?? null,
+      break_end:       deptSchedFields.break_end     ?? null,
+      working_days:    deptSchedFields.working_days  ?? 5,
       workdays_note:   deptSchedFields.workdays_note ?? null,
       grace_period:    deptSchedFields.grace_period  ?? 5,
     };
 
-    // Normalize log_date to YYYY-MM-DD — Directus may return datetime strings
     const logsMap = new Map(
       (logsRes.data ?? []).map((log: Record<string, unknown>) => [
         toDateOnly(log.log_date),
@@ -139,7 +219,6 @@ export async function GET(request: NextRequest) {
 
           log = {
             ...logObj,
-            // directus_id = Directus big PK used for geotag lookup
             directus_id: logObj.log_id ?? null,
             status: (!hasTimeIn && !hasTimeOut && !exemptStatuses.includes(rawStatus))
               ? 'Incomplete'
@@ -191,40 +270,35 @@ export async function GET(request: NextRequest) {
         };
 
         if (schedFields.is_oncall) {
-          // On-call: use oncall schedule for work hours calculation
-          // Preserve real log punch times (time_in, lunch_start etc.) unchanged
-          enrichedLog.work_start          = null;
-          enrichedLog.work_end            = null;
-          enrichedLog.oncall_work_start   = schedFields.work_start;
-          enrichedLog.oncall_work_end     = schedFields.work_end;
-          enrichedLog.oncall_lunch_start  = schedFields.lunch_start;
-          enrichedLog.oncall_lunch_end    = schedFields.lunch_end;
-          enrichedLog.oncall_break_start  = schedFields.break_start;
-          enrichedLog.oncall_break_end    = schedFields.break_end;
+          enrichedLog.work_start         = null;
+          enrichedLog.work_end           = null;
+          enrichedLog.oncall_work_start  = schedFields.work_start;
+          enrichedLog.oncall_work_end    = schedFields.work_end;
+          enrichedLog.oncall_lunch_start = schedFields.lunch_start;
+          enrichedLog.oncall_lunch_end   = schedFields.lunch_end;
+          enrichedLog.oncall_break_start = schedFields.break_start;
+          enrichedLog.oncall_break_end   = schedFields.break_end;
+          // ✅ Fixed: was "lateLate(...)" / "lateOvertime(...)" — correct names are late / overtime
+          enrichedLog.late     = calculateLate(log.time_in as string | null, schedFields.work_start as string | null, schedFields.grace_period as number);
+          enrichedLog.overtime = calculateOvertime(log.time_out as string | null, schedFields.work_end as string | null);
         } else {
-          // Regular schedule — ONLY set work_start/work_end from schedule
-          // DO NOT overwrite lunch_start/lunch_end/break_start/break_end:
-          // those come from the actual attendance log punch data (logObj).
-          // Only synthesized rows (isRealLog=false) get null values which
-          // we leave as-is since there's no punch data anyway.
-          enrichedLog.work_start          = schedFields.work_start;
-          enrichedLog.work_end            = schedFields.work_end;
-          // For real logs: keep the spread logObj values (already in enrichedLog)
-          // For synthesized rows: set to null (already null from log definition)
+          enrichedLog.work_start         = schedFields.work_start;
+          enrichedLog.work_end           = schedFields.work_end;
           if (!isRealLog) {
-            enrichedLog.lunch_start       = null;
-            enrichedLog.lunch_end         = null;
-            enrichedLog.break_start       = null;
-            enrichedLog.break_end         = null;
+            enrichedLog.lunch_start      = null;
+            enrichedLog.lunch_end        = null;
+            enrichedLog.break_start      = null;
+            enrichedLog.break_end        = null;
           }
-          // If isRealLog: lunch_start/lunch_end/break_start/break_end are already
-          // correctly set from ...logObj spread — do NOT touch them here
-          enrichedLog.oncall_work_start   = null;
-          enrichedLog.oncall_work_end     = null;
-          enrichedLog.oncall_lunch_start  = null;
-          enrichedLog.oncall_lunch_end    = null;
-          enrichedLog.oncall_break_start  = null;
-          enrichedLog.oncall_break_end    = null;
+          enrichedLog.oncall_work_start  = null;
+          enrichedLog.oncall_work_end    = null;
+          enrichedLog.oncall_lunch_start = null;
+          enrichedLog.oncall_lunch_end   = null;
+          enrichedLog.oncall_break_start = null;
+          enrichedLog.oncall_break_end   = null;
+          // ✅ Fixed: was "lateLate(...)" / "lateOvertime(...)" — correct names are late / overtime
+          enrichedLog.late     = calculateLate(log.time_in as string | null, schedFields.work_start as string | null, schedFields.grace_period as number);
+          enrichedLog.overtime = calculateOvertime(log.time_out as string | null, schedFields.work_end as string | null);
         }
 
         filledLogs.push(enrichedLog);

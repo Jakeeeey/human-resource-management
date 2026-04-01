@@ -1,13 +1,12 @@
 // src/app/api/hrm/attendance-report/employee-report/geotag/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const DIRECTUS_BASE = 'http://192.168.0.143:9874';
-const COOKIE_NAME   = 'vos_access_token';
+const DIRECTUS_BASE  = process.env.NEXT_PUBLIC_API_BASE_URL;
+const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -17,22 +16,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, message: 'Missing logId' }, { status: 400 });
   }
 
+  if (!DIRECTUS_BASE || !DIRECTUS_TOKEN) {
+    console.error('[HRM/Geotag] Missing env vars');
+    return NextResponse.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
+  }
+
   try {
-    const cookieStore  = await cookies();
-    const sessionToken = cookieStore.get(COOKIE_NAME)?.value;
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    // Pass cookie if available — but don't block the request if missing
-    if (sessionToken) headers['Cookie'] = `${COOKIE_NAME}=${sessionToken}`;
-
-    const url = `${DIRECTUS_BASE}/api/items/attendance_log_geotag`
+    const url = `${DIRECTUS_BASE}/items/attendance_log_geotag`
       + `?filter[log_id][_eq]=${logId}`
       + `&limit=10`
       + `&fields=geotag_id,log_id,kind,position,image_path,captured_at`;
 
-    const res = await fetch(url, { headers, cache: 'no-store' });
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${DIRECTUS_TOKEN}`,
+      },
+      cache: 'no-store',
+    });
 
     if (!res.ok) {
       const body = await res.text();

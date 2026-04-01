@@ -9,15 +9,13 @@ import {
 } from "@/components/ui/select";
 import { Users, UserX, CalendarCheck, AlarmClock, Download } from "lucide-react";
 import { useAttendance } from "./hooks/useAttendance";
-import { PdfEngine } from "@/components/pdf-layout-design/PdfEngine";
-import { pdfTemplateService } from "@/components/pdf-layout-design/services/pdf-template";
-import autoTable from "jspdf-autotable";
-import { LiveClock }            from "./components/LiveClock";
-import { MetricCard }           from "./components/MetricCards";
-import { PunctualityPieChart }  from "./components/PunctualityPieChart";
-import { DepartmentBarChart }   from "./components/DepartmentBarChart";
-import { TimeLogsTable }        from "./components/TimeLogsTable";
-import { applyFilters }         from "./utils";
+import { LiveClock }           from "./components/LiveClock";
+import { MetricCard }          from "./components/MetricCards";
+import { PunctualityPieChart } from "./components/PunctualityPieChart";
+import { DepartmentBarChart }  from "./components/DepartmentBarChart";
+import { TimeLogsTable }       from "./components/TimeLogsTable";
+import { applyFilters }        from "./utils";
+import { exportAttendancePDF } from "./utils/exportAttendancePDF";
 
 type AttendanceRecord = Record<string, unknown>;
 
@@ -34,137 +32,6 @@ function PageSkeleton() {
       <Skeleton className="h-64 w-full" />
     </div>
   );
-}
-
-function formatTime(t: string | null): string {
-  if (!t) return '—';
-  const [hStr, mStr] = t.slice(0, 5).split(':');
-  const h      = parseInt(hStr, 10);
-  const period = h >= 12 ? 'pm' : 'am';
-  const hour   = h > 12 ? h - 12 : h === 0 ? 12 : h;
-  return `${hour}:${mStr}${period}`;
-}
-
-async function fetchCompanyData() {
-  try {
-    const res = await fetch('/api/pdf/company', { credentials: 'include' });
-    if (!res.ok) return null;
-    const result = await res.json();
-    const company = result.data?.[0] || (Array.isArray(result.data) ? null : result.data);
-    return company ?? null;
-  } catch (error) {
-    console.error('Error fetching company data:', error);
-    return null;
-  }
-}
-
-async function handleExportPDF(records: AttendanceRecord[]) {
-  const today = new Date().toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  });
-
-  const tableData = records.slice(0, 100).map((r) => [
-    `${r.user_fname} ${r.user_lname}`,
-    String(r.user_department ?? '—'),
-    String(r.user_position   ?? '—'),
-    formatTime(r.time_in  as string | null),
-    formatTime(r.time_out as string | null),
-    String(r.punctuality  ?? '—'),
-    String(r.presentStatus ?? '—'),
-  ]);
-
-  const fileName = `Attendance_Report_${new Date().toISOString().split('T')[0]}.pdf`;
-
-  try {
-    const [companyData, templates] = await Promise.all([
-      fetchCompanyData(),
-      pdfTemplateService.fetchTemplates(),
-    ]);
-
-    const templateName = templates.find(t => t.name === 'Header')?.name ||
-                         templates.find(t => t.name.includes('Letter'))?.name ||
-                         templates[0]?.name ||
-                         'Attendance Report';
-
-    const doc = await PdfEngine.generateWithFrame(
-      templateName,
-      companyData,
-      (doc, startY, config) => {
-        const margins = config.margins || { top: 10, bottom: 10, left: 10, right: 10 };
-
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text("TODAY'S ATTENDANCE REPORT", margins.left, startY, { baseline: 'top' });
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Date: ${today}`, margins.left, startY + 7, { baseline: 'top' });
-        doc.setTextColor(0, 0, 0);
-
-        if (records.length > 0) {
-          const presentCount = records.filter(r => r.presentStatus === 'Present').length;
-          const absentCount  = records.filter(r => r.presentStatus === 'Absent').length;
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'normal');
-          doc.text(
-            `Total: ${records.length} | Present: ${presentCount} | Absent: ${absentCount}`,
-            margins.left, startY + 13, { baseline: 'top' }
-          );
-        }
-
-        autoTable(doc, {
-          startY: startY + 20,
-          head: [['Employee Name', 'Department', 'Position', 'Time In', 'Time Out', 'Punctuality', 'Status']],
-          body: tableData,
-          margin: { ...margins, bottom: 15 },
-          theme: 'striped',
-          headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 8, fontStyle: 'bold', halign: 'center', valign: 'middle' },
-          bodyStyles: { fontSize: 8, valign: 'middle' },
-          alternateRowStyles: { fillColor: [245, 245, 245] },
-          columnStyles: {
-            0: { cellWidth: 42, halign: 'left' },
-            1: { cellWidth: 32, halign: 'left' },
-            2: { cellWidth: 30, halign: 'left' },
-            3: { cellWidth: 20, halign: 'center' },
-            4: { cellWidth: 20, halign: 'center' },
-            5: { cellWidth: 23, halign: 'center' },
-            6: { cellWidth: 23, halign: 'center' },
-          },
-          didDrawCell: (data: { cell: { x: number; y: number; width: number; height: number }; column: { index: number } }) => {
-            if (data.column.index < 6) {
-              doc.setDrawColor(255, 255, 255);
-              doc.setLineWidth(0);
-              doc.line(
-                data.cell.x + data.cell.width, data.cell.y,
-                data.cell.x + data.cell.width, data.cell.y + data.cell.height
-              );
-            }
-          },
-          didDrawPage: (data: { pageNumber: number }) => {
-            const pageSize   = doc.internal.pageSize;
-            const pageHeight = pageSize.height;
-            const pageWidth  = pageSize.width;
-            doc.setFontSize(7);
-            doc.setTextColor(150, 150, 150);
-            doc.text(`Page ${data.pageNumber}`, pageWidth - 15, pageHeight - 10, { align: 'right' });
-          },
-        });
-      }
-    );
-
-    const blob = doc.output('blob');
-    const url  = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href  = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Error generating PDF:', error);
-  }
 }
 
 export default function TodaysReportModule() {
@@ -261,8 +128,12 @@ export default function TodaysReportModule() {
           </p>
         )}
 
-        <Button variant="outline" size="sm" className="h-9 px-3 text-xs gap-1.5 ml-auto"
-          onClick={() => handleExportPDF(filtered as unknown as AttendanceRecord[])}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 px-3 text-xs gap-1.5 ml-auto"
+          onClick={() => exportAttendancePDF(filtered as unknown as AttendanceRecord[])}
+        >
           <Download className="h-3.5 w-3.5" /> Export PDF
         </Button>
       </div>

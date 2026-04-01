@@ -1,4 +1,3 @@
-// employee-report/components/EmployeeListView.tsx
 "use client";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,8 +22,8 @@ interface Props { onSelect: (e: Employee) => void }
 export function EmployeeListView({ onSelect }: Props) {
   const { loading, error, employees, departments } = useEmployees();
   const [deptFilter, setDeptFilter] = useState("All");
-  const [search,     setSearch]     = useState("");
-  const [page,       setPage]       = useState(1);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() =>
     employees.filter((e) => {
@@ -38,8 +37,7 @@ export function EmployeeListView({ onSelect }: Props) {
     [employees, deptFilter, search]
   );
 
-  // Use a ref to track the previous filter key so we only call setPage
-  // when filters genuinely change — avoids the setState-in-effect lint error
+  // Reset page to 1 whenever filters change
   const prevFilterKey = useRef(`${deptFilter}|${search}`);
   useEffect(() => {
     const key = `${deptFilter}|${search}`;
@@ -64,7 +62,8 @@ export function EmployeeListView({ onSelect }: Props) {
 
   if (error) return (
     <div className="p-8 text-center border border-red-500/20 bg-red-500/5 rounded-lg">
-      <p className="text-red-500 font-medium">Error: {error}</p>
+      <p className="text-red-500 font-medium">Error loading employees: {error}</p>
+      <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>Retry</Button>
     </div>
   );
 
@@ -93,12 +92,6 @@ export function EmployeeListView({ onSelect }: Props) {
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 w-[240px] text-xs"
         />
-        {(deptFilter !== "All" || search) && (
-          <p className="text-xs text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{filtered.length}</span> of{" "}
-            <span className="font-semibold text-foreground">{employees.length}</span> employees
-          </p>
-        )}
       </div>
 
       <DepartmentPieChart employees={employees} />
@@ -106,7 +99,7 @@ export function EmployeeListView({ onSelect }: Props) {
       <Card className="shadow-none border-border overflow-hidden">
         <CardHeader className="bg-muted/30 border-b border-border/50 pb-3">
           <CardTitle className="text-sm font-bold uppercase flex items-center gap-2">
-            <Users className="h-4 w-4" /> Employees
+            <Users className="h-4 w-4" /> Employees ({filtered.length})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -121,8 +114,8 @@ export function EmployeeListView({ onSelect }: Props) {
             <TableBody>
               {paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10 text-muted-foreground text-sm">
-                    No employees found.
+                  <TableCell colSpan={3} className="text-center py-10 text-muted-foreground text-sm">
+                    No employees found matching your criteria.
                   </TableCell>
                 </TableRow>
               ) : paginated.map((emp) => (
@@ -130,7 +123,7 @@ export function EmployeeListView({ onSelect }: Props) {
                   <TableCell className="py-4 pl-6">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                        {getInitials(String(emp.user_fname), String(emp.user_lname))}
+                        {getInitials(emp.user_fname, emp.user_lname)}
                       </div>
                       <div>
                         <div className="font-bold text-xs text-foreground">{emp.user_fname} {emp.user_lname}</div>
@@ -151,23 +144,18 @@ export function EmployeeListView({ onSelect }: Props) {
 
           <div className="px-6 py-3 border-t border-border/50 flex items-center justify-between gap-4 flex-wrap">
             <span className="text-xs text-muted-foreground">
-              Showing{" "}
-              <span className="font-semibold text-foreground">{filtered.length === 0 ? 0 : start + 1}</span>
-              {" "}–{" "}
-              <span className="font-semibold text-foreground">{Math.min(start + PAGE_SIZE, filtered.length)}</span>
-              {" "}of{" "}
-              <span className="font-semibold text-foreground">{filtered.length}</span> employee{filtered.length !== 1 ? "s" : ""}
+              Showing {filtered.length === 0 ? 0 : start + 1} – {Math.min(start + PAGE_SIZE, filtered.length)} of {filtered.length}
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="h-7 w-7 p-0"
-                onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1}>
+                onClick={() => setPage((p) => p - 1)} disabled={safePage === 1}>
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
               <span className="text-xs font-medium text-foreground min-w-[60px] text-center">
                 Page {safePage} / {totalPages}
               </span>
               <Button variant="outline" size="sm" className="h-7 w-7 p-0"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>
+                onClick={() => setPage((p) => p + 1)} disabled={safePage === totalPages}>
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -177,3 +165,5 @@ export function EmployeeListView({ onSelect }: Props) {
     </div>
   );
 }
+
+export default EmployeeListView;

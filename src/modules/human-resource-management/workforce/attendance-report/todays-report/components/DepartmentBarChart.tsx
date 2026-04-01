@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { SearchX } from "lucide-react";
 import { buildDeptChartData } from "../utils";
-import type { AttendanceRecord } from "../../../../attendance-report/todays-report/hooks/useAttendance";
+import type { AttendanceRecord } from "../../../attendance-report/todays-report/hooks/useAttendance";
 
 function EmptyState({ message }: { message: string }) {
   return (
