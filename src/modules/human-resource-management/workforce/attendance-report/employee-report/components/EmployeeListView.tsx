@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,26 +37,15 @@ export function EmployeeListView({ onSelect }: Props) {
     [employees, deptFilter, search]
   );
 
-  // Track the previous filter key so we can detect changes without an effect.
-  // When filters change, we derive safePage from 1 rather than calling setPage
-  // inside an effect (which triggers the react-hooks/set-state-in-effect lint error).
-  const filterKey    = `${deptFilter}|${search}`;
-  const prevKeyRef   = useRef(filterKey);
-  const pageForKey   = useRef(page);
-
-  if (prevKeyRef.current !== filterKey) {
-    // Filters just changed — reset the stored page to 1 synchronously
-    // during render (not inside an effect), which is safe.
-    prevKeyRef.current = filterKey;
-    pageForKey.current = 1;
-    // Also sync the state so pagination buttons still work correctly
+  // Reset page to 1 when filters change
+  const filterKey = `${deptFilter}|${search}`;
+  useEffect(() => {
     if (page !== 1) setPage(1);
-  } else {
-    pageForKey.current = page;
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage   = Math.min(pageForKey.current, totalPages);
+  const safePage   = Math.min(page, totalPages);
   const start      = (safePage - 1) * PAGE_SIZE;
   const paginated  = filtered.slice(start, start + PAGE_SIZE);
 

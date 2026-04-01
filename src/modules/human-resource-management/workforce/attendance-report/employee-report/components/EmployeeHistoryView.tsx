@@ -1,10 +1,13 @@
 // src/modules/human-resource-management/workforce/attendance-report/employee-report/components/EmployeeHistoryView.tsx
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Clock, Check, X, Clock3, Zap, AlertCircle, Download } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Clock,
+  Check, X, Clock3, Zap, AlertCircle, Download,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Employee, EmployeeAttendanceRow } from "../hooks/useEmployeeReport";
 import { MetricCard }          from "./MetricCard";
@@ -21,6 +24,8 @@ export interface EmployeeHistoryViewProps {
   onFromChange: (v: string) => void;
   onToChange:   (v: string) => void;
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseLocal(dateStr: string): Date {
   const [y, m, d] = dateStr.slice(0, 10).split("-").map(Number);
@@ -46,6 +51,14 @@ function minsToHM(mins: number): string {
 const PRESENT_STATUSES = new Set(["Present", "On Time", "Late"]);
 const NEUTRAL_STATUSES = new Set(["Rest Day", "Holiday"]);
 const PAGE_SIZE = 10;
+
+const TABLE_COLS = [
+  "Date", "Schedule", "Time In", "Lunch Start", "Lunch End",
+  "Break Start", "Break End", "Time Out", "Late", "Overtime",
+  "Punctuality", "Status", "Geotag",
+];
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
   if (PRESENT_STATUSES.has(status))
@@ -73,31 +86,66 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
   );
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 export function EmployeeHistoryView({
   employee, logs, from, to, onBack, onFromChange, onToChange,
 }: EmployeeHistoryViewProps) {
-  const [page,         setPage]         = useState(1);
+  // Debug: print all logs with employee info and directus_id
+  console.log('[Geotag Debug] Employee:', employee);
+  console.log('[Geotag Debug] Logs:', logs);
+  const [page,         setPage]       = useState(1);
   const [statusFilter, setStatusFilter] = useState("All");
   const [showRestDay,  setShowRestDay]  = useState(true);
+  // Stores the directus_id of the currently expanded geotag row (null = none)
   const [expandedLog,  setExpandedLog]  = useState<number | null>(null);
-  const [logsWithGeotag, setLogsWithGeotag] = useState<Set<number>>(new Set());
+  // Set of directus_ids that have at least one row in attendance_log_geotag
+  const [geotagIds,    setGeotagIds]    = useState<Set<number>>(new Set());
 
-  React.useEffect(() => {
-    const fetchGeotagInfo = async () => {
-      const validLogIds = logs.filter((l) => l.log_id && l.log_id > 0).map((l) => String(l.log_id));
-      if (validLogIds.length === 0) { setLogsWithGeotag(new Set()); return; }
+  // ── Check which logs have geotag records ──────────────────────────────────
+  // Key insight: attendance_log_geotag.log_id = directus_id (big Directus PK),
+  // NOT the sequential app log_id. We collect all directus_ids from the current
+  // log set and ask the API which ones have matching geotag entries.
+  useEffect(() => {
+    const directusIds = logs
+      .map((l) => l.directus_id)
+      .filter((id): id is number => id !== null && id > 0);
+
+    console.log('[Geotag Debug] directusIds:', directusIds);
+
+    if (directusIds.length === 0) {
+      setGeotagIds(new Set());
+      return;
+    }
+
+    let cancelled = false;
+
+    const check = async () => {
       try {
-        const res = await fetch(`/api/hrm/attendance-report/employee-report/geotag/check?logIds=${validLogIds.join(',')}`);
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data = await res.json();
-        setLogsWithGeotag(new Set(data.logIdsWithGeotag || []));
+        const res = await fetch(
+          `/api/hrm/attendance-report/employee-report/geotag/check?logIds=${directusIds.join(",")}`,
+        );
+        if (!res.ok) throw new Error(`Geotag check failed: ${res.status}`);
+        const data = await res.json() as { logIdsWithGeotag?: number[] };
+        console.log('[Geotag Debug] API response:', data);
+        if (!cancelled) {
+          setGeotagIds(() => {
+            const newSet = new Set(data.logIdsWithGeotag ?? []);
+            console.log('[Geotag Debug] setGeotagIds:', Array.from(newSet));
+            return newSet;
+          });
+        }
       } catch (err) {
-        console.error('Error fetching geotag info:', err);
-        setLogsWithGeotag(new Set());
+        console.error("Geotag check error:", err);
+        if (!cancelled) setGeotagIds(new Set());
       }
     };
-    fetchGeotagInfo();
+
+    check();
+    return () => { cancelled = true; };
   }, [logs]);
+
+  // ── Derived state ─────────────────────────────────────────────────────────
 
   const summary = useMemo(() => ({
     attended: logs.filter((l) => PRESENT_STATUSES.has(l.status)).length,
@@ -117,29 +165,29 @@ export function EmployeeHistoryView({
     return true;
   }), [logs, showRestDay, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(visibleLogs.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
-  const start      = (safePage - 1) * PAGE_SIZE;
-
-  const sortedAndPaginated = [...visibleLogs].sort((a, b) =>
+  const totalPages    = Math.max(1, Math.ceil(visibleLogs.length / PAGE_SIZE));
+  const safePage      = Math.min(page, totalPages);
+  const start         = (safePage - 1) * PAGE_SIZE;
+  const sortedLogs    = [...visibleLogs].sort((a, b) =>
     new Date(b.log_date).getTime() - new Date(a.log_date).getTime()
   );
-  const paginatedLogs = sortedAndPaginated.slice(start, start + PAGE_SIZE);
+  const paginatedLogs = sortedLogs.slice(start, start + PAGE_SIZE);
 
   const schedule = employee.work_start && employee.work_end
     ? `${fmtTime(employee.work_start)} - ${fmtTime(employee.work_end)}`
     : null;
 
-  const TABLE_COLS = [
-    "Date", "Schedule", "Time In", "Lunch Start", "Lunch End",
-    "Break Start", "Break End", "Time Out", "Late", "Overtime", "Punctuality", "Status", "Geotag",
-  ];
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
+
       {/* Top bar */}
       <div className="flex items-center gap-3 flex-wrap">
-        <button onClick={onBack} className="flex items-center gap-1 px-3 py-1.5 text-xs border border-border rounded-md hover:bg-accent transition-colors">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs border border-border rounded-md hover:bg-accent transition-colors"
+        >
           ← Back
         </button>
         <h1 className="text-sm font-bold">Attendance History</h1>
@@ -153,7 +201,7 @@ export function EmployeeHistoryView({
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs"
             onClick={async () => {
               const { exportEmployeeHistoryToPDF } = await import("../utils/exportEmployeePDF");
-              exportEmployeeHistoryToPDF(employee, sortedAndPaginated, from, to);
+              exportEmployeeHistoryToPDF(employee, sortedLogs, from, to);
             }}
           >
             <Download className="h-3.5 w-3.5" /> Export PDF
@@ -208,8 +256,8 @@ export function EmployeeHistoryView({
 
       {/* Metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <MetricCard title="Attended"   value={summary.attended}          sub={`${summary.attended} days`}  icon={<Check       className="h-5 w-5" />} />
-        <MetricCard title="Absent"     value={summary.absent}            sub={`${summary.absent} days`}    icon={<X           className="h-5 w-5" />} />
+        <MetricCard title="Attended"   value={summary.attended}           sub={`${summary.attended} days`} icon={<Check       className="h-5 w-5" />} />
+        <MetricCard title="Absent"     value={summary.absent}             sub={`${summary.absent} days`}   icon={<X           className="h-5 w-5" />} />
         <MetricCard title="Work Hours" value={minsToHM(summary.workMins)} sub={`${summary.workMins}m`}     icon={<Clock3      className="h-5 w-5" />} />
         <MetricCard title="Overtime"   value={minsToHM(summary.otMins)}   sub={`${summary.otMins}m`}       icon={<Zap         className="h-5 w-5" />} />
         <MetricCard title="Late"       value={minsToHM(summary.lateMins)} sub={`${summary.lateMins}m`}     icon={<AlertCircle className="h-5 w-5" />} />
@@ -234,51 +282,102 @@ export function EmployeeHistoryView({
             <thead>
               <tr className="border-b border-border">
                 {TABLE_COLS.map((h) => (
-                  <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left font-semibold whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {paginatedLogs.map((log) => {
-                const geotagKey = log.log_id && log.log_id > 0 ? log.log_id : null;
-                const isExpanded = expandedLog === geotagKey;
-                const hasGeotag  = geotagKey !== null && logsWithGeotag.has(geotagKey) && PRESENT_STATUSES.has(log.status);
+                // directus_id = the Directus PK (e.g. 4195300336) stored as
+                // attendance_log_geotag.log_id — NOT the sequential app log_id.
+                const directusId = log.directus_id ?? null;
+                const isExpanded = directusId !== null && expandedLog === directusId;
+
+                // Show "View" only when:
+                //   1. directus_id is present (real log, not a synthesised absent/rest row)
+                //   2. that directus_id has a row in attendance_log_geotag
+                //   3. employee was present (geotags only exist for clock-in/out events)
+                const hasGeotag =
+                  directusId !== null &&
+                  geotagIds.has(directusId) &&
+                  PRESENT_STATUSES.has(log.status);
 
                 return (
                   <React.Fragment key={log.log_date}>
-                    <tr className={`border-b border-border ${isExpanded ? "bg-muted/40" : "hover:bg-muted/30"}`}>
-                      <td className="px-4 py-3">
+                    <tr className={`border-b border-border transition-colors ${isExpanded ? "bg-muted/40" : "hover:bg-muted/30"}`}>
+
+                      {/* Date */}
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <div className="font-semibold">{fmtDate(log.log_date, "MMM d, yyyy")}</div>
                         <div className="text-[11px] text-muted-foreground">{fmtDate(log.log_date, "EEEE")}</div>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{!NEUTRAL_STATUSES.has(log.status) ? schedule : "—"}</td>
-                      <td className="px-4 py-3 font-bold">{log.time_in ? fmtTime(log.time_in) : "—"}</td>
-                      <td className="px-4 py-3">{fmtTime(log.lunch_start)}</td>
-                      <td className="px-4 py-3">{fmtTime(log.lunch_end)}</td>
-                      <td className="px-4 py-3">{fmtTime(log.break_start)}</td>
-                      <td className="px-4 py-3">{fmtTime(log.break_end)}</td>
-                      <td className="px-4 py-3">{fmtTime(log.time_out)}</td>
-                      <td className="px-4 py-3 text-red-600">{log.late > 0 ? minsToHM(log.late) : "—"}</td>
-                      <td className="px-4 py-3 text-blue-600">{log.overtime > 0 ? minsToHM(log.overtime) : "—"}</td>
-                      <td className="px-4 py-3 font-semibold">
-                        {PRESENT_STATUSES.has(log.status) ? (log.status === "Late" ? "Late" : "On Time") : "—"}
+
+                      {/* Schedule */}
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                        {!NEUTRAL_STATUSES.has(log.status) ? (schedule ?? "—") : "—"}
                       </td>
-                      <td className="px-4 py-3"><StatusBadge status={log.status} /></td>
+
+                      {/* Time In — bold */}
+                      <td className="px-4 py-3 whitespace-nowrap font-bold">
+                        {log.time_in ? fmtTime(log.time_in) : "—"}
+                      </td>
+
+                      {/* Lunch / Break */}
+                      <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.lunch_start)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.lunch_end)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.break_start)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.break_end)}</td>
+
+                      {/* Time Out */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {log.time_out ? fmtTime(log.time_out) : "—"}
+                      </td>
+
+                      {/* Late */}
+                      <td className="px-4 py-3 whitespace-nowrap text-red-600">
+                        {log.late > 0 ? minsToHM(log.late) : "—"}
+                      </td>
+
+                      {/* Overtime */}
+                      <td className="px-4 py-3 whitespace-nowrap text-blue-600">
+                        {log.overtime > 0 ? minsToHM(log.overtime) : "—"}
+                      </td>
+
+                      {/* Punctuality — derived from server-computed late */}
+                      <td className="px-4 py-3 whitespace-nowrap font-semibold">
+                        {PRESENT_STATUSES.has(log.status)
+                          ? (log.late > 0 ? "Late" : "On Time")
+                          : "—"}
+                      </td>
+
+                      {/* Status */}
                       <td className="px-4 py-3">
-                        {hasGeotag && (
+                        <StatusBadge status={log.status} />
+                      </td>
+
+                      {/* Geotag — "View"/"Hide" only if directus_id has a geotag row */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {hasGeotag ? (
                           <button
-                            onClick={() => setExpandedLog(isExpanded ? null : geotagKey)}
-                            className="text-xs px-2 py-1 rounded border"
+                            onClick={() => setExpandedLog(isExpanded ? null : directusId)}
+                            className="text-xs px-2.5 py-1 rounded border border-border hover:bg-accent transition-colors"
                           >
                             {isExpanded ? "Hide" : "View"}
                           </button>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                     </tr>
-                    {isExpanded && geotagKey && (
-                      <tr>
-                        <td colSpan={13} className="p-0 border-b">
-                          <GeotagEvidencePanel logId={geotagKey} logDate={log.log_date} />
+
+                    {/* Inline geotag panel — passes directus_id as logId */}
+                    {isExpanded && directusId !== null && (
+                      <tr key={`${log.log_date}-geo`}>
+                        <td colSpan={13} className="p-0 border-b border-border">
+                          <GeotagEvidencePanel
+                            logId={directusId}
+                            logDate={log.log_date}
+                          />
                         </td>
                       </tr>
                     )}
@@ -288,13 +387,21 @@ export function EmployeeHistoryView({
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t flex items-center justify-between">
+
+        {/* Pagination */}
+        <div className="px-4 py-3 border-t border-border flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Page {safePage} / {totalPages}</span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={safePage === 1}>
+            <Button variant="outline" size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+            >
               <ChevronLeft className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={safePage === totalPages}>
+            <Button variant="outline" size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+            >
               <ChevronRight className="h-3.5 w-3.5" />
             </Button>
           </div>
