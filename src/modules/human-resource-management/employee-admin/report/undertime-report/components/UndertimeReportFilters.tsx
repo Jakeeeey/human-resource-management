@@ -83,13 +83,13 @@ export function UndertimeReportFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-35 justify-start text-left font-normal",
+              "w-[140px] justify-start text-left font-normal",
               !filters.dateFrom && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
             {filters.dateFrom ? (
-              format(filters.dateFrom, "PPP")
+              <span className="truncate">{format(filters.dateFrom, "MMM d, yyyy")}</span>
             ) : (
               <span>From date</span>
             )}
@@ -111,13 +111,13 @@ export function UndertimeReportFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-35 justify-start text-left font-normal",
+              "w-[140px] justify-start text-left font-normal",
               !filters.dateTo && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
             {filters.dateTo ? (
-              format(filters.dateTo, "PPP")
+              <span className="truncate">{format(filters.dateTo, "MMM d, yyyy")}</span>
             ) : (
               <span>To date</span>
             )}

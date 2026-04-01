@@ -78,13 +78,13 @@ export function LeaveRequestFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-40 justify-start text-left font-normal",
+              "w-[140px] justify-start text-left font-normal",
               !dateFrom && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
             {dateFrom ? (
-              format(dateFrom, "PPP")
+              <span className="truncate">{format(dateFrom, "MMM d, yyyy")}</span>
             ) : (
               <span>From date</span>
             )}
@@ -106,13 +106,13 @@ export function LeaveRequestFilters({
           <Button
             variant="outline"
             className={cn(
-              "w-40 justify-start text-left font-normal",
+              "w-[140px] justify-start text-left font-normal",
               !dateTo && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
             {dateTo ? (
-              format(dateTo, "PPP")
+              <span className="truncate">{format(dateTo, "MMM d, yyyy")}</span>
             ) : (
               <span>To date</span>
             )}
