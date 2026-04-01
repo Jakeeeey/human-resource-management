@@ -24,7 +24,7 @@ interface LeaveTableProps {
   isLoading?: boolean;
 }
 
-export function LeaveTable({ data, onApprove, onReject, onRefresh, isLoading = false }: LeaveTableProps) {
+export function LeaveTable({ data, onApprove, onReject, isLoading = false }: LeaveTableProps) {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     action: "approve" | "reject" | null;

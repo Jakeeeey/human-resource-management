@@ -55,7 +55,7 @@ async function directusFetch(path: string, options: RequestInit = {}) {
 // GET - Fetch Undertime Requests (Pending, filtered by department)
 // ============================================================================
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const token = await getAuthToken();
     const payload = token ? decodeJwtPayload(token) : null;

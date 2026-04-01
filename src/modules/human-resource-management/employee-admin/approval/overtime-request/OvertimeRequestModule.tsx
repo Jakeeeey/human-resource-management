@@ -7,8 +7,7 @@ import {
   fetchOvertimeRequests,
   approveOrRejectOvertimeRequest,
 } from "./providers/fetchProvider";
-import type { OvertimeRequestWithUser, ApprovalAction } from "./type";
-import { Spinner } from "@/components/ui/spinner";
+import type { OvertimeRequestWithUser } from "./type";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
