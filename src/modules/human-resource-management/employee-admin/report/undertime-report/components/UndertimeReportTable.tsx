@@ -125,7 +125,7 @@ export function UndertimeReportTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-md border **:data-[slot=table-container]:overflow-x-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -133,9 +133,9 @@ export function UndertimeReportTable({
               <TableHead>Request Date</TableHead>
               <TableHead>Timeout</TableHead>
               <TableHead>Duration</TableHead>
-              <TableHead>Reason</TableHead>
+              <TableHead className="w-48">Reason</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Remarks</TableHead>
+              <TableHead className="w-40">Remarks</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -161,15 +161,30 @@ export function UndertimeReportTable({
                 <TableCell>{formatDuration(request.duration_minutes)}</TableCell>
 
                 {/* Reason */}
-                <TableCell className="max-w-xs truncate">
-                  {request.reason || "N/A"}
+                <TableCell className="max-w-48">
+                  {request.reason ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="block truncate cursor-help">
+                            {request.reason}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-md">
+                          <p>{request.reason}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    "N/A"
+                  )}
                 </TableCell>
 
                 {/* Status */}
                 <TableCell>{getStatusBadge(request.status)}</TableCell>
 
                 {/* Remarks */}
-                <TableCell className="max-w-xs">
+                <TableCell className="max-w-40">
                   {request.remarks ? (
                     <TooltipProvider>
                       <Tooltip>
