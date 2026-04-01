@@ -13,7 +13,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
-import { OperationModule } from "@/modules/human-resource-management/employee-admin/structrure/operation";
+import { IndustryModule } from "@/modules/human-resource-management/employee-admin/structrure/industry/IndustryModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,7 +102,7 @@ export default async function Page() {
                             </BreadcrumbItem>
                             <BreadcrumbSeparator className="hidden md:block" />
                             <BreadcrumbItem>
-                                <BreadcrumbPage>Operation</BreadcrumbPage>
+                                <BreadcrumbPage>Industry</BreadcrumbPage>
                             </BreadcrumbItem>
                         </BreadcrumbList>
                     </Breadcrumb>
@@ -115,7 +115,7 @@ export default async function Page() {
 
             <ScrollArea className="min-h-0 flex-1">
                 <div className="p-4">
-                    <OperationModule />
+                    <IndustryModule />
                 </div>
             </ScrollArea>
         </div>
