@@ -1,114 +1,116 @@
-"use client";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { NavUser } from "../_components/nav-user";
+import { cookies } from "next/headers";
+// import { SubsystemRegistrationModule } from "@/modules/human-resource-management/subsystem-registration";
+import ComingSoon from "../_components/ComingSoon";
 
-import React from "react";
-import { SubsystemRegistrationTable } from "@/modules/human-resource-management/subsystem-registration/components/SubsystemRegistrationTable";
-import { SubsystemDialog } from "@/modules/human-resource-management/subsystem-registration/components/SubsystemDialog";
-import { SubsystemHierarchyDialog } from "@/modules/human-resource-management/subsystem-registration/components/SubsystemHierarchyDialog";
-import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
-import { toast } from "sonner";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
+const COOKIE_NAME = "vos_access_token";
 
-export default function SubsystemRegistrationPage() {
-    const [subsystems, setSubsystems] = React.useState<SubsystemRegistration[]>([]);
-    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-    const [isHierarchyOpen, setIsHierarchyOpen] = React.useState(false);
-    const [selectedSubsystem, setSelectedSubsystem] = React.useState<SubsystemRegistration | null>(null);
-    const [hierarchySubsystem, setHierarchySubsystem] = React.useState<SubsystemRegistration | null>(null);
-    const [isLoading, setIsLoading] = React.useState(true);
+export const metadata = {
+    title: "Subsystem Registration | VOS ERP",
+    description: "Manage system-wide subsystems and module hierarchies.",
+};
 
-    React.useEffect(() => {
-        const load = async () => {
-            const data = await SubsystemService.getSubsystems();
-            setSubsystems(data);
-            setIsLoading(false);
-        };
-        load();
-    }, []);
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
 
-    const handleAdd = () => {
-        setSelectedSubsystem(null);
-        setIsDialogOpen(true);
+        const p = parts[1];
+        const b64 = p.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+
+        const json = Buffer.from(padded, "base64").toString("utf8");
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
+
+function pickString(obj: Record<string, unknown> | null | undefined, keys: string[]): string {
+    for (const k of keys) {
+        const v = obj ? obj[k] : undefined;
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
+function buildHeaderUserFromToken(token: string | null | undefined) {
+    const payload = token ? decodeJwtPayload(token) : null;
+
+    const first = pickString(payload, [
+        "Firstname",
+        "FirstName",
+        "firstName",
+        "firstname",
+        "first_name",
+    ]);
+    const last = pickString(payload, [
+        "LastName",
+        "Lastname",
+        "lastName",
+        "lastname",
+        "last_name",
+    ]);
+    const email = pickString(payload, ["email", "Email"]);
+
+    const name = [first, last].filter(Boolean).join(" ") || email || "User";
+
+    return {
+        name,
+        email: email || "",
+        avatar: "/avatars/shadcn.jpg",
     };
+}
 
-    const handleEdit = (subsystem: SubsystemRegistration) => {
-        setSelectedSubsystem(subsystem);
-        setIsDialogOpen(true);
-    };
-
-    const handleManageHierarchy = (subsystem: SubsystemRegistration) => {
-        setHierarchySubsystem(subsystem);
-        setIsHierarchyOpen(true);
-    };
-
-    const handleUpdateHierarchy = async (updated: SubsystemRegistration) => {
-        const newList = subsystems.map(s => s.id === updated.id ? updated : s);
-        setSubsystems(newList);
-        await SubsystemService.saveSubsystems(newList);
-        toast.success(`Updated hierarchy for ${updated.title}`);
-    };
-
-    const handleDelete = async (subsystem: SubsystemRegistration) => {
-        if (confirm(`Are you sure you want to delete ${subsystem.title}?`)) {
-            const newList = subsystems.filter((s) => s.slug !== subsystem.slug);
-            setSubsystems(newList);
-            await SubsystemService.saveSubsystems(newList);
-            toast.success(`Subsystem ${subsystem.slug} deleted.`);
-        }
-    };
-
-    const handleSubmit = async (data: Partial<SubsystemRegistration>) => {
-        let newList: SubsystemRegistration[];
-        if (selectedSubsystem) {
-            // Edit
-            newList = subsystems.map((s) => (s.slug === selectedSubsystem.slug ? { ...s, ...data } : s)) as SubsystemRegistration[];
-            toast.success(`Updated ${data.title}`);
-        } else {
-            // Add
-            const newSubsystem = {
-                ...data,
-                id: Math.random().toString(36).substr(2, 9),
-            } as SubsystemRegistration;
-            newList = [...subsystems, newSubsystem];
-            toast.success(`Registered ${data.title}`);
-        }
-        setSubsystems(newList);
-        await SubsystemService.saveSubsystems(newList);
-    };
+export default async function SubsystemRegistrationPage() {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
+    const headerUser = buildHeaderUserFromToken(token);
 
     return (
-        <div className="flex-1 space-y-4 p-4 pt-6 h-full overflow-auto">
-            <div className="flex items-center justify-between space-y-2">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Subsystem Registration</h2>
-                    <p className="text-muted-foreground">
-                        Register and manage subsystems accessible within the ERP.
-                    </p>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16 overflow-hidden">
+                <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
+                    <SidebarTrigger className="-ml-1 shrink-0" />
+                    <Separator orientation="vertical" className="hidden sm:block mr-2 data-[orientation=vertical]:h-4 shrink-0" />
+                    <div className="min-w-0 overflow-hidden">
+                        <Breadcrumb>
+                            <BreadcrumbList className="min-w-0 overflow-hidden">
+                                <BreadcrumbItem className="hidden md:block shrink-0">
+                                    <BreadcrumbLink href="#">HRM</BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block shrink-0" />
+                                <BreadcrumbItem className="min-w-0 overflow-hidden">
+                                    <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
+                                        Subsystem Registration
+                                    </BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    </div>
                 </div>
-            </div>
 
-            <SubsystemRegistrationTable
-                data={subsystems}
-                onAdd={handleAdd}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onManageHierarchy={handleManageHierarchy}
-                isLoading={isLoading}
-            />
+                <div className="flex h-full items-center px-2 sm:px-4 shrink-0 max-w-[48vw] sm:max-w-none overflow-hidden">
+                    <NavUser user={headerUser} />
+                </div>
+            </header>
 
-            <SubsystemDialog
-                open={isDialogOpen}
-                onOpenChange={setIsDialogOpen}
-                onSubmit={handleSubmit}
-                subsystem={selectedSubsystem}
-            />
-
-            <SubsystemHierarchyDialog
-                open={isHierarchyOpen}
-                onOpenChange={setIsHierarchyOpen}
-                subsystem={hierarchySubsystem}
-                onUpdate={handleUpdateHierarchy}
-            />
+            <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+                <ComingSoon />
+            </main>
         </div>
     );
 }
