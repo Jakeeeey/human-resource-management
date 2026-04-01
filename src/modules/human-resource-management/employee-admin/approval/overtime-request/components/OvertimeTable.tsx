@@ -24,7 +24,7 @@ interface OvertimeTableProps {
   isLoading?: boolean;
 }
 
-export function OvertimeTable({ data, onApprove, onReject, onRefresh, isLoading = false }: OvertimeTableProps) {
+export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: OvertimeTableProps) {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     action: "approve" | "reject" | null;

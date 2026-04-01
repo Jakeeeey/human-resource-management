@@ -7,8 +7,7 @@ import {
   fetchUndertimeRequests,
   approveOrRejectUndertimeRequest,
 } from "./providers/fetchProvider";
-import type { UndertimeRequestWithUser, ApprovalAction } from "./type";
-import { Spinner } from "@/components/ui/spinner";
+import type { UndertimeRequestWithUser } from "./type";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

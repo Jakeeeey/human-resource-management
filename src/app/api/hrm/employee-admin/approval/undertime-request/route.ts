@@ -11,7 +11,7 @@ export const revalidate = 0;
 // UTILITY FUNCTIONS
 // ============================================================================
 
-function decodeJwtPayload(token: string): any | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     if (!token) return null;
     const parts = token.split(".");
@@ -55,7 +55,7 @@ async function directusFetch(path: string, options: RequestInit = {}) {
 // GET - Fetch Undertime Requests (Pending, filtered by department)
 // ============================================================================
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   try {
     const token = await getAuthToken();
     const payload = token ? decodeJwtPayload(token) : null;
@@ -92,7 +92,7 @@ export async function GET(_req: NextRequest) {
     const requests = undertimeResponse.data || [];
 
     // Fetch user details for each request
-    const userIds = [...new Set(requests.map((r: any) => r.user_id))] as number[];
+    const userIds = [...new Set(requests.map((r: { user_id: number }) => r.user_id))] as number[];
     const usersPromises = userIds.map((id) =>
       directusFetch(`/items/user/${id}?fields=user_id,user_fname,user_lname,user_mname,user_department`)
         .catch(() => null)
@@ -105,7 +105,7 @@ export async function GET(_req: NextRequest) {
     );
 
     // Fetch department details
-    const deptIds = [...new Set(requests.map((r: any) => r.department_id).filter(Boolean))] as number[];
+    const deptIds = [...new Set(requests.map((r: { department_id?: number }) => r.department_id).filter(Boolean))] as number[];
     const deptsPromises = deptIds.map((id) =>
       directusFetch(`/items/department/${id}?fields=department_id,department_name`)
         .catch(() => null)
@@ -118,7 +118,7 @@ export async function GET(_req: NextRequest) {
     );
 
     // Combine data
-    const enrichedRequests = requests.map((req: any) => {
+    const enrichedRequests = requests.map((req: { user_id: number; department_id?: number; [key: string]: unknown }) => {
       const user = usersMap.get(req.user_id);
       const dept = req.department_id ? deptsMap.get(req.department_id) : null;
 
@@ -172,7 +172,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Update the undertime request
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       status,
       remarks: remarks || null,
       approver_id: userId,

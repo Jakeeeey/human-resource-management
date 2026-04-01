@@ -28,7 +28,6 @@ export function UndertimeTable({
   data,
   onApprove,
   onReject,
-  onRefresh,
   isLoading = false
 }: UndertimeTableProps) {
   const [modalState, setModalState] = useState<{
