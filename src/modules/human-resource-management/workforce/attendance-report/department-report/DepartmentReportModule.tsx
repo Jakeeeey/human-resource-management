@@ -1,7 +1,7 @@
 "use client";
 
 // department-report/DepartmentReportModule.tsx
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Input }    from '@/components/ui/input';
 import { Button }   from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -85,11 +85,11 @@ async function handleExportDeptPDF(
       });
     });
 
-  const presentRows  = rows.filter((r) => ['On Time', 'Late', 'Present'].includes(String(r.status)));
-  const absentRows   = rows.filter((r) => r.status === 'Absent');
-  const totalOT      = rows.reduce((s, r) => s + Number(r.overtime ?? 0), 0);
-  const totalLate    = rows.reduce((s, r) => s + Number(r.late     ?? 0), 0);
-  const fileName     = `${deptName}_Report_${from}_to_${to}.pdf`;
+  const presentRows = rows.filter((r) => ['On Time', 'Late', 'Present'].includes(String(r.status)));
+  const absentRows  = rows.filter((r) => r.status === 'Absent');
+  const totalOT     = rows.reduce((s, r) => s + Number(r.overtime ?? 0), 0);
+  const totalLate   = rows.reduce((s, r) => s + Number(r.late     ?? 0), 0);
+  const fileName    = `${deptName}_Report_${from}_to_${to}.pdf`;
 
   try {
     const [companyData, templates] = await Promise.all([
@@ -97,8 +97,8 @@ async function handleExportDeptPDF(
       pdfTemplateService.fetchTemplates(),
     ]);
     const templateName =
-      templates.find((t: { name: string }) => t.name === 'Header')?.name ||
-      templates[0]?.name ||
+      (templates as { name: string }[]).find((t) => t.name === 'Header')?.name ||
+      (templates as { name: string }[])[0]?.name ||
       'Department Attendance Report';
 
     const doc = await PdfEngine.generateWithFrame(
@@ -162,13 +162,12 @@ export default function DepartmentReportModule() {
   const { loading, loadingDepts, error, rows, departments, refetch } =
     useDepartmentReport(deptId, from, to);
 
-  // Auto-select the first department once the dept list has loaded.
-  // This runs exactly once — after that deptId is a real value and
-  // the condition `deptId === null` is never true again.
-  useEffect(() => {
-    if (deptId === null && departments.length > 0) {
-      setDeptId(departments[0].department_id);
-    }
+  // Derive the effective department ID without calling setState inside an effect.
+  // Once the dept list loads, use departments[0] as the default if nothing is
+  // selected yet. The Select's onValueChange then makes it permanent state.
+  const effectiveDeptId = useMemo<number | null>(() => {
+    if (deptId !== null) return deptId;
+    return departments[0]?.department_id ?? null;
   }, [deptId, departments]);
 
   const filtered = useMemo(() => {
@@ -179,8 +178,8 @@ export default function DepartmentReportModule() {
     );
   }, [rows, search]);
 
-  // Show skeleton while department list is loading (deptId not yet set)
-  if (loadingDepts || deptId === null) return <PageSkeleton />;
+  // Show skeleton while dept list is loading or no dept is resolvable yet
+  if (loadingDepts || effectiveDeptId === null) return <PageSkeleton />;
 
   if (error) return (
     <div className="p-8 text-center m-8 border border-red-500/20 bg-red-500/5 rounded-lg">
@@ -200,9 +199,8 @@ export default function DepartmentReportModule() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {/* Department selector */}
         <Select
-          value={String(deptId)}
+          value={String(effectiveDeptId)}
           onValueChange={(v) => setDeptId(Number(v))}
         >
           <SelectTrigger className="h-9 w-[200px] text-sm">
@@ -217,14 +215,12 @@ export default function DepartmentReportModule() {
           </SelectContent>
         </Select>
 
-        {/* From */}
         <div className="flex items-center gap-1.5 rounded-md border border-border bg-background h-9 px-3">
           <span className="text-sm text-muted-foreground font-medium shrink-0">From</span>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
             className="h-auto border-0 p-0 text-sm focus-visible:ring-0 shadow-none w-[130px] bg-transparent" />
         </div>
 
-        {/* To */}
         <div className="flex items-center gap-1.5 rounded-md border border-border bg-background h-9 px-3">
           <span className="text-sm text-muted-foreground font-medium shrink-0">To</span>
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)}
@@ -246,7 +242,7 @@ export default function DepartmentReportModule() {
 
         <Button variant="outline" size="sm" className="h-9 px-4 text-sm gap-2"
           onClick={() => {
-            const dept = departments.find((d) => d.department_id === deptId);
+            const dept = departments.find((d) => d.department_id === effectiveDeptId);
             if (dept) handleExportDeptPDF(dept.department_name, filtered as unknown as TableRow[], from, to);
           }}
         >
@@ -254,7 +250,6 @@ export default function DepartmentReportModule() {
         </Button>
       </div>
 
-      {/* Loading overlay while logs are fetching (dept already selected) */}
       {loading ? (
         <div className="space-y-4">
           <Skeleton className="h-28 w-full" />

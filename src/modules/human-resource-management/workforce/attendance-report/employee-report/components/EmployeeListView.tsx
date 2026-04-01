@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,8 @@ interface Props { onSelect: (e: Employee) => void }
 export function EmployeeListView({ onSelect }: Props) {
   const { loading, error, employees, departments } = useEmployees();
   const [deptFilter, setDeptFilter] = useState("All");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+  const [search,     setSearch]     = useState("");
+  const [page,       setPage]       = useState(1);
 
   const filtered = useMemo(() =>
     employees.filter((e) => {
@@ -37,18 +37,26 @@ export function EmployeeListView({ onSelect }: Props) {
     [employees, deptFilter, search]
   );
 
-  // Reset page to 1 whenever filters change
-  const prevFilterKey = useRef(`${deptFilter}|${search}`);
-  useEffect(() => {
-    const key = `${deptFilter}|${search}`;
-    if (prevFilterKey.current !== key) {
-      prevFilterKey.current = key;
-      setPage(1);
-    }
-  }, [deptFilter, search]);
+  // Track the previous filter key so we can detect changes without an effect.
+  // When filters change, we derive safePage from 1 rather than calling setPage
+  // inside an effect (which triggers the react-hooks/set-state-in-effect lint error).
+  const filterKey    = `${deptFilter}|${search}`;
+  const prevKeyRef   = useRef(filterKey);
+  const pageForKey   = useRef(page);
+
+  if (prevKeyRef.current !== filterKey) {
+    // Filters just changed — reset the stored page to 1 synchronously
+    // during render (not inside an effect), which is safe.
+    prevKeyRef.current = filterKey;
+    pageForKey.current = 1;
+    // Also sync the state so pagination buttons still work correctly
+    if (page !== 1) setPage(1);
+  } else {
+    pageForKey.current = page;
+  }
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage   = Math.min(page, totalPages);
+  const safePage   = Math.min(pageForKey.current, totalPages);
   const start      = (safePage - 1) * PAGE_SIZE;
   const paginated  = filtered.slice(start, start + PAGE_SIZE);
 
@@ -75,7 +83,7 @@ export function EmployeeListView({ onSelect }: Props) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-2">
-        <Select value={deptFilter} onValueChange={setDeptFilter}>
+        <Select value={deptFilter} onValueChange={(v) => { setDeptFilter(v); setPage(1); }}>
           <SelectTrigger className="h-9 w-[180px] text-xs">
             <SelectValue placeholder="All Departments" />
           </SelectTrigger>
@@ -89,7 +97,7 @@ export function EmployeeListView({ onSelect }: Props) {
         <Input
           placeholder="Search by name or email…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           className="h-9 w-[240px] text-xs"
         />
       </div>
@@ -144,7 +152,7 @@ export function EmployeeListView({ onSelect }: Props) {
 
           <div className="px-6 py-3 border-t border-border/50 flex items-center justify-between gap-4 flex-wrap">
             <span className="text-xs text-muted-foreground">
-              Showing {filtered.length === 0 ? 0 : start + 1} – {Math.min(start + PAGE_SIZE, filtered.length)} of {filtered.length}
+              Showing {filtered.length === 0 ? 0 : start + 1}–{Math.min(start + PAGE_SIZE, filtered.length)} of {filtered.length}
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="h-7 w-7 p-0"

@@ -24,7 +24,7 @@ const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 async function fetchCollection(collection: string, params: Record<string, string>) {
   const query = new URLSearchParams({ limit: '-1', ...params });
   const url   = `${DIRECTUS_BASE}/items/${collection}?${query}`;
-  const res = await fetch(url, {
+  const res   = await fetch(url, {
     method: 'GET',
     headers: {
       'Content-Type':  'application/json',
@@ -37,7 +37,6 @@ async function fetchCollection(collection: string, params: Record<string, string
   return res.json();
 }
 
-// FIXED: Removed unused _request parameter
 export async function GET() {
   if (!DIRECTUS_BASE || !DIRECTUS_TOKEN) {
     return NextResponse.json({ ok: false, error: 'Server configuration error' }, { status: 500 });
@@ -46,40 +45,47 @@ export async function GET() {
   try {
     const [usersRes, deptsRes, schedRes, oncallListRes, oncallSchedRes] = await Promise.all([
       fetchCollection('user', { fields: 'user_id,user_fname,user_lname,user_email,user_position,user_image,user_department,is_deleted' }),
-      fetchCollection('department', { fields: 'department_id,department_name' }),
+      fetchCollection('department',          { fields: 'department_id,department_name' }),
       fetchCollection('department_schedule', { fields: 'department_id,work_start,work_end,working_days,workdays_note,grace_period' }),
-      fetchCollection('oncall_list', {}),
+      fetchCollection('oncall_list',     {}),
       fetchCollection('oncall_schedule', { fields: '*' }),
     ]);
 
-    const deptMap  = new Map((deptsRes.data ?? []).map((d: any) => [d.department_id, d]));
-    const schedMap = new Map((schedRes.data ?? []).map((s: any) => [s.department_id, s]));
-    const today = new Date().toISOString().slice(0, 10);
+    const users:  Record<string, unknown>[] = usersRes.data   ?? [];
+    const depts:  Record<string, unknown>[] = deptsRes.data   ?? [];
+    const scheds: Record<string, unknown>[] = schedRes.data   ?? [];
 
-    const merged = (usersRes.data ?? [])
-      .filter((u: any) => !isDeleted(u.is_deleted))
-      .map((u: any) => {
-        const dept  = (deptMap.get(u.user_department)  ?? {}) as any;
-        const sched = (schedMap.get(u.user_department) ?? {}) as any;
+    const deptMap  = new Map(depts.map( (d) => [d.department_id,  d]));
+    const schedMap = new Map(scheds.map((s) => [s.department_id, s]));
+    const today    = new Date().toISOString().slice(0, 10);
+
+    const merged = users
+      .filter((u) => !isDeleted(u.is_deleted))
+      .map((u) => {
+        const dept  = (deptMap.get(u.user_department)  ?? {}) as Record<string, unknown>;
+        const sched = (schedMap.get(u.user_department) ?? {}) as Record<string, unknown>;
         const oncallSched = getActiveOncall(u.user_id, today, oncallListRes.data, oncallSchedRes.data);
         const schedFields = extractScheduleFields(oncallSched, sched);
         return {
-          user_id: u.user_id,
-          user_fname: u.user_fname,
-          user_lname: u.user_lname,
-          user_email: u.user_email,
-          user_position: u.user_position,
-          user_image: u.user_image ?? null,
-          department_id: u.user_department,
+          user_id:         u.user_id,
+          user_fname:      u.user_fname,
+          user_lname:      u.user_lname,
+          user_email:      u.user_email,
+          user_position:   u.user_position,
+          user_image:      u.user_image ?? null,
+          department_id:   u.user_department,
           department_name: dept.department_name ?? '—',
-          work_start: schedFields.work_start ?? null,
-          work_end: schedFields.work_end ?? null,
+          work_start:      schedFields.work_start ?? null,
+          work_end:        schedFields.work_end   ?? null,
         };
       })
-      .sort((a: any, b: any) => String(a.user_lname).localeCompare(String(b.user_lname)));
+      .sort((a, b) =>
+        String(a.user_lname).localeCompare(String(b.user_lname))
+      );
 
     return NextResponse.json({ data: merged });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message }, { status: 502 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ ok: false, error: msg }, { status: 502 });
   }
 }
