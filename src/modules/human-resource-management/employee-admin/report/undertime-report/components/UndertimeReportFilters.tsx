@@ -19,14 +19,14 @@ import {
 import { CalendarIcon, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { Department, OvertimeReportFilters } from "../type";
+import type { Department, UndertimeReportFilters } from "../type";
 
 // ============================================================================
 // PROPS
 // ============================================================================
 
-interface OvertimeReportFiltersProps {
-  filters: OvertimeReportFilters;
+interface UndertimeReportFiltersProps {
+  filters: UndertimeReportFilters;
   departments: Department[];
   isHRAdmin: boolean;
   employeeNames: string[];
@@ -43,7 +43,7 @@ interface OvertimeReportFiltersProps {
 // COMPONENT
 // ============================================================================
 
-export function OvertimeReportFilters({
+export function UndertimeReportFilters({
   filters,
   departments,
   isHRAdmin,
@@ -55,7 +55,7 @@ export function OvertimeReportFilters({
   onNameFilterChange,
   onStatusChange,
   onResetFilters,
-}: OvertimeReportFiltersProps) {
+}: UndertimeReportFiltersProps) {
   const hasActiveFilters =
     filters.searchQuery ||
     filters.dateFrom ||
@@ -70,7 +70,7 @@ export function OvertimeReportFilters({
       <div className="relative w-55">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, purpose..."
+          placeholder="Search by name, reason..."
           value={filters.searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-10"

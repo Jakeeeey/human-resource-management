@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-const DIRECTUS_URL =process.env.NEXT_PUBLIC_API_BASE_URL;
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const COOKIE_NAME = "vos_access_token";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ async function getAuthToken(): Promise<string | null> {
 
 async function directusFetch(path: string, options: RequestInit = {}) {
   const token = process.env.DIRECTUS_STATIC_TOKEN || "";
-  
+
   const response = await fetch(`${DIRECTUS_URL}${path}`, {
     ...options,
     headers: {
@@ -52,14 +52,14 @@ async function directusFetch(path: string, options: RequestInit = {}) {
 }
 
 // ============================================================================
-// GET - Fetch Overtime Requests (Pending, filtered by department)
+// GET - Fetch Undertime Requests (Pending, filtered by department)
 // ============================================================================
 
 export async function GET() {
   try {
     const token = await getAuthToken();
     const payload = token ? decodeJwtPayload(token) : null;
-    
+
     if (!payload) {
       return NextResponse.json(
         { error: "Unauthorized: No valid token" },
@@ -73,23 +73,23 @@ export async function GET() {
     const userResponse = await directusFetch(
       `/items/user/${userId}?fields=user_id,user_department,isAdmin,role`
     );
-    
+
     const currentUserDepartment = userResponse.data?.user_department;
 
     // Build query - only show pending requests from the user's department
     let filter = `filter[status][_eq]=pending`;
-    
+
     // If user has a department, filter by that department
     if (currentUserDepartment) {
       filter += `&filter[department_id][_eq]=${currentUserDepartment}`;
     }
 
-    // Fetch overtime requests with user details
-    const overtimeResponse = await directusFetch(
-      `/items/overtime_request?${filter}&sort=-filed_at&limit=1000&fields=*`
+    // Fetch undertime requests with user details
+    const undertimeResponse = await directusFetch(
+      `/items/undertime_request?${filter}&sort=-filed_at&limit=1000&fields=*`
     );
 
-    const requests = overtimeResponse.data || [];
+    const requests = undertimeResponse.data || [];
 
     // Fetch user details for each request
     const userIds = [...new Set(requests.map((r: { user_id: number }) => r.user_id))] as number[];
@@ -136,16 +136,16 @@ export async function GET() {
       total: enrichedRequests.length,
     });
   } catch (error) {
-    console.error("GET overtime_request error:", error);
+    console.error("GET undertime_request error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch overtime requests" },
+      { error: "Failed to fetch undertime requests" },
       { status: 500 }
     );
   }
 }
 
 // ============================================================================
-// PATCH - Approve or Reject Overtime Request
+// PATCH - Approve or Reject Undertime Request
 // ============================================================================
 
 export async function PATCH(req: NextRequest) {
@@ -162,16 +162,16 @@ export async function PATCH(req: NextRequest) {
 
     const userId = payload?.id || payload?.user_id || payload?.sub;
     const body = await req.json();
-    const { overtime_id, status, remarks } = body;
+    const { undertime_id, status, remarks } = body;
 
-    if (!overtime_id || !status || !['approved', 'rejected'].includes(status)) {
+    if (!undertime_id || !status || !['approved', 'rejected'].includes(status)) {
       return NextResponse.json(
-        { error: "Invalid request: overtime_id and status (approved/rejected) are required" },
+        { error: "Invalid request: undertime_id and status (approved/rejected) are required" },
         { status: 400 }
       );
     }
 
-    // Update the overtime request
+    // Update the undertime request
     const updateData: Record<string, unknown> = {
       status,
       remarks: remarks || null,
@@ -179,19 +179,19 @@ export async function PATCH(req: NextRequest) {
       approved_at: new Date().toISOString(),
     };
 
-    await directusFetch(`/items/overtime_request/${overtime_id}`, {
+    await directusFetch(`/items/undertime_request/${undertime_id}`, {
       method: "PATCH",
       body: JSON.stringify(updateData),
     });
 
     return NextResponse.json({
       success: true,
-      message: `Overtime request ${status} successfully`,
+      message: `Undertime request ${status} successfully`,
     });
   } catch (error) {
-    console.error("PATCH overtime_request error:", error);
+    console.error("PATCH undertime_request error:", error);
     return NextResponse.json(
-      { error: "Failed to update overtime request" },
+      { error: "Failed to update undertime request" },
       { status: 500 }
     );
   }

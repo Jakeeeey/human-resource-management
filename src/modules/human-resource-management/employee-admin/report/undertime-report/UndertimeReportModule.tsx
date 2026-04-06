@@ -1,14 +1,14 @@
 "use client";
 
 import React from "react";
-import { 
-  OvertimeReportFetchProvider,
-  OvertimeReportFilterProvider,
-  OvertimeReportPaginationProvider 
+import {
+  UndertimeReportFetchProvider,
+  UndertimeReportFilterProvider,
+  UndertimeReportPaginationProvider
 } from "./contexts";
-import { useOvertimeReport } from "./hooks/useOvertimeReport";
-import { OvertimeReportFilters } from "./components/OvertimeReportFilters";
-import { OvertimeReportTable } from "./components/OvertimeReportTable";
+import { useUndertimeReport } from "./hooks/useUndertimeReport";
+import { UndertimeReportFilters } from "./components/UndertimeReportFilters";
+import { UndertimeReportTable } from "./components/UndertimeReportTable";
 import {
   Alert,
   AlertDescription,
@@ -22,7 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 // INNER COMPONENT (Has access to context)
 // ============================================================================
 
-function OvertimeReportModuleContent() {
+function UndertimeReportModuleContent() {
   const {
     requests,
     departments,
@@ -43,7 +43,7 @@ function OvertimeReportModuleContent() {
     employeeNames,
     pagination,
     setCurrentPage,
-  } = useOvertimeReport();
+  } = useUndertimeReport();
 
   if (isError) {
     return (
@@ -52,7 +52,7 @@ function OvertimeReportModuleContent() {
         <AlertTitle>Error</AlertTitle>
         <AlertDescription className="flex items-center justify-between">
           <span>
-            Failed to load overtime report: {error?.message || "Unknown error"}
+            Failed to load undertime report: {error?.message || "Unknown error"}
           </span>
           <Button
             variant="outline"
@@ -74,14 +74,14 @@ function OvertimeReportModuleContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Overtime Report
+            Undertime Report
           </h1>
           <p className="text-muted-foreground">
             {isHRAdmin
-              ? "View overtime reports from all departments"
+              ? "View undertime reports from all departments"
               : currentUser?.user_department
-              ? `View overtime report for your department`
-              : "View overtime reports"}
+              ? `View undertime report for your department`
+              : "View undertime reports"}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -93,7 +93,7 @@ function OvertimeReportModuleContent() {
       {/* Filters Card */}
       <Card>
         <CardContent className="pt-6">
-          <OvertimeReportFilters
+          <UndertimeReportFilters
             filters={filters}
             departments={departments}
             isHRAdmin={isHRAdmin}
@@ -113,13 +113,13 @@ function OvertimeReportModuleContent() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Showing <span className="font-semibold">{pagination.totalItems}</span>{" "}
-          overtime {pagination.totalItems === 1 ? "request" : "requests"}
+          undertime {pagination.totalItems === 1 ? "request" : "requests"}
         </p>
       </div>
 
       {/* Table */}
-      <OvertimeReportTable 
-        data={requests} 
+      <UndertimeReportTable
+        data={requests}
         isLoading={isLoading}
         pagination={pagination}
         onPageChange={setCurrentPage}
@@ -132,14 +132,14 @@ function OvertimeReportModuleContent() {
 // MAIN WRAPPER (PROVIDERS)
 // ============================================================================
 
-export default function OvertimeReportModule() {
+export default function UndertimeReportModule() {
   return (
-    <OvertimeReportFetchProvider>
-      <OvertimeReportFilterProvider>
-        <OvertimeReportPaginationProvider>
-          <OvertimeReportModuleContent />
-        </OvertimeReportPaginationProvider>
-      </OvertimeReportFilterProvider>
-    </OvertimeReportFetchProvider>
+    <UndertimeReportFetchProvider>
+      <UndertimeReportFilterProvider>
+        <UndertimeReportPaginationProvider>
+          <UndertimeReportModuleContent />
+        </UndertimeReportPaginationProvider>
+      </UndertimeReportFilterProvider>
+    </UndertimeReportFetchProvider>
   );
 }

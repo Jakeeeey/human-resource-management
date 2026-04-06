@@ -19,14 +19,14 @@ import {
 import { CalendarIcon, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { Department, OvertimeReportFilters } from "../type";
+import type { Department, LeaveReportFilters } from "../type";
 
 // ============================================================================
 // PROPS
 // ============================================================================
 
-interface OvertimeReportFiltersProps {
-  filters: OvertimeReportFilters;
+interface LeaveReportFiltersProps {
+  filters: LeaveReportFilters;
   departments: Department[];
   isHRAdmin: boolean;
   employeeNames: string[];
@@ -43,7 +43,7 @@ interface OvertimeReportFiltersProps {
 // COMPONENT
 // ============================================================================
 
-export function OvertimeReportFilters({
+export function LeaveReportFilters({
   filters,
   departments,
   isHRAdmin,
@@ -55,7 +55,7 @@ export function OvertimeReportFilters({
   onNameFilterChange,
   onStatusChange,
   onResetFilters,
-}: OvertimeReportFiltersProps) {
+}: LeaveReportFiltersProps) {
   const hasActiveFilters =
     filters.searchQuery ||
     filters.dateFrom ||

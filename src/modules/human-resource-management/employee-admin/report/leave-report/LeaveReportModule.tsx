@@ -1,14 +1,14 @@
 "use client";
 
 import React from "react";
-import { 
-  OvertimeReportFetchProvider,
-  OvertimeReportFilterProvider,
-  OvertimeReportPaginationProvider 
+import {
+  LeaveReportFetchProvider,
+  LeaveReportFilterProvider,
+  LeaveReportPaginationProvider
 } from "./contexts";
-import { useOvertimeReport } from "./hooks/useOvertimeReport";
-import { OvertimeReportFilters } from "./components/OvertimeReportFilters";
-import { OvertimeReportTable } from "./components/OvertimeReportTable";
+import { useLeaveReport } from "./hooks/useLeaveReport";
+import { LeaveReportFilters } from "./components/LeaveReportFilters";
+import { LeaveReportTable } from "./components/LeaveReportTable";
 import {
   Alert,
   AlertDescription,
@@ -22,7 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 // INNER COMPONENT (Has access to context)
 // ============================================================================
 
-function OvertimeReportModuleContent() {
+function LeaveReportModuleContent() {
   const {
     requests,
     departments,
@@ -43,7 +43,7 @@ function OvertimeReportModuleContent() {
     employeeNames,
     pagination,
     setCurrentPage,
-  } = useOvertimeReport();
+  } = useLeaveReport();
 
   if (isError) {
     return (
@@ -52,7 +52,7 @@ function OvertimeReportModuleContent() {
         <AlertTitle>Error</AlertTitle>
         <AlertDescription className="flex items-center justify-between">
           <span>
-            Failed to load overtime report: {error?.message || "Unknown error"}
+            Failed to load leave report: {error?.message || "Unknown error"}
           </span>
           <Button
             variant="outline"
@@ -74,14 +74,14 @@ function OvertimeReportModuleContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Overtime Report
+            Leave Report
           </h1>
           <p className="text-muted-foreground">
             {isHRAdmin
-              ? "View overtime reports from all departments"
+              ? "View leave reports from all departments"
               : currentUser?.user_department
-              ? `View overtime report for your department`
-              : "View overtime reports"}
+              ? `View leave report for your department`
+              : "View leave reports"}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -93,7 +93,7 @@ function OvertimeReportModuleContent() {
       {/* Filters Card */}
       <Card>
         <CardContent className="pt-6">
-          <OvertimeReportFilters
+          <LeaveReportFilters
             filters={filters}
             departments={departments}
             isHRAdmin={isHRAdmin}
@@ -113,13 +113,13 @@ function OvertimeReportModuleContent() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Showing <span className="font-semibold">{pagination.totalItems}</span>{" "}
-          overtime {pagination.totalItems === 1 ? "request" : "requests"}
+          leave {pagination.totalItems === 1 ? "request" : "requests"}
         </p>
       </div>
 
       {/* Table */}
-      <OvertimeReportTable 
-        data={requests} 
+      <LeaveReportTable
+        data={requests}
         isLoading={isLoading}
         pagination={pagination}
         onPageChange={setCurrentPage}
@@ -132,14 +132,14 @@ function OvertimeReportModuleContent() {
 // MAIN WRAPPER (PROVIDERS)
 // ============================================================================
 
-export default function OvertimeReportModule() {
+export default function LeaveReportModule() {
   return (
-    <OvertimeReportFetchProvider>
-      <OvertimeReportFilterProvider>
-        <OvertimeReportPaginationProvider>
-          <OvertimeReportModuleContent />
-        </OvertimeReportPaginationProvider>
-      </OvertimeReportFilterProvider>
-    </OvertimeReportFetchProvider>
+    <LeaveReportFetchProvider>
+      <LeaveReportFilterProvider>
+        <LeaveReportPaginationProvider>
+          <LeaveReportModuleContent />
+        </LeaveReportPaginationProvider>
+      </LeaveReportFilterProvider>
+    </LeaveReportFetchProvider>
   );
 }

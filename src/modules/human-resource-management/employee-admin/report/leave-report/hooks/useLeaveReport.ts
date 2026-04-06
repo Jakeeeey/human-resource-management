@@ -1,41 +1,41 @@
 "use client";
 
 import { useContext, useMemo } from "react";
-import { 
-  OvertimeReportFetchContext,
-  OvertimeReportFilterContext,
-  OvertimeReportPaginationContext 
+import {
+  LeaveReportFetchContext,
+  LeaveReportFilterContext,
+  LeaveReportPaginationContext
 } from "../contexts";
 
 // ============================================================================
 // CUSTOM HOOK
 // ============================================================================
 
-export function useOvertimeReport() {
-  const fetchContext = useContext(OvertimeReportFetchContext);
-  const filterContext = useContext(OvertimeReportFilterContext);
-  const paginationContext = useContext(OvertimeReportPaginationContext);
+export function useLeaveReport() {
+  const fetchContext = useContext(LeaveReportFetchContext);
+  const filterContext = useContext(LeaveReportFilterContext);
+  const paginationContext = useContext(LeaveReportPaginationContext);
 
   if (!fetchContext) {
     throw new Error(
-      "useOvertimeReport must be used within OvertimeReportFetchProvider"
+      "useLeaveReport must be used within LeaveReportFetchProvider"
     );
   }
 
   if (!filterContext) {
     throw new Error(
-      "useOvertimeReport must be used within OvertimeReportFilterProvider"
+      "useLeaveReport must be used within LeaveReportFilterProvider"
     );
   }
 
   if (!paginationContext) {
     throw new Error(
-      "useOvertimeReport must be used within OvertimeReportPaginationProvider"
+      "useLeaveReport must be used within LeaveReportPaginationProvider"
     );
   }
 
   const {
-    overtimeRequests,
+    leaveRequests,
     departments,
     currentUser,
     isLoading,
@@ -64,8 +64,8 @@ export function useOvertimeReport() {
 
   // Apply filters to requests
   const filteredRequests = useMemo(() => {
-    return filterRequests(overtimeRequests);
-  }, [overtimeRequests, filterRequests]);
+    return filterRequests(leaveRequests);
+  }, [leaveRequests, filterRequests]);
 
   // Apply pagination to filtered requests
   const { paginatedData, pagination: paginationState } = useMemo(() => {
@@ -78,23 +78,23 @@ export function useOvertimeReport() {
   // Get unique employee names for filter dropdown
   // If HR admin and department is selected, show only names from that department
   const employeeNames = useMemo(() => {
-    let requestsToFilter = overtimeRequests;
-    
+    let requestsToFilter = leaveRequests;
+
     // If HR admin selected a department, filter names by that department
     if (isHRAdmin && filters.departmentId !== null) {
-      requestsToFilter = overtimeRequests.filter(
+      requestsToFilter = leaveRequests.filter(
         (req) => req.department_id === filters.departmentId
       );
     }
-    
+
     const names = requestsToFilter.map((req) => req.employee_name);
     return Array.from(new Set(names)).sort();
-  }, [overtimeRequests, isHRAdmin, filters.departmentId]);
+  }, [leaveRequests, isHRAdmin, filters.departmentId]);
 
   return {
     // Data
     requests: paginatedData,
-    allRequests: overtimeRequests,
+    allRequests: leaveRequests,
     filteredRequests,
     departments,
     currentUser,

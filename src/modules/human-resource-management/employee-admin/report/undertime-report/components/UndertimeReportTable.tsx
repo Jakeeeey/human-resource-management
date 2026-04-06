@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -19,15 +19,15 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import type { OvertimeRequestWithDetails, PaginationState } from "../type";
+import type { UndertimeRequestWithDetails, PaginationState } from "../type";
 import { ViewDetailsModal } from "./ViewDetailsModal";
 
 // ============================================================================
 // PROPS
 // ============================================================================
 
-interface OvertimeReportTableProps {
-  data: OvertimeRequestWithDetails[];
+interface UndertimeReportTableProps {
+  data: UndertimeRequestWithDetails[];
   isLoading: boolean;
   pagination: PaginationState;
   onPageChange: (page: number) => void;
@@ -71,21 +71,21 @@ function getStatusBadge(status: string) {
 // COMPONENT
 // ============================================================================
 
-export function OvertimeReportTable({
+export function UndertimeReportTable({
   data,
   isLoading,
   pagination,
   onPageChange,
-}: OvertimeReportTableProps) {
+}: UndertimeReportTableProps) {
   const [viewModalState, setViewModalState] = useState<{
     isOpen: boolean;
-    data: OvertimeRequestWithDetails | null;
+    data: UndertimeRequestWithDetails | null;
   }>({
     isOpen: false,
     data: null,
   });
 
-  const handleOpenViewModal = (request: OvertimeRequestWithDetails) => {
+  const handleOpenViewModal = (request: UndertimeRequestWithDetails) => {
     setViewModalState({
       isOpen: true,
       data: request,
@@ -113,7 +113,7 @@ export function OvertimeReportTable({
       <div className="flex h-64 items-center justify-center rounded-lg border border-dashed">
         <div className="text-center">
           <p className="text-lg font-semibold text-muted-foreground">
-            No overtime reports found
+            No undertime reports found
           </p>
           <p className="text-sm text-muted-foreground">
             Try adjusting your filters or search query
@@ -131,10 +131,9 @@ export function OvertimeReportTable({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Request Date</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>To</TableHead>
+              <TableHead>Timeout</TableHead>
               <TableHead>Duration</TableHead>
-              <TableHead className="w-48">Purpose</TableHead>
+              <TableHead className="w-48">Reason</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-40">Remarks</TableHead>
               <TableHead className="text-right">Action</TableHead>
@@ -142,7 +141,7 @@ export function OvertimeReportTable({
           </TableHeader>
           <TableBody>
             {data.map((request) => (
-              <TableRow key={request.overtime_id}>
+              <TableRow key={request.undertime_id}>
                 {/* Name */}
                 <TableCell className="font-medium">
                   {request.employee_name}
@@ -155,27 +154,24 @@ export function OvertimeReportTable({
                     : "N/A"}
                 </TableCell>
 
-                {/* From */}
-                <TableCell>{formatTime(request.ot_from)}</TableCell>
-
-                {/* To */}
-                <TableCell>{formatTime(request.ot_to)}</TableCell>
+                {/* Timeout */}
+                <TableCell>{formatTime(request.actual_timeout)}</TableCell>
 
                 {/* Duration */}
                 <TableCell>{formatDuration(request.duration_minutes)}</TableCell>
 
-                {/* Purpose */}
+                {/* Reason */}
                 <TableCell className="max-w-48">
-                  {request.purpose ? (
+                  {request.reason ? (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="block truncate cursor-help">
-                            {request.purpose}
+                            {request.reason}
                           </span>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-md">
-                          <p>{request.purpose}</p>
+                          <p>{request.reason}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

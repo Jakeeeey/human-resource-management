@@ -1,33 +1,33 @@
 "use client";
 
 import React, { createContext, useEffect, useState } from "react";
-import { fetchOvertimeReportData } from "./providers/fetchProvider";
+import { fetchUndertimeReportData } from "./providers/fetchProviders";
 import type {
-  OvertimeRequestWithDetails,
+  UndertimeRequestWithDetails,
   User,
   Department,
-  OvertimeReportFilters,
+  UndertimeReportFilters,
   PaginationState,
-  OvertimeReportFetchContextType,
-  OvertimeReportFilterContextType,
-  OvertimeReportPaginationContextType,
+  UndertimeReportFetchContextType,
+  UndertimeReportFilterContextType,
+  UndertimeReportPaginationContextType,
 } from "./type";
 
 // ============================================================================
 // FETCH CONTEXT
 // ============================================================================
 
-export const OvertimeReportFetchContext = createContext<
-  OvertimeReportFetchContextType | undefined
+export const UndertimeReportFetchContext = createContext<
+  UndertimeReportFetchContextType | undefined
 >(undefined);
 
-export function OvertimeReportFetchProvider({
+export function UndertimeReportFetchProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [overtimeRequests, setOvertimeRequests] = useState<
-    OvertimeRequestWithDetails[]
+  const [undertimeRequests, setUndertimeRequests] = useState<
+    UndertimeRequestWithDetails[]
   >([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -41,11 +41,11 @@ export function OvertimeReportFetchProvider({
       setIsError(false);
       setError(null);
 
-      const data = await fetchOvertimeReportData();
+      const data = await fetchUndertimeReportData();
 
       setCurrentUser(data.currentUser);
       setDepartments(data.departments);
-      setOvertimeRequests(data.overtimeRequests);
+      setUndertimeRequests(data.undertimeRequests);
     } catch (err) {
       setIsError(true);
       setError(
@@ -64,8 +64,8 @@ export function OvertimeReportFetchProvider({
     await fetchData();
   };
 
-  const value: OvertimeReportFetchContextType = {
-    overtimeRequests,
+  const value: UndertimeReportFetchContextType = {
+    undertimeRequests,
     departments,
     currentUser,
     isLoading,
@@ -75,9 +75,9 @@ export function OvertimeReportFetchProvider({
   };
 
   return (
-    <OvertimeReportFetchContext.Provider value={value}>
+    <UndertimeReportFetchContext.Provider value={value}>
       {children}
-    </OvertimeReportFetchContext.Provider>
+    </UndertimeReportFetchContext.Provider>
   );
 }
 
@@ -85,11 +85,11 @@ export function OvertimeReportFetchProvider({
 // FILTER CONTEXT
 // ============================================================================
 
-export const OvertimeReportFilterContext = createContext<
-  OvertimeReportFilterContextType | undefined
+export const UndertimeReportFilterContext = createContext<
+  UndertimeReportFilterContextType | undefined
 >(undefined);
 
-const initialFilters: OvertimeReportFilters = {
+const initialFilters: UndertimeReportFilters = {
   searchQuery: "",
   dateFrom: undefined,
   dateTo: undefined,
@@ -98,12 +98,12 @@ const initialFilters: OvertimeReportFilters = {
   statusFilter: null,
 };
 
-export function OvertimeReportFilterProvider({
+export function UndertimeReportFilterProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [filters, setFilters] = useState<OvertimeReportFilters>(initialFilters);
+  const [filters, setFilters] = useState<UndertimeReportFilters>(initialFilters);
 
   const setSearchQuery = (query: string) => {
     setFilters((prev) => ({ ...prev, searchQuery: query }));
@@ -134,7 +134,7 @@ export function OvertimeReportFilterProvider({
   };
 
   const filterRequests = React.useMemo(() => {
-    return (requests: OvertimeRequestWithDetails[]) => {
+    return (requests: UndertimeRequestWithDetails[]) => {
       let filtered = [...requests];
 
       if (filters.searchQuery.trim()) {
@@ -142,7 +142,7 @@ export function OvertimeReportFilterProvider({
         filtered = filtered.filter(
           (req) =>
             req.employee_name.toLowerCase().includes(query) ||
-            req.purpose?.toLowerCase().includes(query) ||
+            req.reason?.toLowerCase().includes(query) ||
             req.remarks?.toLowerCase().includes(query)
         );
       }
@@ -187,7 +187,7 @@ export function OvertimeReportFilterProvider({
     };
   }, [filters]);
 
-  const value: OvertimeReportFilterContextType = {
+  const value: UndertimeReportFilterContextType = {
     filters,
     setSearchQuery,
     setDateFrom,
@@ -200,9 +200,9 @@ export function OvertimeReportFilterProvider({
   };
 
   return (
-    <OvertimeReportFilterContext.Provider value={value}>
+    <UndertimeReportFilterContext.Provider value={value}>
       {children}
-    </OvertimeReportFilterContext.Provider>
+    </UndertimeReportFilterContext.Provider>
   );
 }
 
@@ -210,13 +210,13 @@ export function OvertimeReportFilterProvider({
 // PAGINATION CONTEXT
 // ============================================================================
 
-export const OvertimeReportPaginationContext = createContext<
-  OvertimeReportPaginationContextType | undefined
+export const UndertimeReportPaginationContext = createContext<
+  UndertimeReportPaginationContextType | undefined
 >(undefined);
 
 const DEFAULT_PAGE_SIZE = 10;
 
-export function OvertimeReportPaginationProvider({
+export function UndertimeReportPaginationProvider({
   children,
 }: {
   children: React.ReactNode;
@@ -225,7 +225,7 @@ export function OvertimeReportPaginationProvider({
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const paginateRequests = React.useMemo(() => {
-    return (requests: OvertimeRequestWithDetails[]) => {
+    return (requests: UndertimeRequestWithDetails[]) => {
       const totalItems = requests.length;
       const totalPages = Math.ceil(totalItems / pageSize);
 
@@ -255,7 +255,7 @@ export function OvertimeReportPaginationProvider({
     totalPages: 1,
   };
 
-  const value: OvertimeReportPaginationContextType = {
+  const value: UndertimeReportPaginationContextType = {
     pagination,
     setCurrentPage,
     setPageSize,
@@ -263,8 +263,8 @@ export function OvertimeReportPaginationProvider({
   };
 
   return (
-    <OvertimeReportPaginationContext.Provider value={value}>
+    <UndertimeReportPaginationContext.Provider value={value}>
       {children}
-    </OvertimeReportPaginationContext.Provider>
+    </UndertimeReportPaginationContext.Provider>
   );
 }

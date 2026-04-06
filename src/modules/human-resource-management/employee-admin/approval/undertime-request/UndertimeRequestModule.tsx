@@ -1,21 +1,20 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { OvertimeTable } from "@/modules/human-resource-management/employee-admin/approval/overtime-request/components/OvertimeTable";
-import { OvertimeRequestFilters } from "@/modules/human-resource-management/employee-admin/approval/overtime-request/components/OvertimeRequestFilters";
+import { UndertimeTable } from "./components/UndertimeTable";
+import { UndertimeRequestFilters } from "./components/UndertimeRequestFilters";
 import {
-  fetchOvertimeRequests,
-  approveOrRejectOvertimeRequest,
-} from "@/modules/human-resource-management/employee-admin/approval/overtime-request/providers/fetchProvider";
-import type { OvertimeRequestWithUser } from "@/modules/human-resource-management/employee-admin/approval/overtime-request/type";
-import { Spinner } from "@/components/ui/spinner";
+  fetchUndertimeRequests,
+  approveOrRejectUndertimeRequest,
+} from "./providers/fetchProvider";
+import type { UndertimeRequestWithUser } from "./type";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export default function OvertimeApprovalContent() {
-  const [requests, setRequests] = useState<OvertimeRequestWithUser[]>([]);
+export default function UndertimeRequestModule() {
+  const [requests, setRequests] = useState<UndertimeRequestWithUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,11 +28,11 @@ export default function OvertimeApprovalContent() {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetchOvertimeRequests();
+      const response = await fetchUndertimeRequests();
       setRequests(response.data);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to load overtime requests";
+        err instanceof Error ? err.message : "Failed to load undertime requests";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -45,49 +44,49 @@ export default function OvertimeApprovalContent() {
     loadData();
   }, []);
 
-  const handleApprove = async (overtimeId: number, remarks: string) => {
+  const handleApprove = async (undertimeId: number, remarks: string) => {
     try {
-      await approveOrRejectOvertimeRequest({
-        overtime_id: overtimeId,
+      await approveOrRejectUndertimeRequest({
+        undertime_id: undertimeId,
         status: "approved",
         remarks,
         approver_id: 0, // Will be set by API from token
       });
 
-      toast.success("Overtime request approved successfully");
+      toast.success("Undertime request approved successfully");
 
       // Reload data
       await loadData();
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to approve overtime request";
+        err instanceof Error ? err.message : "Failed to approve undertime request";
       toast.error(errorMessage);
       throw err;
     }
   };
 
-  const handleReject = async (overtimeId: number, remarks: string) => {
+  const handleReject = async (undertimeId: number, remarks: string) => {
     try {
-      await approveOrRejectOvertimeRequest({
-        overtime_id: overtimeId,
+      await approveOrRejectUndertimeRequest({
+        undertime_id: undertimeId,
         status: "rejected",
         remarks,
         approver_id: 0, // Will be set by API from token
       });
 
-      toast.success("Overtime request rejected successfully");
+      toast.success("Undertime request rejected successfully");
 
       // Reload data
       await loadData();
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to reject overtime request";
+        err instanceof Error ? err.message : "Failed to reject undertime request";
       toast.error(errorMessage);
       throw err;
     }
   };
 
-  const handleRefresh = async () => {
+  const handleRetry = async () => {
     console.log("Refresh button clicked - reloading data...");
     await loadData();
     console.log("Data reloaded successfully");
@@ -125,7 +124,7 @@ export default function OvertimeApprovalContent() {
           .toLowerCase();
         return (
           fullName.includes(query) ||
-          req.purpose?.toLowerCase().includes(query) ||
+          req.reason?.toLowerCase().includes(query) ||
           req.remarks?.toLowerCase().includes(query)
         );
       });
@@ -164,19 +163,23 @@ export default function OvertimeApprovalContent() {
     return filtered;
   }, [requests, searchQuery, dateFrom, dateTo, nameFilter]);
 
-  if (isLoading) {
-    return (
-      <div className="flex h-100 items-center justify-center">
-        <Spinner className="h-8 w-8" />
-      </div>
-    );
-  }
-
   if (error) {
     return (
-      <Alert variant="destructive">
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle>Undertime Request Approval</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <div className="mt-4">
+            <Button onClick={handleRetry} variant="outline">
+              Retry
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -186,16 +189,16 @@ export default function OvertimeApprovalContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Overtime Request
+            Undertime Request
           </h1>
           <p className="text-muted-foreground">
-            View overtime requests for your department
+            View undertime requests for your department
           </p>
         </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={handleRefresh}
+          onClick={handleRetry}
           disabled={isLoading}
           className="gap-2"
         >
@@ -206,7 +209,7 @@ export default function OvertimeApprovalContent() {
       {/* Filters Card */}
       <Card>
         <CardContent className="pt-6">
-          <OvertimeRequestFilters
+          <UndertimeRequestFilters
             searchQuery={searchQuery}
             dateFrom={dateFrom}
             dateTo={dateTo}
@@ -225,16 +228,16 @@ export default function OvertimeApprovalContent() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Showing <span className="font-semibold">{filteredRequests.length}</span>{" "}
-          of <span className="font-semibold">{requests.length}</span> overtime{" "}
+          of <span className="font-semibold">{requests.length}</span> undertime{" "}
           {requests.length === 1 ? "request" : "requests"}
         </p>
       </div>
 
-      <OvertimeTable
+      <UndertimeTable
         data={filteredRequests}
         onApprove={handleApprove}
         onReject={handleReject}
-        onRefresh={handleRefresh}
+        onRefresh={handleRetry}
         isLoading={isLoading}
       />
     </div>

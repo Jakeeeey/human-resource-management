@@ -1,16 +1,14 @@
-// Type definitions for overtime report
+// Type definitions for leave report
 
-export interface OvertimeRequest {
-  overtime_id: number;
+export interface LeaveRequest {
+  leave_id: number;
   user_id: number;
   department_id: number | null;
-  log_id: number | null;
-  request_date: string;
-  sched_timeout: string;
-  ot_from: string;
-  ot_to: string;
-  duration_minutes: number;
-  purpose: string;
+  leave_type: string;
+  leave_start: string;
+  leave_end: string;
+  total_days: string;
+  reason: string;
   remarks: string | null;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   approver_id: number | null;
@@ -38,13 +36,13 @@ export interface Department {
   department_head_id: number | null;
 }
 
-export interface OvertimeRequestWithDetails extends OvertimeRequest {
+export interface LeaveRequestWithDetails extends LeaveRequest {
   user?: User;
   department?: Department;
   employee_name: string;
 }
 
-export interface OvertimeReportFilters {
+export interface LeaveReportFilters {
   searchQuery: string;
   dateFrom: Date | undefined;
   dateTo: Date | undefined;
@@ -64,8 +62,8 @@ export interface PaginationState {
 // CONTEXT TYPES
 // ============================================================================
 
-export interface OvertimeReportFetchContextType {
-  overtimeRequests: OvertimeRequestWithDetails[];
+export interface LeaveReportFetchContextType {
+  leaveRequests: LeaveRequestWithDetails[];
   departments: Department[];
   currentUser: User | null;
   isLoading: boolean;
@@ -74,8 +72,8 @@ export interface OvertimeReportFetchContextType {
   refetch: () => Promise<void>;
 }
 
-export interface OvertimeReportFilterContextType {
-  filters: OvertimeReportFilters;
+export interface LeaveReportFilterContextType {
+  filters: LeaveReportFilters;
   setSearchQuery: (query: string) => void;
   setDateFrom: (date: Date | undefined) => void;
   setDateTo: (date: Date | undefined) => void;
@@ -83,15 +81,15 @@ export interface OvertimeReportFilterContextType {
   setNameFilter: (name: string | null) => void;
   setStatusFilter: (status: string | null) => void;
   resetFilters: () => void;
-  filterRequests: (requests: OvertimeRequestWithDetails[]) => OvertimeRequestWithDetails[];
+  filterRequests: (requests: LeaveRequestWithDetails[]) => LeaveRequestWithDetails[];
 }
 
-export interface OvertimeReportPaginationContextType {
+export interface LeaveReportPaginationContextType {
   pagination: PaginationState;
   setCurrentPage: (page: number) => void;
   setPageSize: (size: number) => void;
-  paginateRequests: (requests: OvertimeRequestWithDetails[]) => {
-    paginatedData: OvertimeRequestWithDetails[];
+  paginateRequests: (requests: LeaveRequestWithDetails[]) => {
+    paginatedData: LeaveRequestWithDetails[];
     pagination: PaginationState;
   };
 }

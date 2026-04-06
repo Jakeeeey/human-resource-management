@@ -135,18 +135,18 @@ const data = {
                             icon: CalendarClock,
                         },
                         {
-                            title: "Overtime Request",
+                            title: "Overtime Approval",
                             url: "/hrm/employee-admin/approval/overtime-request",
                             icon: CalendarClock,
                         },
                         {
                             title: "Undertime Approval",
-                            url: "/hrm/employee-admin/approval/undertime-approval",
+                            url: "/hrm/employee-admin/approval/undertime-request",
                             icon: CalendarClock,
                         },
                         {
                             title: "Leave Approval",
-                            url: "/hrm/employee-admin/approval/leave-approval",
+                            url: "/hrm/employee-admin/approval/leave-request",
                             icon: CalendarClock,
                         },
                     ],
@@ -164,6 +164,11 @@ const data = {
                         {
                             title: "Undertime Report",
                             url: "/hrm/employee-admin/report/undertime-report",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Leave Report",
+                            url: "/hrm/employee-admin/report/leave-report",
                             icon: CalendarClock,
                         },
                     ],
