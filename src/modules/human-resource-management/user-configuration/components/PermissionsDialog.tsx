@@ -9,7 +9,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { 
     Shield, 
     Lock 
@@ -17,7 +17,6 @@ import {
 import { 
     SubsystemRegistration,
     ModuleRegistration,
-    SubModuleRegistration
 } from "@/modules/human-resource-management/subsystem-registration/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -29,6 +28,8 @@ interface PermissionsDialogProps {
     authorizedItems: string[]; // Current list of authorized slugs
     onUpdate: (userId: string, authorizedItems: string[]) => void;
 }
+
+import { extractAllSlugs } from "@/modules/human-resource-management/user-configuration/utils/permissionUtils";
 
 export function PermissionsDialog({
     open,
@@ -48,13 +49,27 @@ export function PermissionsDialog({
 
     if (!user || !subsystem) return null;
 
-    const toggleItem = (slug: string, checked: boolean) => {
+    const toggleItem = (slug: string, checked: boolean, item?: SubsystemRegistration | ModuleRegistration, parentSlugs: string[] = []) => {
+        const slugsToToggle = item ? extractAllSlugs(item) : [slug];
+
         if (checked) {
-            setLocalAuthorized([...localAuthorized, slug]);
+            // Recursive ON: Enable target + all children + all parents in path
+            setLocalAuthorized(prev => Array.from(new Set([...prev, ...slugsToToggle, ...parentSlugs])));
         } else {
-            // If we uncheck a parent, should we uncheck children?
-            // For now, just a flat toggle, but we can add cascading logic later.
-            setLocalAuthorized(localAuthorized.filter(s => s !== slug));
+            // Recursive OFF: Disable target + all children
+            setLocalAuthorized(prev => prev.filter(s => !slugsToToggle.includes(s)));
+        }
+    };
+    
+    const handleGlobalToggle = (checked: boolean) => {
+        if (!subsystem) return;
+        const allSlugs = extractAllSlugs(subsystem);
+        
+        if (checked) {
+            setLocalAuthorized(prev => Array.from(new Set([...prev, ...allSlugs])));
+        } else {
+            // Reset to only subsystem access
+            setLocalAuthorized([subsystem.slug]);
         }
     };
 
@@ -67,67 +82,89 @@ export function PermissionsDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] h-[70vh] flex flex-col p-0">
-                <DialogHeader className="p-6 pb-0">
-                    <DialogTitle className="flex items-center gap-2">
+            <DialogContent showCloseButton={false} className="p-0 sm:max-w-[650px] h-[75vh] sm:h-[85vh] flex flex-col overflow-hidden rounded-2xl border shadow-2xl bg-background">
+                <DialogHeader className="p-5 pb-3 border-b bg-muted/20 shrink-0 flex-none">
+                    <DialogTitle className="flex items-center gap-2 text-lg font-black tracking-tight">
                         <Shield className="h-5 w-5 text-primary" />
                         Permissions: {user.full_name}
                     </DialogTitle>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Configure access for <span className="font-bold text-foreground">{subsystem.title}</span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 font-medium uppercase tracking-wider">
+                        Configuring <span className="font-bold text-primary">{subsystem.title}</span> Access
                     </p>
                 </DialogHeader>
 
-                <ScrollArea className="flex-1 p-6">
-                    <div className="space-y-4">
-                        <div className="flex items-center space-x-3 p-3 rounded-lg border bg-muted/30">
-                            <Checkbox 
-                                id="subsystem-access" 
-                                checked={isSubsystemChecked}
-                                onCheckedChange={(checked) => toggleItem(subsystem.slug, !!checked)}
-                            />
-                            <div className="grid gap-1.5 leading-none">
-                                <label
-                                    htmlFor="subsystem-access"
-                                    className="text-sm font-semibold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                    Enable Subsystem Access
-                                </label>
-                                <p className="text-xs text-muted-foreground">
-                                    Main entry point for this system.
-                                </p>
+                <div className="flex-1 overflow-hidden min-h-0">
+                    <ScrollArea className="h-full w-full px-5 py-0">
+                        <div className="space-y-3">
+                            <div className="flex items-center space-x-3 p-3 rounded-xl border bg-primary/[0.02] border-primary/10 shadow-sm leading-tight transition-all">
+                                <Switch 
+                                    id="subsystem-access" 
+                                    checked={isSubsystemChecked}
+                                    onCheckedChange={(checked) => toggleItem(subsystem.slug, !!checked, subsystem)}
+                                />
+                                <div className="grid gap-0.5 pointer-events-none">
+                                    <label
+                                        htmlFor="subsystem-access"
+                                        className="text-xs font-bold leading-none cursor-pointer"
+                                    >
+                                        Enable Subsystem Access
+                                    </label>
+                                    <p className="text-[10px] text-muted-foreground font-medium">
+                                        Primary entry point for this system.
+                                    </p>
+                                </div>
                             </div>
+
+                            {!isSubsystemChecked && (
+                                <div className="text-center py-10 bg-muted/5 rounded-2xl border border-dashed border-muted-foreground/20">
+                                    <Lock className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
+                                    <p className="text-[11px] text-muted-foreground font-medium">Enable access to configure specific modules.</p>
+                                </div>
+                            )}
+
+                            {isSubsystemChecked && (
+                                <div className="space-y-4 pl-0.5">
+                                    <div className="flex items-center justify-between border-b pb-1">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary/60">Modules & Sub-modules</h4>
+                                        <div className="flex items-center gap-3">
+                                            <button 
+                                                onClick={() => handleGlobalToggle(true)}
+                                                className="text-[9px] font-black text-primary/60 hover:text-primary hover:underline underline-offset-2 tracking-widest transition-all"
+                                            >
+                                                SELECT ALL
+                                            </button>
+                                            <div className="h-2 w-[1px] bg-muted-foreground/20" />
+                                            <button 
+                                                onClick={() => handleGlobalToggle(false)}
+                                                className="text-[9px] font-black text-muted-foreground hover:text-destructive transition-colors tracking-widest"
+                                            >
+                                                CLEAR ALL
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {subsystem.modules?.map((module) => (
+                                            <ModulePermissionItem
+                                                key={module.id}
+                                                module={module}
+                                                authorizedItems={localAuthorized}
+                                                parentSlugs={[subsystem.slug]}
+                                                onToggle={(slug, checked, item, path) => toggleItem(slug, checked, item, path)}
+                                            />
+                                        ))}
+                                        {(!subsystem.modules || subsystem.modules.length === 0) && (
+                                            <p className="text-xs italic text-muted-foreground py-4 text-center">No modules defined for this subsystem.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
+                    </ScrollArea>
+                </div>
 
-                        {!isSubsystemChecked && (
-                            <div className="text-center py-6 bg-muted/10 rounded-lg border border-dashed">
-                                <Lock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-                                <p className="text-xs text-muted-foreground">Enable subsystem access to configure modules.</p>
-                            </div>
-                        )}
-
-                        {isSubsystemChecked && (
-                            <div className="space-y-4 pl-1">
-                                <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Modules & Sub-modules</h4>
-                                {subsystem.modules?.map((module) => (
-                                    <ModulePermissionItem
-                                        key={module.id}
-                                        module={module}
-                                        authorizedItems={localAuthorized}
-                                        onToggle={(slug, checked) => toggleItem(slug, checked)}
-                                    />
-                                ))}
-                                {(!subsystem.modules || subsystem.modules.length === 0) && (
-                                    <p className="text-xs italic text-muted-foreground">No modules defined for this subsystem.</p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </ScrollArea>
-
-                <DialogFooter className="p-6 pt-2 border-t">
-                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={handleSave}>Apply Permissions</Button>
+                <DialogFooter className="p-5 py-4 border-t bg-muted/10 shrink-0 flex-none flex items-center justify-end gap-2">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-9 px-4 rounded-xl text-xs font-bold opacity-60 hover:opacity-100">CANCEL</Button>
+                    <Button onClick={handleSave} className="h-9 px-8 rounded-xl font-black shadow-xl shadow-primary/20 bg-primary text-xs tracking-widest">APPLY</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -137,50 +174,68 @@ export function PermissionsDialog({
 function ModulePermissionItem({ 
     module, 
     authorizedItems, 
+    parentSlugs,
     onToggle 
 }: { 
     module: ModuleRegistration; 
     authorizedItems: string[]; 
-    onToggle: (slug: string, checked: boolean) => void 
+    parentSlugs: string[];
+    onToggle: (slug: string, checked: boolean, item?: ModuleRegistration, parentSlugs?: string[]) => void 
 }) {
     const isChecked = authorizedItems.includes(module.slug);
     const hasChildren = module.subModules && module.subModules.length > 0;
+    
+    // Check if all children are checked
+    const allChildrenChecked = hasChildren && module.subModules?.every(s => authorizedItems.includes(s.slug));
 
     return (
         <div className="space-y-2">
-            <div className="flex items-center space-x-3">
-                <Checkbox 
+            <div className="flex items-center space-x-3 group">
+                <Switch 
                     id={`module-${module.id}`} 
                     checked={isChecked}
-                    onCheckedChange={(checked) => onToggle(module.slug, !!checked)}
+                    onCheckedChange={(checked) => onToggle(module.slug, !!checked, module, parentSlugs)}
                 />
                 <label
                     htmlFor={`module-${module.id}`}
-                    className="text-sm font-medium leading-none cursor-pointer"
+                    className="text-sm font-medium leading-none cursor-pointer flex items-center gap-2"
                 >
                     {module.title}
                 </label>
+                
+                {isChecked && hasChildren && (
+                    <button 
+                        onClick={() => {
+                            if (allChildrenChecked) {
+                                // Clear children except current module
+                                onToggle(module.slug, false, module);
+                                onToggle(module.slug, true); // Keep parent
+                            } else {
+                                // Select all children
+                                onToggle(module.slug, true, module, parentSlugs);
+                            }
+                        }}
+                        className="text-[8px] font-black text-primary/40 hover:text-primary transition-colors tracking-tighter uppercase whitespace-nowrap bg-primary/5 px-1.5 py-0.5 rounded-md border border-primary/10 ml-2"
+                    >
+                        {allChildrenChecked ? "Unselect All" : "Select All"}
+                    </button>
+                )}
             </div>
 
             {isChecked && hasChildren && (
-                <div className="pl-7 space-y-2 border-l-2 ml-1.5 py-1">
-                    {module.subModules.map((sub: SubModuleRegistration) => (
-                        <div key={sub.id} className="flex items-center space-x-3">
-                            <Checkbox 
-                                id={`sub-${sub.id}`} 
-                                checked={authorizedItems.includes(sub.slug)}
-                                onCheckedChange={(checked) => onToggle(sub.slug, !!checked)}
-                            />
-                            <label
-                                htmlFor={`sub-${sub.id}`}
-                                className="text-xs leading-none cursor-pointer"
-                            >
-                                {sub.title}
-                            </label>
-                        </div>
+                <div className="pl-6 space-y-3 border-l-2 ml-1.5 py-1">
+                    {module.subModules?.map((sub) => (
+                        <ModulePermissionItem
+                            key={sub.id}
+                            module={sub}
+                            authorizedItems={authorizedItems}
+                            parentSlugs={[...parentSlugs, module.slug]}
+                            onToggle={onToggle}
+                        />
                     ))}
                 </div>
             )}
         </div>
     );
 }
+

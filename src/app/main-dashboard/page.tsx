@@ -4,26 +4,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import * as Icons from "lucide-react";
 import {
     Search,
     ArrowUpRight,
     Sparkles,
     Timer,
     CheckCircle2,
-    Boxes,
-    Users,
-    Landmark,
-    Settings,
-    ShieldCheck,
-    Factory,
-    FolderKanban,
-    MessagesSquare,
-    Activity,
-    BarChart3, // ✅ added for BIA
     Sun,
     Moon,
     Monitor,
     ExternalLink,
+    Activity,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -38,13 +30,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
+import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
+import { usePermissionsStore } from "@/stores/usePermissionsStore";
+// Unused Select components removed to fix linting warnings
 
 type Status = "active" | "comingSoon";
 
@@ -73,259 +62,6 @@ type SubsystemItem = {
     tag?: string;
     submodules: SubmoduleItem[];
 };
-
-type Position =
-    | "All Access"
-    | "Admin"
-    | "SCM Staff"
-    | "Finance Staff"
-    | "HR Staff"
-    | "Sales/CRM Staff"
-    | "Auditor"
-    | "PMO";
-
-const POSITION_ACCESS: Record<Position, string[]> = {
-    "All Access": [
-        "scm",
-        "crm",
-        "finance",
-        "hr",
-        "mfg",
-        "pm",
-        "arf",
-        "comms",
-        "pm-monitoring",
-        "bia", // ✅ added
-    ],
-    Admin: [
-        "scm",
-        "crm",
-        "finance",
-        "hr",
-        "mfg",
-        "pm",
-        "arf",
-        "comms",
-        "pm-monitoring",
-        "bia", // ✅ added
-    ],
-    "SCM Staff": ["scm", "mfg"],
-    "Finance Staff": ["finance"],
-    "HR Staff": ["hr"],
-    "Sales/CRM Staff": ["crm", "comms"],
-    Auditor: ["arf", "finance"],
-    PMO: ["pm", "pm-monitoring"],
-};
-
-const POSITIONS: Position[] = [
-    "All Access",
-    "Admin",
-    "SCM Staff",
-    "Finance Staff",
-    "HR Staff",
-    "Sales/CRM Staff",
-    "Auditor",
-    "PMO",
-];
-
-const SUBSYSTEMS: SubsystemItem[] = [
-    {
-        id: "scm",
-        title: "Supply Chain Management",
-        subtitle: "Procurement, inventory, logistics, distribution operations",
-        href: "/scm",
-        status: "comingSoon",
-        category: "Operations",
-        icon: Boxes,
-        tag: "SCM",
-        accentClass:
-            "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-500/20",
-        submodules: [
-            { id: "inventory", title: "Inventory" },
-            { id: "logistics", title: "Logistics" },
-            { id: "purchasing", title: "Purchasing" },
-            { id: "warehouse", title: "Warehouse", status: "comingSoon" },
-            { id: "suppliers", title: "Suppliers", status: "comingSoon" },
-            { id: "fleet", title: "Fleet", status: "comingSoon" },
-        ],
-    },
-
-    // ✅ NEW: Business Intelligence & Analytics (no href yet)
-    {
-        id: "bia",
-        title: "Business Intelligence & Analytics",
-        subtitle: "Dashboards, KPIs, performance analytics, drill-down reporting",
-        href: "/bia",
-        status: "comingSoon",
-        category: "Monitoring & Oversight",
-        icon: BarChart3,
-        tag: "BIA",
-        accentClass:
-            "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 ring-1 ring-indigo-500/20",
-        submodules: [
-            { id: "executive", title: "Executive Dashboard", status: "comingSoon" },
-            { id: "managerial", title: "Managerial Views", status: "comingSoon" },
-            { id: "supervisory", title: "Supervisory Views", status: "comingSoon" },
-            { id: "sales-kpi", title: "Sales KPI", status: "comingSoon" },
-            { id: "inventory-analytics", title: "Inventory Analytics", status: "comingSoon" },
-        ],
-    },
-
-    {
-        id: "crm",
-        title: "Customer Relationship Management",
-        subtitle: "Customers, accounts, pipeline, quotations, after-sales linkage",
-        href: "/crm",
-        status: "comingSoon",
-        category: "Customer & Engagement",
-        icon: Users,
-        tag: "CRM",
-        accentClass:
-            "bg-blue-500/10 text-blue-600 dark:text-blue-300 ring-1 ring-blue-500/20",
-        submodules: [
-            { id: "customers", title: "Customers", status: "comingSoon" },
-            { id: "leads", title: "Leads", status: "comingSoon" },
-            { id: "opportunities", title: "Opportunities", status: "comingSoon" },
-            { id: "quotations", title: "Quotations", status: "comingSoon" },
-            { id: "after-sales", title: "After-Sales", status: "comingSoon" },
-        ],
-    },
-    {
-        id: "finance",
-        title: "Financial Management",
-        subtitle: "General ledger, AR/AP, budgeting, cash & bank, compliance",
-        href: "/fm",
-        status: "comingSoon",
-        category: "Corporate Services",
-        icon: Landmark,
-        tag: "FIN",
-        accentClass:
-            "bg-violet-500/10 text-violet-600 dark:text-violet-300 ring-1 ring-violet-500/20",
-        submodules: [
-            { id: "overview", title: "Overview" },
-            { id: "gl", title: "GL", status: "comingSoon" },
-            { id: "ar", title: "AR", status: "comingSoon" },
-            { id: "ap", title: "AP", status: "comingSoon" },
-            { id: "cash-bank", title: "Cash & Bank", status: "comingSoon" },
-            { id: "budget", title: "Budget", status: "comingSoon" },
-            { id: "tax", title: "Tax", status: "comingSoon" },
-            { id: "coa", title: "COA", status: "comingSoon" },
-            { id: "settings", title: "Settings", status: "comingSoon" },
-        ],
-    },
-    {
-        id: "hr",
-        title: "Human Resources",
-        subtitle: "Timekeeping, payroll, benefits, employee master, performance",
-        href: "/hrm",
-        status: "active",
-        category: "Corporate Services",
-        icon: Settings,
-        tag: "HR",
-        accentClass:
-            "bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/20",
-        submodules: [
-            { id: "employees", title: "Employees", status: "comingSoon" },
-            { id: "attendance", title: "Attendance", status: "comingSoon" },
-            { id: "payroll", title: "Payroll", status: "comingSoon" },
-            { id: "benefits", title: "Benefits", status: "comingSoon" },
-            { id: "leaves", title: "Leaves", status: "comingSoon" },
-            { id: "performance", title: "Performance", status: "comingSoon" },
-        ],
-    },
-    {
-        id: "mfg",
-        title: "Manufacturing",
-        subtitle: "Production planning, BOM, work orders, quality, WIP tracking",
-        href: "/manufacturing",
-        status: "comingSoon",
-        category: "Operations",
-        icon: Factory,
-        tag: "MFG",
-        accentClass:
-            "bg-rose-500/10 text-rose-600 dark:text-rose-300 ring-1 ring-rose-500/20",
-        submodules: [
-            { id: "bom", title: "BOM", status: "comingSoon" },
-            { id: "mrp", title: "MRP", status: "comingSoon" },
-            { id: "work-orders", title: "Work Orders", status: "comingSoon" },
-            { id: "wip", title: "WIP", status: "comingSoon" },
-            { id: "qc", title: "Quality", status: "comingSoon" },
-        ],
-    },
-    {
-        id: "pm",
-        title: "Project Management",
-        subtitle: "Projects, tasks, assignments, timelines, deliverables, costing",
-        href: "/projects",
-        status: "comingSoon",
-        category: "Operations",
-        icon: FolderKanban,
-        tag: "PM",
-        accentClass:
-            "bg-sky-500/10 text-sky-600 dark:text-sky-300 ring-1 ring-sky-500/20",
-        submodules: [
-            { id: "projects", title: "Projects", status: "comingSoon" },
-            { id: "tasks", title: "Tasks", status: "comingSoon" },
-            { id: "assignments", title: "Assignments", status: "comingSoon" },
-            { id: "timeline", title: "Timeline", status: "comingSoon" },
-            { id: "costing", title: "Costing", status: "comingSoon" },
-        ],
-    },
-    {
-        id: "arf",
-        title: "Audit Results Findings",
-        subtitle: "Audit issues, corrective actions, evidence, compliance follow-up",
-        href: "/arf",
-        status: "comingSoon",
-        category: "Governance & Assurance",
-        icon: ShieldCheck,
-        tag: "ARF",
-        accentClass:
-            "bg-slate-500/10 text-slate-700 dark:text-slate-200 ring-1 ring-slate-500/15",
-        submodules: [
-            { id: "findings", title: "Findings", status: "comingSoon" },
-            { id: "actions", title: "Action Plans", status: "comingSoon" },
-            { id: "evidence", title: "Evidence", status: "comingSoon" },
-            { id: "compliance", title: "Compliance", status: "comingSoon" },
-        ],
-    },
-    {
-        id: "comms",
-        title: "Integrated Communications",
-        subtitle: "Announcements, messaging, notifications, tickets/case linkage",
-        href: "/comms",
-        status: "comingSoon",
-        category: "Customer & Engagement",
-        icon: MessagesSquare,
-        tag: "COMMS",
-        accentClass:
-            "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-300 ring-1 ring-fuchsia-500/20",
-        submodules: [
-            { id: "announcements", title: "Announcements", status: "comingSoon" },
-            { id: "chat", title: "Chat", status: "comingSoon" },
-            { id: "notifications", title: "Notifications", status: "comingSoon" },
-            { id: "inbox", title: "Inbox", status: "comingSoon" },
-        ],
-    },
-    {
-        id: "pm-monitoring",
-        title: "PM Monitoring",
-        subtitle: "Program monitoring, KPIs, status tracking, escalation visibility",
-        href: "/pm-monitoring",
-        status: "comingSoon",
-        category: "Monitoring & Oversight",
-        icon: Activity,
-        tag: "PMO",
-        accentClass:
-            "bg-zinc-500/10 text-zinc-700 dark:text-zinc-200 ring-1 ring-zinc-500/15",
-        submodules: [
-            { id: "kpis", title: "KPIs", status: "comingSoon" },
-            { id: "dashboards", title: "Dashboards", status: "comingSoon" },
-            { id: "milestones", title: "Milestones", status: "comingSoon" },
-            { id: "escalations", title: "Escalations", status: "comingSoon" },
-        ],
-    },
-];
 
 const CATEGORY_ORDER: SubsystemCategory[] = [
     "Operations",
@@ -509,8 +245,10 @@ function ModeToggle() {
 
 export default function ERPMainDashboard() {
     const [q, setQ] = React.useState("");
-    const [position, setPosition] = React.useState<Position>("All Access");
     const [isCompactHeader, setIsCompactHeader] = React.useState(false);
+    const [registeredSubsystems, setRegisteredSubsystems] = React.useState<SubsystemRegistration[]>([]);
+
+    const { permissions: authorizedSubsystems, isAdmin, isLoading: loadingPermissions, fetchPermissions } = usePermissionsStore();
 
     React.useEffect(() => {
         const onScroll = () => setIsCompactHeader(window.scrollY > 36);
@@ -520,20 +258,46 @@ export default function ERPMainDashboard() {
     }, []);
 
     React.useEffect(() => {
-        try {
-            const saved = window.localStorage.getItem("vos_position");
-            if (saved && POSITIONS.includes(saved as Position)) setPosition(saved as Position);
-        } catch {}
-    }, []);
+        const load = async () => {
+            fetchPermissions();
+            // Load registry
+            const registry = await SubsystemService.getSubsystems();
+            setRegisteredSubsystems(registry);
+        };
+        load();
+    }, [fetchPermissions]);
 
-    React.useEffect(() => {
-        try {
-            window.localStorage.setItem("vos_position", position);
-        } catch {}
-    }, [position]);
+    const subsystems = React.useMemo(() => {
+        return registeredSubsystems.map((s: SubsystemRegistration): SubsystemItem => {
+            // Type-safe lookup in Icons registry
+            const IconComponent = Icons[s.icon_name as keyof typeof Icons] as React.ComponentType<{ className?: string }> || Icons.Activity;
+            
+            return {
+                id: s.slug,
+                title: s.title,
+                subtitle: s.subtitle,
+                href: s.base_path,
+                status: s.status,
+                category: s.category as SubsystemCategory,
+                icon: IconComponent,
+                tag: s.tag,
+                accentClass: "bg-primary/10 text-primary dark:text-primary-foreground ring-1 ring-primary/20",
+                submodules: [],
+            };
+        });
+    }, [registeredSubsystems]);
 
-    const allowedIds = React.useMemo(() => new Set(POSITION_ACCESS[position] || []), [position]);
-    const positionFiltered = React.useMemo(() => SUBSYSTEMS.filter((s) => allowedIds.has(s.id)), [allowedIds]);
+
+
+    const allowedIds = React.useMemo(() => {
+        // Only show subsystems explicitly authorized in the database
+        return new Set(authorizedSubsystems || []);
+    }, [authorizedSubsystems]);
+
+    const positionFiltered = React.useMemo(() => {
+        if (isAdmin) return subsystems;
+        return subsystems.filter((s) => allowedIds.has(s.id));
+    }, [allowedIds, subsystems, isAdmin]);
 
     const filtered = React.useMemo(() => filterSubsystems(positionFiltered, q), [positionFiltered, q]);
     const grouped = React.useMemo(() => groupByCategory(filtered), [filtered]);
@@ -597,41 +361,23 @@ export default function ERPMainDashboard() {
                                     <Badge variant="secondary" className="h-6 px-2 text-[12px]">
                                         Active (Visible): {totalActiveVisible}
                                     </Badge>
-                                    <Badge variant="secondary" className="h-6 px-2 text-[12px]">
-                                        Position: {position}
-                                    </Badge>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <div className={cn("grid gap-3", "sm:grid-cols-[200px_1fr]")}>
-                                    <Select value={position} onValueChange={(v) => setPosition(v as Position)}>
-                                        <SelectTrigger className="bg-background/70 backdrop-blur">
-                                            <SelectValue placeholder="Select position" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {POSITIONS.map((p) => (
-                                                <SelectItem key={p} value={p}>
-                                                    {p}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-
-                                    <div className="relative">
-                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            value={q}
-                                            onChange={(e) => setQ(e.target.value)}
-                                            placeholder="Search subsystems/submodules…"
-                                            className="pl-9 bg-background/70 backdrop-blur"
-                                        />
-                                    </div>
+                                <div className="relative">
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        value={q}
+                                        onChange={(e) => setQ(e.target.value)}
+                                        placeholder="Search subsystems/submodules…"
+                                        className="pl-9 bg-background/70 backdrop-blur"
+                                    />
                                 </div>
 
                                 {!isCompactHeader ? (
-                                    <div className="text-xs text-muted-foreground">
-                                        Note: This hides subsystems the selected position cannot access. Enforce authorization on routes/APIs as well.
+                                    <div className="text-xs text-muted-foreground text-right italic font-medium">
+                                        Access is strictly enforced based on your assigned permissions.
                                     </div>
                                 ) : null}
                             </div>
@@ -646,10 +392,17 @@ export default function ERPMainDashboard() {
                 style={{ paddingTop: headerOffset }}
             >
                 <div className="space-y-8">
-                    {filtered.length === 0 ? (
+                    {loadingPermissions ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4">
+                            <Activity className="h-10 w-10 text-primary animate-pulse" />
+                            <p className="text-sm font-bold tracking-tighter text-muted-foreground uppercase">Verifying Access Permissions...</p>
+                        </div>
+                    ) : filtered.length === 0 ? (
                         <Card className="border bg-background/50 p-8 backdrop-blur">
                             <div className="text-sm text-muted-foreground">
-                                No visible subsystems match “{q.trim()}” for position “{position}”.
+                                {q.trim() 
+                                    ? `No visible subsystems match "${q.trim()}" for your account.` 
+                                    : "You do not have access to any subsystems. Please contact your Administrator."}
                             </div>
                         </Card>
                     ) : (

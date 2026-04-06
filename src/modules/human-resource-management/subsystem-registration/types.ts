@@ -1,20 +1,13 @@
 export type SubsystemStatus = "active" | "comingSoon";
 
-export interface SubModuleRegistration {
-    id: string;
-    slug: string;
-    title: string;
-    base_path: string;
-    status: SubsystemStatus;
-}
-
 export interface ModuleRegistration {
     id: string;
     slug: string;
     title: string;
     base_path: string;
     status: SubsystemStatus;
-    subModules: SubModuleRegistration[];
+    icon_name?: string;
+    subModules?: ModuleRegistration[];
 }
 
 export interface SubsystemRegistration {

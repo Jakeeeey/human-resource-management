@@ -9,7 +9,20 @@ function isProtectedPath(pathname: string) {
     return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
-export function middleware(req: NextRequest) {
+function decodeJwt(token: string): Record<string, unknown> | null {
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
+        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        while (s.length % 4) s += "=";
+        const json = Buffer.from(s, "base64").toString("utf8");
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
+
+export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_AUTH_DISABLED === "true") {
         return NextResponse.next()
     }
@@ -46,7 +59,112 @@ export function middleware(req: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    return NextResponse.next()
+    // --- Subsystem Authorization ---
+    const payload = decodeJwt(token);
+    
+    // Map path to subsystem ID and specific module slug
+    const subsystemMatch = PROTECTED_PREFIXES.find((p) => pathname.startsWith(p));
+    if (subsystemMatch) {
+        const subsystemId = subsystemMatch.replace("/", "");
+        
+        // Dashboard is always allowed if logged in
+        if (subsystemId === "dashboard" || subsystemId === "main-dashboard") {
+            return NextResponse.next();
+        }
+
+        let authorizedSubsystemPaths: string[] = [];
+        let authorizedModulePaths: string[] = [];
+        let allModulePaths: string[] = [];
+        
+        const directusBase = process.env.NEXT_PUBLIC_API_BASE_URL;
+        const directusToken = process.env.DIRECTUS_STATIC_TOKEN;
+
+        if (directusBase && directusToken && payload && payload.sub) {
+            try {
+                // Fetch LIVE permissions from junction tables + User Role
+                const [subRes, modRes, allModsRes, userRes] = await Promise.all([
+                    fetch(`${directusBase}/items/user_access_subsystems?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=subsystem_id.base_path`, {
+                        headers: { "Authorization": `Bearer ${directusToken}` },
+                        cache: 'no-store'
+                    }),
+                    fetch(`${directusBase}/items/user_access_modules?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=module_id.base_path`, {
+                        headers: { "Authorization": `Bearer ${directusToken}` },
+                        cache: 'no-store'
+                    }),
+                    fetch(`${directusBase}/items/modules?limit=-1&fields=base_path`, {
+                        headers: { "Authorization": `Bearer ${directusToken}` },
+                        cache: 'no-store'
+                    }),
+                    fetch(`${directusBase}/items/user/${payload.sub}?fields=role,isAdmin`, {
+                        headers: { "Authorization": `Bearer ${directusToken}` },
+                        cache: 'no-store'
+                    })
+                ]);
+
+                if (subRes.ok && modRes.ok && allModsRes.ok && userRes.ok) {
+                    const [subData, modData, allModsData, userData] = await Promise.all([
+                        subRes.json(), 
+                        modRes.json(), 
+                        allModsRes.json(),
+                        userRes.json()
+                    ]);
+
+                    const u = userData?.data || {};
+                    const isAdmin = u.role === "ADMIN" || u.isAdmin === 1 || u.isAdmin === true;
+                    if (isAdmin) {
+                        return NextResponse.next(); // SILENT BYPASS for Admins
+                    }
+
+                    authorizedSubsystemPaths = (subData.data || []).map((row: { subsystem_id?: { base_path?: string } }) => row.subsystem_id?.base_path?.trim()).filter(Boolean) as string[];
+                    authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
+                    allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
+                } 
+            } catch (err) {
+                 console.error("[Middleware] Failed to fetch permissions from Directus:", err);
+            }
+        }
+
+        // --- Stricter URL Matching Logic ---
+        const cleanPathname = pathname.replace(/\/$/, "");
+        let isAuthorized = false;
+
+        // 1. Root Subsystem Match (e.g. exactly /hrm)
+        if (authorizedSubsystemPaths.includes(cleanPathname)) {
+            isAuthorized = true;
+        }
+
+        // 2. Exact Module Match or Sub-Route of Module
+        if (!isAuthorized) {
+            if (authorizedModulePaths.includes(cleanPathname)) {
+                isAuthorized = true;
+            } else {
+                if (allModulePaths.includes(cleanPathname)) {
+                    isAuthorized = false;
+                } else {
+                    isAuthorized = authorizedModulePaths.some(p => p !== "/" && p !== "" && cleanPathname.startsWith(p + "/"));
+                }
+            }
+        }
+
+        console.log("=== MIDDLEWARE DEBUG ===");
+        console.log("cleanPathname:", cleanPathname);
+        console.log("authorizedSubsystemPaths:", authorizedSubsystemPaths);
+        console.log("authorizedModulePaths:", authorizedModulePaths);
+        console.log("allModulePaths.includes(cleanPathname):", allModulePaths.includes(cleanPathname));
+        console.log("isAuthorized:", isAuthorized);
+        console.log("========================");
+
+        if (!isAuthorized) {
+            console.warn(`[Middleware] Unauthorized access attempt: User ${payload?.email} -> ${pathname}`);
+            const url = req.nextUrl.clone();
+            url.pathname = "/main-dashboard";
+            url.searchParams.set("error", "unauthorized_access");
+            url.searchParams.set("module", subsystemId);
+            return NextResponse.redirect(url);
+        }
+    }
+
+    return NextResponse.next();
 }
 
 export const config = {
