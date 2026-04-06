@@ -39,15 +39,17 @@ export async function GET() {
     }
 
     try {
-        const filter = JSON.stringify({ user_id: { _eq: userId } });
-        
-        // Parallel fetch from both junction tables
-        const [subRes, modRes] = await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user_access_subsystems?filter=${encodeURIComponent(filter)}&limit=-1&fields=subsystem_id.slug`, {
+        // Parallel fetch from junction tables + custom user collection
+        const [subRes, modRes, userRes] = await Promise.all([
+            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user_access_subsystems?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: userId } }))}&limit=-1&fields=subsystem_id.slug`, {
                 headers: { "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` },
                 next: { revalidate: 0 }
             }),
-            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user_access_modules?filter=${encodeURIComponent(filter)}&limit=-1&fields=module_id.slug`, {
+            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user_access_modules?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: userId } }))}&limit=-1&fields=module_id.slug`, {
+                headers: { "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` },
+                next: { revalidate: 0 }
+            }),
+            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user/${userId}?fields=role,isAdmin`, {
                 headers: { "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` },
                 next: { revalidate: 0 }
             })
@@ -57,19 +59,24 @@ export async function GET() {
             return NextResponse.json({ ok: false, message: "Failed to fetch permissions" }, { status: 500 });
         }
 
-        const [subData, modData] = await Promise.all([subRes.json(), modRes.json()]);
+        const [subData, modData, userData] = await Promise.all([subRes.json(), modRes.json(), userRes.json()]);
+        
+        // ADMIN Logic matching DDL: role === "ADMIN" or isAdmin === 1
+        const u = userData?.data || {};
+        const isAdmin = u.role === "ADMIN" || u.isAdmin === 1 || u.isAdmin === true;
         
         // Merge slugs from both tables
         const permissions = [
-            ...(subData.data || []).map((row: any) => row.subsystem_id?.slug),
-            ...(modData.data || []).map((row: any) => row.module_id?.slug)
-        ].filter(Boolean);
+            ...(subData.data || []).map((row: { subsystem_id?: { slug?: string } }) => row.subsystem_id?.slug),
+            ...(modData.data || []).map((row: { module_id?: { slug?: string } }) => row.module_id?.slug)
+        ].filter(Boolean) as string[];
 
         return NextResponse.json({
             ok: true,
             userId,
             email: payload?.email,
-            permissions
+            isAdmin,
+            permissions: isAdmin ? ["*"] : permissions // "*" can be a flag for all access
         });
     } catch (error) {
         console.error("[UserProfileAPI] Error:", error);

@@ -80,29 +80,44 @@ export async function middleware(req: NextRequest) {
         const directusToken = process.env.DIRECTUS_STATIC_TOKEN;
 
         if (directusBase && directusToken && payload && payload.sub) {
-            const filter = JSON.stringify({ user_id: { _eq: payload.sub } });
             try {
-                // Fetch LIVE permissions from junction tables using EXACT base_path and bypass cache
-                const [subRes, modRes, allModsRes] = await Promise.all([
-                    fetch(`${directusBase}/items/user_access_subsystems?filter=${encodeURIComponent(filter)}&limit=-1&fields=subsystem_id.base_path`, {
+                // Fetch LIVE permissions from junction tables + User Role
+                const [subRes, modRes, allModsRes, userRes] = await Promise.all([
+                    fetch(`${directusBase}/items/user_access_subsystems?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=subsystem_id.base_path`, {
                         headers: { "Authorization": `Bearer ${directusToken}` },
                         cache: 'no-store'
                     }),
-                    fetch(`${directusBase}/items/user_access_modules?filter=${encodeURIComponent(filter)}&limit=-1&fields=module_id.base_path`, {
+                    fetch(`${directusBase}/items/user_access_modules?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=module_id.base_path`, {
                         headers: { "Authorization": `Bearer ${directusToken}` },
                         cache: 'no-store'
                     }),
                     fetch(`${directusBase}/items/modules?limit=-1&fields=base_path`, {
                         headers: { "Authorization": `Bearer ${directusToken}` },
                         cache: 'no-store'
+                    }),
+                    fetch(`${directusBase}/items/user/${payload.sub}?fields=role,isAdmin`, {
+                        headers: { "Authorization": `Bearer ${directusToken}` },
+                        cache: 'no-store'
                     })
                 ]);
 
-                if (subRes.ok && modRes.ok && allModsRes.ok) {
-                    const [subData, modData, allModsData] = await Promise.all([subRes.json(), modRes.json(), allModsRes.json()]);
-                    authorizedSubsystemPaths = (subData.data || []).map((row: any) => row.subsystem_id?.base_path?.trim()).filter(Boolean);
-                    authorizedModulePaths = (modData.data || []).map((row: any) => row.module_id?.base_path?.trim()).filter(Boolean);
-                    allModulePaths = (allModsData.data || []).map((row: any) => row.base_path?.trim()).filter(Boolean);
+                if (subRes.ok && modRes.ok && allModsRes.ok && userRes.ok) {
+                    const [subData, modData, allModsData, userData] = await Promise.all([
+                        subRes.json(), 
+                        modRes.json(), 
+                        allModsRes.json(),
+                        userRes.json()
+                    ]);
+
+                    const u = userData?.data || {};
+                    const isAdmin = u.role === "ADMIN" || u.isAdmin === 1 || u.isAdmin === true;
+                    if (isAdmin) {
+                        return NextResponse.next(); // SILENT BYPASS for Admins
+                    }
+
+                    authorizedSubsystemPaths = (subData.data || []).map((row: { subsystem_id?: { base_path?: string } }) => row.subsystem_id?.base_path?.trim()).filter(Boolean) as string[];
+                    authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
+                    allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
                 } 
             } catch (err) {
                  console.error("[Middleware] Failed to fetch permissions from Directus:", err);

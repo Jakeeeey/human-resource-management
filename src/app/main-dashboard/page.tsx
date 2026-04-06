@@ -4,26 +4,18 @@
 import * as React from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import * as Icons from "lucide-react";
 import {
     Search,
     ArrowUpRight,
     Sparkles,
     Timer,
     CheckCircle2,
-    Boxes,
-    Users,
-    Landmark,
-    Settings,
-    ShieldCheck,
-    Factory,
-    FolderKanban,
-    MessagesSquare,
-    Activity,
-    BarChart3, // ✅ added for BIA
     Sun,
     Moon,
     Monitor,
     ExternalLink,
+    Activity,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -38,13 +30,10 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
+import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
+import { usePermissionsStore } from "@/stores/usePermissionsStore";
+// Unused Select components removed to fix linting warnings
 
 type Status = "active" | "comingSoon";
 
@@ -254,50 +243,12 @@ function ModeToggle() {
     );
 }
 
-function decodeJwt(token: string): Record<string, unknown> | null {
-    try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        while (s.length % 4) s += "=";
-        const json = Buffer.from(s, "base64").toString("utf8");
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
-
-function getCookie(name: string) {
-    if (typeof document === "undefined") return null;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(";").shift();
-    return null;
-}
-
-import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
-import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
-import { usePermissionsStore } from "@/stores/usePermissionsStore";
-
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-    Boxes,
-    Users,
-    Landmark,
-    Settings,
-    ShieldCheck,
-    Factory,
-    FolderKanban,
-    MessagesSquare,
-    Activity,
-    BarChart3,
-};
-
 export default function ERPMainDashboard() {
     const [q, setQ] = React.useState("");
     const [isCompactHeader, setIsCompactHeader] = React.useState(false);
     const [registeredSubsystems, setRegisteredSubsystems] = React.useState<SubsystemRegistration[]>([]);
 
-    const { permissions: authorizedSubsystems, isLoading: loadingPermissions, fetchPermissions } = usePermissionsStore();
+    const { permissions: authorizedSubsystems, isAdmin, isLoading: loadingPermissions, fetchPermissions } = usePermissionsStore();
 
     React.useEffect(() => {
         const onScroll = () => setIsCompactHeader(window.scrollY > 36);
@@ -317,18 +268,23 @@ export default function ERPMainDashboard() {
     }, [fetchPermissions]);
 
     const subsystems = React.useMemo(() => {
-        return registeredSubsystems.map((s): SubsystemItem => ({
-            id: s.slug,
-            title: s.title,
-            subtitle: s.subtitle,
-            href: s.base_path,
-            status: s.status,
-            category: s.category as SubsystemCategory,
-            icon: ICON_MAP[s.icon_name] || Activity,
-            tag: s.tag,
-            accentClass: "bg-primary/10 text-primary dark:text-primary-foreground ring-1 ring-primary/20", // Default accent
-            submodules: [], // Could also be made dynamic later
-        }));
+        return registeredSubsystems.map((s: SubsystemRegistration): SubsystemItem => {
+            // Type-safe lookup in Icons registry
+            const IconComponent = Icons[s.icon_name as keyof typeof Icons] as React.ComponentType<{ className?: string }> || Icons.Activity;
+            
+            return {
+                id: s.slug,
+                title: s.title,
+                subtitle: s.subtitle,
+                href: s.base_path,
+                status: s.status,
+                category: s.category as SubsystemCategory,
+                icon: IconComponent,
+                tag: s.tag,
+                accentClass: "bg-primary/10 text-primary dark:text-primary-foreground ring-1 ring-primary/20",
+                submodules: [],
+            };
+        });
     }, [registeredSubsystems]);
 
 
@@ -338,7 +294,10 @@ export default function ERPMainDashboard() {
         return new Set(authorizedSubsystems || []);
     }, [authorizedSubsystems]);
 
-    const positionFiltered = React.useMemo(() => subsystems.filter((s) => allowedIds.has(s.id)), [allowedIds, subsystems]);
+    const positionFiltered = React.useMemo(() => {
+        if (isAdmin) return subsystems;
+        return subsystems.filter((s) => allowedIds.has(s.id));
+    }, [allowedIds, subsystems, isAdmin]);
 
     const filtered = React.useMemo(() => filterSubsystems(positionFiltered, q), [positionFiltered, q]);
     const grouped = React.useMemo(() => groupByCategory(filtered), [filtered]);

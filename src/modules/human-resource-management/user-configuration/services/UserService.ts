@@ -71,7 +71,7 @@ export class UserService {
             const mapping: Record<string, { subsystemSlugs: string[], moduleSlugs: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number> }> = {};
 
             // Process Subsystems
-            subData.forEach((row: any) => {
+            subData.forEach((row: { id: number, user_id: string | number, subsystem_id?: { slug?: string } }) => {
                 const uid = String(row.user_id);
                 if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemAccessIds: {}, moduleAccessIds: {} };
                 if (row.subsystem_id?.slug) {
@@ -81,7 +81,7 @@ export class UserService {
             });
 
             // Process Modules
-            modData.forEach((row: any) => {
+            modData.forEach((row: { id: number, user_id: string | number, module_id?: { slug?: string } }) => {
                 const uid = String(row.user_id);
                 if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemAccessIds: {}, moduleAccessIds: {} };
                 if (row.module_id?.slug) {

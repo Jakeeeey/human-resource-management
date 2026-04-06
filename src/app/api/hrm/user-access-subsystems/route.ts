@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-function decodeJwt(token: string): any {
+function decodeJwt(token: string): Record<string, unknown> | null {
     try {
         const parts = token.split(".");
         if (parts.length < 2) return null;

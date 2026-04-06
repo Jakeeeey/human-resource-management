@@ -9,6 +9,12 @@ import { extractAllSlugs } from "../utils/permissionUtils";
 import { toast } from "sonner";
 import { usePermissionsStore } from "@/stores/usePermissionsStore";
 
+interface Module {
+    slug: string;
+    id: string | number;
+    subModules?: Module[];
+}
+
 export function useUserConfiguration() {
     const { 
         users, 
@@ -53,7 +59,7 @@ export function useUserConfiguration() {
                 .filter(slug => !user.authorized_subsystems.includes(slug))
                 .map(slug => {
                     // Find module ID by slug in registry
-                    const findIn = (modules: any[]): any => {
+                    const findIn = (modules: Module[]): Module | undefined => {
                         for (const m of modules) {
                             if (m.slug === slug) return m;
                             if (m.subModules) {
@@ -62,7 +68,7 @@ export function useUserConfiguration() {
                             }
                         }
                     };
-                    return Number(findIn(subRegistry.modules)?.id);
+                    return Number(findIn(subRegistry.modules || [])?.id);
                 }).filter(id => !isNaN(id));
         } else {
             // Removal: We need junction record IDs from user object
@@ -117,7 +123,7 @@ export function useUserConfiguration() {
             if (slug === activeSubsystem.slug) {
                 updates.subsystemsToAdd.push(Number(activeSubsystem.id));
             } else {
-                const findIn = (modules: any[]): any => {
+                const findIn = (modules: Module[]): Module | undefined => {
                     for (const m of modules) {
                         if (m.slug === slug) return m;
                         if (m.subModules) {
@@ -126,7 +132,7 @@ export function useUserConfiguration() {
                         }
                     }
                 };
-                const reg = findIn(activeSubsystem.modules);
+                const reg = findIn(activeSubsystem.modules || []);
                 if (reg) updates.modulesToAdd.push(Number(reg.id));
             }
         });

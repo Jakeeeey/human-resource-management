@@ -375,8 +375,8 @@ export function AppSidebar({
     className,
     ...props
 }: React.ComponentProps<typeof Sidebar>) {
-    const { permissions, isLoading, fetchPermissions } = usePermissionsStore();
-
+    const { permissions, isAdmin, isLoading, fetchPermissions } = usePermissionsStore();
+    
     React.useEffect(() => {
         fetchPermissions();
     }, [fetchPermissions]);
@@ -384,6 +384,7 @@ export function AppSidebar({
     // Recursive function to filter nav items
     const filteredNavMain = React.useMemo(() => {
         if (isLoading) return [];
+        if (isAdmin) return data.navMain; // ADMIN BYPASS: Show everything
 
         interface NavItem {
             title: string;
@@ -419,7 +420,7 @@ export function AppSidebar({
         }
 
         return filterItems(data.navMain as NavItem[]);
-    }, [permissions, isLoading]);
+    }, [permissions, isAdmin, isLoading]);
 
     return (
         <Sidebar
