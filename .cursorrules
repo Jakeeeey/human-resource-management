@@ -1,0 +1,31 @@
+# HRM Project Rules & Standardization
+
+Follow these rules for all development within this repository to maintain architectural integrity and UI consistency.
+
+## 1. UI Design Standards ("High-Density Admin")
+- **Border Radius**: Use `rounded-2xl` (16px) for all administrative dialogs, modals, and primary containers. Never use `rounded-md` or `rounded-xl`.
+- **Typography**:
+    - Module Headers: Use `font-black` and `tracking-tighter` for all primary titles.
+    - Status Badges: Use high-density, uppercase, and `font-black` text (e.g., `text-[9px] font-black uppercase tracking-widest`).
+- **Standard Modal Width**:
+    - Standard Dialogs: Max width around `max-w-2xl` or `max-w-3xl`.
+    - Hierarchy/Complex Dialogs: Use `sm:max-w-[1000px]`.
+
+## 2. File & Folder Architecture
+- **Structure**: All modules must live in `src/modules/human-resource-management/[path]/[module-name]/`.
+- **Entry Points**: Every module must have a `[ModuleName]Module.tsx` as its entry point.
+- **Gateway**: Every module folder must contain an `index.ts` exporting that Module component.
+- **Extensions**:
+    - `.ts`: Logic-only (Services, Hooks, Utils).
+    - `.tsx`: Components, Layouts, Providers, Pages.
+
+## 3. Technology Stack Best Practices
+- **Services**: Group API calls in static classes within a `services/` folder. Use separate files for different sub-features.
+- **Proxies**: All frontend service calls must point to the Next.js API Routes in `src/app/api/...` (following the mirrored path of the module).
+- **Icons**: Use the established 300+ `IconPicker` and store selection in the `icon_name` field of modules.
+
+## 4. Code Quality & Stability (Strict)
+- **Error-Free Execution**: Every module must pass `npm run lint` and `npx tsc --noEmit` before it is considered complete.
+- **Type Safety**: Avoid using `any` wherever possible. Use specific interfaces defined in the module's `types.ts`.
+- **Cleanup**: Remove all unused imports, variables, and console logs before finalizing a component.
+- **Verification**: Always run linting and type-checking commands locally after significant changes to ensure zero warnings or errors.

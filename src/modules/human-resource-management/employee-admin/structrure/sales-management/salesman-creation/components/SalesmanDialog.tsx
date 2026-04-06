@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
     Dialog,
@@ -18,16 +18,11 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import type {
     SalesmanWithRelations,
     User,
@@ -62,6 +57,7 @@ interface SalesmanDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     salesman?: SalesmanWithRelations | null;
+    registeredSalesmen?: SalesmanWithRelations[];
     users: User[];
     divisions: Division[];
     branches: Branch[];
@@ -75,6 +71,7 @@ export function SalesmanDialog({
     open,
     onOpenChange,
     salesman,
+    registeredSalesmen = [],
     users,
     divisions,
     branches,
@@ -111,6 +108,24 @@ export function SalesmanDialog({
 
     const selectedEmployeeId = form.watch("employee_id");
     const selectedEmployee = users.find((u) => u.user_id.toString() === selectedEmployeeId);
+
+    const selectableUsers = useMemo(() => {
+        if (!registeredSalesmen.length) return users;
+
+        const usedEmployeeIds = new Set(
+            registeredSalesmen
+                .map((s) => s.employee_id)
+                .filter((id): id is number => typeof id === "number")
+        );
+
+        // Allow the currently-linked employee when editing.
+        const currentEmployeeId = salesman?.employee_id;
+        if (typeof currentEmployeeId === "number") {
+            usedEmployeeIds.delete(currentEmployeeId);
+        }
+
+        return users.filter((u) => !usedEmployeeIds.has(u.user_id));
+    }, [registeredSalesmen, salesman?.employee_id, users]);
 
     useEffect(() => {
         if (selectedEmployee) {
@@ -175,6 +190,7 @@ export function SalesmanDialog({
 
     const handleSubmit = async (data: SalesmanFormData) => {
         setIsSubmitting(true);
+        const toastId = toast.loading(isEdit ? "Updating salesman..." : "Creating salesman...");
         try {
             const selectedPriceType = priceTypes.find(
                 (pt) => pt.price_type_id.toString() === data.price_type_id
@@ -204,10 +220,16 @@ export function SalesmanDialog({
             };
 
             await onSubmit(payload);
+            toast.success(isEdit ? "Salesman updated" : "Salesman created", { id: toastId });
             onOpenChange(false);
             form.reset();
         } catch (error) {
             console.error("Error submitting salesman:", error);
+            toast.error("Failed to save salesman", {
+                id: toastId,
+                description:
+                    error instanceof Error ? error.message : "An error occurred",
+            });
             form.setError("root", {
                 message: error instanceof Error ? error.message : "An error occurred",
             });
@@ -240,26 +262,17 @@ export function SalesmanDialog({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Employee Link</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select employee" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {users.map((user) => (
-                                                    <SelectItem
-                                                        key={user.user_id}
-                                                        value={user.user_id.toString()}
-                                                    >
-                                                        {user.user_fname} {user.user_lname}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <FormControl>
+                                            <SearchableSelect
+                                                placeholder="Select employee"
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={selectableUsers.map((user) => ({
+                                                    value: user.user_id.toString(),
+                                                    label: `${user.user_fname} ${user.user_lname}`,
+                                                }))}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -397,26 +410,17 @@ export function SalesmanDialog({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Division</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select division" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {divisions.map((div) => (
-                                                    <SelectItem
-                                                        key={div.division_id}
-                                                        value={div.division_id.toString()}
-                                                    >
-                                                        {div.division_name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <FormControl>
+                                            <SearchableSelect
+                                                placeholder="Select division"
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={divisions.map((div) => ({
+                                                    value: div.division_id.toString(),
+                                                    label: div.division_name,
+                                                }))}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -428,26 +432,17 @@ export function SalesmanDialog({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Operation</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select operation" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {operations.map((op) => (
-                                                    <SelectItem
-                                                        key={op.id}
-                                                        value={op.id.toString()}
-                                                    >
-                                                        {op.operation_name || `Operation ${op.id}`}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <FormControl>
+                                            <SearchableSelect
+                                                placeholder="Select operation"
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={operations.map((op) => ({
+                                                    value: op.id.toString(),
+                                                    label: op.operation_name || `Operation ${op.id}`,
+                                                }))}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -456,13 +451,28 @@ export function SalesmanDialog({
                             <FormField
                                 control={form.control}
                                 name="inventory_day"
+                                rules={{
+                                    validate: (value) => {
+                                        if (!value) return true;
+                                        const numericValue = Number(value);
+                                        if (Number.isNaN(numericValue)) return "Inventory day must be a number";
+                                        return numericValue >= 0 || "Inventory day cannot be negative";
+                                    },
+                                }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Inventory Day</FormLabel>
                                         <FormControl>
                                             <Input
-                                                {...field}
+                                                value={field.value}
+                                                onChange={(e) => {
+                                                    const next = e.target.value;
+                                                    if (next.startsWith("-")) return;
+                                                    field.onChange(e);
+                                                }}
                                                 type="number"
+                                                min={1}
+                                                max={31}
                                                 placeholder="Day of month"
                                             />
                                         </FormControl>
@@ -479,26 +489,17 @@ export function SalesmanDialog({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Branch</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select branch" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {branches.map((branch) => (
-                                                    <SelectItem
-                                                        key={branch.id}
-                                                        value={branch.id.toString()}
-                                                    >
-                                                        {branch.branch_name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <FormControl>
+                                            <SearchableSelect
+                                                placeholder="Select branch"
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={branches.map((branch) => ({
+                                                    value: branch.id.toString(),
+                                                    label: branch.branch_name,
+                                                }))}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -510,26 +511,17 @@ export function SalesmanDialog({
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Bad Branch</FormLabel>
-                                        <Select
-                                            onValueChange={field.onChange}
-                                            value={field.value}
-                                        >
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select bad branch" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {badBranches.map((branch) => (
-                                                    <SelectItem
-                                                        key={branch.id}
-                                                        value={branch.id.toString()}
-                                                    >
-                                                        {branch.branch_name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <FormControl>
+                                            <SearchableSelect
+                                                placeholder="Select bad branch"
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={badBranches.map((branch) => ({
+                                                    value: branch.id.toString(),
+                                                    label: branch.branch_name,
+                                                }))}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -543,23 +535,17 @@ export function SalesmanDialog({
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Price Type</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select price type" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {priceTypes.map((pt) => (
-                                                <SelectItem
-                                                    key={pt.price_type_id}
-                                                    value={pt.price_type_id.toString()}
-                                                >
-                                                    {pt.price_type_name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <FormControl>
+                                        <SearchableSelect
+                                            placeholder="Select price type"
+                                            value={field.value}
+                                            onValueChange={field.onChange}
+                                            options={priceTypes.map((pt) => ({
+                                                value: pt.price_type_id.toString(),
+                                                label: pt.price_type_name,
+                                            }))}
+                                        />
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
