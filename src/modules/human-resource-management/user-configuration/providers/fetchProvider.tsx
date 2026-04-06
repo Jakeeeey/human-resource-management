@@ -15,7 +15,7 @@ interface UserConfigurationFetchContextType {
     totalCount: number;
     pageSize: number;
     fetchPage: (page: number) => Promise<void>;
-    updateUserPermissions: (userId: string, permissions: string[]) => void;
+    updateUserPermissions: (userId: string, permissions: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number>) => void;
 }
 
 const UserConfigurationFetchContext =
@@ -45,15 +45,26 @@ export function UserConfigurationFetchProvider({
                 UserService.getUsers(LIMIT, offset)
             ]);
             
-            // 2. Bulk Fetch Permissions for the users on this page
+            // 2. Bulk Fetch Permissions for the users on this page (Junction Table IDs & Slugs)
             const userIds = userData.map(u => u.user_id);
             const permissionsMap = await UserService.getPermissionsForUsers(userIds);
 
             // 3. Merge permissions into user objects
-            const mergedUsers = userData.map(user => ({
-                ...user,
-                authorized_subsystems: (permissionsMap[user.user_id] || []).map(p => p.slug)
-            }));
+            const mergedUsers = userData.map(user => {
+                const p = permissionsMap[user.user_id] || { 
+                    subsystemSlugs: [], 
+                    moduleSlugs: [], 
+                    subsystemAccessIds: {}, 
+                    moduleAccessIds: {} 
+                };
+                
+                return {
+                    ...user,
+                    authorized_subsystems: [...p.subsystemSlugs, ...p.moduleSlugs],
+                    subsystemAccessIds: p.subsystemAccessIds,
+                    moduleAccessIds: p.moduleAccessIds,
+                };
+            });
 
             setSubsystems(subsystemData);
             setUsers(mergedUsers);
@@ -71,9 +82,14 @@ export function UserConfigurationFetchProvider({
         fetchPage(0);
     }, [fetchPage]);
 
-    const updateUserPermissions = useCallback((userId: string, permissions: string[]) => {
+    const updateUserPermissions = useCallback((userId: string, permissions: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number>) => {
         setUsers((current) =>
-            current.map((user) => (user.user_id === userId ? { ...user, authorized_subsystems: permissions } : user))
+            current.map((user) => (user.user_id === userId ? { 
+                ...user, 
+                authorized_subsystems: permissions,
+                subsystemAccessIds,
+                moduleAccessIds
+            } : user))
         );
     }, []);
 

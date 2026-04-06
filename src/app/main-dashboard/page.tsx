@@ -74,62 +74,6 @@ type SubsystemItem = {
     submodules: SubmoduleItem[];
 };
 
-type Position =
-    | "All Access"
-    | "Admin"
-    | "SCM Staff"
-    | "Finance Staff"
-    | "HR Staff"
-    | "Sales/CRM Staff"
-    | "Auditor"
-    | "PMO";
-
-const POSITION_ACCESS: Record<Position, string[]> = {
-    "All Access": [
-        "scm",
-        "crm",
-        "finance",
-        "hr",
-        "mfg",
-        "pm",
-        "arf",
-        "comms",
-        "pm-monitoring",
-        "bia", // ✅ added
-    ],
-    Admin: [
-        "scm",
-        "crm",
-        "finance",
-        "hr",
-        "mfg",
-        "pm",
-        "arf",
-        "comms",
-        "pm-monitoring",
-        "bia", // ✅ added
-    ],
-    "SCM Staff": ["scm", "mfg"],
-    "Finance Staff": ["finance"],
-    "HR Staff": ["hr"],
-    "Sales/CRM Staff": ["crm", "comms"],
-    Auditor: ["arf", "finance"],
-    PMO: ["pm", "pm-monitoring"],
-};
-
-const POSITIONS: Position[] = [
-    "All Access",
-    "Admin",
-    "SCM Staff",
-    "Finance Staff",
-    "HR Staff",
-    "Sales/CRM Staff",
-    "Auditor",
-    "PMO",
-];
-
-// Removed unused SUBSYSTEMS static array
-
 const CATEGORY_ORDER: SubsystemCategory[] = [
     "Operations",
     "Customer & Engagement",
@@ -333,6 +277,7 @@ function getCookie(name: string) {
 
 import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
 import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
+import { usePermissionsStore } from "@/stores/usePermissionsStore";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
     Boxes,
@@ -349,10 +294,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export default function ERPMainDashboard() {
     const [q, setQ] = React.useState("");
-    const [position, setPosition] = React.useState<Position>("All Access");
     const [isCompactHeader, setIsCompactHeader] = React.useState(false);
-    const [authorizedSubsystems, setAuthorizedSubsystems] = React.useState<string[] | null>(null);
     const [registeredSubsystems, setRegisteredSubsystems] = React.useState<SubsystemRegistration[]>([]);
+
+    const { permissions: authorizedSubsystems, isLoading: loadingPermissions, fetchPermissions } = usePermissionsStore();
 
     React.useEffect(() => {
         const onScroll = () => setIsCompactHeader(window.scrollY > 36);
@@ -363,27 +308,13 @@ export default function ERPMainDashboard() {
 
     React.useEffect(() => {
         const load = async () => {
-            // Load position
-            try {
-                const saved = window.localStorage.getItem("vos_position");
-                if (saved && POSITIONS.includes(saved as Position)) setPosition(saved as Position);
-            } catch {}
-
-            // Load authorized subsystems from token
-            const token = getCookie("vos_access_token");
-            if (token) {
-                const payload = decodeJwt(token);
-                if (payload?.authorized_subsystems) {
-                    setAuthorizedSubsystems(payload.authorized_subsystems as string[]);
-                }
-            }
-
+            fetchPermissions();
             // Load registry
             const registry = await SubsystemService.getSubsystems();
             setRegisteredSubsystems(registry);
         };
         load();
-    }, []);
+    }, [fetchPermissions]);
 
     const subsystems = React.useMemo(() => {
         return registeredSubsystems.map((s): SubsystemItem => ({
@@ -400,26 +331,12 @@ export default function ERPMainDashboard() {
         }));
     }, [registeredSubsystems]);
 
-    React.useEffect(() => {
-        try {
-            window.localStorage.setItem("vos_position", position);
-        } catch {}
-    }, [position]);
+
 
     const allowedIds = React.useMemo(() => {
-        // If we have real authorized subsystems from the token, use them.
-        if (authorizedSubsystems !== null) {
-            return new Set(authorizedSubsystems);
-        }
-        
-        // If position is 'All Access' or 'Admin', show everything in the registry
-        if (position === "All Access" || position === "Admin") {
-            return new Set(registeredSubsystems.map(s => s.slug));
-        }
-
-        // Fallback to static list for other mock positions
-        return new Set(POSITION_ACCESS[position] || []);
-    }, [position, authorizedSubsystems, registeredSubsystems]);
+        // Only show subsystems explicitly authorized in the database
+        return new Set(authorizedSubsystems || []);
+    }, [authorizedSubsystems]);
 
     const positionFiltered = React.useMemo(() => subsystems.filter((s) => allowedIds.has(s.id)), [allowedIds, subsystems]);
 
@@ -485,41 +402,23 @@ export default function ERPMainDashboard() {
                                     <Badge variant="secondary" className="h-6 px-2 text-[12px]">
                                         Active (Visible): {totalActiveVisible}
                                     </Badge>
-                                    <Badge variant="secondary" className="h-6 px-2 text-[12px]">
-                                        Position: {position}
-                                    </Badge>
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <div className={cn("grid gap-3", "sm:grid-cols-[200px_1fr]")}>
-                                    <Select value={position} onValueChange={(v) => setPosition(v as Position)}>
-                                        <SelectTrigger className="bg-background/70 backdrop-blur">
-                                            <SelectValue placeholder="Select position" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {POSITIONS.map((p) => (
-                                                <SelectItem key={p} value={p}>
-                                                    {p}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-
-                                    <div className="relative">
-                                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            value={q}
-                                            onChange={(e) => setQ(e.target.value)}
-                                            placeholder="Search subsystems/submodules…"
-                                            className="pl-9 bg-background/70 backdrop-blur"
-                                        />
-                                    </div>
+                                <div className="relative">
+                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        value={q}
+                                        onChange={(e) => setQ(e.target.value)}
+                                        placeholder="Search subsystems/submodules…"
+                                        className="pl-9 bg-background/70 backdrop-blur"
+                                    />
                                 </div>
 
                                 {!isCompactHeader ? (
-                                    <div className="text-xs text-muted-foreground">
-                                        Note: This hides subsystems the selected position cannot access. Enforce authorization on routes/APIs as well.
+                                    <div className="text-xs text-muted-foreground text-right italic font-medium">
+                                        Access is strictly enforced based on your assigned permissions.
                                     </div>
                                 ) : null}
                             </div>
@@ -534,10 +433,17 @@ export default function ERPMainDashboard() {
                 style={{ paddingTop: headerOffset }}
             >
                 <div className="space-y-8">
-                    {filtered.length === 0 ? (
+                    {loadingPermissions ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4">
+                            <Activity className="h-10 w-10 text-primary animate-pulse" />
+                            <p className="text-sm font-bold tracking-tighter text-muted-foreground uppercase">Verifying Access Permissions...</p>
+                        </div>
+                    ) : filtered.length === 0 ? (
                         <Card className="border bg-background/50 p-8 backdrop-blur">
                             <div className="text-sm text-muted-foreground">
-                                No visible subsystems match “{q.trim()}” for position “{position}”.
+                                {q.trim() 
+                                    ? `No visible subsystems match "${q.trim()}" for your account.` 
+                                    : "You do not have access to any subsystems. Please contact your Administrator."}
                             </div>
                         </Card>
                     ) : (

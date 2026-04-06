@@ -103,15 +103,15 @@ export function UserConfigurationTable({
 
                 <div className="rounded-2xl border bg-card shadow-2xl shadow-primary/5 overflow-hidden">
                     <ScrollArea className="w-full">
-                        <Table className="relative">
-                            <TableHeader className="bg-muted/30 sticky top-0 z-10 backdrop-blur-md">
+                        <Table className="relative border-separate border-spacing-0 min-w-full">
+                            <TableHeader className="bg-muted/95 sticky top-0 z-10 backdrop-blur-md">
                                 {table.getHeaderGroups().map((headerGroup) => (
                                     <TableRow key={headerGroup.id} className="hover:bg-transparent border-b-muted-foreground/10">
                                         {headerGroup.headers.map((header, index) => (
                                             <TableHead 
                                                 key={header.id} 
                                                 className={cn(
-                                                    "h-14 font-black text-center border-r-[1px] border-muted-foreground/10 last:border-r-0",
+                                                    "h-14 font-black text-center border-r-[1px] border-b-[1px] border-muted-foreground/10 last:border-r-0",
                                                     index === 0 && "sticky left-0 bg-muted/95 backdrop-blur-md z-30 border-r-2 border-primary/10 shadow-[2px_0_10px_-4px_rgba(0,0,0,0.1)]"
                                                 )}
                                             >
@@ -134,8 +134,8 @@ export function UserConfigurationTable({
                                                 <TableCell 
                                                     key={cell.id}
                                                     className={cn(
-                                                        "py-3 border-r-[1px] border-muted-foreground/5 last:border-r-0",
-                                                        index === 0 && "sticky left-0 bg-card z-20 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.1)] border-r-2"
+                                                        "py-3 border-r-[1px] border-b-[1px] border-muted-foreground/5 last:border-r-0 last:border-b-0",
+                                                        index === 0 && "sticky left-0 bg-card z-20 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.1)] border-r-2 border-primary/5"
                                                     )}
                                                 >
                                                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

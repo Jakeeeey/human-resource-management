@@ -49,26 +49,45 @@ export class UserService {
     /**
     /**
      * Fetches permissions for a list of users in bulk.
-     * Returns a mapping of userId -> { slug: string, id: string | number }[].
+     * Returns a mapping of userId -> { subsystems: Set<string>, modules: Set<string> }.
      */
-    static async getPermissionsForUsers(userIds: string[]): Promise<Record<string, { slug: string, id: string | number }[]>> {
+    static async getPermissionsForUsers(userIds: string[]): Promise<Record<string, { subsystemSlugs: string[], moduleSlugs: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number> }>> {
         if (!userIds.length) return {};
         try {
             const filter = encodeURIComponent(JSON.stringify({
                 user_id: { _in: userIds }
             }));
-            const url = `/api/hrm/user-access?filter=${filter}&limit=-1&fields=id,user_id,item_slug`;
-            const response = await fetch(url);
-            
-            if (!response.ok) return {};
 
-            const { data } = await response.json();
-            const mapping: Record<string, { slug: string, id: string | number }[]> = {};
-            
-            (data || []).forEach((row: { id: string | number; user_id: string | number; item_slug: string }) => {
+            // Fetch from both tables in parallel
+            const [subRes, modRes] = await Promise.all([
+                fetch(`/api/hrm/user-access-subsystems?filter=${filter}&limit=-1&fields=id,user_id,subsystem_id.slug`),
+                fetch(`/api/hrm/user-access-modules?filter=${filter}&limit=-1&fields=id,user_id,module_id.slug`)
+            ]);
+
+            const [subResult, modResult] = await Promise.all([subRes.json(), modRes.json()]);
+            const subData = subResult.data || [];
+            const modData = modResult.data || [];
+
+            const mapping: Record<string, { subsystemSlugs: string[], moduleSlugs: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number> }> = {};
+
+            // Process Subsystems
+            subData.forEach((row: any) => {
                 const uid = String(row.user_id);
-                if (!mapping[uid]) mapping[uid] = [];
-                mapping[uid].push({ slug: row.item_slug, id: row.id });
+                if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemAccessIds: {}, moduleAccessIds: {} };
+                if (row.subsystem_id?.slug) {
+                    mapping[uid].subsystemSlugs.push(row.subsystem_id.slug);
+                    mapping[uid].subsystemAccessIds[row.subsystem_id.slug] = row.id;
+                }
+            });
+
+            // Process Modules
+            modData.forEach((row: any) => {
+                const uid = String(row.user_id);
+                if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemAccessIds: {}, moduleAccessIds: {} };
+                if (row.module_id?.slug) {
+                    mapping[uid].moduleSlugs.push(row.module_id.slug);
+                    mapping[uid].moduleAccessIds[row.module_id.slug] = row.id;
+                }
             });
 
             return mapping;
@@ -79,62 +98,67 @@ export class UserService {
     }
 
     /**
-     * Performs a Granular Update (Diff & Sync) for user permissions.
+     * Performs a Granular Update (Diff & Sync) for user permissions using IDs.
      */
-    static async updatePermissions(userId: string, newSlugs: string[]): Promise<boolean> {
+    static async updatePermissions(
+        userId: string, 
+        currentAdminId: string | number | null,
+        updates: {
+            subsystemsToAdd: number[];   // IDs from registry
+            subsystemsToRemove: number[]; // Junction Record IDs
+            modulesToAdd: number[];      // IDs from registry
+            modulesToRemove: number[];    // Junction Record IDs
+        }
+    ): Promise<boolean> {
         try {
-            // 1. Fetch current permissions for diffing
-            const existingMapping = await this.getPermissionsForUsers([userId]);
-            const currentRecords = existingMapping[userId] || [];
-            const currentSlugs = currentRecords.map(r => r.slug);
-
-            // 2. Calculate Diff
-            const toAdd = newSlugs.filter(s => !currentSlugs.includes(s));
-            const toRemoveSlugs = currentSlugs.filter(s => !newSlugs.includes(s));
-            
-            // Get the record IDs for the slugs to remove
-            const idsToRemove = currentRecords
-                .filter(r => toRemoveSlugs.includes(r.slug))
-                .map(r => r.id);
-
-            // If no changes, return success
-            if (toAdd.length === 0 && idsToRemove.length === 0) return true;
-
-            // 3. Execute Granular Changes
             const promises = [];
 
-            // Add new permissions
-            if (toAdd.length > 0) {
-                promises.push(fetch(`/api/hrm/user-access`, {
+            // 1. Subsystems
+            if (updates.subsystemsToAdd.length > 0) {
+                promises.push(fetch(`/api/hrm/user-access-subsystems`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(toAdd.map(slug => ({ user_id: userId, item_slug: slug })))
+                    body: JSON.stringify(updates.subsystemsToAdd.map(id => ({ 
+                        user_id: userId, 
+                        subsystem_id: id,
+                        ...(currentAdminId ? { created_by: currentAdminId } : {})
+                    })))
                 }));
             }
-
-            // Remove revoked permissions using Bulk Delete by ID
-            if (idsToRemove.length > 0) {
-                promises.push(fetch(`/api/hrm/user-access`, {
+            if (updates.subsystemsToRemove.length > 0) {
+                promises.push(fetch(`/api/hrm/user-access-subsystems`, {
                     method: "DELETE",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(idsToRemove)
+                    body: JSON.stringify(updates.subsystemsToRemove)
                 }));
             }
 
-            const results = await Promise.all(promises);
-            const allSuccess = results.every(r => r.ok);
-
-            if (!allSuccess) {
-                const errorResults = results.filter(r => !r.ok);
-                for (const res of errorResults) {
-                    const errText = await res.text();
-                    console.error(`[UserService] Permission sync failed (${res.status}):`, errText);
-                }
+            // 2. Modules
+            if (updates.modulesToAdd.length > 0) {
+                promises.push(fetch(`/api/hrm/user-access-modules`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(updates.modulesToAdd.map(id => ({ 
+                        user_id: userId, 
+                        module_id: id,
+                        ...(currentAdminId ? { created_by: currentAdminId } : {})
+                    })))
+                }));
+            }
+            if (updates.modulesToRemove.length > 0) {
+                promises.push(fetch(`/api/hrm/user-access-modules`, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(updates.modulesToRemove)
+                }));
             }
 
-            return allSuccess;
+            if (promises.length === 0) return true;
+
+            const results = await Promise.all(promises);
+            return results.every(r => r.ok);
         } catch (error) {
-            console.error("Error in granular updatePermissions:", error);
+            console.error("Error in updatePermissions:", error);
             return false;
         }
     }
