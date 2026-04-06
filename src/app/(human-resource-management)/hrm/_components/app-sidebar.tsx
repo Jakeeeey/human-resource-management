@@ -155,7 +155,7 @@ const data = {
                             icon: CalendarClock,
                         },
                         {
-                            title: "Overtime Request",
+                            title: "Overtime Approval",
                             url: "/hrm/employee-admin/approval/overtime-request",
                             slug: "overtime-request",
                             icon: CalendarClock,
@@ -190,6 +190,11 @@ const data = {
                             title: "Undertime Report",
                             url: "/hrm/employee-admin/report/undertime-report",
                             slug: "undertime-report",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Leave Report",
+                            url: "/hrm/employee-admin/report/leave-report",
                             icon: CalendarClock,
                         },
                     ],

@@ -38,6 +38,7 @@ function OvertimeReportModuleContent() {
     setDateTo,
     setDepartmentId,
     setNameFilter,
+    setStatusFilter,
     resetFilters,
     employeeNames,
     pagination,
@@ -91,7 +92,7 @@ function OvertimeReportModuleContent() {
 
       {/* Filters Card */}
       <Card>
-        <CardContent>
+        <CardContent className="pt-6">
           <OvertimeReportFilters
             filters={filters}
             departments={departments}
@@ -102,6 +103,7 @@ function OvertimeReportModuleContent() {
             onDateToChange={setDateTo}
             onDepartmentChange={setDepartmentId}
             onNameFilterChange={setNameFilter}
+            onStatusChange={setStatusFilter}
             onResetFilters={resetFilters}
           />
         </CardContent>

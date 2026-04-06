@@ -148,10 +148,11 @@ async function findSalesmanConflict(params: {
     employeeId?: number;
     salesmanCode?: string;
     salesmanName?: string;
+    truckPlate?: string;
     excludeId?: number;
 }): Promise<Salesman | null> {
-    const { employeeId, salesmanCode, salesmanName, excludeId } = params;
-    if (!employeeId && !salesmanCode && !salesmanName) return null;
+    const { employeeId, salesmanCode, salesmanName, truckPlate, excludeId } = params;
+    if (!employeeId && !salesmanCode && !salesmanName && !truckPlate) return null;
 
     const search = new URLSearchParams();
     search.set("limit", "1");
@@ -167,6 +168,11 @@ async function findSalesmanConflict(params: {
     }
     if (salesmanName) {
         search.set(`filter[_or][${orIndex}][salesman_name][_eq]`, salesmanName);
+        orIndex += 1;
+    }
+
+    if (truckPlate) {
+        search.set(`filter[_or][${orIndex}][truck_plate][_eq]`, truckPlate);
         orIndex += 1;
     }
 
@@ -290,23 +296,30 @@ export async function POST(req: NextRequest) {
         const salesmanName =
             typeof salesmanBody["salesman_name"] === "string" ? (salesmanBody["salesman_name"] as string).trim() : "";
 
+        const truckPlate =
+            typeof salesmanBody["truck_plate"] === "string" ? (salesmanBody["truck_plate"] as string).trim() : "";
+
         if (salesmanName && salesmanBody["salesman_name"] !== salesmanName) {
             salesmanBody["salesman_name"] = salesmanName;
         }
         if (salesmanCode && salesmanBody["salesman_code"] !== salesmanCode) {
             salesmanBody["salesman_code"] = salesmanCode;
         }
+        if (truckPlate && salesmanBody["truck_plate"] !== truckPlate) {
+            salesmanBody["truck_plate"] = truckPlate;
+        }
 
         const conflict = await findSalesmanConflict({
             employeeId,
             salesmanCode: salesmanCode || undefined,
             salesmanName: salesmanName || undefined,
+            truckPlate: truckPlate || undefined,
         });
         if (conflict) {
             return NextResponse.json(
                 {
                     error: "Duplicate salesman",
-                    message: "A salesman with this employee, name, or code already exists.",
+                    message: "A salesman with this employee, name, code, or truck plate already exists.",
                     conflictId: conflict.id,
                 },
                 { status: 409 }
@@ -376,24 +389,31 @@ export async function PATCH(req: NextRequest) {
         const salesmanName =
             typeof updateData["salesman_name"] === "string" ? (updateData["salesman_name"] as string).trim() : "";
 
+        const truckPlate =
+            typeof updateData["truck_plate"] === "string" ? (updateData["truck_plate"] as string).trim() : "";
+
         if (salesmanName && updateData["salesman_name"] !== salesmanName) {
             updateData["salesman_name"] = salesmanName;
         }
         if (salesmanCode && updateData["salesman_code"] !== salesmanCode) {
             updateData["salesman_code"] = salesmanCode;
         }
+        if (truckPlate && updateData["truck_plate"] !== truckPlate) {
+            updateData["truck_plate"] = truckPlate;
+        }
 
         const conflict = await findSalesmanConflict({
             employeeId,
             salesmanCode: salesmanCode || undefined,
             salesmanName: salesmanName || undefined,
+            truckPlate: truckPlate || undefined,
             excludeId: salesmanId,
         });
         if (conflict) {
             return NextResponse.json(
                 {
                     error: "Duplicate salesman",
-                    message: "A salesman with this employee, name, or code already exists.",
+                    message: "A salesman with this employee, name, code, or truck plate already exists.",
                     conflictId: conflict.id,
                 },
                 { status: 409 }
