@@ -2,111 +2,190 @@
 description: Create a PDF document with a standardized company header layout
 ---
 
-# Reusable PDF Layout Workflow
+# Reusable PDF Layout System (V2)
 
-This workflow describes how to create a PDF document with a pre-configured header containing the company's logo, name, address, and contact details, followed by dynamic table or body content. It uses the `generatePdfLayout` function provided in `src/components/pdf-layout`.
+This workflow describes the Unified PDF Template System, which allows users to design professional headers/footers in a Visual Designer and reuse them across all system modules via the `PdfEngine`.
 
-## 1. Prerequisites (Database & API)
+## 1. Database Schema (DDL)
 
-Ensure the `company` data is available. The database table schema (`company`) is defined as follows:
+The system uses two primary tables. `company` provides global metadata, and `pdf_templates` stores custom layout configurations.
 
+### Company Metadata (Directus)
 ```sql
 CREATE TABLE `company` (
 	`company_id` INT NOT NULL AUTO_INCREMENT,
-	`company_name` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_type` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_code` VARCHAR(255) NOT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_address` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_brgy` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_city` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_province` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_zipCode` VARCHAR(20) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_registrationNumber` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_tin` VARCHAR(20) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_dateAdmitted` DATE NULL DEFAULT NULL,
-	`company_contact` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_email` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_outlook` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_gmail` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_department` VARCHAR(100) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	`company_logo` TEXT NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_facebook` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_website` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_unicode_ci',
-	`company_tags` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8mb4_0900_ai_ci',
-	PRIMARY KEY (`company_id`) USING BTREE
-)
-COLLATE='utf8mb4_unicode_ci'
-ENGINE=InnoDB
-AUTO_INCREMENT=11;
+	`company_name` VARCHAR(255) NULL,
+	`company_address` VARCHAR(255) NULL,
+	`company_brgy` VARCHAR(255) NULL,
+	`company_city` VARCHAR(255) NULL,
+	`company_province` VARCHAR(255) NULL,
+	`company_zipCode` VARCHAR(20) NULL,
+	`company_contact` VARCHAR(255) NULL,
+	`company_email` VARCHAR(255) NULL,
+	`company_logo` TEXT NULL, -- Base64 or URL
+	PRIMARY KEY (`company_id`)
+);
 ```
 
-You must fetch the company details from the following API endpoint:
+### PDF Templates Table
+```sql
+CREATE TABLE `pdf_templates` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL, -- e.g., 'Official Receipt', 'Employment Contract'
+    `category` VARCHAR(100) DEFAULT 'general',
+    `config` JSON NOT NULL, -- Stores PdfConfig (dimensions, elements, styles)
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+);
+```
 
-**Endpoint:** `/api/pdf-layout/company` (Fetching from Directus `items/company`)
+## 2. System Flow
 
-## 2. Generate PDF using AutoTable
+### Design Phase
+1.  **Open Designer**: Navigate to `/hrm/pdf-layout`.
+2.  **Configure Canvas**: Set Paper Size (Legal, A4, etc.), Orientation, and Margins.
+3.  **Add Elements**: Insert Logo, Company Info (Dynamic), or Custom Text.
+4.  **Edit Typography**: Set Font Size (pt), Text Height (mm), and Line Spacing (Ratio).
+5.  **Save Layout**: Templates are stored as JSON strings in the `config` column.
 
-Use the `generatePdfLayout` function and pass the fetched company data alongside your `jspdf-autotable` options. 
+### Implementation Phase (Developer)
+Modules use the `PdfEngine` to generate documents based on these templates.
 
 ```tsx
-import { useState } from 'react';
-import { generatePdfLayout } from '@/components/pdf-layout';
+import { PdfEngine } from "@/components/pdf-layout-design/PdfEngine";
 
-export function ExamplePdfButton() {
-  const [loading, setLoading] = useState(false);
+// Example: Generating a Report with a Saved Header
+const handlePrint = async () => {
+    const data = { ...fetchSomeData() };
+    
+    const doc = await PdfEngine.generateWithFrame(
+        "Official Receipt", // Template Name
+        data, 
+        async (pdf, startY, config) => {
+            // Your module-specific body logic starts at 'startY'
+            pdf.setFontSize(12);
+            pdf.text("Hello World", 10, startY + 10);
+            
+            // AutoTable integration
+            (pdf as any).autoTable({
+                startY: startY + 20,
+                head: [['#', 'Description']],
+                body: [['1', 'General Services']],
+            });
+        }
+---
+description: Create a PDF document with a standardized company header layout
+---
 
-  const handleDownload = async () => {
-    setLoading(true);
-    try {
-      // 1. Define Table Options (jspdf-autotable format)
-      const tableOptions = {
-        head: [['Name', 'Position', 'Department']],
-        body: [
-          ['John Doe', 'Software Engineer', 'IT'],
-          ['Jane Smith', 'HR Manager', 'Human Resources'],
-        ],
-      };
+# Reusable PDF Layout System (V2)
 
-      // 2. Generate and Download
-      // The `company` header is automatically fetched from the Directus API internally!
-      await generatePdfLayout({
-        tableOptions,
-        filename: 'employee-list.pdf',
-        orientation: 'p',
-      });
+This workflow describes the Unified PDF Template System, which allows users to design professional headers/footers in a Visual Designer and reuse them across all system modules via the `PdfEngine`.
 
-    } catch (error) {
-      console.error('Failed to generate PDF:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+## 1. Database Schema (DDL)
 
-  return (
-    <button onClick={handleDownload} disabled={loading}>
-      {loading ? 'Generating...' : 'Download PDF Report'}
-    </button>
-  );
-}
+The system uses two primary tables. `company` provides global metadata, and `pdf_templates` stores custom layout configurations.
+
+### Company Metadata (Directus)
+```sql
+CREATE TABLE `company` (
+	`company_id` INT NOT NULL AUTO_INCREMENT,
+	`company_name` VARCHAR(255) NULL,
+	`company_address` VARCHAR(255) NULL,
+	`company_brgy` VARCHAR(255) NULL,
+	`company_city` VARCHAR(255) NULL,
+	`company_province` VARCHAR(255) NULL,
+	`company_zipCode` VARCHAR(20) NULL,
+	`company_contact` VARCHAR(255) NULL,
+	`company_email` VARCHAR(255) NULL,
+	`company_logo` TEXT NULL, -- Base64 or URL
+	PRIMARY KEY (`company_id`)
+);
 ```
 
-## 3. Generate PDF with Custom Body Content
+### PDF Templates Table
+```sql
+CREATE TABLE `pdf_templates` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL, -- e.g., 'Official Receipt', 'Employment Contract'
+    `category` VARCHAR(100) DEFAULT 'general',
+    `config` JSON NOT NULL, -- Stores PdfConfig (dimensions, elements, styles)
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+);
+```
 
-If you want to render custom text/content instead of an auto-generated table, use the `renderBody` parameter.
+## 2. System Flow
+
+### Design Phase
+1.  **Open Designer**: Navigate to `/hrm/pdf-layout`.
+2.  **Configure Canvas**: Set Paper Size (Legal, A4, etc.), Orientation, and Margins.
+3.  **Add Elements**: Insert Logo, Company Info (Dynamic), or Custom Text.
+4.  **Edit Typography**: Set Font Size (pt), Text Height (mm), and Line Spacing (Ratio).
+5.  **Save Layout**: Templates are stored as JSON strings in the `config` column.
+
+### Implementation Phase (Developer)
+Modules use the `PdfEngine` to generate documents based on these templates.
 
 ```tsx
-await generatePdfLayout({
-  company: company as Company,
-  filename: 'custom-report.pdf',
-  renderBody: (doc, startY) => {
-    // startY gives you the Y coordinate directly below the header divider line
-    doc.setFontSize(12);
-    doc.text('This is some generic report content.', 15, startY);
+import { PdfEngine } from "@/components/pdf-layout-design/PdfEngine";
+
+// Example: Generating a Report with a Saved Header
+const handlePrint = async () => {
+    const data = { ...fetchSomeData() };
     
-    doc.text('We can continue adding more text or custom rectangles.', 15, startY + 10);
+    const doc = await PdfEngine.generateWithFrame(
+        "Official Receipt", // Template Name
+        data, 
+        async (pdf, startY, config) => {
+            // Your module-specific body logic starts at 'startY'
+            pdf.setFontSize(12);
+            pdf.text("Hello World", 10, startY + 10);
+            
+            // AutoTable integration
+            (pdf as any).autoTable({
+                startY: startY + 20,
+                head: [['#', 'Description']],
+                body: [['1', 'General Services']],
+            });
+        }
+    );
     
-    // return the final Y position if needed by other logic (optional)
-    return startY + 20; 
-  }
-});
+    doc.save("document.pdf");
+};
 ```
+
+## 3. Core Logic & Standards
+
+### Smart Variable Mapping
+The engine automatically detects `{{variable_name}}` patterns in text elements and replaces them with corresponding values from the `data` object.
+*   **Logic**: Uses a global regex `/\{\{(.*?)\}\}/g` to find and trim keys before mapping.
+*   **Fallback**: If a key is missing from the data, it leaves the placeholder `{{key}}` visible for debugging.
+
+### API Proxy (Secure Integration)
+To avoid CORS issues and keep the Directus `STATIC_TOKEN` server-side, all frontend calls go through a local Next.js proxy:
+*   **GET/POST**: `/api/pdf/templates`
+*   **PATCH/DELETE**: `/api/pdf/templates/[id]`
+
+### 100% WYSIWYG Baseline Alignment
+To match the browser's `flex items-center` exactly, the `PdfGenerator` uses a **Hybrid Baseline** calculation instead of the standard `middle` baseline:
+*   **Formula**: `textY = el.y + (el.height / 2) + (capHeightMm / 2)`
+*   **CapHeight**: Calculated as `~70%` of the font size. This ensures text sits in the physical center of the box regardless of the font metrics.
+
+### DPI Calibration
+*   **Standard**: 96 DPI (`1mm = 3.7795px`).
+*   **Scaling**: All Designer offsets in pixels are converted to `mm` using this scale before being sent to the PDF engine.
+
+### Units Sync
+*   **Font Size**: Settable in `pt` (standard) or `mm` (physical height), synced with the conversion `1pt = 0.3528mm`.
+
+## 4. Key Components
+| Component | Purpose |
+| :--- | :--- |
+| `PdfDesigner.tsx` | The Visual Editor (Draggable/Resizable elements). |
+| `PdfSidebar.tsx` | UI Controls for styling and configuration. |
+| `PdfEngine.ts` | The bridge for other modules to load/apply templates. |
+| `PdfGenerator.ts` | The low-level `jsPDF` rendering engine. |
+| `pdfTemplateService.ts`| Data fetching layer (CRUD). |
+| `PdfEditor.tsx` | The wrapper that manages state and template loading. |

@@ -8,30 +8,10 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 // ============================================================================
-// TYPES
-// ============================================================================
-
-interface JwtPayload {
-  id?: number;
-  user_id?: number;
-  sub?: number;
-  [key: string]: unknown;
-}
-
-interface OvertimeRequest {
-  overtime_id: number;
-  user_id: number;
-  department_id?: number;
-  status: string;
-  filed_at?: string;
-  [key: string]: unknown;
-}
-
-// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
-function decodeJwtPayload(token: string): JwtPayload | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     if (!token) return null;
     const parts = token.split(".");
@@ -112,7 +92,7 @@ export async function GET() {
     const requests = overtimeResponse.data || [];
 
     // Fetch user details for each request
-    const userIds = [...new Set(requests.map((r: OvertimeRequest) => r.user_id))] as number[];
+    const userIds = [...new Set(requests.map((r: { user_id: number }) => r.user_id))] as number[];
     const usersPromises = userIds.map((id) =>
       directusFetch(`/items/user/${id}?fields=user_id,user_fname,user_lname,user_mname,user_department`)
         .catch(() => null)
@@ -125,7 +105,7 @@ export async function GET() {
     );
 
     // Fetch department details
-    const deptIds = [...new Set(requests.map((r: OvertimeRequest) => r.department_id).filter(Boolean))] as number[];
+    const deptIds = [...new Set(requests.map((r: { department_id?: number }) => r.department_id).filter(Boolean))] as number[];
     const deptsPromises = deptIds.map((id) =>
       directusFetch(`/items/department/${id}?fields=department_id,department_name`)
         .catch(() => null)
@@ -138,7 +118,7 @@ export async function GET() {
     );
 
     // Combine data
-    const enrichedRequests = requests.map((req: OvertimeRequest) => {
+    const enrichedRequests = requests.map((req: { user_id: number; department_id?: number; [key: string]: unknown }) => {
       const user = usersMap.get(req.user_id);
       const dept = req.department_id ? deptsMap.get(req.department_id) : null;
 

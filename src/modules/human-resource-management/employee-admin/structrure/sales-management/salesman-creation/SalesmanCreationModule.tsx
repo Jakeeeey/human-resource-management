@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
     Select,
     SelectContent,
@@ -17,12 +18,14 @@ import { useSalesmen } from "./hooks/useSalesmen";
 import { SalesmanTable } from "./components/SalesmanTable";
 import { SalesmanDialog } from "./components/SalesmanDialog";
 import { CustomerManagementDialog } from "./components/CustomerManagementDialog";
+import { SalesmanDetailsDialog } from "./components/SalesmanDetailsDialog";
 import type { SalesmanWithRelations } from "./types";
 
 function SalesmanCreationContent() {
     const { filters, updateSearch, updatePriceType, updateIsActive, resetFilters } = useSalesmanFilterContext();
     const {
         salesmen,
+        allSalesmen,
         users,
         divisions,
         branches,
@@ -39,7 +42,9 @@ function SalesmanCreationContent() {
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+    const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
     const [selectedSalesman, setSelectedSalesman] = useState<SalesmanWithRelations | null>(null);
+    const [detailsSalesman, setDetailsSalesman] = useState<SalesmanWithRelations | null>(null);
 
     const handleAdd = () => {
         setSelectedSalesman(null);
@@ -54,6 +59,11 @@ function SalesmanCreationContent() {
     const handleManageCustomers = (salesman: SalesmanWithRelations) => {
         setSelectedSalesman(salesman);
         setCustomerDialogOpen(true);
+    };
+
+    const handleViewDetails = (salesman: SalesmanWithRelations) => {
+        setDetailsSalesman(salesman);
+        setDetailsDialogOpen(true);
     };
 
     const handleSubmit = async (data: Record<string, unknown>) => {
@@ -111,33 +121,27 @@ function SalesmanCreationContent() {
                             />
                         </div>
 
-                        <Select
+                        <SearchableSelect
+                            className="w-[200px]"
+                            placeholder="All Price Types"
                             value={filters.priceType}
                             onValueChange={updatePriceType}
-                        >
-                            <SelectTrigger className="w-[200px]">
-                                <SelectValue placeholder="All Price Types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">All Price Types</SelectItem>
-                                {priceTypes.map((pt) => (
-                                    <SelectItem
-                                        key={pt.price_type_id}
-                                        value={pt.price_type_name}
-                                    >
-                                        {pt.price_type_name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                            options={[
+                                { value: "All", label: "All Price Types" },
+                                ...priceTypes.map((pt) => ({
+                                    value: pt.price_type_name,
+                                    label: pt.price_type_name,
+                                })),
+                            ]}
+                        />
 
                         <Select
                             value={
                                 filters.isActive === null
                                     ? "all"
                                     : filters.isActive
-                                    ? "active"
-                                    : "inactive"
+                                      ? "active"
+                                      : "inactive"
                             }
                             onValueChange={(value) =>
                                 updateIsActive(
@@ -169,6 +173,7 @@ function SalesmanCreationContent() {
                     ) : (
                         <SalesmanTable
                             salesmen={salesmen}
+                            onViewDetails={handleViewDetails}
                             onEdit={handleEdit}
                             onManageCustomers={handleManageCustomers}
                         />
@@ -180,6 +185,7 @@ function SalesmanCreationContent() {
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 salesman={selectedSalesman}
+                registeredSalesmen={allSalesmen}
                 users={users}
                 divisions={divisions}
                 branches={branches}
@@ -193,6 +199,12 @@ function SalesmanCreationContent() {
                 open={customerDialogOpen}
                 onOpenChange={setCustomerDialogOpen}
                 salesman={selectedSalesman}
+            />
+
+            <SalesmanDetailsDialog
+                open={detailsDialogOpen}
+                onOpenChange={setDetailsDialogOpen}
+                salesman={detailsSalesman}
             />
         </div>
     );

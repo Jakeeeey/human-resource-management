@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, X } from "lucide-react";
+import { toast } from "sonner";
 import type { Customer, SalesmanWithRelations } from "../types";
 
 interface CustomerManagementDialogProps {
@@ -30,7 +31,9 @@ export function CustomerManagementDialog({
 }: CustomerManagementDialogProps) {
     const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
     const [assignedCustomerIds, setAssignedCustomerIds] = useState<number[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [lastAssignedCustomerId, setLastAssignedCustomerId] = useState<number | null>(null);
+    const [assignedSearchQuery, setAssignedSearchQuery] = useState("");
+    const [availableSearchQuery, setAvailableSearchQuery] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -55,6 +58,7 @@ export function CustomerManagementDialog({
                 const result = await res.json();
                 setAllCustomers(result.customers || []);
                 setAssignedCustomerIds(result.assignedCustomerIds || []);
+                setLastAssignedCustomerId(null);
             } catch (error) {
                 console.error("Error fetching customers:", error);
             } finally {
@@ -70,16 +74,26 @@ export function CustomerManagementDialog({
         }
     }, [open, salesman, fetchData]);
 
-    const filteredCustomers = useMemo(() => {
-        if (!searchQuery) return allCustomers;
-        const query = searchQuery.toLowerCase();
-        return allCustomers.filter(
-            (c) =>
-                c.customer_name.toLowerCase().includes(query) ||
-                c.customer_code.toLowerCase().includes(query) ||
-                c.store_name.toLowerCase().includes(query)
-        );
-    }, [allCustomers, searchQuery]);
+    useEffect(() => {
+        if (open) {
+            setAssignedSearchQuery("");
+            setAvailableSearchQuery("");
+            setLastAssignedCustomerId(null);
+        }
+    }, [open]);
+
+    const customerMatchesQuery = useCallback(
+        (customer: Customer, query: string) => {
+            const q = query.trim().toLowerCase();
+            if (!q) return true;
+            return (
+                customer.customer_name.toLowerCase().includes(q) ||
+                customer.customer_code.toLowerCase().includes(q) ||
+                customer.store_name.toLowerCase().includes(q)
+            );
+        },
+        []
+    );
 
     const assignedCustomers = useMemo(() => {
         if (assignedCustomerIds.length === 0) return [];
@@ -94,29 +108,44 @@ export function CustomerManagementDialog({
     }, [allCustomers, assignedCustomerIds]);
 
     const filteredAssignedCustomers = useMemo(() => {
-        const source = searchQuery ? filteredCustomers : assignedCustomers;
-        const assignedSet = new Set(assignedCustomerIds);
-        return source.filter((c) => assignedSet.has(c.id));
-    }, [assignedCustomers, assignedCustomerIds, filteredCustomers, searchQuery]);
+        const base = assignedSearchQuery
+            ? assignedCustomers.filter((c) => customerMatchesQuery(c, assignedSearchQuery))
+            : assignedCustomers;
+
+        if (!lastAssignedCustomerId) return base;
+
+        const idx = base.findIndex((c) => c.id === lastAssignedCustomerId);
+        if (idx === -1) return base;
+
+        return [base[idx], ...base.slice(0, idx), ...base.slice(idx + 1)];
+    }, [assignedCustomers, assignedSearchQuery, customerMatchesQuery, lastAssignedCustomerId]);
 
     const filteredAvailableCustomers = useMemo(() => {
-        const source = searchQuery ? filteredCustomers : availableCustomers;
-        const assignedSet = new Set(assignedCustomerIds);
-        return source.filter((c) => !assignedSet.has(c.id));
-    }, [assignedCustomerIds, availableCustomers, filteredCustomers, searchQuery]);
+        if (!availableSearchQuery) return availableCustomers;
+        return availableCustomers.filter((c) => customerMatchesQuery(c, availableSearchQuery));
+    }, [availableCustomers, availableSearchQuery, customerMatchesQuery]);
 
     const handleToggleCustomer = (customerId: number) => {
-        setAssignedCustomerIds((prev) =>
-            prev.includes(customerId)
+        setAssignedCustomerIds((prev) => {
+            const wasAssigned = prev.includes(customerId);
+            const next = wasAssigned
                 ? prev.filter((id) => id !== customerId)
-                : [...prev, customerId]
-        );
+                : [...prev, customerId];
+
+            // If it was available and is now assigned, move it to the top of the Assigned list.
+            if (!wasAssigned) {
+                setLastAssignedCustomerId(customerId);
+            }
+
+            return next;
+        });
     };
 
     const handleSave = async () => {
         if (!salesman) return;
 
         setIsSaving(true);
+        const toastId = toast.loading("Saving customer assignments...");
         try {
             const res = await fetch(customersApiUrl, {
                 method: "PUT",
@@ -130,12 +159,22 @@ export function CustomerManagementDialog({
             if (!res.ok) {
                 const text = await res.text();
                 console.warn("Save customer assignments failed:", res.status, text);
+                toast.error("Failed to save changes", {
+                    id: toastId,
+                    description: text || `Request failed (${res.status})`,
+                });
                 return;
             }
 
+            toast.success("Customer assignments saved", { id: toastId });
             onOpenChange(false);
         } catch (error) {
             console.error("Error saving customer assignments:", error);
+            toast.error("Failed to save changes", {
+                id: toastId,
+                description:
+                    error instanceof Error ? error.message : "Unexpected error occurred",
+            });
         } finally {
             setIsSaving(false);
         }
@@ -143,7 +182,7 @@ export function CustomerManagementDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[950px] max-h-[80vh]">
+            <DialogContent className="sm:max-w-[950px] max-h-[80vh] overflow-hidden flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Manage Customers for {salesman?.salesman_name}</DialogTitle>
                     <DialogDescription>
@@ -151,27 +190,7 @@ export function CustomerManagementDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search customers..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9"
-                        />
-                        {searchQuery && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                                onClick={() => setSearchQuery("")}
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        )}
-                    </div>
-
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">
                             {assignedCustomerIds.length} customer(s) selected
@@ -180,7 +199,10 @@ export function CustomerManagementDialog({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setAssignedCustomerIds([])}
+                                onClick={() => {
+                                    setAssignedCustomerIds([]);
+                                    setLastAssignedCustomerId(null);
+                                }}
                             >
                                 Clear All
                             </Button>
@@ -193,24 +215,49 @@ export function CustomerManagementDialog({
                                 Loading customers...
                             </span>
                         </div>
-                    ) : filteredCustomers.length === 0 ? (
-                        <div className="flex items-center justify-center h-32">
+                    ) : allCustomers.length === 0 ? (
+                        <div className="flex items-center justify-center h-32 rounded-lg border border-dashed">
                             <span className="text-sm text-muted-foreground">
                                 No customers found
                             </span>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="rounded-lg border bg-muted/20">
-                                <div className="flex items-center justify-between border-b px-3 py-2">
-                                    <div className="text-sm font-medium">Assigned Customers</div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {filteredAssignedCustomers.length}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
+                            <div className="flex flex-col rounded-lg border bg-muted/10 overflow-hidden min-h-0">
+                                <div className="border-b bg-muted/20 px-4 py-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm font-semibold">Assigned Customers</div>
+                                        <Badge variant="secondary" className="text-xs">
+                                            {filteredAssignedCustomers.length}
+                                        </Badge>
+                                    </div>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search assigned..."
+                                            value={assignedSearchQuery}
+                                            onChange={(e) =>
+                                                setAssignedSearchQuery(e.target.value)
+                                            }
+                                            className="pl-9"
+                                        />
+                                        {assignedSearchQuery && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                                                onClick={() =>
+                                                    setAssignedSearchQuery("")
+                                                }
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
-                                <ScrollArea className="h-[45vh] px-3 py-3">
+                                <ScrollArea className="flex-1 min-h-0 p-3">
                                     {filteredAssignedCustomers.length === 0 ? (
-                                        <div className="text-sm text-muted-foreground p-1">
+                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground p-4 text-center border-2 border-dashed rounded-md m-2">
                                             No customers assigned yet.
                                         </div>
                                     ) : (
@@ -222,7 +269,7 @@ export function CustomerManagementDialog({
                                                 return (
                                                     <div
                                                         key={customer.id}
-                                                        className="flex items-start space-x-3 rounded-lg border bg-background p-3 hover:bg-accent cursor-pointer"
+                                                        className="group flex items-start space-x-3 rounded-lg border bg-background p-3 hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer"
                                                         onClick={() =>
                                                             handleToggleCustomer(customer.id)
                                                         }
@@ -259,12 +306,14 @@ export function CustomerManagementDialog({
                                                             </div>
                                                             {(customer.city ||
                                                                 customer.province) && (
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    {customer.city}
-                                                                    {customer.city &&
-                                                                        customer.province &&
-                                                                        ", "}
-                                                                    {customer.province}
+                                                                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                                                    <span className="truncate">
+                                                                        {customer.city}
+                                                                        {customer.city &&
+                                                                            customer.province &&
+                                                                            ", "}
+                                                                        {customer.province}
+                                                                    </span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -276,17 +325,44 @@ export function CustomerManagementDialog({
                                 </ScrollArea>
                             </div>
 
-                            <div className="rounded-lg border bg-muted/20">
-                                <div className="flex items-center justify-between border-b px-3 py-2">
-                                    <div className="text-sm font-medium">Available Customers</div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {filteredAvailableCustomers.length}
+                            <div className="flex flex-col rounded-lg border bg-muted/10 overflow-hidden min-h-0">
+                                <div className="border-b bg-muted/20 px-4 py-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm font-semibold">Available Customers</div>
+                                        <Badge variant="secondary" className="text-xs">
+                                            {filteredAvailableCustomers.length}
+                                        </Badge>
+                                    </div>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search available..."
+                                            value={availableSearchQuery}
+                                            onChange={(e) =>
+                                                setAvailableSearchQuery(e.target.value)
+                                            }
+                                            className="pl-9"
+                                        />
+                                        {availableSearchQuery && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                                                onClick={() =>
+                                                    setAvailableSearchQuery("")
+                                                }
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
-                                <ScrollArea className="h-[45vh] px-3 py-3">
+                                <ScrollArea className="flex-1 min-h-0 p-3">
                                     {filteredAvailableCustomers.length === 0 ? (
-                                        <div className="text-sm text-muted-foreground p-1">
-                                            No additional customers available.
+                                        <div className="flex h-full items-center justify-center text-sm text-muted-foreground p-4 text-center border-2 border-dashed rounded-md m-2">
+                                            {availableSearchQuery
+                                                ? "No customers found matching your search"
+                                                : "No additional customers available."}
                                         </div>
                                     ) : (
                                         <div className="space-y-2">
@@ -297,7 +373,7 @@ export function CustomerManagementDialog({
                                                 return (
                                                     <div
                                                         key={customer.id}
-                                                        className="flex items-start space-x-3 rounded-lg border bg-background p-3 hover:bg-accent cursor-pointer"
+                                                        className="group flex items-start space-x-3 rounded-lg border bg-background p-3 hover:border-primary/50 hover:shadow-sm transition-all cursor-pointer"
                                                         onClick={() =>
                                                             handleToggleCustomer(customer.id)
                                                         }
@@ -334,12 +410,14 @@ export function CustomerManagementDialog({
                                                             </div>
                                                             {(customer.city ||
                                                                 customer.province) && (
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    {customer.city}
-                                                                    {customer.city &&
-                                                                        customer.province &&
-                                                                        ", "}
-                                                                    {customer.province}
+                                                                <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                                                    <span className="truncate">
+                                                                        {customer.city}
+                                                                        {customer.city &&
+                                                                            customer.province &&
+                                                                            ", "}
+                                                                        {customer.province}
+                                                                    </span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -359,10 +437,15 @@ export function CustomerManagementDialog({
                         variant="outline"
                         onClick={() => onOpenChange(false)}
                         disabled={isSaving}
+                        className="w-full sm:w-auto"
                     >
                         Cancel
                     </Button>
-                    <Button onClick={handleSave} disabled={isSaving || isLoading}>
+                    <Button
+                        onClick={handleSave}
+                        disabled={isSaving || isLoading}
+                        className="w-full sm:w-auto"
+                    >
                         {isSaving ? "Saving..." : "Save Changes"}
                     </Button>
                 </DialogFooter>
