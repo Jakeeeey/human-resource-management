@@ -15,6 +15,8 @@ import {
     Layers, // Department
     KeyRound, // Department Accounts
     BadgeCheck, // Role Management
+    Boxes, // Subsystem Registration
+    Brush, // PDF Layout Designer
 } from "lucide-react";
 
 import { NavMain } from "./nav-main";
@@ -87,11 +89,6 @@ const data = {
                             icon: Building2,
                         },
                         {
-                            title: "Salesman Management",
-                            url: "/hrm/employee-admin/structure/salesman-management/",
-                            icon: UserCog,
-                        },
-                        {
                             title: "Company Profile",
                             url: "/hrm/employee-admin/structure/company-profile",
                             icon: Building,
@@ -129,23 +126,46 @@ const data = {
                     ],
                 },
                 {
+                    title: "Sales Management",
+                    url: "#",
+                    icon: UserCog,
+                    items: [
+                        {
+                            title: "Salesman Creation",
+                            url: "/hrm/employee-admin/structure/sales-management/salesman-creation",
+                            icon: UserCog,
+                        },
+                        {
+                            title: "Salesman QR Code",
+                            url: "/hrm/employee-admin/structure/sales-management/salesman-qr-code",
+                            icon: UserCog,
+                        },
+                    ],
+                },
+
+                {
                     title: "Approval",
                     url: "#",
                     icon: Shield,
                     items: [
                         {
-                            title: "Overtime Request",
+                            title: "Attendance Approval",
+                            url: "/hrm/employee-admin/approval/attendance-approval",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Overtime Approval",
                             url: "/hrm/employee-admin/approval/overtime-request",
                             icon: CalendarClock,
                         },
                         {
                             title: "Undertime Approval",
-                            url: "/hrm/employee-admin/approval/undertime-approval",
+                            url: "/hrm/employee-admin/approval/undertime-request",
                             icon: CalendarClock,
                         },
                         {
                             title: "Leave Approval",
-                            url: "/hrm/employee-admin/approval/leave-approval",
+                            url: "/hrm/employee-admin/approval/leave-request",
                             icon: CalendarClock,
                         },
                     ],
@@ -165,9 +185,29 @@ const data = {
                             url: "/hrm/employee-admin/report/undertime-report",
                             icon: CalendarClock,
                         },
+                        {
+                            title: "Leave Report",
+                            url: "/hrm/employee-admin/report/leave-report",
+                            icon: CalendarClock,
+                        },
                     ],
                 },
             ],
+        },
+        {
+            title: "User Configuration",
+            url: "/hrm/user-configuration",
+            icon: UserCog,
+        },
+        {
+            title: "Subsystem Registration",
+            url: "/hrm/subsystem-registration",
+            icon: Boxes,
+        },
+        {
+            title: "PDF Layout",
+            url: "/hrm/pdf-layout",
+            icon: Brush,
         },
         {
             title: "Workforce",
@@ -181,17 +221,22 @@ const data = {
                     items: [
                         {
                             title: "Today's Report",
-                            url: "/hrm/workforce/payroll-and-attendance/attendance-report",
+                            url: "/hrm/workforce/attendance-report/todays-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Employee Report",
-                            url: "/hrm/workforce/payroll-and-attendance/employee-report",
+                            url: "/hrm/workforce/attendance-report/employee-report",
                             icon: CalendarClock,
                         },
                         {
                             title: "Department Report",
-                            url: "/hrm/workforce/payroll-and-attendance/department-report",
+                            url: "/hrm/workforce/attendance-report/department-report",
+                            icon: CalendarClock,
+                        },
+                        {
+                            title: "Logistics Report",
+                            url: "/hrm/workforce/attendance-report/logistics-report",
                             icon: CalendarClock,
                         },
                     ],
@@ -214,6 +259,11 @@ const data = {
                     ],
                 },
                 {
+                    title: "Attendance Management",
+                    url: "/hrm/workforce/attendance-management",
+                    icon: CalendarClock,
+                },
+                {
                     title: "Job Orders",
                     url: "#",
                     items: [
@@ -221,7 +271,7 @@ const data = {
                             title: "Application Management",
                             url: "/hrm/workforce/job-orders/application-management",
                             icon: CalendarClock,
-                        },  
+                        },
                     ],
                 },
                 {
@@ -292,20 +342,17 @@ const data = {
             isActive: false,
             items: [
                 {
-                    title: "Employee File Record Type",
+                    title: "Employee File Type",
                     url: "/hrm/file-management/employee-file-record-type",
                     icon: Shield,
                 },
                 {
-                    title: "Employee File Record List",
+                    title: "Employee File List",
                     url: "/hrm/file-management/employee-file-record-list",
                     icon: Shield,
                 },
-                {
-                    title: "Employee File Record Category",
-                    url: "/hrm/file-management/employee-file-record-category",
-                    icon: Shield,
-                },
+
+
             ],
 
         },

@@ -31,6 +31,7 @@ export interface CreateEmployeePayload {
   biometricId?: string;
   rfId?: string;
   admin?: boolean;
+  role?: string;
   emergencyContactName?: string;
   emergencyContactNumber?: string;
 }
@@ -114,3 +115,4 @@ export async function deleteEmployeeSpring(
 
   return data as DeleteEmployeeResponse;
 }
+

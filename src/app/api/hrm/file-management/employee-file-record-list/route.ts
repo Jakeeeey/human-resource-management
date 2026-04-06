@@ -3,11 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
 
+const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
+
 async function dFetch(path: string, options?: RequestInit) {
     const res = await fetch(`${DIRECTUS_URL}${path}`, {
         ...options,
         headers: {
             "Content-Type": "application/json",
+            Authorization: `Bearer ${STATIC_TOKEN}`,
             ...(options?.headers || {}),
         },
     });
@@ -15,7 +18,11 @@ async function dFetch(path: string, options?: RequestInit) {
     if (!res.ok) {
         const text = await res.text();
         console.error("DIRECTUS ERROR:", text);
-        throw new Error(text);
+        try {
+            return JSON.parse(text);
+        } catch {
+            throw new Error(text);
+        }
     }
 
     if (res.status === 204) {
@@ -25,10 +32,7 @@ async function dFetch(path: string, options?: RequestInit) {
     return res.json();
 }
 
-async function fetchAll(collection: string) {
-    const r = await dFetch(`/items/${collection}?limit=${LIMIT}`);
-    return r.data || [];
-}
+
 
 interface RecordType {
     id: number;
@@ -46,19 +50,33 @@ interface Record {
 }
 
 export async function GET() {
-    const [records, recordTypes] = await Promise.all([
-        fetchAll("employee_file_record_list"),
-        fetchAll("employee_file_record_type"),
-    ]);
+    try {
+        const [recordsRes, recordTypesRes] = await Promise.all([
+            dFetch(`/items/employee_file_record_list?limit=${LIMIT}`),
+            dFetch(`/items/employee_file_record_type?limit=${LIMIT}`),
+        ]);
 
-    const typeMap = new Map(recordTypes.map((t: RecordType) => [t.id, t]));
+        if (recordsRes.error || recordTypesRes.error) {
+            return NextResponse.json(
+                { error: recordsRes.error || recordTypesRes.error },
+                { status: 500 }
+            );
+        }
 
-    const enriched = records.map((r: Record) => ({
-        ...r,
-        record_type: typeMap.get(r.record_type_id) || null,
-    }));
+        const records = recordsRes.data || [];
+        const recordTypes = recordTypesRes.data || [];
 
-    return NextResponse.json({ records: enriched, recordTypes });
+        const typeMap = new Map(recordTypes.map((t: RecordType) => [t.id, t]));
+
+        const enriched = records.map((r: Record) => ({
+            ...r,
+            record_type: typeMap.get(r.record_type_id) || null,
+        }));
+
+        return NextResponse.json({ records: enriched, recordTypes });
+    } catch (err: unknown) {
+        return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
+    }
 }
 
 export async function POST(req: NextRequest) {

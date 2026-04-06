@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -31,6 +32,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
     case "review-committees":
       upstreamPath = "/items/target_setting_approver?fields=id,approver_id.user_id,approver_id.user_fname,approver_id.user_lname,approver_id.user_email,approver_id.user_position,is_deleted,created_at&limit=200&filter[is_deleted][_eq]=0";
       break;
+    case "expense-review-committees":
+      upstreamPath = "/items/disbursement_draft_approver?fields=id,approver_id.user_id,approver_id.user_fname,approver_id.user_lname,approver_id.user_email,approver_id.user_position,division_id.division_id,division_id.division_name,approver_heirarchy,is_deleted,created_at&limit=500&filter[is_deleted][_eq]=0";
+      break;
     case "division-heads":
       upstreamPath = "/items/division_sales_head?fields=id,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_email,user_id.user_position,division_id.division_id,division_id.division_name,created_at,is_deleted&limit=200&filter[is_deleted][_eq]=0";
       break;
@@ -56,13 +60,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
       else if (segment.startsWith("supervisors/")) upstreamPath = `/items/supervisor_per_division/${segments[1]}`;
       else if (segment.startsWith("salesman-assignments/")) upstreamPath = `/items/salesman_per_supervisor/${segments[1]}`;
       else if (segment.startsWith("review-committees/")) upstreamPath = `/items/target_setting_approver/${segments[1]}`;
+      else if (segment.startsWith("expense-review-committees/")) upstreamPath = `/items/disbursement_draft_approver/${segments[1]}`;
       break;
   }
 
   try {
+    const authHeader = process.env.DIRECTUS_STATIC_TOKEN 
+      ? `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` 
+      : req.headers.get("Authorization") || "";
+
     const res = await fetch(`${UPSTREAM_BASE}${upstreamPath}${search.replace('?', '&')}`, {
       headers: {
-        "Authorization": req.headers.get("Authorization") || "",
+        "Authorization": authHeader,
         "Content-Type": "application/json"
       },
       cache: 'no-store'
@@ -125,6 +134,7 @@ async function handleMutation(req: NextRequest, segments: string[], method: stri
   switch (segment) {
     case "executives": upstreamPath = "/items/executive"; break;
     case "review-committees": upstreamPath = "/items/target_setting_approver"; break;
+    case "expense-review-committees": upstreamPath = "/items/disbursement_draft_approver"; break;
     case "division-heads": upstreamPath = "/items/division_sales_head"; break;
     case "supervisors": upstreamPath = "/items/supervisor_per_division"; break;
     case "salesman-assignments": upstreamPath = "/items/salesman_per_supervisor"; break;
@@ -140,6 +150,32 @@ async function handleMutation(req: NextRequest, segments: string[], method: stri
     // For DELETE, we actually use PATCH for soft delete if it's one of our main tables
     let finalMethod = method;
     let finalBody = body;
+
+    if (method === "POST") {
+      // Extract user ID from vos_access_token cookie
+      const token = req.cookies.get("vos_access_token")?.value;
+      let created_by = null;
+      if (token) {
+        try {
+          const payloadBuffer = Buffer.from(token.split('.')[1], 'base64');
+          const payload = JSON.parse(payloadBuffer.toString('utf-8'));
+          if (payload.sub) {
+            created_by = Number(payload.sub);
+          }
+        } catch (e) {
+          console.error("Failed to parse jwt cookie payload", e);
+        }
+      }
+
+      // Generate Asia/Manila timestamp
+      const phTime = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" }).replace("T", " ");
+
+      finalBody = {
+        ...finalBody,
+        ...(created_by ? { created_by } : {}),
+        created_at: phTime
+      };
+    }
 
     if (method === "DELETE") {
       finalMethod = "PATCH";
