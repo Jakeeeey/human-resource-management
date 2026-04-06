@@ -60,9 +60,20 @@ export interface ReviewCommittee {
     created_at?: string;
 }
 
+export interface ExpenseReviewCommittee {
+    id: number;
+    approver_id: number | SystemUser;
+    division_id: number | Division;
+    approver_heirarchy: number;
+    is_deleted?: number;
+    created_by?: number;
+    created_at?: string;
+}
+
 export type RoleManagementTab =
     | "executive"
     | "review-committee"
+    | "expense-review-committee"
     | "division-head"
     | "supervisor"
     | "salesman";
