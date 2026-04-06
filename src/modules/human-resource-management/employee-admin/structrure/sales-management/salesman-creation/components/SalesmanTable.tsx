@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     flexRender,
     getCoreRowModel,
+    getPaginationRowModel,
     getSortedRowModel,
+    type PaginationState,
     type SortingState,
     type ColumnDef,
     useReactTable,
@@ -27,21 +29,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Pencil, Users } from "lucide-react";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { Eye, MoreHorizontal, Pencil, Users } from "lucide-react";
 import type { SalesmanWithRelations } from "../types";
 
 interface SalesmanTableProps {
     salesmen: SalesmanWithRelations[];
+    onViewDetails: (salesman: SalesmanWithRelations) => void;
     onEdit: (salesman: SalesmanWithRelations) => void;
     onManageCustomers: (salesman: SalesmanWithRelations) => void;
 }
 
 export function SalesmanTable({
     salesmen,
+    onViewDetails,
     onEdit,
     onManageCustomers,
 }: SalesmanTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
+    const [pagination, setPagination] = useState<PaginationState>({
+        pageIndex: 0,
+        pageSize: 10,
+    });
+
+    useEffect(() => {
+        // When the dataset changes (filters/search/refetch), return to page 1.
+        setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    }, [salesmen]);
 
     const columns: ColumnDef<SalesmanWithRelations>[] = [
         {
@@ -101,6 +115,10 @@ export function SalesmanTable({
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => onViewDetails(salesman)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => onEdit(salesman)}>
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Edit
@@ -124,14 +142,17 @@ export function SalesmanTable({
         columns,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
         onSortingChange: setSorting,
+        onPaginationChange: setPagination,
         state: {
             sorting,
+            pagination,
         },
     });
 
     return (
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-hidden">
             <Table>
                 <TableHeader>
                     {table.getHeaderGroups().map((headerGroup) => (
@@ -172,12 +193,26 @@ export function SalesmanTable({
                                 colSpan={columns.length}
                                 className="h-24 text-center"
                             >
-                                No salesmen found.
+                                {salesmen.length === 0
+                                    ? "No salesmen found."
+                                    : "No results on this page."}
                             </TableCell>
                         </TableRow>
                     )}
                 </TableBody>
             </Table>
+
+            {salesmen.length > 0 ? (
+                <div className="border-t py-2">
+                    <DataTablePagination
+                        pageIndex={table.getState().pagination.pageIndex + 1}
+                        pageSize={table.getState().pagination.pageSize}
+                        rowCount={salesmen.length}
+                        onPageChange={(page) => table.setPageIndex(page - 1)}
+                        onPageSizeChange={(pageSize) => table.setPageSize(pageSize)}
+                    />
+                </div>
+            ) : null}
         </div>
     );
 }
