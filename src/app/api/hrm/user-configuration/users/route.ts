@@ -48,11 +48,8 @@ async function proxy(req: NextRequest) {
         }, { status: res.status });
     }
 
-    const data = await res.arrayBuffer();
-    return new NextResponse(data, {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
+    const data = await res.json();
+    return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[User Config - Users Proxy] Fetch fatal error:", message);
