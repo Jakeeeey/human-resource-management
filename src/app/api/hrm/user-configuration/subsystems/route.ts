@@ -11,23 +11,11 @@ async function proxy(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
-  const limit = searchParams.get("limit") || "100";
-  const filter = searchParams.get("filter");
-  const fields = searchParams.get("fields") || "*";
   
   // Construct upstream URL
-  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/modules`;
-  if (id) {
-    upstreamUrl += `/${id}`;
-  } else {
-    // Forward query params for listing
-    const queryParams = new URLSearchParams();
-    queryParams.set("limit", limit);
-    queryParams.set("fields", fields);
-    if (filter) queryParams.set("filter", filter);
-    upstreamUrl += `?${queryParams.toString()}`;
-  }
-
+  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/subsystems?limit=-1`;
+  if (id) upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/subsystems/${id}`;
+  
   const headers = new Headers();
   headers.set("content-type", "application/json");
   const token = process.env.DIRECTUS_STATIC_TOKEN;
@@ -39,33 +27,23 @@ async function proxy(req: NextRequest) {
       headers,
     };
 
-    if (["POST", "PATCH", "PUT"].includes(req.method)) {
-      const body = await req.json();
-      fetchOptions.body = JSON.stringify(body);
-    }
-
     const res = await fetch(upstreamUrl, {
       ...fetchOptions,
     });
 
     if (!res.ok) {
         const errorBody = await res.text();
+        console.error(`[User Config - Subsystems Proxy] Upstream Error (${res.status}):`, errorBody);
         return NextResponse.json({ error: "Upstream Error", details: errorBody }, { status: res.status });
-    }
-
-    if (req.method === "DELETE") {
-        return new NextResponse(null, { status: 204 });
     }
 
     const data = await res.json();
     return NextResponse.json(data);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error(`[User Config - Subsystems Proxy] Connection Error:`, message);
     return NextResponse.json({ error: "Connection Error", message }, { status: 502 });
   }
 }
 
 export async function GET(req: NextRequest) { return proxy(req); }
-export async function POST(req: NextRequest) { return proxy(req); }
-export async function PATCH(req: NextRequest) { return proxy(req); }
-export async function DELETE(req: NextRequest) { return proxy(req); }

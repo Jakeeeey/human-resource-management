@@ -30,9 +30,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
 import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
-import { usePermissionsStore } from "@/stores/usePermissionsStore";
+import { toast } from "sonner";
 // Unused Select components removed to fix linting warnings
 
 type Status = "active" | "comingSoon";
@@ -247,8 +246,11 @@ export default function ERPMainDashboard() {
     const [q, setQ] = React.useState("");
     const [isCompactHeader, setIsCompactHeader] = React.useState(false);
     const [registeredSubsystems, setRegisteredSubsystems] = React.useState<SubsystemRegistration[]>([]);
-
-    const { permissions: authorizedSubsystems, isAdmin, isLoading: loadingPermissions, fetchPermissions } = usePermissionsStore();
+    
+    // Local state for dashboard permissions - 100% isolated
+    const [authorizedSubsystems, setAuthorizedSubsystems] = React.useState<string[]>([]);
+    const [isAdmin, setIsAdmin] = React.useState(false);
+    const [loadingPermissions, setLoadingPermissions] = React.useState(true);
 
     React.useEffect(() => {
         const onScroll = () => setIsCompactHeader(window.scrollY > 36);
@@ -259,13 +261,36 @@ export default function ERPMainDashboard() {
 
     React.useEffect(() => {
         const load = async () => {
-            fetchPermissions();
-            // Load registry
-            const registry = await SubsystemService.getSubsystems();
-            setRegisteredSubsystems(registry);
+            setLoadingPermissions(true);
+            try {
+                // 1. Fetch Permissions from dedicated dashboard proxy
+                const permRes = await fetch("/api/main-dashboard/user-profile");
+                if (permRes.ok) {
+                    const permData = await permRes.json();
+                    setAuthorizedSubsystems(permData.permissions || []);
+                    setIsAdmin(!!permData.isAdmin);
+                } else {
+                    console.error("[Dashboard] Failed to fetch permissions from dedicated proxy");
+                }
+
+                // 2. Fetch Subsystems Registry from dedicated dashboard proxy
+                const registryRes = await fetch("/api/main-dashboard/subsystems");
+                if (registryRes.ok) {
+                    const registryData = await registryRes.json();
+                    setRegisteredSubsystems(registryData.data || []);
+                } else {
+                    console.error("[Dashboard] Failed to fetch subsystems from dedicated proxy");
+                    toast.error("Failed to load subsystems registry.");
+                }
+            } catch (err) {
+                console.error("[Dashboard] Fatal load error:", err);
+                toast.error("Connection error while loading dashboard data.");
+            } finally {
+                setLoadingPermissions(false);
+            }
         };
         load();
-    }, [fetchPermissions]);
+    }, []);
 
     const subsystems = React.useMemo(() => {
         return registeredSubsystems.map((s: SubsystemRegistration): SubsystemItem => {
