@@ -25,7 +25,27 @@ export async function POST(req: Request) {
         const outgoingForm = new FormData();
 
         // 1. Specify the folder metadata FIRST (Directus requirement)
-        const folderId = process.env.DIRECTUS_FOLDER_COMPANY_LOGO;
+        const targetFolderName = "hrm_assets";
+        let folderId: string | undefined;
+
+        try {
+            const folderRes = await fetch(`${DIRECTUS_URL}/folders?filter[name][_eq]=${targetFolderName}`, {
+              headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
+            });
+            if (folderRes.ok) {
+              const folderData = await folderRes.json();
+              if (folderData.data && folderData.data.length > 0) {
+                folderId = folderData.data[0].id;
+              } else {
+                console.warn(`[upload] Folder "${targetFolderName}" not found in Directus.`);
+              }
+            } else {
+              console.error(`[upload] Failed to fetch folder "${targetFolderName}":`, await folderRes.text());
+            }
+        } catch (err) {
+            console.error(`[upload] Error fetching folder "${targetFolderName}":`, err);
+        }
+
         if (folderId) {
             outgoingForm.append("folder", folderId);
         }
