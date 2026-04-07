@@ -51,7 +51,7 @@ export function SubsystemHierarchyDialog({
 }: SubsystemHierarchyDialogProps) {
     const [modules, setModules] = React.useState<ModuleRegistration[]>([]);
     const [searchQuery, setSearchQuery] = React.useState("");
-    const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+    const [expandedIds, setExpandedIds] = React.useState<Set<string | number>>(new Set());
     const [isSaving, setIsSaving] = React.useState(false);
 
     React.useEffect(() => {
@@ -77,7 +77,7 @@ export function SubsystemHierarchyDialog({
     const stats = countModules(modules);
 
     // Recursive helper to update an item in the tree
-    const updateInTree = (items: ModuleRegistration[], id: string, updater: (item: ModuleRegistration) => ModuleRegistration | null): ModuleRegistration[] => {
+    const updateInTree = (items: ModuleRegistration[], id: string | number, updater: (item: ModuleRegistration) => ModuleRegistration | null): ModuleRegistration[] => {
         return items.reduce((acc, item) => {
             if (item.id === id) {
                 const updated = updater(item);
@@ -111,7 +111,7 @@ export function SubsystemHierarchyDialog({
         setExpandedIds(prev => new Set(prev).add(newModule.id));
     };
 
-    const handleUpdateItem = (id: string, data: Partial<ModuleRegistration>, parentPath: string = "") => {
+    const handleUpdateItem = (id: string | number, data: Partial<ModuleRegistration>, parentPath: string = "") => {
         setModules(prev => updateInTree(prev, id, item => {
             const updated = { ...item, ...data };
             // Helper: Slug from title
@@ -126,11 +126,11 @@ export function SubsystemHierarchyDialog({
         }));
     };
 
-    const handleDeleteItem = (id: string) => {
+    const handleDeleteItem = (id: string | number) => {
         setModules(prev => updateInTree(prev, id, () => null));
     };
 
-    const handleAddChild = (parentId: string, parentPath: string) => {
+    const handleAddChild = (parentId: string | number, parentPath: string) => {
         const newId = Math.random().toString(36).substr(2, 9);
         setModules(prev => updateInTree(prev, parentId, item => ({
             ...item,
@@ -150,7 +150,7 @@ export function SubsystemHierarchyDialog({
         setExpandedIds(prev => new Set(prev).add(parentId));
     };
 
-    const toggleExpand = (id: string) => {
+    const toggleExpand = (id: string | number) => {
         setExpandedIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -159,7 +159,7 @@ export function SubsystemHierarchyDialog({
         });
     };
 
-    const handleMoveItem = (id: string, direction: 'up' | 'down') => {
+    const handleMoveItem = (id: string | number, direction: 'up' | 'down') => {
         const move = (items: ModuleRegistration[]): ModuleRegistration[] => {
             const index = items.findIndex(m => m.id === id);
             if (index !== -1) {
@@ -179,7 +179,7 @@ export function SubsystemHierarchyDialog({
     };
 
     const handleExpandAll = () => {
-        const allIds = new Set<string>();
+        const allIds = new Set<string | number>();
         const collect = (items: ModuleRegistration[]) => {
             items.forEach(item => {
                 allIds.add(item.id);
@@ -234,7 +234,7 @@ export function SubsystemHierarchyDialog({
     // Expand search results automatically
     React.useEffect(() => {
         if (searchQuery) {
-            const resultIds = new Set<string>();
+            const resultIds = new Set<string | number>();
             const collect = (items: ModuleRegistration[]) => {
                 items.forEach(item => {
                     if (item.subModules && item.subModules.length > 0) {
@@ -414,12 +414,12 @@ interface RecursiveModuleItemProps {
     item: ModuleRegistration;
     depth: number;
     parentPath: string;
-    expandedIds: Set<string>;
-    onExpand: (id: string) => void;
-    onUpdate: (id: string, data: Partial<ModuleRegistration>, parentPath?: string) => void;
-    onDelete: (id: string) => void;
-    onAddChild: (id: string, parentPath: string) => void;
-    onMove: (id: string, direction: 'up' | 'down') => void;
+    expandedIds: Set<string | number>;
+    onExpand: (id: string | number) => void;
+    onUpdate: (id: string | number, data: Partial<ModuleRegistration>, parentPath?: string) => void;
+    onDelete: (id: string | number) => void;
+    onAddChild: (id: string | number, parentPath: string) => void;
+    onMove: (id: string | number, direction: 'up' | 'down') => void;
     isFirst: boolean;
     isLast: boolean;
 }
