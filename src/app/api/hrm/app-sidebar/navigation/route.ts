@@ -6,20 +6,16 @@ const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 async function proxy(req: NextRequest) {
   if (!UPSTREAM_BASE) {
+    console.error("[Sidebar - Navigation Proxy] NEXT_PUBLIC_API_BASE_URL missing.");
     return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
   }
 
-  const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-  
-  // Construct upstream URL
-  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/subsystems`;
-  if (id) upstreamUrl += `/${id}`;
-
-  // Add fields for GET if no ID (listing)
-  if (req.method === "GET" && !id) {
-    upstreamUrl += `?fields=*,modules.*,modules.subModules.*`;
-  }
+  // Dashboard registry fetch: usually all subsystems with their icon/slug info
+  // Hardcoded for HRM subsystem as this is a dedicated sidebar proxy for HRM
+  const hrmFilter = encodeURIComponent(JSON.stringify({ 
+      subsystem_id: { slug: { _eq: "hrm" } } 
+  }));
+  const upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/modules?filter=${hrmFilter}&sort=sort&limit=-1`;
   
   const headers = new Headers();
   headers.set("content-type", "application/json");
@@ -27,39 +23,25 @@ async function proxy(req: NextRequest) {
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
   try {
-    const fetchOptions: RequestInit = {
-      method: req.method,
-      headers,
-    };
-
-    if (["POST", "PATCH", "PUT"].includes(req.method)) {
-      const body = await req.json();
-      fetchOptions.body = JSON.stringify(body);
-    }
-
     const res = await fetch(upstreamUrl, {
-      ...fetchOptions,
+      method: "GET",
+      headers,
+      next: { revalidate: 0 },
     });
 
     if (!res.ok) {
         const errorBody = await res.text();
-        console.error(`[Subsystems Proxy] Upstream Error (${res.status}):`, errorBody);
+        console.error(`[Sidebar - Navigation Proxy] Upstream Error (${res.status}):`, errorBody);
         return NextResponse.json({ error: "Upstream Error", details: errorBody }, { status: res.status });
-    }
-
-    if (req.method === "DELETE") {
-        return new NextResponse(null, { status: 204 });
     }
 
     const data = await res.json();
     return NextResponse.json(data);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error(`[Sidebar - Navigation Proxy] Fetch error:`, message);
     return NextResponse.json({ error: "Connection Error", message }, { status: 502 });
   }
 }
 
 export async function GET(req: NextRequest) { return proxy(req); }
-export async function POST(req: NextRequest) { return proxy(req); }
-export async function PATCH(req: NextRequest) { return proxy(req); }
-export async function DELETE(req: NextRequest) { return proxy(req); }

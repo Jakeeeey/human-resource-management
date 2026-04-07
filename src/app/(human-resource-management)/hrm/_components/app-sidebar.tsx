@@ -1,29 +1,19 @@
 "use client";
 
 import * as React from "react";
+import { type ComponentProps } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-    Users, // Employee Admin
-    UserRound, // Employee Master List
-    Shield, // Administrator
-    CalendarClock, // Admin > Department Schedule
-    Network, // Structure (replaces Sitemap)
-    Building2, // Division
-    UserCog, // Salesman
-    Building, // Company Profile
-    Layers, // Department
-    KeyRound, // Department Accounts
-    BadgeCheck, // Role Management
-    Boxes, // Subsystem Registration
-    Brush, // PDF Layout Designer
-    type LucideIcon,
-} from "lucide-react";
+import * as Icons from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 
 import { NavMain } from "./nav-main";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { usePermissionsStore } from "@/stores/usePermissionsStore";
+import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
+import { SIDEBAR_REFRESH_EVENT } from "./sidebar-events";
+import { ModuleRegistration, NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
 import { cn } from "@/lib/utils";
 import {
     Sidebar,
@@ -35,397 +25,179 @@ import {
     SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const data = {
-    navMain: [
-        {
-            title: "Employee Admin",
-            url: "#",
-            slug: "employee-admin",
-            icon: Users,
-            isActive: false,
-            items: [
-                {
-                    title: "Employee Master List",
-                    url: "/hrm/employee-admin/employee-master-list",
-                    slug: "employee-admin-master-list",
-                    icon: UserRound,
-                },
-                {
-                    title: "Administrator",
-                    url: "#",
-                    slug: "administrator",
-                    icon: Shield,
-                    items: [
-                        {
-                            title: "Department Schedule",
-                            url: "/hrm/employee-admin/administrator/department-schedule",
-                            slug: "department-schedule",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "On Call",
-                            url: "/hrm/employee-admin/administrator/on-call",
-                            slug: "on-call",
-                            icon: CalendarClock,
-                        },
-                    ],
-                },
-                {
-                    title: "Structure",
-                    url: "#",
-                    slug: "structure",
-                    icon: Network,
-                    items: [
-                        {
-                            title: "Division",
-                            url: "/hrm/employee-admin/structure/division",
-                            slug: "division",
-                            icon: Building2,
-                        },
-                        {
-                            title: "Company Profile",
-                            url: "/hrm/employee-admin/structure/company-profile",
-                            slug: "company-profile",
-                            icon: Building,
-                        },
-                        {
-                            title: "Department",
-                            url: "/hrm/employee-admin/structure/department",
-                            slug: "department",
-                            icon: Layers,
-                        },
-                        {
-                            title: "Department Accounts",
-                            url: "/hrm/employee-admin/structure/department-accounts",
-                            slug: "department-accounts",
-                            icon: KeyRound,
-                        },
-                        {
-                            title: "Role Management",
-                            url: "/hrm/employee-admin/structure/role-management",
-                            slug: "role-management",
-                            icon: BadgeCheck,
-                        },
-                        {
-                            title: "Operation",
-                            url: "/hrm/employee-admin/structure/operation",
-                            slug: "operation",
-                            icon: BadgeCheck,
-                        },
-                        {
-                            title: "Industry",
-                            url: "/hrm/employee-admin/structure/industry",
-                            slug: "industry",
-                            icon: BadgeCheck,
-                        },
-
-                    ],
-                },
-                {
-                    title: "Sales Management",
-                    url: "#",
-                    slug: "sales-management",
-                    icon: UserCog,
-                    items: [
-                        {
-                            title: "Salesman Creation",
-                            url: "/hrm/employee-admin/structure/sales-management/salesman-creation",
-                            slug: "salesman-creation",
-                            icon: UserCog,
-                        },
-                        {
-                            title: "Salesman QR Code",
-                            url: "/hrm/employee-admin/structure/sales-management/salesman-qr-code",
-                            slug: "salesman-qr-code",
-                            icon: UserCog,
-                        },
-                    ],
-                },
-
-                {
-                    title: "Approval",
-                    url: "#",
-                    slug: "approval",
-                    icon: Shield,
-                    items: [
-                        {
-                            title: "Attendance Approval",
-                            url: "/hrm/employee-admin/approval/attendance-approval",
-                            slug: "attendance-approval",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Overtime Approval",
-                            url: "/hrm/employee-admin/approval/overtime-request",
-                            slug: "overtime-request",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Undertime Approval",
-                            url: "/hrm/employee-admin/approval/undertime-approval",
-                            slug: "undertime-approval",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Leave Approval",
-                            url: "/hrm/employee-admin/approval/leave-approval",
-                            slug: "leave-approval",
-                            icon: CalendarClock,
-                        },
-                    ],
-                },
-                {
-                    title: "Report",
-                    url: "#",
-                    slug: "report",
-                    icon: Shield,
-                    items: [
-                        {
-                            title: "Overtime Report",
-                            url: "/hrm/employee-admin/report/overtime-report",
-                            slug: "overtime-report",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Undertime Report",
-                            url: "/hrm/employee-admin/report/undertime-report",
-                            slug: "undertime-report",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Leave Report",
-                            url: "/hrm/employee-admin/report/leave-report",
-                            icon: CalendarClock,
-                        },
-                    ],
-                },
-            ],
-        },
-        {
-            title: "User Configuration",
-            url: "/hrm/user-configuration",
-            slug: "user-configuration",
-            icon: UserCog,
-        },
-        {
-            title: "Subsystem Registration",
-            url: "/hrm/subsystem-registration",
-            slug: "subsystem-registration",
-            icon: Boxes,
-        },
-        {
-            title: "PDF Layout",
-            url: "/hrm/pdf-layout",
-            slug: "pdf-layout",
-            icon: Brush,
-        },
-        {
-            title: "Workforce",
-            url: "#",
-            slug: "workforce",
-            icon: Users,
-            isActive: false,
-            items: [
-                {
-                    title: "Attendance Report",
-                    url: "#",
-                    slug: "attendance-report",
-                    items: [
-                        {
-                            title: "Today's Report",
-                            url: "/hrm/workforce/attendance-report/todays-report",
-                            slug: "todays-report",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Employee Report",
-                            url: "/hrm/workforce/attendance-report/employee-report",
-                            slug: "employee-report",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Department Report",
-                            url: "/hrm/workforce/attendance-report/department-report",
-                            slug: "department-report",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "Logistics Report",
-                            url: "/hrm/workforce/attendance-report/logistics-report",
-                            slug: "logistics-report",
-                            icon: CalendarClock,
-                        },
-                    ],
-                },
-
-                {
-                    title: "Attendance Management",
-                    url: "/hrm/workforce/attendance-management",
-                    slug: "attendance-management",
-                    icon: CalendarClock,
-                },
-                {
-                    title: "Job Orders",
-                    url: "#",
-                    slug: "job-orders",
-                    items: [
-                        {
-                            title: "Application Management",
-                            url: "/hrm/workforce/job-orders/application-management",
-                            slug: "application-management",
-                            icon: CalendarClock,
-                        },
-                    ],
-                },
-                {
-                    title: "Asset Tagging",
-                    url: "/hrm/workforce/asset-tagging",
-                    slug: "asset-tagging",
-                    icon: CalendarClock,
-                },
-                {
-                    title: "Asset Investigation",
-                    url: "/hrm/workforce/asset-investigation",
-                    slug: "asset-investigation",
-                    icon: CalendarClock,
-                },
-            ],
-        },
-        {
-            title: "Communications",
-            url: "#",
-            slug: "communications",
-            icon: Users,
-            isActive: false,
-            items: [
-                {
-                    title: "Policies",
-                    url: "/hrm/communications/policies",
-                    slug: "policies",
-                    icon: CalendarClock,
-                },
-                {
-                    title: "Memorandums",
-                    url: "/hrm/communications/memorandums",
-                    slug: "memorandums",
-                    icon: CalendarClock,
-                },
-                {
-                    title: "Notices",
-                    url: "#",
-                    slug: "notices",
-                    items: [
-                        {
-                            title: "NTE",
-                            url: "/hrm/communications/notices/nte",
-                            slug: "nte",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "NOD",
-                            url: "/hrm/communications/notices/nod",
-                            slug: "nod",
-                            icon: CalendarClock,
-                        },
-                        {
-                            title: "CARE",
-                            url: "/hrm/communications/notices/care",
-                            slug: "care",
-                            icon: CalendarClock,
-                        },
-                    ],
-                },
-                {
-                    title: "Announcement",
-                    url: "hrm/communications/announcement",
-                    slug: "announcement",
-                    icon: CalendarClock,
-                },
-                {
-                    title: "Cooperatives",
-                    url: "/hrm/communication/cooperatives",
-                    slug: "cooperatives",
-                    icon: CalendarClock,
-                },
-            ],
-        },
-        {
-            title: "File Management",
-            url: "#",
-            slug: "file-management",
-            icon: Users,
-            isActive: false,
-            items: [
-                {
-                    title: "Employee File Type",
-                    url: "/hrm/file-management/employee-file-record-type",
-                    slug: "employee-file-record-type",
-                    icon: Shield,
-                },
-                {
-                    title: "Employee File List",
-                    url: "/hrm/file-management/employee-file-record-list",
-                    slug: "employee-file-record-list",
-                    icon: Shield,
-                },
-
-
-            ],
-
-        },
-    ],
+// Dynamic Icon Resolver
+const getIcon = (name?: string): LucideIcon => {
+    if (!name) return Icons.Box;
+    return (Icons as unknown as Record<string, LucideIcon>)[name] || Icons.Box;
 };
 
 export function AppSidebar({
     className,
     ...props
-}: React.ComponentProps<typeof Sidebar>) {
-    const { permissions, isAdmin, isLoading, fetchPermissions } = usePermissionsStore();
+}: ComponentProps<typeof Sidebar>) {
+    // Local Permission State
+    const [permissions, setPermissions] = React.useState<string[]>([]);
+    const [moduleIds, setModuleIds] = React.useState<number[]>([]);
+    const [isAdmin, setIsAdmin] = React.useState(false);
+    const [isPermLoading, setIsPermLoading] = React.useState(true);
+
+    // Local Navigation State
+    const [modules, setModules] = React.useState<ModuleRegistration[]>([]);
+    const [isNavLoading, setIsNavLoading] = React.useState(true);
+
+    const [searchTerm, setSearchTerm] = React.useState("");
+    const inputRef = React.useRef<HTMLInputElement>(null);
     
+    const isLoading = isPermLoading || isNavLoading;
+
+    // Local Fetching Logic
+    const fetchPermissions = React.useCallback(async () => {
+        setIsPermLoading(true);
+        try {
+            const res = await fetch("/api/hrm/app-sidebar/user-profile");
+            if (res.ok) {
+                const data = await res.json();
+                setPermissions(data.permissions || []);
+                setModuleIds(Array.isArray(data.moduleIds) ? data.moduleIds : []);
+                setIsAdmin(!!data.isAdmin);
+            }
+        } catch (err) {
+            console.error("[Sidebar] Permission fetch error:", err);
+        } finally {
+            setIsPermLoading(false);
+        }
+    }, []);
+
+    const fetchModules = React.useCallback(async () => {
+        setIsNavLoading(true);
+        try {
+            const res = await fetch("/api/hrm/app-sidebar/navigation");
+            if (res.ok) {
+                const { data: allModules } = await res.json();
+                
+                // Build recursive tree (logic replicated from useNavigationStore)
+                const modulesById: Record<string, ModuleRegistration> = {};
+                const roots: ModuleRegistration[] = [];
+
+                (allModules || []).forEach((m: any) => {
+                    const mod: ModuleRegistration = {
+                        ...m,
+                        id: String(m.id),
+                        subModules: []
+                    };
+                    modulesById[mod.id] = mod;
+                });
+
+                (allModules || []).forEach((m: any) => {
+                    const id = String(m.id);
+                    const parentId = m.parent_module_id ? String(m.parent_module_id) : null;
+                    if (parentId && modulesById[parentId]) {
+                        modulesById[parentId].subModules?.push(modulesById[id]);
+                    } else if (!parentId) {
+                        roots.push(modulesById[id]);
+                    }
+                });
+
+                setModules(roots);
+            }
+        } catch (err) {
+            console.error("[Sidebar] Navigation fetch error:", err);
+        } finally {
+            setIsNavLoading(false);
+        }
+    }, []);
+
     React.useEffect(() => {
         fetchPermissions();
-    }, [fetchPermissions]);
+        fetchModules();
+    }, [fetchPermissions, fetchModules]);
 
-    // Recursive function to filter nav items
+    // Custom Event Listener for cross-module refresh
+    React.useEffect(() => {
+        const handleRefresh = () => {
+            console.log("[Sidebar] Refresh signal received. Re-fetching...");
+            fetchPermissions();
+            fetchModules();
+        };
+
+        window.addEventListener(SIDEBAR_REFRESH_EVENT, handleRefresh);
+        return () => window.removeEventListener(SIDEBAR_REFRESH_EVENT, handleRefresh);
+    }, [fetchPermissions, fetchModules, SIDEBAR_REFRESH_EVENT]);
+
+    // Keyboard shortcut for search
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+                e.preventDefault();
+                inputRef.current?.focus();
+            }
+            if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
+                e.preventDefault();
+                inputRef.current?.focus();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    // Recursive function to filter mapping modules to NavItems
     const filteredNavMain = React.useMemo(() => {
         if (isLoading) return [];
-        if (isAdmin) return data.navMain; // ADMIN BYPASS: Show everything
 
-        interface NavItem {
-            title: string;
-            url: string;
-            slug?: string;
-            icon?: LucideIcon;
-            items?: NavItem[];
-        }
-
-        function filterItems(items: NavItem[]): NavItem[] {
-            return items
-                .map((item) => {
-                    // Use the explicit slug if provided, else derive from URL
-                    const slug = item.slug || item.url.replace(/^\//, "");
+        function mapToNavItems(modules: ModuleRegistration[]): NavItem[] {
+            return modules
+                .map((m) => {
+                    const moduleId = Number(m.id);
+                    const isAuthorized = isAdmin || moduleIds.includes(moduleId);
                     
-                    // Use exact matching to respect granular permissions
-                    const isAuthorized = permissions.includes(slug);
+                    const item: NavItem = {
+                        title: m.title,
+                        url: m.base_path || "#",
+                        slug: m.slug,
+                        status: m.status,
+                        icon: getIcon(m.icon_name),
+                    };
 
-                    // If it has children, recursively filter them
-                    if (item.items) {
-                        const authorizedChildren = filterItems(item.items);
-                        // Parent is visible if it's explicitly authorized OR has authorized children
+                    if (m.subModules && m.subModules.length > 0) {
+                        const authorizedChildren = mapToNavItems(m.subModules);
                         if (isAuthorized || authorizedChildren.length > 0) {
                             return { ...item, items: authorizedChildren };
                         }
                         return null;
                     }
 
-                    // For leaf items, must be explicitly authorized (either direct or via parent subsystem)
                     return isAuthorized ? item : null;
+                })
+                .filter((item): item is NavItem => item !== null)
+                .sort((a, b) => {
+                    const modA = modules.find(m => m.slug === a.slug);
+                    const modB = modules.find(m => m.slug === b.slug);
+                    return (modA?.sort || 0) - (modB?.sort || 0);
+                });
+        }
+
+        const baseNav = mapToNavItems(modules);
+
+        if (!searchTerm) return baseNav;
+
+        const lowerTerm = searchTerm.toLowerCase();
+        function filterTree(items: NavItem[]): NavItem[] {
+            return items
+                .map((item) => {
+                    const titleMatch = item.title.toLowerCase().includes(lowerTerm);
+                    const filteredChildren = item.items ? filterTree(item.items) : undefined;
+                    const hasChildMatch = !!filteredChildren?.length;
+
+                    if (titleMatch || hasChildMatch) {
+                        return { ...item, items: filteredChildren } as NavItem;
+                    }
+                    return null;
                 })
                 .filter((item): item is NavItem => item !== null);
         }
 
-        return filterItems(data.navMain as NavItem[]);
-    }, [permissions, isAdmin, isLoading]);
+        return filterTree(baseNav);
+    }, [modules, permissions, isAdmin, isLoading, searchTerm]);
 
     return (
         <Sidebar
@@ -466,9 +238,36 @@ export function AppSidebar({
 
             <Separator />
 
-            <SidebarContent>
-                <div className="px-4 pt-3 pb-2 text-xs font-medium text-muted-foreground uppercase tracking-widest opacity-50">
-                    Platform
+            <SidebarContent className="flex flex-col h-full overflow-hidden">
+                <div className="sticky top-0 bg-sidebar/95 backdrop-blur-sm z-20 px-4 py-3 pb-2 border-b border-sidebar-border/30">
+                    <div className="relative group/search">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground/50 group-focus-within/search:text-primary transition-colors" />
+                        <Input
+                            ref={inputRef}
+                            placeholder="Quick search modules..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={cn(
+                                "pl-9 pr-12 h-9 bg-sidebar-accent/50 border-sidebar-border/50 rounded-full transition-all text-sm shadow-sm",
+                                "focus-visible:bg-sidebar-accent/80 focus-visible:ring-1 focus-visible:ring-sidebar-ring focus-visible:border-sidebar-border",
+                                "placeholder:text-muted-foreground/50 font-medium"
+                            )}
+                        />
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            {searchTerm ? (
+                                <button
+                                    onClick={() => setSearchTerm("")}
+                                    className="size-4 text-muted-foreground/30 hover:text-muted-foreground transition-colors"
+                                >
+                                    <X className="size-full" />
+                                </button>
+                            ) : (
+                                <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-sidebar-border bg-sidebar-accent/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                                    <span className="text-[12px]">/</span>
+                                </kbd>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 <ScrollArea
@@ -487,7 +286,7 @@ export function AppSidebar({
                                 <div className="h-4 w-2/3 bg-muted animate-pulse rounded-md opacity-30" />
                             </div>
                         ) : (
-                            <NavMain items={filteredNavMain} />
+                            <NavMain items={filteredNavMain} searchTerm={searchTerm} />
                         )}
                     </div>
                 </ScrollArea>

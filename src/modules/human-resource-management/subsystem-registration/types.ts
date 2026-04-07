@@ -7,7 +7,17 @@ export interface ModuleRegistration {
     base_path: string;
     status: SubsystemStatus;
     icon_name?: string;
+    sort?: number;
     subModules?: ModuleRegistration[];
+}
+
+export interface NavItem {
+    title: string;
+    url: string;
+    slug?: string;
+    status?: string | SubsystemStatus;
+    icon?: any;
+    items?: NavItem[];
 }
 
 export interface SubsystemRegistration {

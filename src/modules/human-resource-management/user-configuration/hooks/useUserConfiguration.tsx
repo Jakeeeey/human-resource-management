@@ -3,17 +3,11 @@
 import { useState, useCallback } from "react";
 import { useUserConfigurationFetchContext } from "../providers/fetchProvider";
 import { UserSubsystemAccess } from "../types";
-import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
+import { SubsystemRegistration, ModuleRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
 import { UserService } from "../services/UserService";
-import { extractAllSlugs } from "../utils/permissionUtils";
+import { extractAllSlugs, extractAllIds } from "../utils/permissionUtils";
 import { toast } from "sonner";
 import { usePermissionsStore } from "@/stores/usePermissionsStore";
-
-interface Module {
-    slug: string;
-    id: string | number;
-    subModules?: Module[];
-}
 
 export function useUserConfiguration() {
     const { 
@@ -34,65 +28,58 @@ export function useUserConfiguration() {
 
     const { userId: currentAdminId, updatePermissionsRemotely } = usePermissionsStore();
 
+    /**
+     * Toggles access for an entire subsystem.
+     * MANUAL-ADD Model: Turning ON only adds the subsystem.
+     * AUTO-CLEANUP Model: Turning OFF removes the subsystem AND all its module permissions.
+     */
     const handleToggleAccess = useCallback(async (userId: string, subsystemId: string, authorized: boolean) => {
         const user = users.find(u => u.user_id === userId);
         const subRegistry = subsystems.find(s => s.slug === subsystemId);
         if (!user || !subRegistry) return;
 
-        const slugsToToggle = extractAllSlugs(subRegistry);
+        const slugsInSubsystem = extractAllSlugs(subRegistry);
+        const subPk = Number(subRegistry.id);
+
+        // DEEP FIX: Collect module IDs exclusively from the module tree of this subsystem
+        const allModuleIds: number[] = [];
+        subRegistry.modules?.forEach(mod => {
+            allModuleIds.push(...extractAllIds(mod));
+        });
+
         const newSlugs = authorized
-            ? Array.from(new Set([...user.authorized_subsystems, ...slugsToToggle]))
-            : user.authorized_subsystems.filter((slug) => !slugsToToggle.includes(slug));
+            ? Array.from(new Set([...user.authorized_subsystems, subsystemId]))
+            : user.authorized_subsystems.filter((slug) => !slugsInSubsystem.includes(slug));
         
-        // Prepare DIFF for persistence
+        const newSubIds = authorized
+            ? Array.from(new Set([...(user.authorized_subsystem_ids || []), subPk]))
+            : (user.authorized_subsystem_ids || []).filter(id => id !== subPk);
+
+        // Modules only change on Toggle OFF (Auto-Cleanup)
+        const newModuleIds = authorized
+            ? (user.authorized_module_ids || [])
+            : (user.authorized_module_ids || []).filter(id => !allModuleIds.includes(id));
+
         const updates = {
-            subsystemsToAdd: [] as number[],
-            subsystemsToRemove: [] as number[],
+            subsystemsToAdd: authorized ? [subPk] : [],
+            subsystemsToRemove: (!authorized && user.subsystemAccessIds[subPk]) ? [user.subsystemAccessIds[subPk]] : [],
             modulesToAdd: [] as number[],
-            modulesToRemove: [] as number[]
+            modulesToRemove: (!authorized) 
+                ? allModuleIds.filter(id => user.moduleAccessIds[id]).map(id => user.moduleAccessIds[id]) 
+                : []
         };
 
-        if (authorized) {
-            // Addition: We need registry IDs
-            updates.subsystemsToAdd = [Number(subRegistry.id)];
-            updates.modulesToAdd = (subRegistry.modules || []).flatMap(m => extractAllSlugs(m))
-                .filter(slug => !user.authorized_subsystems.includes(slug))
-                .map(slug => {
-                    // Find module ID by slug in registry
-                    const findIn = (modules: Module[]): Module | undefined => {
-                        for (const m of modules) {
-                            if (m.slug === slug) return m;
-                            if (m.subModules) {
-                                const found = findIn(m.subModules);
-                                if (found) return found;
-                            }
-                        }
-                    };
-                    return Number(findIn(subRegistry.modules || [])?.id);
-                }).filter(id => !isNaN(id));
-        } else {
-            // Removal: We need junction record IDs from user object
-            if (user.subsystemAccessIds[subsystemId]) {
-                updates.subsystemsToRemove = [user.subsystemAccessIds[subsystemId]];
-            }
-            updates.modulesToRemove = slugsToToggle
-                .filter(slug => slug !== subsystemId && user.moduleAccessIds[slug])
-                .map(slug => user.moduleAccessIds[slug]);
-        }
+        // Optimistic UI Update
+        updateUserPermissions(userId, newSlugs, newSubIds, newModuleIds, user.subsystemAccessIds, user.moduleAccessIds);
 
-        // Optimistic UI Update (Simplified for now - re-fetch will populate correct junction IDs)
-        updateUserPermissions(userId, newSlugs, user.subsystemAccessIds, user.moduleAccessIds);
-
-        // Persist change
         const success = await UserService.updatePermissions(userId, null, updates);
         if (success) {
             toast.success("User access updated successfully");
-            fetchPage(currentPage); // Re-fetch to get new junction IDs
-            if (userId === currentAdminId) {
-                updatePermissionsRemotely(newSlugs);
-            }
+            fetchPage(currentPage, true);
+            if (userId === currentAdminId) updatePermissionsRemotely(newSlugs);
         } else {
             toast.error("Failed to persist permission changes.");
+            fetchPage(currentPage, true);
         }
     }, [subsystems, users, updateUserPermissions, fetchPage, currentPage, currentAdminId, updatePermissionsRemotely]);
 
@@ -102,61 +89,67 @@ export function useUserConfiguration() {
         setIsPermissionsOpen(true);
     }, []);
 
-    const handleUpdatePermissions = useCallback(async (userId: string, newSlugs: string[]) => {
+    /**
+     * Updates granular module permissions using Database IDs.
+     * Separates subsystem IDs from module IDs to avoid collisions.
+     */
+    const handleUpdatePermissions = useCallback(async (userId: string, newSubIds: number[], newModuleIds: number[]) => {
         const user = users.find(u => u.user_id === userId);
         if (!user || !activeSubsystem) return;
 
-        // Calculate Diff similar to handleToggleAccess but at modular level
-        const currentSlugs = user.authorized_subsystems;
-        const added = newSlugs.filter(s => !currentSlugs.includes(s));
-        const removed = currentSlugs.filter(s => !newSlugs.includes(s));
+        const currentSubIds = user.authorized_subsystem_ids || [];
+        const currentModuleIds = user.authorized_module_ids || [];
+        const activeSubPk = Number(activeSubsystem.id);
+
+        // Diff Calculation
+        const subAdded = newSubIds.filter(id => !currentSubIds.includes(id));
+        const subRemoved = currentSubIds.filter(id => !newSubIds.includes(id));
+        const modAdded = newModuleIds.filter(id => !currentModuleIds.includes(id));
+        const modRemoved = currentModuleIds.filter(id => !newModuleIds.includes(id));
 
         const updates = {
-            subsystemsToAdd: [] as number[],
-            subsystemsToRemove: [] as number[],
-            modulesToAdd: [] as number[],
-            modulesToRemove: [] as number[]
+            subsystemsToAdd: subAdded,
+            subsystemsToRemove: subRemoved.map(id => user.subsystemAccessIds[id]).filter(Boolean) as number[],
+            modulesToAdd: modAdded,
+            modulesToRemove: modRemoved.map(id => user.moduleAccessIds[id]).filter(Boolean) as number[]
         };
 
-        // Addition
-        added.forEach(slug => {
-            if (slug === activeSubsystem.slug) {
-                updates.subsystemsToAdd.push(Number(activeSubsystem.id));
-            } else {
-                const findIn = (modules: Module[]): Module | undefined => {
-                    for (const m of modules) {
-                        if (m.slug === slug) return m;
-                        if (m.subModules) {
-                            const found = findIn(m.subModules);
-                            if (found) return found;
-                        }
-                    }
-                };
-                const reg = findIn(activeSubsystem.modules || []);
-                if (reg) updates.modulesToAdd.push(Number(reg.id));
+        // Sync Slugs for UI/Routing
+        const allSlugsInActiveSub = extractAllSlugs(activeSubsystem);
+        const findSlugById = (id: number, modules: ModuleRegistration[]): string | null => {
+            for (const m of modules) {
+                if (Number(m.id) === id) return m.slug;
+                if (m.subModules) {
+                    const found = findSlugById(id, m.subModules);
+                    if (found) return found;
+                }
             }
-        });
+            return null;
+        };
 
-        // Removal
-        removed.forEach(slug => {
-            if (slug === activeSubsystem.slug && user.subsystemAccessIds[slug]) {
-                updates.subsystemsToRemove.push(user.subsystemAccessIds[slug]);
-            } else if (user.moduleAccessIds[slug]) {
-                updates.modulesToRemove.push(user.moduleAccessIds[slug]);
-            }
-        });
+        const activeModSlugs = newModuleIds
+            .map(id => findSlugById(id, activeSubsystem.modules || []))
+            .filter(Boolean) as string[];
 
-        updateUserPermissions(userId, newSlugs, user.subsystemAccessIds, user.moduleAccessIds);
-        
+        const activeSubSlug = newSubIds.includes(activeSubPk) ? [activeSubsystem.slug] : [];
+
+        const newSlugs = Array.from(new Set([
+            ...user.authorized_subsystems.filter(s => !allSlugsInActiveSub.includes(s)),
+            ...activeSubSlug,
+            ...activeModSlugs
+        ]));
+
+        // Optimistic UI Update
+        updateUserPermissions(userId, newSlugs, newSubIds, newModuleIds, user.subsystemAccessIds, user.moduleAccessIds);
+
         const success = await UserService.updatePermissions(userId, null, updates);
         if (success) {
             toast.success("Granular permissions updated successfully");
-            fetchPage(currentPage);
-            if (userId === currentAdminId) {
-                updatePermissionsRemotely(newSlugs);
-            }
+            fetchPage(currentPage, true);
+            if (userId === currentAdminId) updatePermissionsRemotely(newSlugs);
         } else {
             toast.error("Failed to persist granular changes.");
+            fetchPage(currentPage, true);
         }
     }, [users, activeSubsystem, updateUserPermissions, fetchPage, currentPage, currentAdminId, updatePermissionsRemotely]);
 

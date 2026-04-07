@@ -22,6 +22,8 @@ import {
     Maximize2,
     Minimize2,
     Loader2,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import { 
     SubsystemRegistration, 
@@ -32,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { IconPicker } from "./IconPicker";
+import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
 
 interface SubsystemHierarchyDialogProps {
     open: boolean;
@@ -156,6 +159,25 @@ export function SubsystemHierarchyDialog({
         });
     };
 
+    const handleMoveItem = (id: string, direction: 'up' | 'down') => {
+        const move = (items: ModuleRegistration[]): ModuleRegistration[] => {
+            const index = items.findIndex(m => m.id === id);
+            if (index !== -1) {
+                const newItems = [...items];
+                const targetIndex = direction === 'up' ? index - 1 : index + 1;
+                if (targetIndex >= 0 && targetIndex < newItems.length) {
+                    [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
+                }
+                return newItems;
+            }
+            return items.map(item => ({
+                ...item,
+                subModules: item.subModules ? move(item.subModules) : []
+            }));
+        };
+        setModules(prev => move(prev));
+    };
+
     const handleExpandAll = () => {
         const allIds = new Set<string>();
         const collect = (items: ModuleRegistration[]) => {
@@ -176,6 +198,8 @@ export function SubsystemHierarchyDialog({
         try {
             const success = await onUpdate({ ...subsystem, modules });
             if (success) {
+                // Live Sync: Force refresh the sidebar navigation via Custom Event
+                window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
                 onOpenChange(false);
             }
         } catch (error) {
@@ -334,7 +358,7 @@ export function SubsystemHierarchyDialog({
                             </div>
                         ) : (
                             <div className="space-y-0.5">
-                                {displayedModules.map((module) => (
+                                {displayedModules.map((module, index) => (
                                     <RecursiveModuleItem
                                         key={module.id}
                                         item={module}
@@ -345,6 +369,9 @@ export function SubsystemHierarchyDialog({
                                         onUpdate={handleUpdateItem}
                                         onDelete={handleDeleteItem}
                                         onAddChild={handleAddChild}
+                                        onMove={handleMoveItem}
+                                        isFirst={index === 0}
+                                        isLast={index === displayedModules.length - 1}
                                     />
                                 ))}
                             </div>
@@ -392,6 +419,9 @@ interface RecursiveModuleItemProps {
     onUpdate: (id: string, data: Partial<ModuleRegistration>, parentPath?: string) => void;
     onDelete: (id: string) => void;
     onAddChild: (id: string, parentPath: string) => void;
+    onMove: (id: string, direction: 'up' | 'down') => void;
+    isFirst: boolean;
+    isLast: boolean;
 }
 
 function RecursiveModuleItem({ 
@@ -402,7 +432,10 @@ function RecursiveModuleItem({
     onExpand,
     onUpdate, 
     onDelete, 
-    onAddChild 
+    onAddChild,
+    onMove,
+    isFirst,
+    isLast
 }: RecursiveModuleItemProps) {
     const isExpanded = expandedIds.has(item.id);
     const hasChildren = item.subModules && item.subModules.length > 0;
@@ -504,6 +537,27 @@ function RecursiveModuleItem({
                         <Plus className="h-4 w-4" />
                     </Button>
                     <Separator orientation="vertical" className="h-4 mx-0 sm:mx-0.5 opacity-10" />
+                    <div className="flex bg-muted/60 p-0.5 rounded-xl border border-divider">
+                         <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            disabled={isFirst}
+                            className="h-6 w-6 rounded-lg text-primary hover:bg-primary/10 disabled:opacity-30 active:scale-90" 
+                            onClick={() => onMove(item.id, 'up')}
+                        >
+                            <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            disabled={isLast}
+                            className="h-6 w-6 rounded-lg text-primary hover:bg-primary/10 disabled:opacity-30 active:scale-90" 
+                            onClick={() => onMove(item.id, 'down')}
+                        >
+                            <ArrowDown className="h-3 w-3" />
+                        </Button>
+                    </div>
+                    <Separator orientation="vertical" className="h-4 mx-0 sm:mx-0.5 opacity-10" />
                     <Button 
                         variant="ghost" 
                         size="icon" 
@@ -518,7 +572,7 @@ function RecursiveModuleItem({
 
             {isExpanded && hasChildren && (
                 <div className="ml-6 sm:ml-10 mt-1 space-y-1">
-                    {item.subModules?.map((child) => (
+                    {item.subModules?.map((child, idx) => (
                         <RecursiveModuleItem
                             key={child.id}
                             item={child}
@@ -529,6 +583,9 @@ function RecursiveModuleItem({
                             onUpdate={onUpdate}
                             onDelete={onDelete}
                             onAddChild={onAddChild}
+                            onMove={onMove}
+                            isFirst={idx === 0}
+                            isLast={idx === (item.subModules?.length || 0) - 1}
                         />
                     ))}
                 </div>

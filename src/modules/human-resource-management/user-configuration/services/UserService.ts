@@ -1,4 +1,10 @@
 import { UserSubsystemAccess } from "../types";
+import { SubsystemRegistration, ModuleRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
+
+interface RawModule extends ModuleRegistration {
+    subsystem_id?: number;
+    parent_module_id?: number | null;
+}
 
 export class UserService {
     /**
@@ -10,10 +16,10 @@ export class UserService {
         let total = 0;
         try {
             // Fetch from our local proxy route with pagination params
-            const response = await fetch(`/api/hrm/user-configuration?limit=${limit}&offset=${offset}`);
+            const response = await fetch(`/api/hrm/user-configuration/users?limit=${limit}&offset=${offset}`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                console.error("Failed to fetch users from /api/hrm/user-configuration:", {
+                console.error("Failed to fetch users from /api/hrm/user-configuration/users:", {
                     status: response.status,
                     details: errorData
                 });
@@ -51,7 +57,7 @@ export class UserService {
      * Fetches permissions for a list of users in bulk.
      * Returns a mapping of userId -> { subsystems: Set<string>, modules: Set<string> }.
      */
-    static async getPermissionsForUsers(userIds: string[]): Promise<Record<string, { subsystemSlugs: string[], moduleSlugs: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number> }>> {
+    static async getPermissionsForUsers(userIds: string[]): Promise<Record<string, { subsystemSlugs: string[], moduleSlugs: string[], subsystemIds: number[], moduleIds: number[], subsystemAccessIds: Record<number, number>, moduleAccessIds: Record<number, number> }>> {
         if (!userIds.length) return {};
         try {
             const filter = encodeURIComponent(JSON.stringify({
@@ -60,33 +66,43 @@ export class UserService {
 
             // Fetch from both tables in parallel
             const [subRes, modRes] = await Promise.all([
-                fetch(`/api/hrm/user-access-subsystems?filter=${filter}&limit=-1&fields=id,user_id,subsystem_id.slug`),
-                fetch(`/api/hrm/user-access-modules?filter=${filter}&limit=-1&fields=id,user_id,module_id.slug`)
+                fetch(`/api/hrm/user-configuration/user-access-subsystems?filter=${filter}&limit=-1&fields=id,user_id,subsystem_id.slug,subsystem_id.id`),
+                fetch(`/api/hrm/user-configuration/user-access-modules?filter=${filter}&limit=-1&fields=id,user_id,module_id.slug,module_id.id`)
             ]);
 
             const [subResult, modResult] = await Promise.all([subRes.json(), modRes.json()]);
             const subData = subResult.data || [];
             const modData = modResult.data || [];
 
-            const mapping: Record<string, { subsystemSlugs: string[], moduleSlugs: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number> }> = {};
+            const mapping: Record<string, { subsystemSlugs: string[], moduleSlugs: string[], subsystemIds: number[], moduleIds: number[], subsystemAccessIds: Record<number, number>, moduleAccessIds: Record<number, number> }> = {};
 
             // Process Subsystems
-            subData.forEach((row: { id: number, user_id: string | number, subsystem_id?: { slug?: string } }) => {
+            subData.forEach((row: { id: number, user_id: string | number, subsystem_id?: { slug?: string, id?: number } }) => {
                 const uid = String(row.user_id);
-                if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemAccessIds: {}, moduleAccessIds: {} };
+                if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemIds: [], moduleIds: [], subsystemAccessIds: {}, moduleAccessIds: {} };
                 if (row.subsystem_id?.slug) {
                     mapping[uid].subsystemSlugs.push(row.subsystem_id.slug);
-                    mapping[uid].subsystemAccessIds[row.subsystem_id.slug] = row.id;
+                    if (row.subsystem_id.id) {
+                        const sid = Number(row.subsystem_id.id);
+                        mapping[uid].subsystemIds.push(sid);
+                        mapping[uid].subsystemAccessIds[sid] = row.id;
+                    }
                 }
             });
 
             // Process Modules
-            modData.forEach((row: { id: number, user_id: string | number, module_id?: { slug?: string } }) => {
+            modData.forEach((row: { id: number, user_id: string | number, module_id?: { slug?: string, id?: number } }) => {
                 const uid = String(row.user_id);
-                if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemAccessIds: {}, moduleAccessIds: {} };
+                if (!mapping[uid]) mapping[uid] = { subsystemSlugs: [], moduleSlugs: [], subsystemIds: [], moduleIds: [], subsystemAccessIds: {}, moduleAccessIds: {} };
                 if (row.module_id?.slug) {
-                    mapping[uid].moduleSlugs.push(row.module_id.slug);
-                    mapping[uid].moduleAccessIds[row.module_id.slug] = row.id;
+                    const slug = row.module_id.slug;
+                    mapping[uid].moduleSlugs.push(slug);
+                    
+                    if (row.module_id.id) {
+                        const mid = Number(row.module_id.id);
+                        mapping[uid].moduleIds.push(mid);
+                        mapping[uid].moduleAccessIds[mid] = row.id;
+                    }
                 }
             });
 
@@ -115,7 +131,7 @@ export class UserService {
 
             // 1. Subsystems
             if (updates.subsystemsToAdd.length > 0) {
-                promises.push(fetch(`/api/hrm/user-access-subsystems`, {
+                promises.push(fetch(`/api/hrm/user-configuration/user-access-subsystems`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(updates.subsystemsToAdd.map(id => ({ 
@@ -126,7 +142,7 @@ export class UserService {
                 }));
             }
             if (updates.subsystemsToRemove.length > 0) {
-                promises.push(fetch(`/api/hrm/user-access-subsystems`, {
+                promises.push(fetch(`/api/hrm/user-configuration/user-access-subsystems`, {
                     method: "DELETE",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(updates.subsystemsToRemove)
@@ -135,7 +151,7 @@ export class UserService {
 
             // 2. Modules
             if (updates.modulesToAdd.length > 0) {
-                promises.push(fetch(`/api/hrm/user-access-modules`, {
+                promises.push(fetch(`/api/hrm/user-configuration/user-access-modules`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(updates.modulesToAdd.map(id => ({ 
@@ -146,7 +162,7 @@ export class UserService {
                 }));
             }
             if (updates.modulesToRemove.length > 0) {
-                promises.push(fetch(`/api/hrm/user-access-modules`, {
+                promises.push(fetch(`/api/hrm/user-configuration/user-access-modules`, {
                     method: "DELETE",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(updates.modulesToRemove)
@@ -160,6 +176,68 @@ export class UserService {
         } catch (error) {
             console.error("Error in updatePermissions:", error);
             return false;
+        }
+    }
+
+    static async getSubsystemsRegistry(): Promise<SubsystemRegistration[]> {
+        try {
+            // Fetch subsystems and all modules in parallel for User Configuration registry
+            const [subsystemsRes, modulesRes] = await Promise.all([
+                fetch(`/api/hrm/user-configuration/subsystems`),
+                fetch(`/api/hrm/user-configuration/modules`)
+            ]);
+
+            if (!subsystemsRes.ok || !modulesRes.ok) return [];
+
+            const { data: subsystems } = await subsystemsRes.json();
+            const { data: allModules } = await modulesRes.json();
+
+            // 1. Build a map of modules by their subsystem_id
+            const modulesBySubsystem: Record<number, RawModule[]> = {};
+            const modulesById: Record<number, RawModule> = {};
+
+            (allModules || []).forEach((m: any) => {
+                const mod: RawModule = { ...m, id: Number(m.id), subModules: [] };
+                modulesById[Number(mod.id)] = mod;
+                
+                const sid = Number(m.subsystem_id);
+                if (!modulesBySubsystem[sid]) modulesBySubsystem[sid] = [];
+                modulesBySubsystem[sid].push(mod);
+            });
+
+            // 2. Build the recursive tree for each subsystem
+            const finalSubsystems = (subsystems || []).map((sub: any) => {
+                const subId = Number(sub.id);
+                const subModulesForThisSub = modulesBySubsystem[subId] || [];
+                
+                // Identify root modules for this subsystem
+                const roots = subModulesForThisSub.filter(m => !m.parent_module_id);
+                
+                // Link children to parents within this subsystem's modules
+                subModulesForThisSub.forEach(m => {
+                    const parentId = m.parent_module_id ? Number(m.parent_module_id) : null;
+                    if (parentId && modulesById[parentId]) {
+                        if (!modulesById[parentId].subModules) modulesById[parentId].subModules = [];
+                        
+                        // Prevent duplicates
+                        const alreadyExists = modulesById[parentId].subModules?.some(child => child.id === m.id);
+                        if (!alreadyExists) {
+                            modulesById[parentId].subModules?.push(m);
+                        }
+                    }
+                });
+
+                return {
+                    ...sub,
+                    id: subId,
+                    modules: roots
+                } as SubsystemRegistration;
+            });
+
+            return finalSubsystems;
+        } catch (error) {
+            console.error("Error fetching subsystems registry for User Config:", error);
+            return [];
         }
     }
 }

@@ -25,60 +25,96 @@ interface PermissionsDialogProps {
     onOpenChange: (open: boolean) => void;
     user: { full_name: string; user_id: string } | null;
     subsystem: SubsystemRegistration | null;
-    authorizedItems: string[]; // Current list of authorized slugs
-    onUpdate: (userId: string, authorizedItems: string[]) => void;
+    authorizedSubsystemIds: number[];
+    authorizedModuleIds: number[]; // Current list of authorized module IDs
+    onUpdate: (userId: string, authorizedSubsystemIds: number[], authorizedModuleIds: number[]) => void;
 }
 
-import { extractAllSlugs } from "@/modules/human-resource-management/user-configuration/utils/permissionUtils";
+import { extractAllSlugs, extractAllIds } from "@/modules/human-resource-management/user-configuration/utils/permissionUtils";
 
 export function PermissionsDialog({
     open,
     onOpenChange,
     user,
     subsystem,
-    authorizedItems,
+    authorizedSubsystemIds,
+    authorizedModuleIds,
     onUpdate,
 }: PermissionsDialogProps) {
-    const [localAuthorized, setLocalAuthorized] = React.useState<string[]>([]);
+    const [localSubsystems, setLocalSubsystems] = React.useState<number[]>([]);
+    const [localModules, setLocalModules] = React.useState<number[]>([]);
 
     React.useEffect(() => {
         if (open) {
-            setLocalAuthorized(authorizedItems);
+            setLocalSubsystems(authorizedSubsystemIds);
+            setLocalModules(authorizedModuleIds);
         }
-    }, [open, authorizedItems]);
+    }, [open, authorizedSubsystemIds, authorizedModuleIds]);
 
     if (!user || !subsystem) return null;
 
-    const toggleItem = (slug: string, checked: boolean, item?: SubsystemRegistration | ModuleRegistration, parentSlugs: string[] = []) => {
-        const slugsToToggle = item ? extractAllSlugs(item) : [slug];
+    const toggleItem = (id: number, checked: boolean, item?: SubsystemRegistration | ModuleRegistration, parentIds: number[] = []) => {
+        const idsToToggle = item ? extractAllIds(item) : [id];
 
         if (checked) {
             // Recursive ON: Enable target + all children + all parents in path
-            setLocalAuthorized(prev => Array.from(new Set([...prev, ...slugsToToggle, ...parentSlugs])));
+            setLocalModules(prev => Array.from(new Set([...prev, ...idsToToggle, ...parentIds])));
         } else {
             // Recursive OFF: Disable target + all children
-            setLocalAuthorized(prev => prev.filter(s => !slugsToToggle.includes(s)));
+            setLocalModules(prev => prev.filter(i => !idsToToggle.includes(i)));
         }
     };
     
-    const handleGlobalToggle = (checked: boolean) => {
+    const handleSubsystemToggle = (checked: boolean) => {
         if (!subsystem) return;
-        const allSlugs = extractAllSlugs(subsystem);
+        const subId = Number(subsystem.id);
         
         if (checked) {
-            setLocalAuthorized(prev => Array.from(new Set([...prev, ...allSlugs])));
+            setLocalSubsystems(prev => Array.from(new Set([...prev, subId])));
         } else {
-            // Reset to only subsystem access
-            setLocalAuthorized([subsystem.slug]);
+            setLocalSubsystems(prev => prev.filter(id => id !== subId));
+            
+            // CLEANUP: Extract IDs from modules ONLY to keep them separate from the subsystem ID
+            const allModuleIds: number[] = [];
+            subsystem.modules?.forEach(mod => {
+                allModuleIds.push(...extractAllIds(mod));
+            });
+            setLocalModules(prev => prev.filter(id => !allModuleIds.includes(id)));
         }
     };
 
+    const handleSelectAllModules = () => {
+        if (!subsystem) return;
+        const subId = Number(subsystem.id);
+        
+        // COLLECT: Only from modules branch of the registry tree
+        const moduleIdsToSelect: number[] = [];
+        subsystem.modules?.forEach(mod => {
+            moduleIdsToSelect.push(...extractAllIds(mod));
+        });
+        
+        setLocalSubsystems(prev => Array.from(new Set([...prev, subId])));
+        setLocalModules(prev => Array.from(new Set([...prev, ...moduleIdsToSelect])));
+    };
+
+    const handleClearAllModules = () => {
+        if (!subsystem) return;
+        
+        // COLLECT: Only from modules branch
+        const moduleIdsToClear: number[] = [];
+        subsystem.modules?.forEach(mod => {
+            moduleIdsToClear.push(...extractAllIds(mod));
+        });
+        
+        setLocalModules(prev => prev.filter(id => !moduleIdsToClear.includes(id)));
+    };
+
     const handleSave = () => {
-        onUpdate(user.user_id, localAuthorized);
+        onUpdate(user.user_id, localSubsystems, localModules);
         onOpenChange(false);
     };
 
-    const isSubsystemChecked = localAuthorized.includes(subsystem.slug);
+    const isSubsystemChecked = localSubsystems.includes(Number(subsystem.id));
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -100,7 +136,7 @@ export function PermissionsDialog({
                                 <Switch 
                                     id="subsystem-access" 
                                     checked={isSubsystemChecked}
-                                    onCheckedChange={(checked) => toggleItem(subsystem.slug, !!checked, subsystem)}
+                                    onCheckedChange={handleSubsystemToggle}
                                 />
                                 <div className="grid gap-0.5 pointer-events-none">
                                     <label
@@ -128,14 +164,14 @@ export function PermissionsDialog({
                                         <h4 className="text-[10px] font-black uppercase tracking-widest text-primary/60">Modules & Sub-modules</h4>
                                         <div className="flex items-center gap-3">
                                             <button 
-                                                onClick={() => handleGlobalToggle(true)}
+                                                onClick={handleSelectAllModules}
                                                 className="text-[9px] font-black text-primary/60 hover:text-primary hover:underline underline-offset-2 tracking-widest transition-all"
                                             >
                                                 SELECT ALL
                                             </button>
                                             <div className="h-2 w-[1px] bg-muted-foreground/20" />
                                             <button 
-                                                onClick={() => handleGlobalToggle(false)}
+                                                onClick={handleClearAllModules}
                                                 className="text-[9px] font-black text-muted-foreground hover:text-destructive transition-colors tracking-widest"
                                             >
                                                 CLEAR ALL
@@ -147,9 +183,9 @@ export function PermissionsDialog({
                                             <ModulePermissionItem
                                                 key={module.id}
                                                 module={module}
-                                                authorizedItems={localAuthorized}
-                                                parentSlugs={[subsystem.slug]}
-                                                onToggle={(slug, checked, item, path) => toggleItem(slug, checked, item, path)}
+                                                authorizedModuleIds={localModules}
+                                                parentIds={[]}
+                                                onToggle={(id, checked, item, path) => toggleItem(id, checked, item, path)}
                                             />
                                         ))}
                                         {(!subsystem.modules || subsystem.modules.length === 0) && (
@@ -173,20 +209,21 @@ export function PermissionsDialog({
 
 function ModulePermissionItem({ 
     module, 
-    authorizedItems, 
-    parentSlugs,
+    authorizedModuleIds, 
+    parentIds,
     onToggle 
 }: { 
     module: ModuleRegistration; 
-    authorizedItems: string[]; 
-    parentSlugs: string[];
-    onToggle: (slug: string, checked: boolean, item?: ModuleRegistration, parentSlugs?: string[]) => void 
+    authorizedModuleIds: number[]; 
+    parentIds: number[];
+    onToggle: (id: number, checked: boolean, item?: ModuleRegistration, parentIds?: number[]) => void 
 }) {
-    const isChecked = authorizedItems.includes(module.slug);
+    const moduleId = Number(module.id);
+    const isChecked = authorizedModuleIds.includes(moduleId);
     const hasChildren = module.subModules && module.subModules.length > 0;
     
     // Check if all children are checked
-    const allChildrenChecked = hasChildren && module.subModules?.every(s => authorizedItems.includes(s.slug));
+    const allChildrenChecked = hasChildren && module.subModules?.every(s => authorizedModuleIds.includes(Number(s.id)));
 
     return (
         <div className="space-y-2">
@@ -194,7 +231,7 @@ function ModulePermissionItem({
                 <Switch 
                     id={`module-${module.id}`} 
                     checked={isChecked}
-                    onCheckedChange={(checked) => onToggle(module.slug, !!checked, module, parentSlugs)}
+                    onCheckedChange={(checked) => onToggle(moduleId, !!checked, module, parentIds)}
                 />
                 <label
                     htmlFor={`module-${module.id}`}
@@ -208,11 +245,11 @@ function ModulePermissionItem({
                         onClick={() => {
                             if (allChildrenChecked) {
                                 // Clear children except current module
-                                onToggle(module.slug, false, module);
-                                onToggle(module.slug, true); // Keep parent
+                                onToggle(moduleId, false, module);
+                                onToggle(moduleId, true); // Keep parent
                             } else {
                                 // Select all children
-                                onToggle(module.slug, true, module, parentSlugs);
+                                onToggle(moduleId, true, module, parentIds);
                             }
                         }}
                         className="text-[8px] font-black text-primary/40 hover:text-primary transition-colors tracking-tighter uppercase whitespace-nowrap bg-primary/5 px-1.5 py-0.5 rounded-md border border-primary/10 ml-2"
@@ -228,8 +265,8 @@ function ModulePermissionItem({
                         <ModulePermissionItem
                             key={sub.id}
                             module={sub}
-                            authorizedItems={authorizedItems}
-                            parentSlugs={[...parentSlugs, module.slug]}
+                            authorizedModuleIds={authorizedModuleIds}
+                            parentIds={[...parentIds, moduleId]}
                             onToggle={onToggle}
                         />
                     ))}
