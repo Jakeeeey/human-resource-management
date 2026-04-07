@@ -95,8 +95,17 @@ export interface NewEmployeeFormData {
   user_fname: string;
   user_mname: string;
   user_lname: string;
+  suffix_name: string;
   user_contact: string;
   user_bday: string;
+  gender: string;
+  gender_specify: string;
+  civil_status: string;
+  nationality: string;
+  place_of_birth: string;
+  blood_type: string;
+  religion: string;
+  spouse_name: string;
   // Address
   user_province: string;
   user_city: string;
@@ -111,6 +120,7 @@ export interface NewEmployeeFormData {
   user_password: string;
   user_dateOfHire: string;
   rf_id: string;
+  biometric_id: string;
   user_tin: string;
   user_sss: string;
   user_philhealth: string;
@@ -187,8 +197,17 @@ const EMPTY_FORM: NewEmployeeFormData = {
   user_fname: "",
   user_mname: "",
   user_lname: "",
+  suffix_name: "",
   user_contact: "",
   user_bday: "",
+  gender: "",
+  gender_specify: "",
+  civil_status: "",
+  nationality: "",
+  place_of_birth: "",
+  blood_type: "",
+  religion: "",
+  spouse_name: "",
   user_province: "",
   user_city: "",
   user_brgy: "",
@@ -200,6 +219,7 @@ const EMPTY_FORM: NewEmployeeFormData = {
   user_password: "",
   user_dateOfHire: "",
   rf_id: "",
+  biometric_id: "",
   user_tin: "",
   user_sss: "",
   user_philhealth: "",
@@ -507,10 +527,102 @@ export function AddEmployeeModal({
                       className={cn(inputCls, "pl-9")}
                       value={form.user_bday}
                       onChange={(e) => set("user_bday", e.target.value)}
+                      max="9999-12-31"
                       required
                     />
                   </div>
                 </Field>
+                <Field label="Suffix Name">
+                  <Input
+                    className={inputCls}
+                    value={form.suffix_name || ""}
+                    onChange={(e) => set("suffix_name", e.target.value)}
+                    placeholder="e.g. Jr., III"
+                  />
+                </Field>
+                <Field label="Gender" required>
+                   <Select value={form.gender} onValueChange={(v) => set("gender", v)} required>
+                    <SelectTrigger className={inputCls}>
+                      <SelectValue placeholder="Select Gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                {form.gender === "Other" && (
+                  <Field label="Please specify gender" required>
+                    <Input
+                      className={inputCls}
+                      value={form.gender_specify || ""}
+                      onChange={(e) => set("gender_specify", e.target.value)}
+                      placeholder="Enter gender"
+                      required
+                    />
+                  </Field>
+                )}
+
+                <Field label="Civil Status" required>
+                  <Select value={form.civil_status} onValueChange={(v) => set("civil_status", v)} required>
+                    <SelectTrigger className={inputCls}>
+                      <SelectValue placeholder="Select Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Single">Single</SelectItem>
+                      <SelectItem value="Married">Married</SelectItem>
+                      <SelectItem value="Widowed">Widowed</SelectItem>
+                      <SelectItem value="Separated">Separated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Blood Type">
+                  <Input
+                    className={inputCls}
+                    value={form.blood_type || ""}
+                    onChange={(e) => set("blood_type", e.target.value)}
+                    placeholder="e.g. O+, A-"
+                  />
+                </Field>
+                <Field label="Nationality" required>
+                  <Input
+                    className={inputCls}
+                    value={form.nationality || ""}
+                    onChange={(e) => set("nationality", e.target.value)}
+                    placeholder="e.g. Filipino"
+                    required
+                  />
+                </Field>
+                <Field label="Place of Birth" required>
+                  <Input
+                    className={inputCls}
+                    value={form.place_of_birth || ""}
+                    onChange={(e) => set("place_of_birth", e.target.value)}
+                    placeholder="City / Province"
+                    required
+                  />
+                </Field>
+                <Field label="Religion" required>
+                  <Input
+                    className={inputCls}
+                    value={form.religion || ""}
+                    onChange={(e) => set("religion", e.target.value)}
+                    placeholder="Religion"
+                    required
+                  />
+                </Field>
+                {(form.civil_status === "Married" || form.civil_status === "Widowed") && (
+                  <Field label="Spouse Name">
+                    <Input
+                      className={inputCls}
+                      value={form.spouse_name || ""}
+                      onChange={(e) => set("spouse_name", e.target.value)}
+                      placeholder="Full Name"
+                    />
+                  </Field>
+                )}
               </div>
 
               {/* Address */}
@@ -673,6 +785,7 @@ export function AddEmployeeModal({
                       className={cn(inputCls, "pl-9")}
                       value={form.user_dateOfHire}
                       onChange={(e) => set("user_dateOfHire", e.target.value)}
+                      max="9999-12-31"
                       required
                     />
                   </div>
@@ -687,6 +800,14 @@ export function AddEmployeeModal({
                       placeholder="RFID number"
                     />
                   </div>
+                </Field>
+                <Field label="Biometric ID">
+                  <Input
+                    className={inputCls}
+                    value={form.biometric_id || ""}
+                    onChange={(e) => set("biometric_id", e.target.value)}
+                    placeholder="Biometric System ID"
+                  />
                 </Field>
               </div>
 

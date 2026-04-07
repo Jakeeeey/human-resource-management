@@ -21,6 +21,7 @@ export interface User {
   firstName: string;
   middleName?: string;
   lastName: string;
+  suffixName?: string;
   contact?: string;
   province?: string;
   city?: string;
@@ -34,12 +35,20 @@ export interface User {
   dateOfHire?: string;
   tags?: string | null;
   birthday?: string | null;
+  gender?: string | null;
+  civilStatus?: string | null;
+  nationality?: string | null;
+  placeOfBirth?: string | null;
+  bloodType?: string | null;
+  religion?: string | null;
+  spouseName?: string | null;
   image?: string | null;
   signature?: string | null;
   rfId?: string | null;
   isAdmin?: boolean | null;
   admin?: boolean | null;
   role?: string | null;
+  roleId?: number | null;
   biometricId?: string | null;
   externalId?: string | null;
   isDeleted?: boolean | null;

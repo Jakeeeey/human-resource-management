@@ -51,8 +51,16 @@ export default function EmployeeMasterlistModule() {
         firstName:  data.user_fname,
         middleName: data.user_mname || undefined,
         lastName:   data.user_lname,
+        suffixName: data.suffix_name || undefined,
         contact:    data.user_contact,
         birthday:   data.user_bday   || undefined,
+        gender:     data.gender === "Other" ? data.gender_specify : (data.gender || undefined),
+        civilStatus: data.civil_status || undefined,
+        nationality: data.nationality || undefined,
+        placeOfBirth: data.place_of_birth || undefined,
+        bloodType:   data.blood_type   || undefined,
+        religion:    data.religion     || undefined,
+        spouseName:  data.spouse_name  || undefined,
         // Address
         province: data.user_province,
         city:     data.user_city,
@@ -61,17 +69,20 @@ export default function EmployeeMasterlistModule() {
         emergencyContactName:   data.emergency_contact_name   || undefined,
         emergencyContactNumber: data.emergency_contact_number || undefined,
         // Work
-        department:   data.user_department || undefined,
+        department:   data.user_department ? String(data.user_department) : undefined,
         position:     data.user_position,
         dateOfHire:   data.user_dateOfHire,
-        rfId:         data.rf_id           || undefined,
-        tinNumber:    data.user_tin        || undefined,
-        sssNumber:    data.user_sss        || undefined,
-        philHealthNumber: data.user_philhealth || undefined,
-        pagibigNumber:    data.user_pagibig   || undefined,
+        rfid:         data.rf_id           || undefined,
+        biometricId:  data.biometric_id    || undefined,
         admin:        data.isAdmin,
         role:         data.role,
-        // Media — Directus file UUIDs from /files upload
+        tags:         "Employee", // or however you want to handle tags
+        // sss, philhealth, etc from fields
+        sssNumber:    data.user_sss        || undefined,
+        philHealthNumber: data.user_philhealth || undefined,
+        tinNumber:    data.user_tin        || undefined,
+        pagibigNumber:data.user_pagibig    || undefined,
+        // Media
         image:     data._userImageId ?? undefined,
         signature: data._signatureId ?? undefined,
       });
