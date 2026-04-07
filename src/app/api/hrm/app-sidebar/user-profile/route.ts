@@ -68,11 +68,11 @@ export async function GET() {
         console.log(`[Sidebar - User Profile Proxy] Fetching for User: ${userId}. role: ${u.role}, isAdmin_field: ${u.isAdmin}, RESOLVED_isAdmin: ${isAdmin}`);
 
         const subsystemIds = (subData.data || [])
-            .map((row: { subsystem_id?: { id?: any } }) => Number(row.subsystem_id?.id))
+            .map((row: { subsystem_id?: { id?: number | string } }) => Number(row.subsystem_id?.id))
             .filter((id: number) => !isNaN(id));
 
         const moduleIds = (modData.data || [])
-            .map((row: { module_id?: { id?: any } }) => Number(row.module_id?.id))
+            .map((row: { module_id?: { id?: number | string } }) => Number(row.module_id?.id))
             .filter((id: number) => !isNaN(id));
 
         const permissions = [

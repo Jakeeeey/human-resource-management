@@ -44,4 +44,4 @@ async function proxy(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) { return proxy(req); }
+export async function GET(_req: NextRequest) { return proxy(_req); }

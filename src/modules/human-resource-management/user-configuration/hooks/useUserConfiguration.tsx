@@ -7,7 +7,7 @@ import { SubsystemRegistration, ModuleRegistration } from "@/modules/human-resou
 import { UserService } from "../services/UserService";
 import { extractAllSlugs, extractAllIds } from "../utils/permissionUtils";
 import { toast } from "sonner";
-import { usePermissionsStore } from "@/stores/usePermissionsStore";
+import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
 
 export function useUserConfiguration() {
     const { 
@@ -26,7 +26,7 @@ export function useUserConfiguration() {
     const [activeUser, setActiveUser] = useState<UserSubsystemAccess | null>(null);
     const [activeSubsystem, setActiveSubsystem] = useState<SubsystemRegistration | null>(null);
 
-    const { userId: currentAdminId, updatePermissionsRemotely } = usePermissionsStore();
+    // const { userId: currentAdminId, updatePermissionsRemotely } = usePermissionsStore();
 
     /**
      * Toggles access for an entire subsystem.
@@ -76,12 +76,14 @@ export function useUserConfiguration() {
         if (success) {
             toast.success("User access updated successfully");
             fetchPage(currentPage, true);
-            if (userId === currentAdminId) updatePermissionsRemotely(newSlugs);
+            
+            // Trigger Sidebar Refresh
+            window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
         } else {
             toast.error("Failed to persist permission changes.");
             fetchPage(currentPage, true);
         }
-    }, [subsystems, users, updateUserPermissions, fetchPage, currentPage, currentAdminId, updatePermissionsRemotely]);
+    }, [subsystems, users, updateUserPermissions, fetchPage, currentPage]);
 
     const handleConfigure = useCallback((user: UserSubsystemAccess, subsystem: SubsystemRegistration) => {
         setActiveUser(user);
@@ -146,12 +148,14 @@ export function useUserConfiguration() {
         if (success) {
             toast.success("Granular permissions updated successfully");
             fetchPage(currentPage, true);
-            if (userId === currentAdminId) updatePermissionsRemotely(newSlugs);
+            
+            // Trigger Sidebar Refresh via Custom Event
+            window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
         } else {
             toast.error("Failed to persist granular changes.");
             fetchPage(currentPage, true);
         }
-    }, [users, activeSubsystem, updateUserPermissions, fetchPage, currentPage, currentAdminId, updatePermissionsRemotely]);
+    }, [users, activeSubsystem, updateUserPermissions, fetchPage, currentPage]);
 
     return {
         users,

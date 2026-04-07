@@ -30,7 +30,7 @@ interface PermissionsDialogProps {
     onUpdate: (userId: string, authorizedSubsystemIds: number[], authorizedModuleIds: number[]) => void;
 }
 
-import { extractAllSlugs, extractAllIds } from "@/modules/human-resource-management/user-configuration/utils/permissionUtils";
+import { extractAllIds } from "@/modules/human-resource-management/user-configuration/utils/permissionUtils";
 
 export function PermissionsDialog({
     open,

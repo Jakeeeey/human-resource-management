@@ -79,7 +79,7 @@ export function AppSidebar({
                 const modulesById: Record<string, ModuleRegistration> = {};
                 const roots: ModuleRegistration[] = [];
 
-                (allModules || []).forEach((m: any) => {
+                (allModules || []).forEach((m: ModuleRegistration) => {
                     const mod: ModuleRegistration = {
                         ...m,
                         id: String(m.id),
@@ -88,7 +88,7 @@ export function AppSidebar({
                     modulesById[mod.id] = mod;
                 });
 
-                (allModules || []).forEach((m: any) => {
+                (allModules || []).forEach((m: ModuleRegistration) => {
                     const id = String(m.id);
                     const parentId = m.parent_module_id ? String(m.parent_module_id) : null;
                     if (parentId && modulesById[parentId]) {
@@ -122,7 +122,7 @@ export function AppSidebar({
 
         window.addEventListener(SIDEBAR_REFRESH_EVENT, handleRefresh);
         return () => window.removeEventListener(SIDEBAR_REFRESH_EVENT, handleRefresh);
-    }, [fetchPermissions, fetchModules, SIDEBAR_REFRESH_EVENT]);
+    }, [fetchPermissions, fetchModules]);
 
     // Keyboard shortcut for search
     React.useEffect(() => {
@@ -197,7 +197,7 @@ export function AppSidebar({
         }
 
         return filterTree(baseNav);
-    }, [modules, permissions, isAdmin, isLoading, searchTerm]);
+    }, [modules, isAdmin, isLoading, searchTerm, moduleIds]);
 
     return (
         <Sidebar

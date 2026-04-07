@@ -196,7 +196,7 @@ export class UserService {
             const modulesBySubsystem: Record<number, RawModule[]> = {};
             const modulesById: Record<number, RawModule> = {};
 
-            (allModules || []).forEach((m: any) => {
+            (allModules || []).forEach((m: RawModule) => {
                 const mod: RawModule = { ...m, id: Number(m.id), subModules: [] };
                 modulesById[Number(mod.id)] = mod;
                 
@@ -206,7 +206,7 @@ export class UserService {
             });
 
             // 2. Build the recursive tree for each subsystem
-            const finalSubsystems = (subsystems || []).map((sub: any) => {
+            const finalSubsystems = (subsystems || []).map((sub: SubsystemRegistration) => {
                 const subId = Number(sub.id);
                 const subModulesForThisSub = modulesBySubsystem[subId] || [];
                 

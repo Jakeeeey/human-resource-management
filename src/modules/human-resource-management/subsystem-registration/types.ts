@@ -1,13 +1,14 @@
 export type SubsystemStatus = "active" | "comingSoon";
 
 export interface ModuleRegistration {
-    id: string;
+    id: string | number;
     slug: string;
     title: string;
     base_path: string;
     status: SubsystemStatus;
     icon_name?: string;
     sort?: number;
+    parent_module_id?: string | number | null;
     subModules?: ModuleRegistration[];
 }
 
@@ -16,12 +17,12 @@ export interface NavItem {
     url: string;
     slug?: string;
     status?: string | SubsystemStatus;
-    icon?: any;
+    icon?: React.ComponentType<{ className?: string }>;
     items?: NavItem[];
 }
 
 export interface SubsystemRegistration {
-    id: string;
+    id: string | number;
     slug: string;
     title: string;
     subtitle: string;

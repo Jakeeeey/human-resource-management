@@ -184,7 +184,7 @@ export class SubsystemService {
                     const currentRes = await fetch(`/api/hrm/subsystem-registration/modules?filter={"subsystem_id":{"_eq":${subsystemId}}}&fields=id`);
                     if (currentRes.ok) {
                         const { data: currentInDb } = await currentRes.json();
-                        const dbIds = (currentInDb || []).map((m: any) => Number(m.id));
+                        const dbIds = (currentInDb || []).map((m: { id: string | number }) => Number(m.id));
                         const incomingIds = this.collectIds(data.modules);
                         
                         const staleIds = dbIds.filter((dbId: number) => !incomingIds.includes(dbId));
