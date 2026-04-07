@@ -36,7 +36,6 @@ export function AppSidebar({
     ...props
 }: ComponentProps<typeof Sidebar>) {
     // Local Permission State
-    const [permissions, setPermissions] = React.useState<string[]>([]);
     const [moduleIds, setModuleIds] = React.useState<number[]>([]);
     const [isAdmin, setIsAdmin] = React.useState(false);
     const [isPermLoading, setIsPermLoading] = React.useState(true);
@@ -57,7 +56,6 @@ export function AppSidebar({
             const res = await fetch("/api/hrm/app-sidebar/user-profile");
             if (res.ok) {
                 const data = await res.json();
-                setPermissions(data.permissions || []);
                 setModuleIds(Array.isArray(data.moduleIds) ? data.moduleIds : []);
                 setIsAdmin(!!data.isAdmin);
             }

@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
 const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-async function proxy(req: NextRequest) {
+async function proxy() {
   if (!UPSTREAM_BASE) {
     console.error("[Dashboard - Subsystems Proxy] NEXT_PUBLIC_API_BASE_URL missing.");
     return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
@@ -40,4 +40,4 @@ async function proxy(req: NextRequest) {
   }
 }
 
-export async function GET(_req: NextRequest) { return proxy(_req); }
+export async function GET() { return proxy(); }
