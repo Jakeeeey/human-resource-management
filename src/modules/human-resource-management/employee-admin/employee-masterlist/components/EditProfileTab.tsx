@@ -32,11 +32,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { toast } from "sonner";
 import type { Department, User } from "../types";
 import { UpdateEmployeePayload } from "../providers/springProvider";
 
 const UPLOAD_API = "/api/hrm/employee-admin/employee-master-list/upload";
 const PROXY_BASE = "/api/hrm/employee-admin/employee-master-list";
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 function isUUID(str: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -281,6 +284,11 @@ export function EditProfileTab({
   }
 
   function handleFileChange(key: "image" | "signature", file: File | null) {
+    if (file && file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+      return;
+    }
+
     set(key, file as EditEmployeeFormData[typeof key]);
     if (file) {
       const url = URL.createObjectURL(file);

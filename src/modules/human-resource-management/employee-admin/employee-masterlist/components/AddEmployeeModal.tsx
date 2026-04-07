@@ -38,9 +38,12 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { Department } from "../types";
 
 const UPLOAD_API = "/api/hrm/employee-admin/employee-master-list/upload";
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 /** Compress and upload a File to Directus /files. Returns the UUID string. */
 async function uploadToDirectus(file: File, type: "profile" | "signature"): Promise<string> {
@@ -276,6 +279,11 @@ export function AddEmployeeModal({
     key: "user_image" | "signature",
     file: File | null
   ) {
+    if (file && file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+      return;
+    }
+
     set(key, file as NewEmployeeFormData[typeof key]);
     if (file) {
       const url = URL.createObjectURL(file);
