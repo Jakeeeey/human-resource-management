@@ -1,19 +1,8 @@
 // src/app/api/hrm/attendance-report/todays-report/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getActiveOncall, extractScheduleFields } from '../../../../../modules/human-resource-management/workforce/attendance-report/todays-report/utils/oncall';
+import { getActiveOncall, extractScheduleFields } from '../../../../../../modules/human-resource-management/workforce/attendance-report/todays-report/utils/oncall';
 
-function isDeleted(val: unknown): boolean {
-  if (typeof val === 'boolean') return val;
-  if (typeof val === 'number') return val !== 0;
-  if (val && typeof val === 'object') {
-    const buf = val as { type?: string; data?: number[] };
-    if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
-      return buf.data[0] === 1;
-    }
-  }
-  return false;
-}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -105,14 +94,12 @@ export async function GET(request: NextRequest) {
     const scheds:       Record<string, unknown>[] = schedRes.data       ?? [];
     const oncallList:   Record<string, unknown>[] = oncallListRes.data  ?? [];
     const oncallScheds: Record<string, unknown>[] = oncallSchedRes.data ?? [];
-    // Temporarily in route.ts
-const testRes = await fetchCollection('attendance_log', { limit: '3' });
-console.log('[DEBUG] sample log_dates:', testRes.data.map((l: Record<string,unknown>) => l.log_date));
 
     console.log(`[HRM/Attendance] logs=${logs.length} users=${users.length} depts=${depts.length} scheds=${scheds.length}`);
 
-    // Filter out deleted users
-    const filteredUsers = users.filter((u) => !isDeleted(u.is_deleted));
+    // No deleted user filtering
+    const filteredUsers = users;
+    
     const userMap  = new Map(filteredUsers.map((u) => [u.user_id, u]));
     const deptMap  = new Map(depts.map((d) => [d.department_id, d]));
     const schedMap = new Map(scheds.map((s) => [s.department_id, s]));
@@ -178,8 +165,10 @@ console.log('[DEBUG] sample log_dates:', testRes.data.map((l: Record<string,unkn
       return record;
     }
 
-    const loggedUserIds = new Set(logs.map((l) => l.user_id));
-    const merged: Record<string, unknown>[] = logs.map((log) =>
+    // Only process logs from non-deleted users
+    const filteredLogs = logs.filter((log) => userMap.has(log.user_id));
+    const loggedUserIds = new Set(filteredLogs.map((l) => l.user_id));
+    const merged: Record<string, unknown>[] = filteredLogs.map((log) =>
       buildRecord(log, log.user_id)
     );
 

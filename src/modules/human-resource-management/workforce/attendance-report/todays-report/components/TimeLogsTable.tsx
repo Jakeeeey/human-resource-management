@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatTime } from "../utils";
 import type { AttendanceRecord } from "../hooks/useAttendance";
 
@@ -155,10 +155,6 @@ export function TimeLogsTable({ records, total }: Props) {
           </span>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground flex items-center gap-1 mr-3">
-              <Clock className="h-3 w-3" />
-              {new Date().toLocaleTimeString("en-PH")}
-            </span>
             <Button
               variant="outline" size="sm" className="h-7 w-7 p-0"
               onClick={() => setPage((p) => Math.max(1, p - 1))}

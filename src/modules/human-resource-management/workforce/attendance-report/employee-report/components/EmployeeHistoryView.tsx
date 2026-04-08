@@ -6,7 +6,7 @@ import Image from "next/image";
 import { format } from "date-fns";
 import {
   ChevronLeft, ChevronRight, Clock,
-  Check, X, Clock3, Zap, AlertCircle, Download,
+  Check, X, Clock3, Zap, AlertCircle, Download, Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Employee, EmployeeAttendanceRow } from "../hooks/useEmployeeReport";
@@ -20,6 +20,8 @@ export interface EmployeeHistoryViewProps {
   logs:         EmployeeAttendanceRow[];
   from:         string;
   to:           string;
+  /** True only on re-fetches (date change) — previous logs remain visible */
+  refreshing:   boolean;
   onBack:       () => void;
   onFromChange: (v: string) => void;
   onToChange:   (v: string) => void;
@@ -89,29 +91,20 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function EmployeeHistoryView({
-  employee, logs, from, to, onBack, onFromChange, onToChange,
+  employee, logs, from, to, refreshing,
+  onBack, onFromChange, onToChange,
 }: EmployeeHistoryViewProps) {
-  // Debug: print all logs with employee info and directus_id
-  console.log('[Geotag Debug] Employee:', employee);
-  console.log('[Geotag Debug] Logs:', logs);
-  const [page,         setPage]       = useState(1);
+  const [page,         setPage]         = useState(1);
   const [statusFilter, setStatusFilter] = useState("All");
   const [showRestDay,  setShowRestDay]  = useState(true);
-  // Stores the directus_id of the currently expanded geotag row (null = none)
   const [expandedLog,  setExpandedLog]  = useState<number | null>(null);
-  // Set of directus_ids that have at least one row in attendance_log_geotag
   const [geotagIds,    setGeotagIds]    = useState<Set<number>>(new Set());
 
-  // ── Check which logs have geotag records ──────────────────────────────────
-  // Key insight: attendance_log_geotag.log_id = directus_id (big Directus PK),
-  // NOT the sequential app log_id. We collect all directus_ids from the current
-  // log set and ask the API which ones have matching geotag entries.
+  // ── Geotag check ──────────────────────────────────────────────────────────
   useEffect(() => {
     const directusIds = logs
       .map((l) => l.directus_id)
       .filter((id): id is number => id !== null && id > 0);
-
-    console.log('[Geotag Debug] directusIds:', directusIds);
 
     if (directusIds.length === 0) {
       setGeotagIds(new Set());
@@ -119,28 +112,19 @@ export function EmployeeHistoryView({
     }
 
     let cancelled = false;
-
     const check = async () => {
       try {
         const res = await fetch(
-          `/api/hrm/attendance-report/employee-report/geotag/check?logIds=${directusIds.join(",")}`,
+          `/api/hrm/workforce/attendance-report/employee-report/geotag/check?logIds=${directusIds.join(",")}`,
         );
         if (!res.ok) throw new Error(`Geotag check failed: ${res.status}`);
         const data = await res.json() as { logIdsWithGeotag?: number[] };
-        console.log('[Geotag Debug] API response:', data);
-        if (!cancelled) {
-          setGeotagIds(() => {
-            const newSet = new Set(data.logIdsWithGeotag ?? []);
-            console.log('[Geotag Debug] setGeotagIds:', Array.from(newSet));
-            return newSet;
-          });
-        }
+        if (!cancelled) setGeotagIds(new Set(data.logIdsWithGeotag ?? []));
       } catch (err) {
         console.error("Geotag check error:", err);
         if (!cancelled) setGeotagIds(new Set());
       }
     };
-
     check();
     return () => { cancelled = true; };
   }, [logs]);
@@ -191,6 +175,15 @@ export function EmployeeHistoryView({
           ← Back
         </button>
         <h1 className="text-sm font-bold">Attendance History</h1>
+
+        {/* Subtle refreshing indicator — shown inline, does NOT clear the table */}
+        {refreshing && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Updating…
+          </span>
+        )}
+
         <div className="flex items-center gap-2 ml-auto flex-wrap">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground border border-border rounded-md px-3 py-1.5">
             <Clock className="w-3.5 h-3.5" />
@@ -228,34 +221,42 @@ export function EmployeeHistoryView({
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="block text-xs text-muted-foreground mb-1">From</label>
-          <input type="date" value={from}
+          <input
+            type="date" value={from}
             onChange={(e) => { onFromChange(e.target.value); setPage(1); }}
-            className="border border-border rounded-md px-2.5 py-1.5 text-xs bg-background" />
+            className="border border-border rounded-md px-2.5 py-1.5 text-xs bg-background"
+          />
         </div>
         <div>
           <label className="block text-xs text-muted-foreground mb-1">To</label>
-          <input type="date" value={to}
+          <input
+            type="date" value={to}
             onChange={(e) => { onToChange(e.target.value); setPage(1); }}
-            className="border border-border rounded-md px-2.5 py-1.5 text-xs bg-background" />
+            className="border border-border rounded-md px-2.5 py-1.5 text-xs bg-background"
+          />
         </div>
         <div>
           <label className="block text-xs text-muted-foreground mb-1">Status</label>
-          <select value={statusFilter}
+          <select
+            value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="border border-border rounded-md px-2.5 py-1.5 text-xs bg-background">
+            className="border border-border rounded-md px-2.5 py-1.5 text-xs bg-background"
+          >
             {statusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none mb-1">
-          <input type="checkbox" checked={showRestDay}
+          <input
+            type="checkbox" checked={showRestDay}
             onChange={(e) => { setShowRestDay(e.target.checked); setPage(1); }}
-            className="w-3.5 h-3.5 accent-blue-600" />
+            className="w-3.5 h-3.5 accent-blue-600"
+          />
           Show Rest Day
         </label>
       </div>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Metric cards — always visible, update smoothly when new data arrives */}
+      <div className={`grid grid-cols-2 md:grid-cols-5 gap-4 transition-opacity duration-300 ${refreshing ? "opacity-60" : "opacity-100"}`}>
         <MetricCard title="Attended"   value={summary.attended}           sub={`${summary.attended} days`} icon={<Check       className="h-5 w-5" />} />
         <MetricCard title="Absent"     value={summary.absent}             sub={`${summary.absent} days`}   icon={<X           className="h-5 w-5" />} />
         <MetricCard title="Work Hours" value={minsToHM(summary.workMins)} sub={`${summary.workMins}m`}     icon={<Clock3      className="h-5 w-5" />} />
@@ -263,8 +264,8 @@ export function EmployeeHistoryView({
         <MetricCard title="Late"       value={minsToHM(summary.lateMins)} sub={`${summary.lateMins}m`}     icon={<AlertCircle className="h-5 w-5" />} />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Charts — fade during refresh instead of disappearing */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 transition-opacity duration-300 ${refreshing ? "opacity-60" : "opacity-100"}`}>
         <div className="border border-border rounded-lg p-4">
           <div className="text-xs font-semibold mb-3">Work Hours Trend</div>
           <WorkHoursLineChart logs={logs} />
@@ -275,8 +276,8 @@ export function EmployeeHistoryView({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border border-border overflow-hidden bg-background">
+      {/* Table — stays visible during refresh, subtle opacity shift */}
+      <div className={`rounded-xl border border-border overflow-hidden bg-background transition-opacity duration-300 ${refreshing ? "opacity-60" : "opacity-100"}`}>
         <div className="overflow-x-auto">
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -288,16 +289,9 @@ export function EmployeeHistoryView({
             </thead>
             <tbody>
               {paginatedLogs.map((log) => {
-                // directus_id = the Directus PK (e.g. 4195300336) stored as
-                // attendance_log_geotag.log_id — NOT the sequential app log_id.
                 const directusId = log.directus_id ?? null;
                 const isExpanded = directusId !== null && expandedLog === directusId;
-
-                // Show "View" only when:
-                //   1. directus_id is present (real log, not a synthesised absent/rest row)
-                //   2. that directus_id has a row in attendance_log_geotag
-                //   3. employee was present (geotags only exist for clock-in/out events)
-                const hasGeotag =
+                const hasGeotag  =
                   directusId !== null &&
                   geotagIds.has(directusId) &&
                   PRESENT_STATUSES.has(log.status);
@@ -305,57 +299,37 @@ export function EmployeeHistoryView({
                 return (
                   <React.Fragment key={log.log_date}>
                     <tr className={`border-b border-border transition-colors ${isExpanded ? "bg-muted/40" : "hover:bg-muted/30"}`}>
-
-                      {/* Date */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="font-semibold">{fmtDate(log.log_date, "MMM d, yyyy")}</div>
                         <div className="text-[11px] text-muted-foreground">{fmtDate(log.log_date, "EEEE")}</div>
                       </td>
-
-                      {/* Schedule */}
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {!NEUTRAL_STATUSES.has(log.status) ? (schedule ?? "—") : "—"}
                       </td>
-
-                      {/* Time In — bold */}
                       <td className="px-4 py-3 whitespace-nowrap font-bold">
                         {log.time_in ? fmtTime(log.time_in) : "—"}
                       </td>
-
-                      {/* Lunch / Break */}
                       <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.lunch_start)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.lunch_end)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.break_start)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{fmtTime(log.break_end)}</td>
-
-                      {/* Time Out */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         {log.time_out ? fmtTime(log.time_out) : "—"}
                       </td>
-
-                      {/* Late */}
                       <td className="px-4 py-3 whitespace-nowrap text-red-600">
                         {log.late > 0 ? minsToHM(log.late) : "—"}
                       </td>
-
-                      {/* Overtime */}
                       <td className="px-4 py-3 whitespace-nowrap text-blue-600">
                         {log.overtime > 0 ? minsToHM(log.overtime) : "—"}
                       </td>
-
-                      {/* Punctuality — derived from server-computed late */}
                       <td className="px-4 py-3 whitespace-nowrap font-semibold">
                         {PRESENT_STATUSES.has(log.status)
                           ? (log.late > 0 ? "Late" : "On Time")
                           : "—"}
                       </td>
-
-                      {/* Status */}
                       <td className="px-4 py-3">
                         <StatusBadge status={log.status} />
                       </td>
-
-                      {/* Geotag — "View"/"Hide" only if directus_id has a geotag row */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         {hasGeotag ? (
                           <button
@@ -370,14 +344,10 @@ export function EmployeeHistoryView({
                       </td>
                     </tr>
 
-                    {/* Inline geotag panel — passes directus_id as logId */}
                     {isExpanded && directusId !== null && (
                       <tr key={`${log.log_date}-geo`}>
                         <td colSpan={13} className="p-0 border-b border-border">
-                          <GeotagEvidencePanel
-                            logId={directusId}
-                            logDate={log.log_date}
-                          />
+                          <GeotagEvidencePanel logId={directusId} logDate={log.log_date} />
                         </td>
                       </tr>
                     )}

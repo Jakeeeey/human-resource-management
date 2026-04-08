@@ -1,7 +1,7 @@
 // src/app/api/hrm/attendance-report/employee-report/history/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getActiveOncall, extractScheduleFields } from '../../../../../../modules/human-resource-management/workforce/attendance-report/employee-report/utils/oncall';
+import { getActiveOncall, extractScheduleFields } from '../../../../../../../modules/human-resource-management/workforce/attendance-report/employee-report/utils/oncall';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,17 +96,44 @@ function calculateLate(
 }
 
 /**
- * Returns how many minutes after work_end the employee clocked out.
- * Normalises full datetime strings to HH:MM before comparing.
+ * Calculate actual overtime hours beyond the standard work schedule.
+ * Overtime = (actual work time - lunch deduction) - (scheduled work hours)
+ * Only returns positive overtime if actual work exceeds scheduled hours.
  */
 function calculateOvertime(
+  timeIn: string | null,
   timeOut: string | null,
+  workStart: string | null,
   workEnd: string | null,
+  lunchStart: string | null,
+  lunchEnd: string | null,
 ): number {
+  const ti = extractTime(timeIn);
   const to = extractTime(timeOut);
+  const ws = extractTime(workStart);
   const we = extractTime(workEnd);
-  if (!to || !we) return 0;
-  return Math.max(0, timeToMins(to) - timeToMins(we));
+
+  // Must have all core times
+  if (!ti || !to || !ws || !we) return 0;
+
+  // Calculate actual time worked
+  let actualWorkMins = timeToMins(to) - timeToMins(ti);
+
+  // Deduct lunch break if both lunch times are present
+  const ls = extractTime(lunchStart);
+  const le = extractTime(lunchEnd);
+  if (ls && le) {
+    actualWorkMins -= (timeToMins(le) - timeToMins(ls));
+  }
+
+  // Ensure non-negative actual work time
+  actualWorkMins = Math.max(0, actualWorkMins);
+
+  // Calculate scheduled work hours
+  const scheduledWorkMins = timeToMins(we) - timeToMins(ws);
+
+  // Overtime is only the excess beyond scheduled hours
+  return Math.max(0, actualWorkMins - scheduledWorkMins);
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -280,7 +307,7 @@ export async function GET(request: NextRequest) {
           enrichedLog.oncall_break_end   = schedFields.break_end;
           // ✅ Fixed: was "lateLate(...)" / "lateOvertime(...)" — correct names are late / overtime
           enrichedLog.late     = calculateLate(log.time_in as string | null, schedFields.work_start as string | null, schedFields.grace_period as number);
-          enrichedLog.overtime = calculateOvertime(log.time_out as string | null, schedFields.work_end as string | null);
+          enrichedLog.overtime = calculateOvertime(log.time_in as string | null, log.time_out as string | null, schedFields.work_start as string | null, schedFields.work_end as string | null, log.lunch_start as string | null, log.lunch_end as string | null);
         } else {
           enrichedLog.work_start         = schedFields.work_start;
           enrichedLog.work_end           = schedFields.work_end;
@@ -298,7 +325,7 @@ export async function GET(request: NextRequest) {
           enrichedLog.oncall_break_end   = null;
           // ✅ Fixed: was "lateLate(...)" / "lateOvertime(...)" — correct names are late / overtime
           enrichedLog.late     = calculateLate(log.time_in as string | null, schedFields.work_start as string | null, schedFields.grace_period as number);
-          enrichedLog.overtime = calculateOvertime(log.time_out as string | null, schedFields.work_end as string | null);
+          enrichedLog.overtime = calculateOvertime(log.time_in as string | null, log.time_out as string | null, schedFields.work_start as string | null, schedFields.work_end as string | null, log.lunch_start as string | null, log.lunch_end as string | null);
         }
 
         filledLogs.push(enrichedLog);

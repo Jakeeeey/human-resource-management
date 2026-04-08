@@ -1,7 +1,8 @@
 // src/app/api/hrm/attendance-report/department-report/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getActiveOncall, extractScheduleFields } from '../../../../../modules/human-resource-management/workforce/attendance-report/department-report/utils/oncall';
+import { getActiveOncall, extractScheduleFields } from '../../../../../../modules/human-resource-management/workforce/attendance-report/department-report/utils/oncall';
+
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -156,12 +157,7 @@ export async function GET(request: NextRequest) {
     if (deptId) userParams['filter[user_department][_eq]'] = deptId;
 
     const usersRes = await fetchCollection('user', userParams);
-    const allUsers = (usersRes.data ?? []).filter((u: Record<string, unknown>) => {
-      const deleted = (u.is_deleted as { data?: number[] } | null)?.data
-        ? (u.is_deleted as { data: number[] }).data[0] === 1
-        : !!u.is_deleted;
-      return !deleted;
-    });
+    const allUsers = (usersRes.data ?? []);
 
     // 3. Fetch attendance logs for the date range
     const logParams: Record<string, string> = {
