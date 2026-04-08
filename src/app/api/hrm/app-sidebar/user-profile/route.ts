@@ -32,40 +32,49 @@ export async function GET() {
         return NextResponse.json({ ok: false, message: "Invalid session" }, { status: 401 });
     }
 
-    // Logic: Fetch fresh permissions from the Directus 'user_access' table
-    const baseUrl = process.env.SPRING_API_BASE_URL; // Using established proxy pattern
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!baseUrl) {
+        console.error("[Sidebar - User Profile Proxy] NEXT_PUBLIC_API_BASE_URL missing.");
         return NextResponse.json({ ok: false, message: "Server misconfigured" }, { status: 500 });
     }
 
     try {
         // Parallel fetch from junction tables + custom user collection
         const [subRes, modRes, userRes] = await Promise.all([
-            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user_access_subsystems?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: userId } }))}&limit=-1&fields=subsystem_id.slug`, {
+            fetch(`${baseUrl}/items/user_access_subsystems?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: userId } }))}&limit=-1&fields=subsystem_id.id,subsystem_id.slug`, {
                 headers: { "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` },
                 next: { revalidate: 0 }
             }),
-            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user_access_modules?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: userId } }))}&limit=-1&fields=module_id.slug`, {
+            fetch(`${baseUrl}/items/user_access_modules?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: userId } }))}&limit=-1&fields=module_id.id,module_id.slug`, {
                 headers: { "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` },
                 next: { revalidate: 0 }
             }),
-            fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/items/user/${userId}?fields=role,isAdmin`, {
+            fetch(`${baseUrl}/items/user/${userId}?fields=role,isAdmin`, {
                 headers: { "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` },
                 next: { revalidate: 0 }
             })
         ]);
 
         if (!subRes.ok || !modRes.ok) {
+            console.error(`[Sidebar - User Profile Proxy] Permission Fetch Failed: Subs=${subRes.status}, Mods=${modRes.status}`);
             return NextResponse.json({ ok: false, message: "Failed to fetch permissions" }, { status: 500 });
         }
 
         const [subData, modData, userData] = await Promise.all([subRes.json(), modRes.json(), userRes.json()]);
         
-        // ADMIN Logic matching DDL: role === "ADMIN" or isAdmin === 1
         const u = userData?.data || {};
         const isAdmin = u.role === "ADMIN" || u.isAdmin === 1 || u.isAdmin === true;
         
-        // Merge slugs from both tables
+        console.log(`[Sidebar - User Profile Proxy] Fetching for User: ${userId}. role: ${u.role}, isAdmin_field: ${u.isAdmin}, RESOLVED_isAdmin: ${isAdmin}`);
+
+        const subsystemIds = (subData.data || [])
+            .map((row: { subsystem_id?: { id?: number | string } }) => Number(row.subsystem_id?.id))
+            .filter((id: number) => !isNaN(id));
+
+        const moduleIds = (modData.data || [])
+            .map((row: { module_id?: { id?: number | string } }) => Number(row.module_id?.id))
+            .filter((id: number) => !isNaN(id));
+
         const permissions = [
             ...(subData.data || []).map((row: { subsystem_id?: { slug?: string } }) => row.subsystem_id?.slug),
             ...(modData.data || []).map((row: { module_id?: { slug?: string } }) => row.module_id?.slug)
@@ -74,12 +83,13 @@ export async function GET() {
         return NextResponse.json({
             ok: true,
             userId,
-            email: payload?.email,
             isAdmin,
-            permissions: isAdmin ? ["*"] : permissions // "*" can be a flag for all access
+            subsystemIds: isAdmin ? ["*"] : subsystemIds,
+            moduleIds: isAdmin ? ["*"] : moduleIds,
+            permissions: isAdmin ? ["*"] : permissions
         });
     } catch (error) {
-        console.error("[UserProfileAPI] Error:", error);
+        console.error("[Sidebar - User Profile Proxy] Fatal Error:", error);
         return NextResponse.json({ ok: false, message: "Internal server error" }, { status: 500 });
     }
 }

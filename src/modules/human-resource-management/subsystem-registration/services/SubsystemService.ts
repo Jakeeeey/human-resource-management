@@ -10,8 +10,8 @@ export class SubsystemService {
         try {
             // Fetch everything in parallel for speed
             const [subRes, modRes] = await Promise.all([
-                fetch(`/api/hrm/subsystems?limit=-1`),
-                fetch(`/api/hrm/modules?limit=-1`)
+                fetch(`/api/hrm/subsystem-registration/subsystems?limit=-1`),
+                fetch(`/api/hrm/subsystem-registration/modules?limit=-1&sort=sort`)
             ]);
 
             if (!subRes.ok || !modRes.ok) return [];
@@ -62,6 +62,19 @@ export class SubsystemService {
         }
     }
 
+    private static collectIds(modules: ModuleRegistration[]): number[] {
+        const ids: number[] = [];
+        const traverse = (items: ModuleRegistration[]) => {
+            items.forEach(item => {
+                const id = Number(item.id);
+                if (!isNaN(id)) ids.push(id);
+                if (item.subModules) traverse(item.subModules);
+            });
+        };
+        traverse(modules);
+        return ids;
+    }
+
     /**
      * Recursively syncs modules and sub-modules to the database.
      * Handles both new items (POST) and updates (PATCH).
@@ -71,6 +84,7 @@ export class SubsystemService {
         subsystemId: number, 
         parentId: number | null = null
     ): Promise<void> {
+        let index = 0;
         for (const itemModule of modules) {
             const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 5;
             
@@ -81,6 +95,7 @@ export class SubsystemService {
                 base_path: itemModule.base_path || "",
                 status: itemModule.status || "active",
                 icon_name: itemModule.icon_name || "Folder",
+                sort: index,
                 subsystem_id: subsystemId,
                 parent_module_id: parentId
             };
@@ -90,7 +105,7 @@ export class SubsystemService {
             try {
                 if (isNew) {
                     // Create new module
-                    const response = await fetch(`/api/hrm/modules`, {
+                    const response = await fetch(`/api/hrm/subsystem-registration/modules`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(payload)
@@ -101,7 +116,7 @@ export class SubsystemService {
                     }
                 } else {
                     // Update existing module
-                    await fetch(`/api/hrm/modules?id=${module.id}`, {
+                    await fetch(`/api/hrm/subsystem-registration/modules?id=${itemModule.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(payload)
@@ -112,6 +127,8 @@ export class SubsystemService {
                 if (itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
                     await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
                 }
+
+                index++;
             } catch (err) {
                 console.error(`Failed to sync module: ${itemModule.title}`, err);
             }
@@ -125,7 +142,7 @@ export class SubsystemService {
             delete cleanedData.id;
             delete cleanedData.modules; // Modules saved via sync
 
-            const response = await fetch(`/api/hrm/subsystems`, {
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(cleanedData)
@@ -154,7 +171,7 @@ export class SubsystemService {
             delete subsystemPayload.modules; // Modules saved via explicit sync
 
             // 1. Update the subsystem record
-            const response = await fetch(`/api/hrm/subsystems?id=${id}`, {
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems?id=${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(subsystemPayload)
@@ -162,6 +179,25 @@ export class SubsystemService {
 
             // 2. Sync Hierarchy (Modules and Sub-modules)
             if (data.modules) {
+                // PRUNING LOGIC: Delete removed modules
+                try {
+                    const currentRes = await fetch(`/api/hrm/subsystem-registration/modules?filter={"subsystem_id":{"_eq":${subsystemId}}}&fields=id`);
+                    if (currentRes.ok) {
+                        const { data: currentInDb } = await currentRes.json();
+                        const dbIds = (currentInDb || []).map((m: { id: string | number }) => Number(m.id));
+                        const incomingIds = this.collectIds(data.modules);
+                        
+                        const staleIds = dbIds.filter((dbId: number) => !incomingIds.includes(dbId));
+                        
+                        // Execute deletions in sequence to avoid race conditions or use bulk delete if API supports it
+                        for (const sId of staleIds) {
+                            await fetch(`/api/hrm/subsystem-registration/modules?id=${sId}`, { method: "DELETE" });
+                        }
+                    }
+                } catch (pruneErr) {
+                    console.error("Pruning failed, continuing with sync:", pruneErr);
+                }
+
                 await this.syncModulesRecursively(data.modules, subsystemId);
             }
 
@@ -174,7 +210,7 @@ export class SubsystemService {
 
     static async deleteSubsystem(id: string): Promise<boolean> {
         try {
-            const response = await fetch(`/api/hrm/subsystems?id=${id}`, {
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems?id=${id}`, {
                 method: "DELETE"
             });
             return response.ok;

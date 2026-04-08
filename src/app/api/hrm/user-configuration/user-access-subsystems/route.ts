@@ -4,6 +4,19 @@ export const runtime = "nodejs";
 
 const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
+function decodeJwt(token: string): Record<string, unknown> | null {
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
+        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        while (s.length % 4) s += "=";
+        const json = Buffer.from(s, "base64").toString("utf8");
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
+
 async function proxy(req: NextRequest) {
   if (!UPSTREAM_BASE) {
     return NextResponse.json({ error: "Server Configuration Error" }, { status: 500 });
@@ -12,12 +25,11 @@ async function proxy(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const filter = searchParams.get("filter");
   const limit = searchParams.get("limit") || "100";
-  const fields = searchParams.get("fields") || "user_id,item_slug";
+  const fields = searchParams.get("fields") || "user_id,subsystem_id";
 
-  // Construct upstream URL
-  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user_access`;
+  // Point to the new junction table for subsystems
+  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user_access_subsystems`;
   
-  // Append query params for GET and DELETE (Directus supports filter on DELETE)
   const queryParams = new URLSearchParams();
   if (filter) queryParams.set("filter", filter);
   if (req.method === "GET") {
@@ -30,8 +42,8 @@ async function proxy(req: NextRequest) {
   
   const headers = new Headers();
   headers.set("content-type", "application/json");
-  const token = process.env.DIRECTUS_STATIC_TOKEN;
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const directusToken = process.env.DIRECTUS_STATIC_TOKEN;
+  if (directusToken) headers.set("Authorization", `Bearer ${directusToken}`);
 
   try {
     const fetchOptions: RequestInit = {
@@ -42,20 +54,34 @@ async function proxy(req: NextRequest) {
     if (req.method === "POST" || req.method === "PATCH" || req.method === "DELETE") {
       try {
         const body = await req.json();
-        if (body) fetchOptions.body = JSON.stringify(body);
+        
+        let currentAdminId: number | null = null;
+        const tokenVal = req.cookies.get("vos_access_token")?.value;
+        if (tokenVal) {
+            const payload = decodeJwt(tokenVal);
+            if (payload && payload.sub) currentAdminId = Number(payload.sub);
+        }
+
+        if (body) {
+          if (req.method === "POST" && Array.isArray(body)) {
+             body.forEach(item => { 
+                 if (currentAdminId && !item.created_by) {
+                     item.created_by = currentAdminId;
+                 }
+             });
+          }
+          fetchOptions.body = JSON.stringify(body);
+        }
       } catch (e) {
-        // Body might be empty or invalid, skip for DELETE
         if (req.method !== "DELETE") throw e;
       }
     }
 
-    const res = await fetch(upstreamUrl, {
-        ...fetchOptions,
-    });
+    const res = await fetch(upstreamUrl, fetchOptions);
 
     if (!res.ok) {
         const errorBody = await res.text();
-        console.error(`[UserAccess Proxy] Upstream Error (${res.status}):`, errorBody);
+        console.error(`[User Config - Access Subsystems Proxy] Upstream Error (${res.status}):`, errorBody);
         return NextResponse.json({ error: "Upstream Error", details: errorBody }, { status: res.status });
     }
 
@@ -67,6 +93,7 @@ async function proxy(req: NextRequest) {
     return NextResponse.json(data);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error(`[User Config - Access Subsystems Proxy] Connection Error:`, message);
     return NextResponse.json({ error: "Connection Error", message }, { status: 502 });
   }
 }
