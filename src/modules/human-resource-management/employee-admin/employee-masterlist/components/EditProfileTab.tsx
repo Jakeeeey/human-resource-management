@@ -35,6 +35,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import type { Department, User } from "../types";
 import { UpdateEmployeePayload } from "../providers/springProvider";
+import { AddressSelectors } from "./AddressSelectors";
 
 const UPLOAD_API = "/api/hrm/employee-admin/employee-master-list/upload";
 const PROXY_BASE = "/api/hrm/employee-admin/employee-master-list";
@@ -574,17 +575,14 @@ export function EditProfileTab({
           <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-1.5">
             <MapPin className="h-3 w-3" /> Address
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field label="Province" required>
-              <Input className={inputCls} value={form.province} onChange={(e) => set("province", e.target.value)} required />
-            </Field>
-            <Field label="City / Municipality" required>
-              <Input className={inputCls} value={form.city} onChange={(e) => set("city", e.target.value)} required />
-            </Field>
-            <Field label="Barangay" required>
-              <Input className={inputCls} value={form.brgy} onChange={(e) => set("brgy", e.target.value)} required />
-            </Field>
-          </div>
+          <AddressSelectors 
+            province={form.province}
+            city={form.city}
+            brgy={form.brgy}
+            onProvinceChange={(v) => set("province", v)}
+            onCityChange={(v) => set("city", v)}
+            onBrgyChange={(v) => set("brgy", v)}
+          />
         </div>
 
         {/* Emergency */}

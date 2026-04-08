@@ -40,6 +40,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { Department } from "../types";
+import { AddressSelectors } from "./AddressSelectors";
 
 const UPLOAD_API = "/api/hrm/employee-admin/employee-master-list/upload";
 const MAX_FILE_SIZE_MB = 10;
@@ -630,35 +631,14 @@ export function AddEmployeeModal({
                 <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-1.5">
                   <MapPin className="h-3 w-3" /> Address
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <Field label="Province" required>
-                    <Input
-                      className={inputCls}
-                      value={form.user_province}
-                      onChange={(e) => set("user_province", e.target.value)}
-                      placeholder="Province"
-                      required
-                    />
-                  </Field>
-                  <Field label="City / Municipality" required>
-                    <Input
-                      className={inputCls}
-                      value={form.user_city}
-                      onChange={(e) => set("user_city", e.target.value)}
-                      placeholder="City / Municipality"
-                      required
-                    />
-                  </Field>
-                  <Field label="Barangay" required>
-                    <Input
-                      className={inputCls}
-                      value={form.user_brgy}
-                      onChange={(e) => set("user_brgy", e.target.value)}
-                      placeholder="Barangay"
-                      required
-                    />
-                  </Field>
-                </div>
+                <AddressSelectors 
+                  province={form.user_province}
+                  city={form.user_city}
+                  brgy={form.user_brgy}
+                  onProvinceChange={(v) => set("user_province", v)}
+                  onCityChange={(v) => set("user_city", v)}
+                  onBrgyChange={(v) => set("user_brgy", v)}
+                />
               </div>
 
               {/* Emergency */}

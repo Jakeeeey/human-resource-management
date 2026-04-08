@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
  * POST /api/hrm/employee-admin/employee-master-list/employees
  * Proxies creation to Spring Boot if needed (though /create is usually used)
  */
-export async function POST(req: NextRequest) {
-   // Implementation would be similar to /create/route.ts if needed
-   return NextResponse.json({ error: "Use /create for POST requests" }, { status: 405 });
+export async function POST() {
+  // Implementation would be similar to /create/route.ts if needed
+  return NextResponse.json({ error: "Use /create for POST requests" }, { status: 405 });
 }

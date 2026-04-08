@@ -51,7 +51,8 @@ export interface User {
   roleId?: number | null;
   biometricId?: string | null;
   externalId?: string | null;
-  isDeleted?: boolean | null;
+  isDeleted?: boolean | unknown | null;
+  is_deleted?: boolean | unknown | null;
   updateAt?: string | null;
   emergencyContactName?: string | null;
   emergencyContactNumber?: string | null;
