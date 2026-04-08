@@ -9,7 +9,7 @@ import {
     ChevronDown,
     FileText,
     Folder,
-    type LucideIcon,
+    SearchX,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
 
 import { THEME_SETTINGS_EVENT } from "@/components/theme/theme-settings";
 
@@ -41,14 +42,7 @@ function isRouteActiveExact(currentPath: string, targetUrl: string) {
     return cur === tgt;
 }
 
-type NavNode = {
-    title: string;
-    url: string;
-    icon?: LucideIcon;
-    items?: NavNode[];
-};
-
-function hasActiveInTree(pathname: string, node?: NavNode): boolean {
+function hasActiveInTree(pathname: string, node?: NavItem): boolean {
     if (!node) return false;
     if (isRouteActiveExact(pathname, node.url)) return true;
     return node.items?.some((c) => hasActiveInTree(pathname, c)) ?? false;
@@ -154,12 +148,12 @@ const ICON_L1_CLASS = "size-5 shrink-0 text-current";
 const ICON_L2_CLASS = "size-4 shrink-0 text-current";
 const ICON_L3_CLASS = "size-4 shrink-0 text-current";
 
-function L2Icon({ node, kind }: { node: NavNode; kind: "leaf" | "parent" }) {
+function L2Icon({ node, kind }: { node: NavItem; kind: "leaf" | "parent" }) {
     const Icon = node.icon ?? (kind === "parent" ? Folder : FileText);
     return <Icon className={ICON_L2_CLASS} />;
 }
 
-function L3Icon({ node }: { node: NavNode }) {
+function L3Icon({ node }: { node: NavItem }) {
     const Icon = node.icon ?? FileText;
     return <Icon className={ICON_L3_CLASS} />;
 }
@@ -179,9 +173,195 @@ const DROP_INNER = "min-h-0 overflow-hidden";
 
 const CHEVRON_ANIM = "transition-transform duration-200 ease-out";
 
+/* --------------------------------- soon badge -------------------------------- */
+function SoonBadge() {
+    return (
+        <span className="ml-auto flex h-4 items-center rounded-full bg-amber-500/10 px-1.5 text-[8px] font-black uppercase tracking-tighter text-amber-600 border border-amber-500/20 shadow-sm">
+            Soon
+        </span>
+    );
+}
+
+function HighlightMatch({ text, term }: { text: string; term?: string }) {
+    if (!term || !term.trim()) return <>{text}</>;
+
+    const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const parts = text.split(new RegExp(`(${safeTerm})`, "gi"));
+
+    return (
+        <>
+            {parts.map((part, i) =>
+                part.toLowerCase() === term.toLowerCase() ? (
+                    <span
+                        key={i}
+                        className="text-amber-600 font-bold underline decoration-2 underline-offset-[3px] decoration-amber-500/40"
+                    >
+                        {part}
+                    </span>
+                ) : (
+                    <span key={i}>{part}</span>
+                )
+            )}
+        </>
+    );
+}
+
 /* -------------------------------- component -------------------------------- */
 
-export function NavMain({ items }: { items: NavNode[] }) {
+/* ---------------------------- Recursive Nav Item --------------------------- */
+
+interface RecursiveNavItemProps {
+    node: NavItem;
+    depth: number;
+    pathname: string;
+    searchTerm?: string;
+    openMap: Record<string, boolean>;
+    toggleOpen: (key: string) => void;
+    parentKey?: string;
+    isLast: boolean;
+}
+
+function RecursiveNavItem({
+    node,
+    depth,
+    pathname,
+    searchTerm,
+    openMap,
+    toggleOpen,
+    parentKey,
+    isLast,
+}: RecursiveNavItemProps) {
+    const hasChildren = !!node.items?.length;
+    const currentKey = parentKey ? `${parentKey}::${node.title}` : node.title;
+    const isOpen = hasChildren ? !!openMap[currentKey] : false;
+    const isActive = isRouteActiveExact(pathname, node.url);
+    const isClickable = node.url !== "#";
+    const isComingSoon = node.status === "comingSoon";
+
+    // Indentation: 0 -> 12px, 1 -> 32px, 2 -> 52px...
+    const indent = 12 + (depth * 20);
+    
+    // Parent Icon Center X (where our vertical line should be)
+    // L1 icon center = 22px
+    // L[d] icon center = (12 + d*20) + 8
+    const parentIconCenterX = depth === 0 ? 0 : depth === 1 ? 22 : (12 + (depth - 1) * 20) + 8;
+
+    const Icon = node.icon ?? (depth === 0 ? undefined : hasChildren ? Folder : FileText);
+    const iconClass = depth === 0 ? ICON_L1_CLASS : ICON_L2_CLASS;
+    const gapClass = depth === 0 ? GAP_L1 : GAP_L2;
+
+    const content = (
+        <div className={cn(PILL_BASE, gapClass, PILL_HOVER, PILL_ACTIVE)}>
+            {Icon && <Icon className={iconClass} />}
+            <span className={LABEL}>
+                <HighlightMatch text={node.title} term={searchTerm} />
+            </span>
+            {isComingSoon && <SoonBadge />}
+            {hasChildren && (
+                isOpen ? (
+                    <ChevronDown className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
+                ) : (
+                    <ChevronRight className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
+                )
+            )}
+        </div>
+    );
+
+    const buttonProps = {
+        tooltip: node.title,
+        className: cn(
+            "cursor-pointer min-w-0 overflow-hidden relative group/btn",
+            OUTER_ROW_NO_GREY,
+            isComingSoon && "opacity-60 cursor-not-allowed",
+            depth > 0 && "h-8 text-sm"
+        ),
+        ["data-active" as string]: isActive,
+        style: { paddingLeft: `${indent}px` },
+    };
+
+    const itemContent = (
+        <SidebarMenuItem className="min-w-0 overflow-hidden relative">
+            {/* Tree Connectors */}
+            {depth > 0 && (
+                <>
+                    {/* Vertical line from parent (only if we have a parentIconCenterX) */}
+                    <div 
+                        className={cn(
+                            "absolute top-0 w-px bg-sidebar-border/50 transition-colors group-hover/btn:bg-sidebar-border",
+                            isLast ? "h-4" : "h-full"
+                        )}
+                        style={{ left: `${parentIconCenterX}px` }}
+                    />
+                    {/* Horizontal tick to current item */}
+                    <div 
+                        className="absolute h-px bg-sidebar-border/50 top-4 transition-colors group-hover/btn:bg-sidebar-border"
+                        style={{ 
+                            left: `${parentIconCenterX}px`,
+                            width: `${indent - parentIconCenterX}px`
+                        }}
+                    />
+                </>
+            )}
+
+            {hasChildren ? (
+                <CollapsibleTrigger asChild>
+                    <SidebarMenuButton {...buttonProps}>
+                        <div className={ROW}>{content}</div>
+                    </SidebarMenuButton>
+                </CollapsibleTrigger>
+            ) : (
+                <SidebarMenuButton asChild {...buttonProps}>
+                    {isClickable && !isComingSoon ? (
+                        <Link href={node.url} className={ROW}>{content}</Link>
+                    ) : (
+                        <div className={ROW}>{content}</div>
+                    )}
+                </SidebarMenuButton>
+            )}
+
+            {hasChildren && (
+                <div className={cn(DROP_WRAP, isOpen ? DROP_OPEN : DROP_CLOSED)}>
+                    <div className={DROP_INNER}>
+                        <CollapsibleContent forceMount>
+                            <SidebarMenuSub className="mx-0 px-0 translate-x-0 border-0 flex flex-col gap-0 relative">
+                                {node.items!.map((child, idx) => (
+                                    <RecursiveNavItem
+                                        key={`${currentKey}::${child.title}`}
+                                        node={child}
+                                        depth={depth + 1}
+                                        pathname={pathname}
+                                        searchTerm={searchTerm}
+                                        openMap={openMap}
+                                        toggleOpen={toggleOpen}
+                                        parentKey={currentKey}
+                                        isLast={idx === node.items!.length - 1}
+                                    />
+                                ))}
+                            </SidebarMenuSub>
+                        </CollapsibleContent>
+                    </div>
+                </div>
+            )}
+        </SidebarMenuItem>
+    );
+
+    if (hasChildren) {
+        return (
+            <Collapsible
+                open={isOpen}
+                onOpenChange={() => toggleOpen(currentKey)}
+                asChild
+            >
+                {itemContent}
+            </Collapsible>
+        );
+    }
+
+    return itemContent;
+}
+
+
+export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: string }) {
     const pathname = normalizePath(usePathname() || "/");
     const [accentVars, setAccentVars] = React.useState(() => resolveAccentVars("amber"));
 
@@ -190,60 +370,55 @@ export function NavMain({ items }: { items: NavNode[] }) {
             const s = readVOSThemeSettings();
             setAccentVars(resolveAccentVars(s?.accent));
         };
-
         applyFromStorage();
-
         const onThemeSettingsChanged = () => applyFromStorage();
         window.addEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
-
-        return () => {
-            window.removeEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
-        };
+        return () => window.removeEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
     }, []);
 
-    const [openMap, setOpenMap] = React.useState<Record<string, boolean>>(() => {
-        const initial: Record<string, boolean> = {};
-        for (const l1 of items) {
-            if (l1.items?.length) initial[l1.title] = hasActiveInTree(pathname, l1);
-            for (const l2 of l1.items ?? []) {
-                if (l2.items?.length) initial[`${l1.title}::${l2.title}`] = hasActiveInTree(pathname, l2);
+    const [openMap, setOpenMap] = React.useState<Record<string, boolean>>({});
+
+    const toggleOpen = (key: string) => {
+        setOpenMap(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    // Auto-expand logic (Recursive)
+    React.useEffect(() => {
+        const nextMap: Record<string, boolean> = {};
+        
+        function processNode(node: NavItem, parentKey?: string) {
+            const currentKey = parentKey ? `${parentKey}::${node.title}` : node.title;
+            const hasChildren = !!node.items?.length;
+            
+            if (hasChildren) {
+                const isActiveInPath = hasActiveInTree(pathname, node);
+                const isSearchMatch = searchTerm && (
+                    node.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    node.items?.some(c => hasActiveInTree("", c))
+                );
+                
+                if (searchTerm || isActiveInPath) {
+                    nextMap[currentKey] = true;
+                }
+                
+                node.items?.forEach(child => processNode(child, currentKey));
             }
         }
-        return initial;
-    });
 
-    React.useEffect(() => {
-        setOpenMap((prev) => {
-            let changed = false;
-            const next = { ...prev };
-
-            for (const l1 of items) {
-                if (l1.items?.length) {
-                    const should = hasActiveInTree(pathname, l1);
-                    if (should && !next[l1.title]) {
-                        next[l1.title] = true;
-                        changed = true;
-                    }
-                }
-                for (const l2 of l1.items ?? []) {
-                    if (l2.items?.length) {
-                        const key = `${l1.title}::${l2.title}`;
-                        const should = hasActiveInTree(pathname, l2);
-                        if (should && !next[key]) {
-                            next[key] = true;
-                            changed = true;
-                        }
-                    }
-                }
-            }
-
-            return changed ? next : prev;
+        items.forEach(item => processNode(item));
+        setOpenMap(prev => {
+            // Merge but only add true values from nextMap, don't overwrite manual closes if they didn't change
+            const merged = { ...prev };
+            Object.keys(nextMap).forEach(k => {
+                if (nextMap[k]) merged[k] = true;
+            });
+            return merged;
         });
-    }, [pathname, items]);
+    }, [pathname, items, searchTerm]);
 
     return (
         <SidebarGroup
-            className="overflow-x-hidden"
+            className="overflow-x-hidden p-0"
             style={
                 {
                     "--vos-pill": accentVars.pill,
@@ -251,198 +426,32 @@ export function NavMain({ items }: { items: NavNode[] }) {
                 } as React.CSSProperties
             }
         >
-            <SidebarMenu className="overflow-x-hidden">
-                {items.map((l1) => {
-                    const l1HasChildren = !!l1.items?.length;
-                    const l1Exact = isRouteActiveExact(pathname, l1.url);
-                    const l1Open = l1HasChildren ? !!openMap[l1.title] : false;
-                    const l1Clickable = l1.url !== "#";
-
-                    return (
-                        <Collapsible
-                            key={l1.title}
-                            asChild
-                            open={l1HasChildren ? l1Open : undefined}
-                            onOpenChange={l1HasChildren ? (v) => setOpenMap((p) => ({ ...p, [l1.title]: v })) : undefined}
-                        >
-                            <SidebarMenuItem className="min-w-0 overflow-hidden">
-                                {/* LEVEL 1 */}
-                                {l1HasChildren ? (
-                                    <CollapsibleTrigger asChild>
-                                        <SidebarMenuButton
-                                            tooltip={l1.title}
-                                            className={cn("cursor-pointer min-w-0 overflow-hidden", OUTER_ROW_NO_GREY)}
-                                            data-active={l1Exact}
-                                        >
-                                            <div className={ROW}>
-                                                <div className={cn(PILL_BASE, GAP_L1, PILL_HOVER, PILL_ACTIVE)}>
-                                                    {l1.icon ? <l1.icon className={ICON_L1_CLASS} /> : null}
-                                                    <span className={LABEL}>{l1.title}</span>
-
-                                                    {l1Open ? (
-                                                        <ChevronDown className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
-                                                    ) : (
-                                                        <ChevronRight className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </SidebarMenuButton>
-                                    </CollapsibleTrigger>
-                                ) : (
-                                    <SidebarMenuButton
-                                        asChild
-                                        tooltip={l1.title}
-                                        className={cn("cursor-pointer min-w-0 overflow-hidden", OUTER_ROW_NO_GREY)}
-                                        data-active={l1Exact}
-                                    >
-                                        {l1Clickable ? (
-                                            <Link href={l1.url} className={ROW}>
-                                                <div className={cn(PILL_BASE, GAP_L1, PILL_HOVER, PILL_ACTIVE)}>
-                                                    {l1.icon ? <l1.icon className={ICON_L1_CLASS} /> : null}
-                                                    <span className={LABEL}>{l1.title}</span>
-                                                </div>
-                                            </Link>
-                                        ) : (
-                                            <div className={ROW}>
-                                                <div className={cn(PILL_BASE, GAP_L1, PILL_HOVER, PILL_ACTIVE)}>
-                                                    {l1.icon ? <l1.icon className={ICON_L1_CLASS} /> : null}
-                                                    <span className={LABEL}>{l1.title}</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </SidebarMenuButton>
-                                )}
-
-                                {/* ✅ L1 dropdown animation wrapper (fixed) */}
-                                {l1HasChildren ? (
-                                    <div className={cn(DROP_WRAP, l1Open ? DROP_OPEN : DROP_CLOSED)}>
-                                        <div className={DROP_INNER}>
-                                            <CollapsibleContent forceMount>
-                                                <div>
-                                                    <SidebarMenuSub className={SUB_WRAP_L2}>
-                                                        {l1.items!.map((l2) => {
-                                                            const l2HasChildren = !!l2.items?.length;
-                                                            const l2Key = `${l1.title}::${l2.title}`;
-                                                            const l2Open = l2HasChildren ? !!openMap[l2Key] : false;
-
-                                                            const l2Exact = isRouteActiveExact(pathname, l2.url);
-                                                            const l2Clickable = l2.url !== "#";
-
-                                                            if (!l2HasChildren) {
-                                                                return (
-                                                                    <SidebarMenuSubItem key={l2.title} className="min-w-0 overflow-hidden">
-                                                                        <SidebarMenuSubButton
-                                                                            asChild
-                                                                            isActive={l2Exact}
-                                                                            data-active={l2Exact}
-                                                                            className={cn("cursor-pointer", subBtnVariants({ level: 2 }), OUTER_ROW_NO_GREY)}
-                                                                        >
-                                                                            {l2Clickable ? (
-                                                                                <Link href={l2.url} className={ROW}>
-                                                                                    <div className={cn(PILL_BASE, GAP_L2, PILL_HOVER, PILL_ACTIVE)}>
-                                                                                        <L2Icon node={l2} kind="leaf" />
-                                                                                        <span className={LABEL}>{l2.title}</span>
-                                                                                    </div>
-                                                                                </Link>
-                                                                            ) : (
-                                                                                <div className={ROW}>
-                                                                                    <div className={cn(PILL_BASE, GAP_L2, PILL_HOVER, PILL_ACTIVE)}>
-                                                                                        <L2Icon node={l2} kind="leaf" />
-                                                                                        <span className={LABEL}>{l2.title}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </SidebarMenuSubButton>
-                                                                    </SidebarMenuSubItem>
-                                                                );
-                                                            }
-
-                                                            return (
-                                                                <Collapsible
-                                                                    key={l2.title}
-                                                                    asChild
-                                                                    open={l2Open}
-                                                                    onOpenChange={(v) => setOpenMap((p) => ({ ...p, [l2Key]: v }))}
-                                                                >
-                                                                    <SidebarMenuSubItem className="min-w-0 overflow-hidden">
-                                                                        <CollapsibleTrigger asChild>
-                                                                            <SidebarMenuSubButton
-                                                                                isActive={l2Exact}
-                                                                                data-active={l2Exact}
-                                                                                className={cn("cursor-pointer", subBtnVariants({ level: 2 }), OUTER_ROW_NO_GREY)}
-                                                                            >
-                                                                                <div className={ROW}>
-                                                                                    <div className={cn(PILL_BASE, GAP_L2, PILL_HOVER, PILL_ACTIVE)}>
-                                                                                        <L2Icon node={l2} kind="parent" />
-                                                                                        <span className={LABEL}>{l2.title}</span>
-
-                                                                                        {l2Open ? (
-                                                                                            <ChevronDown className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
-                                                                                        ) : (
-                                                                                            <ChevronRight className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </SidebarMenuSubButton>
-                                                                        </CollapsibleTrigger>
-
-                                                                        {/* ✅ L2 dropdown animation wrapper (fixed) */}
-                                                                        <div className={cn(DROP_WRAP, l2Open ? DROP_OPEN : DROP_CLOSED)}>
-                                                                            <div className={DROP_INNER}>
-                                                                                <CollapsibleContent forceMount>
-                                                                                    <div>
-                                                                                        <SidebarMenuSub className={SUB_WRAP_L3}>
-                                                                                            {l2.items!.map((l3) => {
-                                                                                                const l3Exact = isRouteActiveExact(pathname, l3.url);
-                                                                                                const l3Clickable = l3.url !== "#";
-
-                                                                                                return (
-                                                                                                    <SidebarMenuSubItem key={l3.title} className="min-w-0 overflow-hidden">
-                                                                                                        <SidebarMenuSubButton
-                                                                                                            asChild
-                                                                                                            isActive={l3Exact}
-                                                                                                            data-active={l3Exact}
-                                                                                                            className={cn("cursor-pointer", subBtnVariants({ level: 3 }), OUTER_ROW_NO_GREY)}
-                                                                                                        >
-                                                                                                            {l3Clickable ? (
-                                                                                                                <Link href={l3.url} className={ROW}>
-                                                                                                                    <div className={cn(PILL_BASE, GAP_L3, PILL_HOVER, PILL_ACTIVE)}>
-                                                                                                                        <L3Icon node={l3} />
-                                                                                                                        <span className={LABEL}>{l3.title}</span>
-                                                                                                                    </div>
-                                                                                                                </Link>
-                                                                                                            ) : (
-                                                                                                                <div className={ROW}>
-                                                                                                                    <div className={cn(PILL_BASE, GAP_L3, PILL_HOVER, PILL_ACTIVE)}>
-                                                                                                                        <L3Icon node={l3} />
-                                                                                                                        <span className={LABEL}>{l3.title}</span>
-                                                                                                                    </div>
-                                                                                                                </div>
-                                                                                                            )}
-                                                                                                        </SidebarMenuSubButton>
-                                                                                                    </SidebarMenuSubItem>
-                                                                                                );
-                                                                                            })}
-                                                                                        </SidebarMenuSub>
-                                                                                    </div>
-                                                                                </CollapsibleContent>
-                                                                            </div>
-                                                                        </div>
-                                                                    </SidebarMenuSubItem>
-                                                                </Collapsible>
-                                                            );
-                                                        })}
-                                                    </SidebarMenuSub>
-                                                </div>
-                                            </CollapsibleContent>
-                                        </div>
-                                    </div>
-                                ) : null}
-                            </SidebarMenuItem>
-                        </Collapsible>
-                    );
-                })}
+            <SidebarMenu className="overflow-x-hidden gap-0">
+                {items.length === 0 && searchTerm ? (
+                    <div className="px-5 py-8 text-center animate-in fade-in slide-in-from-top-1 duration-300">
+                        <div className="mx-auto size-12 rounded-2xl bg-sidebar-accent/30 flex items-center justify-center mb-3 border border-sidebar-border/50">
+                            <SearchX className="size-6 text-muted-foreground/40" />
+                        </div>
+                        <p className="text-xs font-bold text-muted-foreground tracking-tight">No modules found</p>
+                        <p className="text-[10px] text-muted-foreground/60 mt-1">Try another keyword</p>
+                    </div>
+                ) : (
+                    items.map((item, idx) => (
+                        <RecursiveNavItem
+                            key={item.title}
+                            node={item}
+                            depth={0}
+                            pathname={pathname}
+                            searchTerm={searchTerm}
+                            openMap={openMap}
+                            toggleOpen={toggleOpen}
+                            isLast={idx === items.length - 1}
+                        />
+                    ))
+                )}
             </SidebarMenu>
         </SidebarGroup>
     );
 }
+
+

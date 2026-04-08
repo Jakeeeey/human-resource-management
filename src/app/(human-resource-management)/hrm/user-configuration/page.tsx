@@ -10,8 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "../_components/nav-user";
 import { cookies } from "next/headers";
-// import { UserConfigurationModule } from "@/modules/human-resource-management/user-configuration";
-import ComingSoon from "../_components/ComingSoon";
+import { UserConfigurationModule } from "@/modules/human-resource-management/user-configuration";
+// import ComingSoon from "../_components/ComingSoon";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,7 +109,7 @@ export default async function UserConfigurationPage() {
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-                <ComingSoon />
+                <UserConfigurationModule />
             </main>
         </div>
     );
