@@ -52,7 +52,8 @@ const UserConfigurationContent = () => {
                 onOpenChange={setIsPermissionsOpen}
                 user={activeUser}
                 subsystem={activeSubsystem}
-                authorizedItems={activeUser?.authorized_subsystems || []}
+                authorizedSubsystemIds={activeUser?.authorized_subsystem_ids || []}
+                authorizedModuleIds={activeUser?.authorized_module_ids || []}
                 onUpdate={handleUpdatePermissions}
             />
         </div>

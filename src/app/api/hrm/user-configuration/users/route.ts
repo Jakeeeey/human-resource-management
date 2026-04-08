@@ -6,7 +6,7 @@ const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 async function proxy(req: NextRequest) {
   if (!UPSTREAM_BASE) {
-    console.error("[Proxy] NEXT_PUBLIC_API_BASE_URL is not defined in environment.");
+    console.error("[User Config - Users Proxy] NEXT_PUBLIC_API_BASE_URL is not defined in environment.");
     return NextResponse.json({ 
         error: "Server Configuration Error: NEXT_PUBLIC_API_BASE_URL missing." 
     }, { status: 500 });
@@ -36,7 +36,7 @@ async function proxy(req: NextRequest) {
 
     if (!res.ok) {
         const errorBody = await res.text();
-        console.error(`[Proxy] Upstream Error (${res.status}):`, errorBody);
+        console.error(`[User Config - Users Proxy] Upstream Error (${res.status}):`, errorBody);
         return NextResponse.json({ 
             error: "Upstream API Error", 
             upstreamStatus: res.status,
@@ -48,14 +48,11 @@ async function proxy(req: NextRequest) {
         }, { status: res.status });
     }
 
-    const data = await res.arrayBuffer();
-    return new NextResponse(data, {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
+    const data = await res.json();
+    return NextResponse.json(data);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[Proxy] Fetch fatal error:", message);
+    console.error("[User Config - Users Proxy] Fetch fatal error:", message);
     return NextResponse.json({ 
         error: "Failed to connect to upstream API", 
         message: message 

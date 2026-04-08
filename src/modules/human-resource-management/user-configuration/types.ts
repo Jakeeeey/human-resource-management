@@ -4,6 +4,8 @@ export interface UserSubsystemAccess {
     full_name: string;
     avatar_url?: string | null;
     authorized_subsystems: string[]; // Contains ALL authorized slugs for UI logic
-    subsystemAccessIds: Record<string, number>; // slug -> junction record ID
-    moduleAccessIds: Record<string, number>;    // slug -> junction record ID
+    authorized_subsystem_ids: number[]; // Contains ALL authorized subsystem primary keys
+    authorized_module_ids: number[]; // Contains ALL authorized module primary keys
+    subsystemAccessIds: Record<number, number>; // subsystemID -> junction record ID
+    moduleAccessIds: Record<number, number>;    // moduleID -> junction record ID
 }

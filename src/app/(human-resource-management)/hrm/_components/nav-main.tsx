@@ -9,7 +9,7 @@ import {
     ChevronDown,
     FileText,
     Folder,
-    type LucideIcon,
+    SearchX,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
 
 import { THEME_SETTINGS_EVENT } from "@/components/theme/theme-settings";
 
@@ -41,14 +42,7 @@ function isRouteActiveExact(currentPath: string, targetUrl: string) {
     return cur === tgt;
 }
 
-type NavNode = {
-    title: string;
-    url: string;
-    icon?: LucideIcon;
-    items?: NavNode[];
-};
-
-function hasActiveInTree(pathname: string, node?: NavNode): boolean {
+function hasActiveInTree(pathname: string, node?: NavItem): boolean {
     if (!node) return false;
     if (isRouteActiveExact(pathname, node.url)) return true;
     return node.items?.some((c) => hasActiveInTree(pathname, c)) ?? false;
@@ -154,12 +148,12 @@ const ICON_L1_CLASS = "size-5 shrink-0 text-current";
 const ICON_L2_CLASS = "size-4 shrink-0 text-current";
 const ICON_L3_CLASS = "size-4 shrink-0 text-current";
 
-function L2Icon({ node, kind }: { node: NavNode; kind: "leaf" | "parent" }) {
+function L2Icon({ node, kind }: { node: NavItem; kind: "leaf" | "parent" }) {
     const Icon = node.icon ?? (kind === "parent" ? Folder : FileText);
     return <Icon className={ICON_L2_CLASS} />;
 }
 
-function L3Icon({ node }: { node: NavNode }) {
+function L3Icon({ node }: { node: NavItem }) {
     const Icon = node.icon ?? FileText;
     return <Icon className={ICON_L3_CLASS} />;
 }
@@ -179,9 +173,42 @@ const DROP_INNER = "min-h-0 overflow-hidden";
 
 const CHEVRON_ANIM = "transition-transform duration-200 ease-out";
 
+/* --------------------------------- soon badge -------------------------------- */
+function SoonBadge() {
+    return (
+        <span className="ml-auto flex h-4 items-center rounded-full bg-amber-500/10 px-1.5 text-[8px] font-black uppercase tracking-tighter text-amber-600 border border-amber-500/20 shadow-sm">
+            Soon
+        </span>
+    );
+}
+
+function HighlightMatch({ text, term }: { text: string; term?: string }) {
+    if (!term || !term.trim()) return <>{text}</>;
+
+    const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const parts = text.split(new RegExp(`(${safeTerm})`, "gi"));
+
+    return (
+        <>
+            {parts.map((part, i) =>
+                part.toLowerCase() === term.toLowerCase() ? (
+                    <span
+                        key={i}
+                        className="text-amber-600 font-bold underline decoration-2 underline-offset-[3px] decoration-amber-500/40"
+                    >
+                        {part}
+                    </span>
+                ) : (
+                    <span key={i}>{part}</span>
+                )
+            )}
+        </>
+    );
+}
+
 /* -------------------------------- component -------------------------------- */
 
-export function NavMain({ items }: { items: NavNode[] }) {
+export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: string }) {
     const pathname = normalizePath(usePathname() || "/");
     const [accentVars, setAccentVars] = React.useState(() => resolveAccentVars("amber"));
 
@@ -217,6 +244,7 @@ export function NavMain({ items }: { items: NavNode[] }) {
             let changed = false;
             const next = { ...prev };
 
+            // 1. Auto-expand for pathname (current logic)
             for (const l1 of items) {
                 if (l1.items?.length) {
                     const should = hasActiveInTree(pathname, l1);
@@ -237,9 +265,30 @@ export function NavMain({ items }: { items: NavNode[] }) {
                 }
             }
 
+            // 2. Auto-expand for searchTerm
+            if (searchTerm && searchTerm.length > 0) {
+                for (const l1 of items) {
+                    // If searching and this L1 has items, it must be because it matched or a child matched.
+                    // We expand it to show the matches.
+                    if (l1.items?.length && !next[l1.title]) {
+                        next[l1.title] = true;
+                        changed = true;
+                    }
+                    for (const l2 of l1.items ?? []) {
+                        if (l2.items?.length) {
+                            const key = `${l1.title}::${l2.title}`;
+                            if (!next[key]) {
+                                next[key] = true;
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+
             return changed ? next : prev;
         });
-    }, [pathname, items]);
+    }, [pathname, items, searchTerm]);
 
     return (
         <SidebarGroup
@@ -252,7 +301,16 @@ export function NavMain({ items }: { items: NavNode[] }) {
             }
         >
             <SidebarMenu className="overflow-x-hidden">
-                {items.map((l1) => {
+                {items.length === 0 && searchTerm ? (
+                    <div className="px-5 py-8 text-center animate-in fade-in slide-in-from-top-1 duration-300">
+                        <div className="mx-auto size-12 rounded-2xl bg-sidebar-accent/30 flex items-center justify-center mb-3 border border-sidebar-border/50">
+                            <SearchX className="size-6 text-muted-foreground/40" />
+                        </div>
+                        <p className="text-xs font-bold text-muted-foreground tracking-tight">No modules found</p>
+                        <p className="text-[10px] text-muted-foreground/60 mt-1">Try another keyword</p>
+                    </div>
+                ) : (
+                    items.map((l1) => {
                     const l1HasChildren = !!l1.items?.length;
                     const l1Exact = isRouteActiveExact(pathname, l1.url);
                     const l1Open = l1HasChildren ? !!openMap[l1.title] : false;
@@ -271,13 +329,20 @@ export function NavMain({ items }: { items: NavNode[] }) {
                                     <CollapsibleTrigger asChild>
                                         <SidebarMenuButton
                                             tooltip={l1.title}
-                                            className={cn("cursor-pointer min-w-0 overflow-hidden", OUTER_ROW_NO_GREY)}
+                                            className={cn(
+                                                "cursor-pointer min-w-0 overflow-hidden", 
+                                                OUTER_ROW_NO_GREY,
+                                                l1.status === "comingSoon" && "opacity-60 cursor-not-allowed"
+                                            )}
                                             data-active={l1Exact}
                                         >
                                             <div className={ROW}>
                                                 <div className={cn(PILL_BASE, GAP_L1, PILL_HOVER, PILL_ACTIVE)}>
                                                     {l1.icon ? <l1.icon className={ICON_L1_CLASS} /> : null}
-                                                    <span className={LABEL}>{l1.title}</span>
+                                                    <span className={LABEL}>
+                                                        <HighlightMatch text={l1.title} term={searchTerm} />
+                                                    </span>
+                                                    {l1.status === "comingSoon" && <SoonBadge />}
 
                                                     {l1Open ? (
                                                         <ChevronDown className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
@@ -292,21 +357,31 @@ export function NavMain({ items }: { items: NavNode[] }) {
                                     <SidebarMenuButton
                                         asChild
                                         tooltip={l1.title}
-                                        className={cn("cursor-pointer min-w-0 overflow-hidden", OUTER_ROW_NO_GREY)}
+                                        className={cn(
+                                            "cursor-pointer min-w-0 overflow-hidden", 
+                                            OUTER_ROW_NO_GREY,
+                                            l1.status === "comingSoon" && "opacity-60 cursor-not-allowed"
+                                        )}
                                         data-active={l1Exact}
                                     >
-                                        {l1Clickable ? (
+                                        {l1Clickable && l1.status !== "comingSoon" ? (
                                             <Link href={l1.url} className={ROW}>
                                                 <div className={cn(PILL_BASE, GAP_L1, PILL_HOVER, PILL_ACTIVE)}>
                                                     {l1.icon ? <l1.icon className={ICON_L1_CLASS} /> : null}
-                                                    <span className={LABEL}>{l1.title}</span>
+                                                    <span className={LABEL}>
+                                                        <HighlightMatch text={l1.title} term={searchTerm} />
+                                                    </span>
+                                                    {l1.status === "comingSoon" && <SoonBadge />}
                                                 </div>
                                             </Link>
                                         ) : (
                                             <div className={ROW}>
                                                 <div className={cn(PILL_BASE, GAP_L1, PILL_HOVER, PILL_ACTIVE)}>
                                                     {l1.icon ? <l1.icon className={ICON_L1_CLASS} /> : null}
-                                                    <span className={LABEL}>{l1.title}</span>
+                                                    <span className={LABEL}>
+                                                        <HighlightMatch text={l1.title} term={searchTerm} />
+                                                    </span>
+                                                    {l1.status === "comingSoon" && <SoonBadge />}
                                                 </div>
                                             </div>
                                         )}
@@ -335,20 +410,31 @@ export function NavMain({ items }: { items: NavNode[] }) {
                                                                             asChild
                                                                             isActive={l2Exact}
                                                                             data-active={l2Exact}
-                                                                            className={cn("cursor-pointer", subBtnVariants({ level: 2 }), OUTER_ROW_NO_GREY)}
+                                                                            className={cn(
+                                                                                "cursor-pointer", 
+                                                                                subBtnVariants({ level: 2 }), 
+                                                                                OUTER_ROW_NO_GREY,
+                                                                                l2.status === "comingSoon" && "opacity-60 cursor-not-allowed"
+                                                                            )}
                                                                         >
-                                                                            {l2Clickable ? (
+                                                                            {l2Clickable && l2.status !== "comingSoon" ? (
                                                                                 <Link href={l2.url} className={ROW}>
                                                                                     <div className={cn(PILL_BASE, GAP_L2, PILL_HOVER, PILL_ACTIVE)}>
                                                                                         <L2Icon node={l2} kind="leaf" />
-                                                                                        <span className={LABEL}>{l2.title}</span>
+                                                                                        <span className={LABEL}>
+                                                                                            <HighlightMatch text={l2.title} term={searchTerm} />
+                                                                                        </span>
+                                                                                        {l2.status === "comingSoon" && <SoonBadge />}
                                                                                     </div>
                                                                                 </Link>
                                                                             ) : (
                                                                                 <div className={ROW}>
                                                                                     <div className={cn(PILL_BASE, GAP_L2, PILL_HOVER, PILL_ACTIVE)}>
                                                                                         <L2Icon node={l2} kind="leaf" />
-                                                                                        <span className={LABEL}>{l2.title}</span>
+                                                                                        <span className={LABEL}>
+                                                                                            <HighlightMatch text={l2.title} term={searchTerm} />
+                                                                                        </span>
+                                                                                        {l2.status === "comingSoon" && <SoonBadge />}
                                                                                     </div>
                                                                                 </div>
                                                                             )}
@@ -369,12 +455,20 @@ export function NavMain({ items }: { items: NavNode[] }) {
                                                                             <SidebarMenuSubButton
                                                                                 isActive={l2Exact}
                                                                                 data-active={l2Exact}
-                                                                                className={cn("cursor-pointer", subBtnVariants({ level: 2 }), OUTER_ROW_NO_GREY)}
+                                                                                className={cn(
+                                                                                    "cursor-pointer", 
+                                                                                    subBtnVariants({ level: 2 }), 
+                                                                                    OUTER_ROW_NO_GREY,
+                                                                                    l2.status === "comingSoon" && "opacity-60 cursor-not-allowed"
+                                                                                )}
                                                                             >
                                                                                 <div className={ROW}>
                                                                                     <div className={cn(PILL_BASE, GAP_L2, PILL_HOVER, PILL_ACTIVE)}>
                                                                                         <L2Icon node={l2} kind="parent" />
-                                                                                        <span className={LABEL}>{l2.title}</span>
+                                                                                        <span className={LABEL}>
+                                                                                            <HighlightMatch text={l2.title} term={searchTerm} />
+                                                                                        </span>
+                                                                                        {l2.status === "comingSoon" && <SoonBadge />}
 
                                                                                         {l2Open ? (
                                                                                             <ChevronDown className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
@@ -402,20 +496,31 @@ export function NavMain({ items }: { items: NavNode[] }) {
                                                                                                             asChild
                                                                                                             isActive={l3Exact}
                                                                                                             data-active={l3Exact}
-                                                                                                            className={cn("cursor-pointer", subBtnVariants({ level: 3 }), OUTER_ROW_NO_GREY)}
+                                                                                                            className={cn(
+                                                                                                                "cursor-pointer", 
+                                                                                                                subBtnVariants({ level: 3 }), 
+                                                                                                                OUTER_ROW_NO_GREY,
+                                                                                                                l3.status === "comingSoon" && "opacity-60 cursor-not-allowed"
+                                                                                                            )}
                                                                                                         >
-                                                                                                            {l3Clickable ? (
+                                                                                                            {l3Clickable && l3.status !== "comingSoon" ? (
                                                                                                                 <Link href={l3.url} className={ROW}>
                                                                                                                     <div className={cn(PILL_BASE, GAP_L3, PILL_HOVER, PILL_ACTIVE)}>
                                                                                                                         <L3Icon node={l3} />
-                                                                                                                        <span className={LABEL}>{l3.title}</span>
+                                                                                                                        <span className={LABEL}>
+                                                                                                                            <HighlightMatch text={l3.title} term={searchTerm} />
+                                                                                                                        </span>
+                                                                                                                        {l3.status === "comingSoon" && <SoonBadge />}
                                                                                                                     </div>
                                                                                                                 </Link>
                                                                                                             ) : (
                                                                                                                 <div className={ROW}>
                                                                                                                     <div className={cn(PILL_BASE, GAP_L3, PILL_HOVER, PILL_ACTIVE)}>
                                                                                                                         <L3Icon node={l3} />
-                                                                                                                        <span className={LABEL}>{l3.title}</span>
+                                                                                                                        <span className={LABEL}>
+                                                                                                                            <HighlightMatch text={l3.title} term={searchTerm} />
+                                                                                                                        </span>
+                                                                                                                        {l3.status === "comingSoon" && <SoonBadge />}
                                                                                                                     </div>
                                                                                                                 </div>
                                                                                                             )}
@@ -441,7 +546,8 @@ export function NavMain({ items }: { items: NavNode[] }) {
                             </SidebarMenuItem>
                         </Collapsible>
                     );
-                })}
+                })
+                )}
             </SidebarMenu>
         </SidebarGroup>
     );

@@ -25,10 +25,10 @@ async function proxy(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const filter = searchParams.get("filter");
   const limit = searchParams.get("limit") || "100";
-  const fields = searchParams.get("fields") || "user_id,subsystem_id";
+  const fields = searchParams.get("fields") || "id,user_id,module_id";
 
-  // Point to the new junction table for subsystems
-  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user_access_subsystems`;
+  // Point to the new junction table for modules
+  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user_access_modules`;
   
   const queryParams = new URLSearchParams();
   if (filter) queryParams.set("filter", filter);
@@ -81,7 +81,7 @@ async function proxy(req: NextRequest) {
 
     if (!res.ok) {
         const errorBody = await res.text();
-        console.error(`[UserAccessSubsystems Proxy] Upstream Error (${res.status}):`, errorBody);
+        console.error(`[User Config - Access Modules Proxy] Upstream Error (${res.status}):`, errorBody);
         return NextResponse.json({ error: "Upstream Error", details: errorBody }, { status: res.status });
     }
 
@@ -93,6 +93,7 @@ async function proxy(req: NextRequest) {
     return NextResponse.json(data);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error(`[User Config - Access Modules Proxy] Connection Error:`, message);
     return NextResponse.json({ error: "Connection Error", message }, { status: 502 });
   }
 }
