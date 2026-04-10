@@ -84,8 +84,8 @@ export class SubsystemService {
         subsystemId: number, 
         parentId: number | null = null
     ): Promise<void> {
-        let index = 0;
-        for (const itemModule of modules) {
+        // Optimized: Trigger all sibling modules in parallel to reduce sequential wait time
+        await Promise.all(modules.map(async (itemModule, index) => {
             const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 5;
             
             // Prepare payload
@@ -124,15 +124,14 @@ export class SubsystemService {
                 }
 
                 // Recursively sync sub-modules if any
+                // These will also run in parallel among themselves once the parent ID is secured
                 if (itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
                     await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
                 }
-
-                index++;
             } catch (err) {
                 console.error(`Failed to sync module: ${itemModule.title}`, err);
             }
-        }
+        }));
     }
 
     static async createSubsystem(data: Partial<SubsystemRegistration>): Promise<SubsystemRegistration | null> {
@@ -189,9 +188,13 @@ export class SubsystemService {
                         
                         const staleIds = dbIds.filter((dbId: number) => !incomingIds.includes(dbId));
                         
-                        // Execute deletions in sequence to avoid race conditions or use bulk delete if API supports it
-                        for (const sId of staleIds) {
-                            await fetch(`/api/hrm/subsystem-registration/modules?id=${sId}`, { method: "DELETE" });
+                        // Optimized: Execute batch deletion instead of sequential requests
+                        if (staleIds.length > 0) {
+                            await fetch(`/api/hrm/subsystem-registration/modules`, { 
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(staleIds)
+                            });
                         }
                     }
                 } catch (pruneErr) {

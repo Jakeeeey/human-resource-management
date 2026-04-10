@@ -18,6 +18,7 @@ export interface NavItem {
     slug?: string;
     status?: string | SubsystemStatus;
     icon?: React.ComponentType<{ className?: string }>;
+    iconName?: string | null;
     items?: NavItem[];
 }
 
