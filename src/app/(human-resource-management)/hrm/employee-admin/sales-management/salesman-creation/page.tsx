@@ -8,13 +8,13 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../../../../_components/nav-user";
+import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
 
 // ✅ Wire the module
 
-import { SalesmanCreationModule } from "@/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-creation/SalesmanCreationModule";
+import { SalesmanCreationModule } from "@/modules/human-resource-management/employee-admin/sales-management/salesman-creation/SalesmanCreationModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
