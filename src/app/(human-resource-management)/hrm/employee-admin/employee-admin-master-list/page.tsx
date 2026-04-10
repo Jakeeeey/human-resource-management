@@ -83,7 +83,7 @@ export default async function Page() {
         // âœ… This fills the RIGHT column provided by SidebarInset (which is now fixed-height).
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* âœ… Topbar is fixed in place because ONLY <main> scrolls */}
-            <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16 overflow-hidden">
+            <header className="relative z-50 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16">
                 <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
                     <SidebarTrigger className="-ml-1 shrink-0" />
 

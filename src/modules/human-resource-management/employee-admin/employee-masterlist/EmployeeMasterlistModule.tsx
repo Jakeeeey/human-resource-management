@@ -13,13 +13,16 @@ import {
   UserPlus, 
   FileText,
   AlertCircle, 
-  RefreshCw 
+  RefreshCw,
+  BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmployeeTable } from "./components/EmployeeTable";
 import { AddEmployeeModal, type NewEmployeeFormData } from "./components/AddEmployeeModal";
 import { EmployeeDetailsModal } from "./components/EmployeeDetailsModal";
 import { MasterlistPreviewModal } from "./components/MasterlistPreviewModal";
+import { EmployeeInfographics } from "./components/EmployeeInfographics";
 import type { User } from "./types";
 import { useEmployeeMasterlist } from "./hooks/useEmployeeMasterlist";
 import { createEmployeeSpring } from "./providers/springProvider";
@@ -40,6 +43,7 @@ export default function EmployeeMasterlistModule() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState("list");
 
   const handleAddEmployee = async (data: NewEmployeeFormData & { _userImageId?: string; _signatureId?: string }) => {
     try {
@@ -51,8 +55,16 @@ export default function EmployeeMasterlistModule() {
         firstName:  data.user_fname,
         middleName: data.user_mname || undefined,
         lastName:   data.user_lname,
+        suffixName: data.suffix_name || undefined,
         contact:    data.user_contact,
         birthday:   data.user_bday   || undefined,
+        gender:     data.gender === "Other" ? data.gender_specify : (data.gender || undefined),
+        civilStatus: data.civil_status || undefined,
+        nationality: data.nationality || undefined,
+        placeOfBirth: data.place_of_birth || undefined,
+        bloodType:   data.blood_type   || undefined,
+        religion:    data.religion     || undefined,
+        spouseName:  data.spouse_name  || undefined,
         // Address
         province: data.user_province,
         city:     data.user_city,
@@ -61,17 +73,20 @@ export default function EmployeeMasterlistModule() {
         emergencyContactName:   data.emergency_contact_name   || undefined,
         emergencyContactNumber: data.emergency_contact_number || undefined,
         // Work
-        department:   data.user_department || undefined,
+        department:   data.user_department ? String(data.user_department) : undefined,
         position:     data.user_position,
         dateOfHire:   data.user_dateOfHire,
-        rfId:         data.rf_id           || undefined,
-        tinNumber:    data.user_tin        || undefined,
-        sssNumber:    data.user_sss        || undefined,
-        philHealthNumber: data.user_philhealth || undefined,
-        pagibigNumber:    data.user_pagibig   || undefined,
+        rfid:         data.rf_id           || undefined,
+        biometricId:  data.biometric_id    || undefined,
         admin:        data.isAdmin,
         role:         data.role,
-        // Media — Directus file UUIDs from /files upload
+        tags:         "Employee", // or however you want to handle tags
+        // sss, philhealth, etc from fields
+        sssNumber:    data.user_sss        || undefined,
+        philHealthNumber: data.user_philhealth || undefined,
+        tinNumber:    data.user_tin        || undefined,
+        pagibigNumber:data.user_pagibig    || undefined,
+        // Media
         image:     data._userImageId ?? undefined,
         signature: data._signatureId ?? undefined,
       });
@@ -128,20 +143,22 @@ export default function EmployeeMasterlistModule() {
   }
 
   return (
-    <div className="space-y-8 max-w-[1400px] mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5">
-              <Users className="h-7 w-7 text-primary" />
+    <div className="space-y-8 max-w-[1400px] mx-auto px-4 py-8 overflow-x-hidden">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="p-2.5 bg-primary/10 rounded-2xl shadow-inner border border-primary/5">
+              <Users className="h-8 w-8 text-primary" />
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
-              Employee Masterlist
-            </h1>
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent">
+                Employee Masterlist
+              </h1>
+              <p className="text-muted-foreground text-sm font-medium">
+                System of record for all verified organizational human resources.
+              </p>
+            </div>
           </div>
-          <p className="text-muted-foreground text-sm pl-12 font-medium">
-            System of record for all verified organizational human resources.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -151,7 +168,7 @@ export default function EmployeeMasterlistModule() {
             className="rounded-xl shadow-sm border-muted-foreground/20 hover:bg-muted/50 h-10 px-4"
           >
             <FileText className="mr-2 h-4 w-4 text-indigo-600" />
-            Export Masterlist Summary
+            Export Summary
           </Button>
           <Button
             size="sm"
@@ -175,18 +192,43 @@ export default function EmployeeMasterlistModule() {
         </div>
       </div>
 
-      <div className="bg-card rounded-3xl border shadow-xl shadow-foreground/5 overflow-hidden transition-all duration-300">
-        <EmployeeTable 
-            data={employees} 
-            departments={departments}
-            isLoading={isLoading} 
-            onViewDetails={(user) => {
-              setSelectedEmployee(user);
-              setIsDetailsModalOpen(true);
-            }}
-            onDeleteEmployee={removeEmployee}
-        />
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <div className="flex items-center justify-between border-b pb-1">
+          <TabsList className="bg-transparent h-12 w-fit p-0 gap-8">
+            <TabsTrigger 
+              value="list" 
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-12 px-2 gap-2"
+            >
+              <Users className="h-4 w-4" /> Master List
+            </TabsTrigger>
+            <TabsTrigger 
+              value="analytics" 
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-12 px-2 gap-2"
+            >
+              <BarChart3 className="h-4 w-4" /> HR Analytics
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="list" className="mt-0">
+          <div className="bg-card rounded-3xl border shadow-xl shadow-foreground/5 overflow-hidden transition-all duration-300">
+            <EmployeeTable 
+                data={employees} 
+                departments={departments}
+                isLoading={isLoading} 
+                onViewDetails={(user) => {
+                  setSelectedEmployee(user);
+                  setIsDetailsModalOpen(true);
+                }}
+                onDeleteEmployee={removeEmployee}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-0">
+          <EmployeeInfographics employees={employees} departments={departments} />
+        </TabsContent>
+      </Tabs>
 
       <AddEmployeeModal
         isOpen={isAddModalOpen}

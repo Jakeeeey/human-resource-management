@@ -32,11 +32,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { toast } from "sonner";
 import type { Department, User } from "../types";
 import { UpdateEmployeePayload } from "../providers/springProvider";
+import { AddressSelectors } from "./AddressSelectors";
 
 const UPLOAD_API = "/api/hrm/employee-admin/employee-master-list/upload";
 const PROXY_BASE = "/api/hrm/employee-admin/employee-master-list";
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 function isUUID(str: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -95,8 +99,17 @@ export interface EditEmployeeFormData {
   firstName: string;
   middleName: string;
   lastName: string;
+  suffixName: string;
   contact: string;
   birthday: string;
+  gender: string;
+  gender_specify: string;
+  civilStatus: string;
+  nationality: string;
+  placeOfBirth: string;
+  bloodType: string;
+  religion: string;
+  spouseName: string;
   // Address
   province: string;
   city: string;
@@ -111,6 +124,7 @@ export interface EditEmployeeFormData {
   password?: string; // Optional for update
   dateOfHire: string;
   rfId: string;
+  biometricId: string;
   tinNumber: string;
   sssNumber: string;
   philHealthNumber: string;
@@ -176,8 +190,17 @@ export function EditProfileTab({
     firstName: user.firstName || "",
     middleName: user.middleName || "",
     lastName: user.lastName || "",
+    suffixName: user.suffixName || "",
     contact: user.contact || "",
     birthday: user.birthday || "",
+    gender: (user.gender === "Male" || user.gender === "Female") ? user.gender : (user.gender ? "Other" : ""),
+    gender_specify: (user.gender === "Male" || user.gender === "Female") ? "" : (user.gender || ""),
+    civilStatus: user.civilStatus || "",
+    nationality: user.nationality || "",
+    placeOfBirth: user.placeOfBirth || "",
+    bloodType: user.bloodType || "",
+    religion: user.religion || "",
+    spouseName: user.spouseName || "",
     province: user.province || "",
     city: user.city || "",
     brgy: user.brgy || "",
@@ -189,6 +212,7 @@ export function EditProfileTab({
     password: "", // blank password means no change
     dateOfHire: user.dateOfHire || "",
     rfId: user.rfId || "",
+    biometricId: user.biometricId || "",
     tinNumber: user.tinNumber || "",
     sssNumber: user.sssNumber || "",
     philHealthNumber: user.philHealthNumber || "",
@@ -205,8 +229,17 @@ export function EditProfileTab({
       firstName: user.firstName || "",
       middleName: user.middleName || "",
       lastName: user.lastName || "",
+      suffixName: user.suffixName || "",
       contact: user.contact || "",
       birthday: user.birthday || "",
+      gender: (user.gender === "Male" || user.gender === "Female") ? user.gender : (user.gender ? "Other" : ""),
+      gender_specify: (user.gender === "Male" || user.gender === "Female") ? "" : (user.gender || ""),
+      civilStatus: user.civilStatus || "",
+      nationality: user.nationality || "",
+      placeOfBirth: user.placeOfBirth || "",
+      bloodType: user.bloodType || "",
+      religion: user.religion || "",
+      spouseName: user.spouseName || "",
       province: user.province || "",
       city: user.city || "",
       brgy: user.brgy || "",
@@ -218,6 +251,7 @@ export function EditProfileTab({
       password: "",
       dateOfHire: user.dateOfHire || "",
       rfId: user.rfId || "",
+      biometricId: user.biometricId || "",
       tinNumber: user.tinNumber || "",
       sssNumber: user.sssNumber || "",
       philHealthNumber: user.philHealthNumber || "",
@@ -281,6 +315,11 @@ export function EditProfileTab({
   }
 
   function handleFileChange(key: "image" | "signature", file: File | null) {
+    if (file && file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+      return;
+    }
+
     set(key, file as EditEmployeeFormData[typeof key]);
     if (file) {
       const url = URL.createObjectURL(file);
@@ -348,25 +387,35 @@ export function EditProfileTab({
         firstName:    form.firstName,
         middleName:   form.middleName || undefined,
         lastName:     form.lastName,
+        suffixName:   form.suffixName || undefined,
         contact:      form.contact,
         birthday:     form.birthday || undefined,
+        gender:       form.gender === "Other" ? form.gender_specify : (form.gender || undefined),
+        civilStatus:  form.civilStatus || undefined,
+        nationality:  form.nationality || undefined,
+        placeOfBirth: form.placeOfBirth || undefined,
+        bloodType:    form.bloodType    || undefined,
+        religion:     form.religion     || undefined,
+        spouseName:   form.spouseName   || undefined,
         province:     form.province,
         city:         form.city,
         brgy:         form.brgy,
         emergencyContactName:   form.emergencyContactName || undefined,
         emergencyContactNumber: form.emergencyContactNumber || undefined,
-        department:   form.department || undefined,
+        department:   form.department ? String(form.department) : undefined,
         position:     form.position,
         dateOfHire:   form.dateOfHire,
-        rfId:         form.rfId || undefined,
+        tags:         "Employee", // or handle tags
+        rfid:         form.rfId || undefined,
+        biometricId:  form.biometricId || undefined,
         tinNumber:    form.tinNumber || undefined,
         sssNumber:    form.sssNumber || undefined,
         philHealthNumber: form.philHealthNumber || undefined,
         pagibigNumber:    form.pagibigNumber || undefined,
         admin:        form.isAdmin,
         role:         form.role,
-        image:        finalImageId ? finalImageId : (existingImage ? (user.image || undefined) : ""),
-        signature:    finalSigId ? finalSigId : (isSignatureCleared ? "" : (existingSignature ? (user.signature || undefined) : "")),
+        image:        finalImageId ? finalImageId : (existingImage ? (user.image || null) : null),
+        signature:    finalSigId ? finalSigId : (isSignatureCleared ? null : (existingSignature ? (user.signature || null) : null)),
       });
 
     } catch (err) {
@@ -456,10 +505,69 @@ export function EditProfileTab({
                 className={cn(inputCls, "pl-9")} 
                 value={form.birthday} 
                 onChange={(e) => set("birthday", e.target.value)} 
+                max="9999-12-31"
                 required
               />
             </div>
           </Field>
+          <Field label="Suffix Name">
+            <Input className={inputCls} value={form.suffixName || ""} onChange={(e) => set("suffixName", e.target.value)} placeholder="e.g. Jr., III" />
+          </Field>
+          <Field label="Gender" required>
+            <Select value={form.gender} onValueChange={(v) => set("gender", v)} required>
+              <SelectTrigger className={inputCls}>
+                <SelectValue placeholder="Select Gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Male">Male</SelectItem>
+                <SelectItem value="Female">Female</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {form.gender === "Other" && (
+            <Field label="Please specify gender" required>
+              <Input
+                className={inputCls}
+                value={form.gender_specify || ""}
+                onChange={(e) => set("gender_specify", e.target.value)}
+                placeholder="Enter gender"
+                required
+              />
+            </Field>
+          )}
+
+          <Field label="Civil Status" required>
+            <Select value={form.civilStatus} onValueChange={(v) => set("civilStatus", v)} required>
+              <SelectTrigger className={inputCls}>
+                <SelectValue placeholder="Select Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Single">Single</SelectItem>
+                <SelectItem value="Married">Married</SelectItem>
+                <SelectItem value="Widowed">Widowed</SelectItem>
+                <SelectItem value="Separated">Separated</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Blood Type">
+            <Input className={inputCls} value={form.bloodType || ""} onChange={(e) => set("bloodType", e.target.value)} placeholder="e.g. O+, A-" />
+          </Field>
+          <Field label="Nationality" required>
+            <Input className={inputCls} value={form.nationality || ""} onChange={(e) => set("nationality", e.target.value)} placeholder="e.g. Filipino" required />
+          </Field>
+          <Field label="Place of Birth" required>
+            <Input className={inputCls} value={form.placeOfBirth || ""} onChange={(e) => set("placeOfBirth", e.target.value)} placeholder="City / Province" required />
+          </Field>
+          <Field label="Religion" required>
+            <Input className={inputCls} value={form.religion || ""} onChange={(e) => set("religion", e.target.value)} placeholder="Religion" required />
+          </Field>
+          {(form.civilStatus === "Married" || form.civilStatus === "Widowed") && (
+            <Field label="Spouse Name">
+              <Input className={inputCls} value={form.spouseName || ""} onChange={(e) => set("spouseName", e.target.value)} placeholder="Full Name" />
+            </Field>
+          )}
         </div>
 
         {/* Address */}
@@ -467,17 +575,14 @@ export function EditProfileTab({
           <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-1.5">
             <MapPin className="h-3 w-3" /> Address
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field label="Province" required>
-              <Input className={inputCls} value={form.province} onChange={(e) => set("province", e.target.value)} required />
-            </Field>
-            <Field label="City / Municipality" required>
-              <Input className={inputCls} value={form.city} onChange={(e) => set("city", e.target.value)} required />
-            </Field>
-            <Field label="Barangay" required>
-              <Input className={inputCls} value={form.brgy} onChange={(e) => set("brgy", e.target.value)} required />
-            </Field>
-          </div>
+          <AddressSelectors 
+            province={form.province}
+            city={form.city}
+            brgy={form.brgy}
+            onProvinceChange={(v) => set("province", v)}
+            onCityChange={(v) => set("city", v)}
+            onBrgyChange={(v) => set("brgy", v)}
+          />
         </div>
 
         {/* Emergency */}
@@ -557,6 +662,9 @@ export function EditProfileTab({
               <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50" />
               <Input className={cn(inputCls, "pl-9")} value={form.rfId} onChange={(e) => set("rfId", e.target.value)} />
             </div>
+          </Field>
+          <Field label="Biometric ID">
+            <Input className={inputCls} value={form.biometricId || ""} onChange={(e) => set("biometricId", e.target.value)} placeholder="Biometric System ID" />
           </Field>
         </div>
 
