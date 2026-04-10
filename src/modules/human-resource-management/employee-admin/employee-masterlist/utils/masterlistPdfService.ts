@@ -182,7 +182,24 @@ export async function generateMasterlistPdf(data: PdfData): Promise<jsPDF> {
   const deptLabels  = sortedDepts.map(([k]) => k);
   const deptValues  = sortedDepts.map(([, v]) => v);
 
-  const activeCount   = employees.filter((e) => !e.isDeleted).length;
+  const activeCount = employees.filter((e) => {
+    const val = e.isDeleted ?? (e as unknown as Record<string, unknown>).is_deleted ?? (e as unknown as Record<string, unknown>).deleted;
+    if (val === undefined || val === null) return true; // Assume active if missing
+    
+    // 1. Handle standard Buffer/Object from DB: { type: "Buffer", data: [1] }
+    if (typeof val === 'object' && 'data' in val && Array.isArray(val.data)) {
+      return val.data[0] === 0;
+    }
+    
+    // 2. Handle Strings: "1", "0", "true", "false"
+    if (typeof val === 'string') {
+      const s = val.toLowerCase();
+      return s !== '1' && s !== 'true';
+    }
+    
+    // 3. Handle Number/Boolean: 1/0, true/false
+    return !val;
+  }).length;
 
   // ─── Header banner ────────────────────────────────────────────────────────
   // Background gradient strip

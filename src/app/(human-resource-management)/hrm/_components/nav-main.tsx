@@ -466,15 +466,10 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
             const s = readVOSThemeSettings();
             setAccentVars(resolveAccentVars(s?.accent));
         };
-
         applyFromStorage();
-
         const onThemeSettingsChanged = () => applyFromStorage();
         window.addEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
-
-        return () => {
-            window.removeEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
-        };
+        return () => window.removeEventListener(THEME_SETTINGS_EVENT, onThemeSettingsChanged as EventListener);
     }, []);
 
     const [openMap, setOpenMap] = React.useState<Record<string, boolean>>({});
@@ -504,7 +499,7 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
 
     return (
         <SidebarGroup
-            className="overflow-x-hidden"
+            className="overflow-x-hidden p-0"
             style={
                 {
                     "--vos-pill": accentVars.pill,
@@ -512,7 +507,7 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
                 } as React.CSSProperties
             }
         >
-            <SidebarMenu className="overflow-x-hidden">
+            <SidebarMenu className="overflow-x-hidden gap-0">
                 {items.length === 0 && searchTerm ? (
                     <div className="px-5 py-8 text-center animate-in fade-in slide-in-from-top-1 duration-300">
                         <div className="mx-auto size-12 rounded-2xl bg-sidebar-accent/30 flex items-center justify-center mb-3 border border-sidebar-border/50">
@@ -538,3 +533,5 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
         </SidebarGroup>
     );
 }
+
+

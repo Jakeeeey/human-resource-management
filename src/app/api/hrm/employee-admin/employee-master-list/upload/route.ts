@@ -74,10 +74,17 @@ export async function POST(req: Request) {
 
     // 2. File binary AFTER metadata
     const file = incomingForm.get("file");
-    if (!file) {
+    if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
-    outgoingForm.append("file", file as Blob);
+
+    // --- Hard Limit Check (10MB) ---
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; 
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "File too large (Max 10MB)" }, { status: 413 });
+    }
+
+    outgoingForm.append("file", file);
 
     const response = await fetch(`${DIRECTUS_URL}/files`, {
       method: "POST",
