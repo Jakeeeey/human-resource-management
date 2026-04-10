@@ -10,8 +10,8 @@ export class SubsystemService {
         try {
             // Fetch everything in parallel for speed
             const [subRes, modRes] = await Promise.all([
-                fetch(`/api/hrm/subsystems?limit=-1`),
-                fetch(`/api/hrm/modules?limit=-1`)
+                fetch(`/api/hrm/subsystem-registration/subsystems?limit=-1`),
+                fetch(`/api/hrm/subsystem-registration/modules?limit=-1&sort=sort`)
             ]);
 
             if (!subRes.ok || !modRes.ok) return [];
@@ -62,25 +62,35 @@ export class SubsystemService {
         }
     }
 
-    /**
-     * Recursively syncs modules and sub-modules to the database.
-     * Handles both new items (POST) and updates (PATCH).
-     */
+    private static collectIds(modules: ModuleRegistration[]): number[] {
+        const ids: number[] = [];
+        const traverse = (items: ModuleRegistration[]) => {
+            items.forEach(item => {
+                const id = Number(item.id);
+                if (!isNaN(id)) ids.push(id);
+                if (item.subModules) traverse(item.subModules);
+            });
+        };
+        traverse(modules);
+        return ids;
+    }
+
     private static async syncModulesRecursively(
         modules: ModuleRegistration[], 
         subsystemId: number, 
         parentId: number | null = null
     ): Promise<void> {
-        for (const itemModule of modules) {
+        // Optimized: Trigger all sibling modules in parallel to reduce sequential wait time
+        await Promise.all(modules.map(async (itemModule, index) => {
             const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 5;
             
-            // Prepare payload
             const payload = {
                 slug: itemModule.slug || "",
                 title: itemModule.title || "Untitled",
                 base_path: itemModule.base_path || "",
                 status: itemModule.status || "active",
                 icon_name: itemModule.icon_name || "Folder",
+                sort: index,
                 subsystem_id: subsystemId,
                 parent_module_id: parentId
             };
@@ -90,7 +100,7 @@ export class SubsystemService {
             try {
                 if (isNew) {
                     // Create new module
-                    const response = await fetch(`/api/hrm/modules`, {
+                    const response = await fetch(`/api/hrm/subsystem-registration/modules`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(payload)
@@ -101,7 +111,7 @@ export class SubsystemService {
                     }
                 } else {
                     // Update existing module
-                    await fetch(`/api/hrm/modules?id=${module.id}`, {
+                    await fetch(`/api/hrm/subsystem-registration/modules?id=${itemModule.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(payload)
@@ -109,33 +119,31 @@ export class SubsystemService {
                 }
 
                 // Recursively sync sub-modules if any
+                // These will also run in parallel among themselves once the parent ID is secured
                 if (itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
                     await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
                 }
             } catch (err) {
                 console.error(`Failed to sync module: ${itemModule.title}`, err);
             }
-        }
+        }));
     }
 
     static async createSubsystem(data: Partial<SubsystemRegistration>): Promise<SubsystemRegistration | null> {
         try {
-            // New subsystems shouldn't have ID yet
             const cleanedData = { ...data };
             delete cleanedData.id;
-            delete cleanedData.modules; // Modules saved via sync
+            delete cleanedData.modules;
 
-            const response = await fetch(`/api/hrm/subsystems`, {
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(cleanedData)
             });
             
             if (!response.ok) return null;
-            
             const { data: created } = await response.json();
             
-            // Sync modules if any were provided
             if (data.modules && data.modules.length > 0) {
                 await this.syncModulesRecursively(data.modules, Number(created.id));
             }
@@ -151,17 +159,39 @@ export class SubsystemService {
         try {
             const subsystemId = Number(id);
             const subsystemPayload = { ...data };
-            delete subsystemPayload.modules; // Modules saved via explicit sync
+            delete subsystemPayload.modules;
 
             // 1. Update the subsystem record
-            const response = await fetch(`/api/hrm/subsystems?id=${id}`, {
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems?id=${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(subsystemPayload)
             });
 
-            // 2. Sync Hierarchy (Modules and Sub-modules)
             if (data.modules) {
+                // 2. PRUNING: Bulk Delete stale modules in parallel
+                try {
+                    const currentRes = await fetch(`/api/hrm/subsystem-registration/modules?filter={"subsystem_id":{"_eq":${subsystemId}}}&fields=id`);
+                    if (currentRes.ok) {
+                        const { data: currentInDb } = await currentRes.json();
+                        const dbIds = (currentInDb || []).map((m: { id: string | number }) => Number(m.id));
+                        const incomingIds = this.collectIds(data.modules);
+                        const staleIds = dbIds.filter((dbId: number) => !incomingIds.includes(dbId));
+                        
+                        // Optimized: Execute batch deletion instead of sequential requests
+                        if (staleIds.length > 0) {
+                            await fetch(`/api/hrm/subsystem-registration/modules`, { 
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(staleIds)
+                            });
+                        }
+                    }
+                } catch (pruneErr) {
+                    console.error("Pruning failed:", pruneErr);
+                }
+
+                // 3. Batch Sync Current Hierarchy
                 await this.syncModulesRecursively(data.modules, subsystemId);
             }
 
@@ -174,7 +204,7 @@ export class SubsystemService {
 
     static async deleteSubsystem(id: string): Promise<boolean> {
         try {
-            const response = await fetch(`/api/hrm/subsystems?id=${id}`, {
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems?id=${id}`, {
                 method: "DELETE"
             });
             return response.ok;
@@ -184,8 +214,8 @@ export class SubsystemService {
         }
     }
 
-    /** @deprecated Use createSubsystem, updateSubsystem, or deleteSubsystem instead */
+    /** @deprecated */
     static async saveSubsystems(): Promise<void> {
-        console.warn("saveSubsystems is slow and deprecated. System is migrating to granular CRUD.");
+        console.warn("saveSubsystems is slow and deprecated.");
     }
 }

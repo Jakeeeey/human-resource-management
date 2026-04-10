@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { UserSubsystemAccess } from "../types";
 import { UserService } from "../services/UserService";
-import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
 import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
 import { toast } from "sonner";
 
@@ -14,8 +13,15 @@ interface UserConfigurationFetchContextType {
     currentPage: number;
     totalCount: number;
     pageSize: number;
-    fetchPage: (page: number) => Promise<void>;
-    updateUserPermissions: (userId: string, permissions: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number>) => void;
+    fetchPage: (page: number, quiet?: boolean) => Promise<void>;
+    updateUserPermissions: (
+        userId: string, 
+        permissions: string[], 
+        authorizedSubsystemIds: number[],
+        authorizedModuleIds: number[],
+        subsystemAccessIds: Record<number, number>, 
+        moduleAccessIds: Record<number, number>
+    ) => void;
 }
 
 const UserConfigurationFetchContext =
@@ -34,14 +40,14 @@ export function UserConfigurationFetchProvider({
     const [currentPage, setCurrentPage] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
 
-    const fetchPage = useCallback(async (page: number) => {
-        setIsLoading(true);
+    const fetchPage = useCallback(async (page: number, quiet = false) => {
+        if (!quiet) setIsLoading(true);
         try {
             const offset = page * LIMIT;
             
             // 1. Fetch Subsystems and Users in parallel
             const [subsystemData, { users: userData, total }] = await Promise.all([
-                SubsystemService.getSubsystems(),
+                UserService.getSubsystemsRegistry(),
                 UserService.getUsers(LIMIT, offset)
             ]);
             
@@ -54,6 +60,8 @@ export function UserConfigurationFetchProvider({
                 const p = permissionsMap[user.user_id] || { 
                     subsystemSlugs: [], 
                     moduleSlugs: [], 
+                    subsystemIds: [],
+                    moduleIds: [],
                     subsystemAccessIds: {}, 
                     moduleAccessIds: {} 
                 };
@@ -61,6 +69,8 @@ export function UserConfigurationFetchProvider({
                 return {
                     ...user,
                     authorized_subsystems: [...p.subsystemSlugs, ...p.moduleSlugs],
+                    authorized_subsystem_ids: p.subsystemIds,
+                    authorized_module_ids: p.moduleIds,
                     subsystemAccessIds: p.subsystemAccessIds,
                     moduleAccessIds: p.moduleAccessIds,
                 };
@@ -82,11 +92,20 @@ export function UserConfigurationFetchProvider({
         fetchPage(0);
     }, [fetchPage]);
 
-    const updateUserPermissions = useCallback((userId: string, permissions: string[], subsystemAccessIds: Record<string, number>, moduleAccessIds: Record<string, number>) => {
+    const updateUserPermissions = useCallback((
+        userId: string, 
+        permissions: string[], 
+        authorizedSubsystemIds: number[],
+        authorizedModuleIds: number[],
+        subsystemAccessIds: Record<number, number>, 
+        moduleAccessIds: Record<number, number>
+    ) => {
         setUsers((current) =>
             current.map((user) => (user.user_id === userId ? { 
                 ...user, 
                 authorized_subsystems: permissions,
+                authorized_subsystem_ids: authorizedSubsystemIds,
+                authorized_module_ids: authorizedModuleIds,
                 subsystemAccessIds,
                 moduleAccessIds
             } : user))

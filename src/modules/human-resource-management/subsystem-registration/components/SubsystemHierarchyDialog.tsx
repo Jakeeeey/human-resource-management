@@ -10,6 +10,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
     Plus, 
     Trash2, 
@@ -22,6 +33,8 @@ import {
     Maximize2,
     Minimize2,
     Loader2,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import { 
     SubsystemRegistration, 
@@ -32,6 +45,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { IconPicker } from "./IconPicker";
+import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
 
 interface SubsystemHierarchyDialogProps {
     open: boolean;
@@ -48,7 +62,7 @@ export function SubsystemHierarchyDialog({
 }: SubsystemHierarchyDialogProps) {
     const [modules, setModules] = React.useState<ModuleRegistration[]>([]);
     const [searchQuery, setSearchQuery] = React.useState("");
-    const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+    const [expandedIds, setExpandedIds] = React.useState<Set<string | number>>(new Set());
     const [isSaving, setIsSaving] = React.useState(false);
 
     React.useEffect(() => {
@@ -74,7 +88,7 @@ export function SubsystemHierarchyDialog({
     const stats = countModules(modules);
 
     // Recursive helper to update an item in the tree
-    const updateInTree = (items: ModuleRegistration[], id: string, updater: (item: ModuleRegistration) => ModuleRegistration | null): ModuleRegistration[] => {
+    const updateInTree = (items: ModuleRegistration[], id: string | number, updater: (item: ModuleRegistration) => ModuleRegistration | null): ModuleRegistration[] => {
         return items.reduce((acc, item) => {
             if (item.id === id) {
                 const updated = updater(item);
@@ -108,7 +122,7 @@ export function SubsystemHierarchyDialog({
         setExpandedIds(prev => new Set(prev).add(newModule.id));
     };
 
-    const handleUpdateItem = (id: string, data: Partial<ModuleRegistration>, parentPath: string = "") => {
+    const handleUpdateItem = (id: string | number, data: Partial<ModuleRegistration>, parentPath: string = "") => {
         setModules(prev => updateInTree(prev, id, item => {
             const updated = { ...item, ...data };
             // Helper: Slug from title
@@ -123,11 +137,11 @@ export function SubsystemHierarchyDialog({
         }));
     };
 
-    const handleDeleteItem = (id: string) => {
+    const handleDeleteItem = (id: string | number) => {
         setModules(prev => updateInTree(prev, id, () => null));
     };
 
-    const handleAddChild = (parentId: string, parentPath: string) => {
+    const handleAddChild = (parentId: string | number, parentPath: string) => {
         const newId = Math.random().toString(36).substr(2, 9);
         setModules(prev => updateInTree(prev, parentId, item => ({
             ...item,
@@ -147,7 +161,7 @@ export function SubsystemHierarchyDialog({
         setExpandedIds(prev => new Set(prev).add(parentId));
     };
 
-    const toggleExpand = (id: string) => {
+    const toggleExpand = (id: string | number) => {
         setExpandedIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -156,8 +170,27 @@ export function SubsystemHierarchyDialog({
         });
     };
 
+    const handleMoveItem = (id: string | number, direction: 'up' | 'down') => {
+        const move = (items: ModuleRegistration[]): ModuleRegistration[] => {
+            const index = items.findIndex(m => m.id === id);
+            if (index !== -1) {
+                const newItems = [...items];
+                const targetIndex = direction === 'up' ? index - 1 : index + 1;
+                if (targetIndex >= 0 && targetIndex < newItems.length) {
+                    [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
+                }
+                return newItems;
+            }
+            return items.map(item => ({
+                ...item,
+                subModules: item.subModules ? move(item.subModules) : []
+            }));
+        };
+        setModules(prev => move(prev));
+    };
+
     const handleExpandAll = () => {
-        const allIds = new Set<string>();
+        const allIds = new Set<string | number>();
         const collect = (items: ModuleRegistration[]) => {
             items.forEach(item => {
                 allIds.add(item.id);
@@ -176,6 +209,8 @@ export function SubsystemHierarchyDialog({
         try {
             const success = await onUpdate({ ...subsystem, modules });
             if (success) {
+                // Live Sync: Force refresh the sidebar navigation via Custom Event
+                window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
                 onOpenChange(false);
             }
         } catch (error) {
@@ -188,18 +223,17 @@ export function SubsystemHierarchyDialog({
     // Filter Logic for Tree (Side-effect free version)
     const filterTree = React.useCallback((items: ModuleRegistration[], query: string): ModuleRegistration[] => {
         if (!query) return items;
-        return items.filter(item => {
+        return items.reduce<ModuleRegistration[]>((acc, item) => {
             const matchesSelf = item.title.toLowerCase().includes(query.toLowerCase()) ||
                               item.base_path.toLowerCase().includes(query.toLowerCase());
             const filteredChildren = item.subModules ? filterTree(item.subModules, query) : [];
             const matchesChildren = filteredChildren.length > 0;
 
-            if (matchesChildren) {
-                item.subModules = filteredChildren;
-                return true;
+            if (matchesSelf || matchesChildren) {
+                acc.push({ ...item, subModules: matchesChildren ? filteredChildren : item.subModules });
             }
-            return matchesSelf;
-        });
+            return acc;
+        }, []);
     }, []);
 
     const displayedModules = React.useMemo(() => {
@@ -210,7 +244,7 @@ export function SubsystemHierarchyDialog({
     // Expand search results automatically
     React.useEffect(() => {
         if (searchQuery) {
-            const resultIds = new Set<string>();
+            const resultIds = new Set<string | number>();
             const collect = (items: ModuleRegistration[]) => {
                 items.forEach(item => {
                     if (item.subModules && item.subModules.length > 0) {
@@ -334,7 +368,7 @@ export function SubsystemHierarchyDialog({
                             </div>
                         ) : (
                             <div className="space-y-0.5">
-                                {displayedModules.map((module) => (
+                                {displayedModules.map((module, index) => (
                                     <RecursiveModuleItem
                                         key={module.id}
                                         item={module}
@@ -345,6 +379,9 @@ export function SubsystemHierarchyDialog({
                                         onUpdate={handleUpdateItem}
                                         onDelete={handleDeleteItem}
                                         onAddChild={handleAddChild}
+                                        onMove={handleMoveItem}
+                                        isFirst={index === 0}
+                                        isLast={index === displayedModules.length - 1}
                                     />
                                 ))}
                             </div>
@@ -387,11 +424,14 @@ interface RecursiveModuleItemProps {
     item: ModuleRegistration;
     depth: number;
     parentPath: string;
-    expandedIds: Set<string>;
-    onExpand: (id: string) => void;
-    onUpdate: (id: string, data: Partial<ModuleRegistration>, parentPath?: string) => void;
-    onDelete: (id: string) => void;
-    onAddChild: (id: string, parentPath: string) => void;
+    expandedIds: Set<string | number>;
+    onExpand: (id: string | number) => void;
+    onUpdate: (id: string | number, data: Partial<ModuleRegistration>, parentPath?: string) => void;
+    onDelete: (id: string | number) => void;
+    onAddChild: (id: string | number, parentPath: string) => void;
+    onMove: (id: string | number, direction: 'up' | 'down') => void;
+    isFirst: boolean;
+    isLast: boolean;
 }
 
 function RecursiveModuleItem({ 
@@ -402,7 +442,10 @@ function RecursiveModuleItem({
     onExpand,
     onUpdate, 
     onDelete, 
-    onAddChild 
+    onAddChild,
+    onMove,
+    isFirst,
+    isLast
 }: RecursiveModuleItemProps) {
     const isExpanded = expandedIds.has(item.id);
     const hasChildren = item.subModules && item.subModules.length > 0;
@@ -504,21 +547,67 @@ function RecursiveModuleItem({
                         <Plus className="h-4 w-4" />
                     </Button>
                     <Separator orientation="vertical" className="h-4 mx-0 sm:mx-0.5 opacity-10" />
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 sm:h-7 sm:w-7 rounded-xl text-destructive hover:bg-destructive/10 active:scale-90 transition-all" 
-                        title="Delete element"
-                        onClick={() => onDelete(item.id)}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex bg-muted/60 p-0.5 rounded-xl border border-divider">
+                         <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            disabled={isFirst}
+                            className="h-6 w-6 rounded-lg text-primary hover:bg-primary/10 disabled:opacity-30 active:scale-90" 
+                            onClick={() => onMove(item.id, 'up')}
+                        >
+                            <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            disabled={isLast}
+                            className="h-6 w-6 rounded-lg text-primary hover:bg-primary/10 disabled:opacity-30 active:scale-90" 
+                            onClick={() => onMove(item.id, 'down')}
+                        >
+                            <ArrowDown className="h-3 w-3" />
+                        </Button>
+                    </div>
+                    <Separator orientation="vertical" className="h-4 mx-0 sm:mx-0.5 opacity-10" />
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 sm:h-7 sm:w-7 rounded-xl text-destructive hover:bg-destructive/10 active:scale-90 transition-all" 
+                                title="Delete element"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-2xl border-destructive/20 shadow-2xl">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="font-black tracking-tighter text-xl">
+                                    Delete Module?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription className="text-sm font-medium">
+                                    Are you sure you want to delete <span className="text-foreground font-bold">&quot;{item.title}&quot;</span>? 
+                                    This will remove the module and all its sub-modules from the current structure.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="mt-4 gap-2">
+                                <AlertDialogCancel className="rounded-xl border-muted-foreground/10 font-bold uppercase text-[10px]">
+                                    Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction 
+                                    onClick={() => onDelete(item.id)}
+                                    className="rounded-xl bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] shadow-lg shadow-destructive/20"
+                                >
+                                    Confirm Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             </div>
 
             {isExpanded && hasChildren && (
                 <div className="ml-6 sm:ml-10 mt-1 space-y-1">
-                    {item.subModules?.map((child) => (
+                    {item.subModules?.map((child, idx) => (
                         <RecursiveModuleItem
                             key={child.id}
                             item={child}
@@ -529,6 +618,9 @@ function RecursiveModuleItem({
                             onUpdate={onUpdate}
                             onDelete={onDelete}
                             onAddChild={onAddChild}
+                            onMove={onMove}
+                            isFirst={idx === 0}
+                            isLast={idx === (item.subModules?.length || 0) - 1}
                         />
                     ))}
                 </div>

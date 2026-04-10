@@ -69,6 +69,15 @@ export function SubsystemDialog({
     }, [subsystem, open]);
 
     const handleChange = (field: keyof SubsystemRegistration, value: string) => {
+        if (field === "slug") {
+            const processedSlug = value.toLowerCase().replace(/\s+/g, "-");
+            setFormData((prev) => ({ 
+                ...prev, 
+                slug: processedSlug,
+                base_path: `/${processedSlug}`
+            }));
+            return;
+        }
         setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -114,7 +123,7 @@ export function SubsystemDialog({
                                     id="slug"
                                     value={formData.slug}
                                     onChange={(e) => handleChange("slug", e.target.value)}
-                                    className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-muted/5 font-mono text-[11px] font-bold tracking-tighter"
+                                    className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-muted/5 font-mono text-[11px] font-bold tracking-tighter placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
                                     placeholder="e.g. scm"
                                     disabled={isEdit}
                                 />
@@ -127,7 +136,7 @@ export function SubsystemDialog({
                                     id="tag"
                                     value={formData.tag}
                                     onChange={(e) => handleChange("tag", e.target.value)}
-                                    className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-xs"
+                                    className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-xs placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
                                     placeholder="e.g. SCM"
                                 />
                             </div>
@@ -140,7 +149,7 @@ export function SubsystemDialog({
                                 id="title"
                                 value={formData.title}
                                 onChange={(e) => handleChange("title", e.target.value)}
-                                className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-sm tracking-tight"
+                                className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-sm tracking-tight placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
                                 placeholder="e.g. Supply Chain Management"
                             />
                         </div>
@@ -162,8 +171,8 @@ export function SubsystemDialog({
                                 <Input
                                     id="base_path"
                                     value={formData.base_path}
-                                    onChange={(e) => handleChange("base_path", e.target.value)}
-                                    className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-muted/5 font-mono text-[11px] font-bold text-primary tracking-tighter"
+                                    readOnly
+                                    className="h-10 rounded-xl border-muted-foreground/10 bg-muted/20 font-mono text-[11px] font-bold text-primary/60 tracking-tighter cursor-not-allowed placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
                                     placeholder="e.g. /scm"
                                 />
                             </div>
@@ -175,7 +184,7 @@ export function SubsystemDialog({
                                 id="subtitle"
                                 value={formData.subtitle}
                                 onChange={(e) => handleChange("subtitle", e.target.value)}
-                                className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card text-xs font-semibold text-muted-foreground shadow-sm"
+                                className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card text-xs font-semibold text-muted-foreground shadow-sm placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
                                 placeholder="Core management for logistics & inventories..."
                             />
                         </div>
