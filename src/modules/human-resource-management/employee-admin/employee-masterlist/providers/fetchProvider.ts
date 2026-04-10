@@ -32,9 +32,9 @@ export async function listDepartments(): Promise<Department[]> {
 }
 
 export async function deleteEmployee(id: number): Promise<void> {
-  await request("DELETE", `${PROXY_BASE}/employees/${id}`);
+  await request("DELETE", `${PROXY_BASE}/delete/${id}`);
 }
 
 export async function createEmployee(data: Record<string, unknown>): Promise<User> {
-  return request<User>("POST", `${PROXY_BASE}/employees`, data);
+  return request<User>("POST", `${PROXY_BASE}/create`, data);
 }

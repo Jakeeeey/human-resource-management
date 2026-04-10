@@ -1,154 +1,221 @@
-import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
+import { SubsystemRegistration, ModuleRegistration } from "../types";
 
-// Initial mock data based on the main dashboard
-const INITIAL_SUBSYSTEMS: SubsystemRegistration[] = [
-    {
-        id: "scm",
-        slug: "scm",
-        title: "Supply Chain",
-        subtitle: "Procurement, inventory, logistics, distribution operations",
-        base_path: "/scm",
-        icon_name: "Boxes",
-        status: "comingSoon",
-        category: "Operations",
-        tag: "SCM",
-        modules: [],
-    },
-    {
-        id: "crm",
-        slug: "crm",
-        title: "Customer Relationship",
-        subtitle: "Customers, accounts, pipeline, quotations, after-sales linkage",
-        base_path: "/crm",
-        icon_name: "Users",
-        status: "comingSoon",
-        category: "Customer & Engagement",
-        tag: "CRM",
-        modules: [],
-    },
-    {
-        id: "finance",
-        slug: "finance",
-        title: "Financial Management",
-        subtitle: "General ledger, AR/AP, budgeting, cash & bank, compliance",
-        base_path: "/fm",
-        icon_name: "Landmark",
-        status: "comingSoon",
-        category: "Corporate Services",
-        tag: "FIN",
-        modules: [],
-    },
-    {
-        id: "hr",
-        slug: "hr",
-        title: "Human Resources",
-        subtitle: "Timekeeping, payroll, benefits, employee master, performance",
-        base_path: "/hrm",
-        icon_name: "Settings",
-        status: "active",
-        category: "Corporate Services",
-        tag: "HR",
-        modules: [
-            {
-                id: "hr-m1",
-                slug: "employee-admin",
-                title: "Employee Admin",
-                base_path: "/hrm/employee-admin",
-                status: "active",
-                subModules: [
-                    { id: "hr-sm1", slug: "master-list", title: "Employee Master List", base_path: "/hrm/employee-admin/master-list", status: "active" },
-                    { id: "hr-sm2", slug: "administrator", title: "Administrator", base_path: "/hrm/employee-admin/administrator", status: "active" },
-                ]
-            }
-        ],
-    },
-    {
-        id: "mfg",
-        slug: "mfg",
-        title: "Manufacturing",
-        subtitle: "Production planning, BOM, work orders, quality, WIP tracking",
-        base_path: "/manufacturing",
-        icon_name: "Factory",
-        status: "comingSoon",
-        category: "Operations",
-        tag: "MFG",
-        modules: [],
-    },
-    {
-        id: "pm",
-        slug: "pm",
-        title: "Project Management",
-        subtitle: "Projects, tasks, assignments, timelines, deliverables, costing",
-        base_path: "/projects",
-        icon_name: "FolderKanban",
-        status: "comingSoon",
-        category: "Operations",
-        tag: "PM",
-        modules: [],
-    },
-    {
-        id: "arf",
-        slug: "arf",
-        title: "Audit & Findings",
-        subtitle: "Audit issues, corrective actions, evidence, compliance follow-up",
-        base_path: "/arf",
-        icon_name: "ShieldCheck",
-        status: "comingSoon",
-        category: "Governance & Assurance",
-        tag: "ARF",
-        modules: [],
-    },
-    {
-        id: "comms",
-        slug: "comms",
-        title: "Communications",
-        subtitle: "Announcements, messaging, notifications, tickets/case linkage",
-        base_path: "/comms",
-        icon_name: "MessagesSquare",
-        status: "comingSoon",
-        category: "Customer & Engagement",
-        tag: "COMMS",
-        modules: [],
-    },
-    {
-        id: "pm-monitoring",
-        slug: "pm-monitoring",
-        title: "PM Monitoring",
-        subtitle: "Program monitoring, KPIs, status tracking, escalation visibility",
-        base_path: "/pm-monitoring",
-        icon_name: "Activity",
-        status: "comingSoon",
-        category: "Monitoring & Oversight",
-        tag: "PMO",
-        modules: [],
-    },
-    {
-        id: "bia",
-        slug: "bia",
-        title: "Business Intelligence",
-        subtitle: "Dashboards, KPIs, performance analytics, drill-down reporting",
-        base_path: "/bia",
-        icon_name: "BarChart3",
-        status: "comingSoon",
-        category: "Monitoring & Oversight",
-        tag: "BIA",
-        modules: [],
-    },
-];
+interface RawModule extends ModuleRegistration {
+    subsystem_id?: number;
+    parent_module_id?: number | null;
+}
 
 export class SubsystemService {
     static async getSubsystems(): Promise<SubsystemRegistration[]> {
-        // Return local storage if exists, otherwise initial data
-        if (typeof window !== "undefined") {
-            const saved = localStorage.getItem("vos_subsystems_registry");
-            if (saved) return JSON.parse(saved);
+        try {
+            // Fetch everything in parallel for speed
+            const [subRes, modRes] = await Promise.all([
+                fetch(`/api/hrm/subsystem-registration/subsystems?limit=-1`),
+                fetch(`/api/hrm/subsystem-registration/modules?limit=-1&sort=sort`)
+            ]);
+
+            if (!subRes.ok || !modRes.ok) return [];
+
+            const { data: subsystems } = await subRes.json();
+            const { data: allModules } = await modRes.json();
+
+            // 1. Build a map of modules by their subsystem_id
+            const modulesBySubsystem: Record<number, RawModule[]> = {};
+            const modulesById: Record<number, RawModule> = {};
+
+            (allModules || []).forEach((m: RawModule) => {
+                const mod: RawModule = { ...m, subModules: [] };
+                modulesById[Number(mod.id)] = mod;
+                
+                const sid = Number(m.subsystem_id);
+                if (!modulesBySubsystem[sid]) modulesBySubsystem[sid] = [];
+                modulesBySubsystem[sid].push(mod);
+            });
+
+            // 2. Build the recursive tree for each subsystem
+            const finalSubsystems = (subsystems || []).map((sub: SubsystemRegistration) => {
+                const subId = Number(sub.id);
+                const subModules = modulesBySubsystem[subId] || [];
+                
+                // Identify root modules (those with no parent_module_id)
+                const roots = subModules.filter(m => !m.parent_module_id);
+                
+                // Link children to parents
+                subModules.forEach(m => {
+                    const parentId = m.parent_module_id ? Number(m.parent_module_id) : null;
+                    if (parentId && modulesById[parentId]) {
+                        if (!modulesById[parentId].subModules) modulesById[parentId].subModules = [];
+                        modulesById[parentId].subModules?.push(m);
+                    }
+                });
+
+                return {
+                    ...sub,
+                    modules: roots
+                };
+            });
+
+            return finalSubsystems;
+        } catch (error) {
+            console.error("Error in manual getSubsystems:", error);
+            return [];
         }
-        return INITIAL_SUBSYSTEMS;
     }
 
-    static async saveSubsystems(subsystems: SubsystemRegistration[]): Promise<void> {
-        if (typeof window !== "undefined") {
-            localStorage.setItem("vos_subsystems_registry", JSON.stringify(subsystems));
+    private static collectIds(modules: ModuleRegistration[]): number[] {
+        const ids: number[] = [];
+        const traverse = (items: ModuleRegistration[]) => {
+            items.forEach(item => {
+                const id = Number(item.id);
+                if (!isNaN(id)) ids.push(id);
+                if (item.subModules) traverse(item.subModules);
+            });
+        };
+        traverse(modules);
+        return ids;
+    }
+
+    private static async syncModulesRecursively(
+        modules: ModuleRegistration[], 
+        subsystemId: number, 
+        parentId: number | null = null
+    ): Promise<void> {
+        // Optimized: Trigger all sibling modules in parallel to reduce sequential wait time
+        await Promise.all(modules.map(async (itemModule, index) => {
+            const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 5;
+            
+            const payload = {
+                slug: itemModule.slug || "",
+                title: itemModule.title || "Untitled",
+                base_path: itemModule.base_path || "",
+                status: itemModule.status || "active",
+                icon_name: itemModule.icon_name || "Folder",
+                sort: index,
+                subsystem_id: subsystemId,
+                parent_module_id: parentId
+            };
+
+            let savedModuleId: string | number = itemModule.id;
+
+            try {
+                if (isNew) {
+                    // Create new module
+                    const response = await fetch(`/api/hrm/subsystem-registration/modules`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) {
+                        const { data } = await response.json();
+                        savedModuleId = data.id;
+                    }
+                } else {
+                    // Update existing module
+                    await fetch(`/api/hrm/subsystem-registration/modules?id=${itemModule.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                // Recursively sync sub-modules if any
+                // These will also run in parallel among themselves once the parent ID is secured
+                if (itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
+                    await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
+                }
+            } catch (err) {
+                console.error(`Failed to sync module: ${itemModule.title}`, err);
+            }
+        }));
+    }
+
+    static async createSubsystem(data: Partial<SubsystemRegistration>): Promise<SubsystemRegistration | null> {
+        try {
+            const cleanedData = { ...data };
+            delete cleanedData.id;
+            delete cleanedData.modules;
+
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(cleanedData)
+            });
+            
+            if (!response.ok) return null;
+            const { data: created } = await response.json();
+            
+            if (data.modules && data.modules.length > 0) {
+                await this.syncModulesRecursively(data.modules, Number(created.id));
+            }
+
+            return created;
+        } catch (error) {
+            console.error("Error creating subsystem:", error);
+            return null;
         }
+    }
+
+    static async updateSubsystem(id: string, data: Partial<SubsystemRegistration>): Promise<boolean> {
+        try {
+            const subsystemId = Number(id);
+            const subsystemPayload = { ...data };
+            delete subsystemPayload.modules;
+
+            // 1. Update the subsystem record
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems?id=${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(subsystemPayload)
+            });
+
+            if (data.modules) {
+                // 2. PRUNING: Bulk Delete stale modules in parallel
+                try {
+                    const currentRes = await fetch(`/api/hrm/subsystem-registration/modules?filter={"subsystem_id":{"_eq":${subsystemId}}}&fields=id`);
+                    if (currentRes.ok) {
+                        const { data: currentInDb } = await currentRes.json();
+                        const dbIds = (currentInDb || []).map((m: { id: string | number }) => Number(m.id));
+                        const incomingIds = this.collectIds(data.modules);
+                        const staleIds = dbIds.filter((dbId: number) => !incomingIds.includes(dbId));
+                        
+                        // Optimized: Execute batch deletion instead of sequential requests
+                        if (staleIds.length > 0) {
+                            await fetch(`/api/hrm/subsystem-registration/modules`, { 
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(staleIds)
+                            });
+                        }
+                    }
+                } catch (pruneErr) {
+                    console.error("Pruning failed:", pruneErr);
+                }
+
+                // 3. Batch Sync Current Hierarchy
+                await this.syncModulesRecursively(data.modules, subsystemId);
+            }
+
+            return response.ok;
+        } catch (error) {
+            console.error("Error updating subsystem:", error);
+            return false;
+        }
+    }
+
+    static async deleteSubsystem(id: string): Promise<boolean> {
+        try {
+            const response = await fetch(`/api/hrm/subsystem-registration/subsystems?id=${id}`, {
+                method: "DELETE"
+            });
+            return response.ok;
+        } catch (error) {
+            console.error("Error deleting subsystem:", error);
+            return false;
+        }
+    }
+
+    /** @deprecated */
+    static async saveSubsystems(): Promise<void> {
+        console.warn("saveSubsystems is slow and deprecated.");
     }
 }

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { toISODate } from "@/lib/utils";
 
+const ENV_SPRING_API_BASE_URL = process.env.SPRING_API_BASE_URL?.trim() || "";
 const LOGISTICS_REPORT_API_BASE_URL =
-	process.env.LOGISTICS_REPORT_API_BASE_URL || "";
-const LOGISTICS_REPORT_FALLBACK_BASE_URL = "http://100.81.225.79:8086";
+	process.env.LOGISTICS_REPORT_API_BASE_URL?.trim() || "";
 const LOGISTICS_REPORT_STATIC_TOKEN =
-	process.env.LOGISTICS_REPORT_STATIC_TOKEN || "";
+	process.env.LOGISTICS_REPORT_STATIC_TOKEN?.trim() || "";
 const LOGISTICS_REPORT_PATH =
-	"/api/view-post-dispatch-plan-staff-attendance/all";
+	process.env.LOGISTICS_REPORT_PATH?.trim() || "/api/view-post-dispatch-plan-staff-attendance/all";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -227,7 +227,18 @@ export async function GET(request: NextRequest) {
 	const debug = searchParams.get("debug") === "1";
 
 	const springApiBaseUrl =
-		LOGISTICS_REPORT_API_BASE_URL.trim() || LOGISTICS_REPORT_FALLBACK_BASE_URL;
+		LOGISTICS_REPORT_API_BASE_URL || ENV_SPRING_API_BASE_URL;
+
+	if (!springApiBaseUrl) {
+		return NextResponse.json(
+			{
+				error: "Upstream configuration missing",
+				details:
+					"Set LOGISTICS_REPORT_API_BASE_URL or SPRING_API_BASE_URL environment variable",
+			},
+			{ status: 500 }
+		);
+	}
 	const authorizationCandidates = [
 		vosToken ? `Bearer ${vosToken}` : "",
 		authHeader.startsWith("Bearer ") ? authHeader : "",

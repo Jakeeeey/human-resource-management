@@ -1,109 +1,116 @@
-"use client";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { NavUser } from "../_components/nav-user";
+import { cookies } from "next/headers";
+import { UserConfigurationModule } from "@/modules/human-resource-management/user-configuration";
+// import ComingSoon from "../_components/ComingSoon";
 
-import React from "react";
-import { UserConfigurationTable } from "@/modules/human-resource-management/user-configuration/components/UserConfigurationTable";
-import { UserSubsystemAccess } from "@/modules/human-resource-management/user-configuration/types";
-import { PermissionsDialog } from "@/modules/human-resource-management/user-configuration/components/PermissionsDialog";
-import { toast } from "sonner";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const MOCK_USERS: UserSubsystemAccess[] = [
-    {
-        user_id: "1",
-        email: "admin@vertex.com",
-        full_name: "System Admin",
-        authorized_subsystems: ["hr", "scm", "finance", "crm", "mfg", "pm", "arf", "comms", "pm-monitoring", "bia"],
-    },
-    {
-        user_id: "2",
-        email: "jake@vertex.com",
-        full_name: "Jake Staff",
-        authorized_subsystems: ["hr", "comms"],
-    },
-    {
-        user_id: "3",
-        email: "finance_user@vertex.com",
-        full_name: "Finance Manager",
-        authorized_subsystems: ["finance"],
-    },
-];
+const COOKIE_NAME = "vos_access_token";
 
-import { SubsystemService } from "@/modules/human-resource-management/subsystem-registration/services/SubsystemService";
-import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
+export const metadata = {
+    title: "User Configuration | VOS ERP",
+    description: "Manage system-wide user permissions and access controls.",
+};
 
-export default function UserConfigurationPage() {
-    const [users, setUsers] = React.useState<UserSubsystemAccess[]>(MOCK_USERS);
-    const [subsystems, setSubsystems] = React.useState<SubsystemRegistration[]>([]);
-    const [isLoading, setIsLoading] = React.useState(true);
-    
-    // Permissions Dialog State
-    const [isPermissionsOpen, setIsPermissionsOpen] = React.useState(false);
-    const [activeUser, setActiveUser] = React.useState<UserSubsystemAccess | null>(null);
-    const [activeSubsystem, setActiveSubsystem] = React.useState<SubsystemRegistration | null>(null);
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
 
-    React.useEffect(() => {
-        const load = async () => {
-            const data = await SubsystemService.getSubsystems();
-            setSubsystems(data);
-            setIsLoading(false);
-        };
-        load();
-    }, []);
+        const p = parts[1];
+        const b64 = p.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
 
-    const handleToggleAccess = async (userId: string, subsystemId: string, authorized: boolean) => {
-        setUsers((current) =>
-            current.map((user) => {
-                if (user.user_id === userId) {
-                    const newAccess = authorized
-                        ? [...user.authorized_subsystems, subsystemId]
-                        : user.authorized_subsystems.filter((id) => id !== subsystemId);
-                    return { ...user, authorized_subsystems: newAccess };
-                }
-                return user;
-            })
-        );
-        toast.success(`Updated access for user ${userId}`);
+        const json = Buffer.from(padded, "base64").toString("utf8");
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
+
+function pickString(obj: Record<string, unknown> | null | undefined, keys: string[]): string {
+    for (const k of keys) {
+        const v = obj ? obj[k] : undefined;
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
+function buildHeaderUserFromToken(token: string | null | undefined) {
+    const payload = token ? decodeJwtPayload(token) : null;
+
+    const first = pickString(payload, [
+        "Firstname",
+        "FirstName",
+        "firstName",
+        "firstname",
+        "first_name",
+    ]);
+    const last = pickString(payload, [
+        "LastName",
+        "Lastname",
+        "lastName",
+        "lastname",
+        "last_name",
+    ]);
+    const email = pickString(payload, ["email", "Email"]);
+
+    const name = [first, last].filter(Boolean).join(" ") || email || "User";
+
+    return {
+        name,
+        email: email || "",
+        avatar: "/avatars/shadcn.jpg",
     };
+}
 
-    const handleConfigure = (user: UserSubsystemAccess, subsystem: SubsystemRegistration) => {
-        setActiveUser(user);
-        setActiveSubsystem(subsystem);
-        setIsPermissionsOpen(true);
-    };
-
-    const handleUpdatePermissions = (userId: string, items: string[]) => {
-        setUsers((current) =>
-            current.map((user) => (user.user_id === userId ? { ...user, authorized_subsystems: items } : user))
-        );
-        toast.success("Permissions updated successfully");
-    };
+export default async function UserConfigurationPage() {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
+    const headerUser = buildHeaderUserFromToken(token);
 
     return (
-        <div className="flex-1 space-y-4 p-4 pt-6 h-full overflow-auto">
-            <div className="flex items-center justify-between space-y-2">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">User Configuration</h2>
-                    <p className="text-muted-foreground">
-                        Manage subsystem access permissions for each user.
-                    </p>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16 overflow-hidden">
+                <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
+                    <SidebarTrigger className="-ml-1 shrink-0" />
+                    <Separator orientation="vertical" className="hidden sm:block mr-2 data-[orientation=vertical]:h-4 shrink-0" />
+                    <div className="min-w-0 overflow-hidden">
+                        <Breadcrumb>
+                            <BreadcrumbList className="min-w-0 overflow-hidden">
+                                <BreadcrumbItem className="hidden md:block shrink-0">
+                                    <BreadcrumbLink href="#">HRM</BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block shrink-0" />
+                                <BreadcrumbItem className="min-w-0 overflow-hidden">
+                                    <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
+                                        User Configuration
+                                    </BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    </div>
                 </div>
-            </div>
 
-            <UserConfigurationTable
-                data={users}
-                subsystems={subsystems}
-                onToggleAccess={handleToggleAccess}
-                onConfigure={handleConfigure}
-                isLoading={isLoading}
-            />
+                <div className="flex h-full items-center px-2 sm:px-4 shrink-0 max-w-[48vw] sm:max-w-none overflow-hidden">
+                    <NavUser user={headerUser} />
+                </div>
+            </header>
 
-            <PermissionsDialog
-                open={isPermissionsOpen}
-                onOpenChange={setIsPermissionsOpen}
-                user={activeUser}
-                subsystem={activeSubsystem}
-                authorizedItems={activeUser?.authorized_subsystems || []}
-                onUpdate={handleUpdatePermissions}
-            />
+            <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+                <UserConfigurationModule />
+            </main>
         </div>
     );
 }

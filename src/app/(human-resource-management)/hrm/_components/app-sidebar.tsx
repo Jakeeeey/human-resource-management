@@ -1,37 +1,15 @@
-"use client";
-
 import * as React from "react";
-import Link from "next/link";
-import Image from "next/image";
-import {
-    Users, // Employee Admin
-    UserRound, // Employee Master List
-    Shield, // Administrator
-    CalendarClock, // Admin > Department Schedule
-    Network, // Structure (replaces Sitemap)
-    Building2, // Division
-    UserCog, // Salesman
-    Building, // Company Profile
-    Layers, // Department
-    KeyRound, // Department Accounts
-    BadgeCheck, // Role Management
-    Boxes, // Subsystem Registration
-} from "lucide-react";
+import { type ComponentProps } from "react";
+import { AppSidebarClient } from "./app-sidebar-client";
+import { getSidebarNavigation } from "../_actions/sidebar";
+import { Sidebar } from "@/components/ui/sidebar";
 
-import { NavMain } from "./nav-main";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
-import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-} from "@/components/ui/sidebar";
+export async function AppSidebar(props: ComponentProps<typeof Sidebar>) {
+    // 1. Fetch data on the server (Directly from Spring Boot)
+    // No more "use client" fetch delays or skeletons!
+    const items = await getSidebarNavigation();
 
+<<<<<<< HEAD
 const data = {
     navMain: [
         {
@@ -317,70 +295,12 @@ export function AppSidebar({
     className,
     ...props
 }: React.ComponentProps<typeof Sidebar>) {
+=======
+>>>>>>> c1f01f4099f6cdd02f56f81ffc836b4ec58bd25c
     return (
-        <Sidebar
-            {...props}
-            className={cn(
-                "border-r border-sidebar-border/60 dark:border-white/20",
-                "shadow-sm dark:shadow-[0_0_0_1px_rgba(255,255,255,0.10),0_16px_40px_-24px_rgba(0,0,0,0.9)]",
-                className
-            )}
-        >
-            <SidebarHeader>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <Link href="/main-dashboard">
-                                <div className="flex aspect-square size-10 items-center justify-center overflow-hidden">
-                                    <Image
-                                        src="/vertex_logo_black.png"
-                                        alt="VOS Logo"
-                                        width={40}
-                                        height={40}
-                                        className="h-9 w-10 object-contain"
-                                        priority
-                                    />
-                                </div>
-
-                                <div className="grid flex-1 text-left text-sm leading-tight">
-                                    <span className="truncate font-medium">VOS Web</span>
-                                    <span className="truncate text-xs text-muted-foreground">
-                                        Human Resource Management
-                                    </span>
-                                </div>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarHeader>
-
-            <Separator />
-
-            <SidebarContent>
-                <div className="px-4 pt-3 pb-2 text-xs font-medium text-muted-foreground">
-                    Platform
-                </div>
-
-                <ScrollArea
-                    className={cn(
-                        "min-h-0 flex-1",
-                        "[&_[data-radix-scroll-area-viewport]>div]:block",
-                        "[&_[data-radix-scroll-area-viewport]>div]:w-full",
-                        "[&_[data-radix-scroll-area-viewport]>div]:min-w-0"
-                    )}
-                >
-                    <div className="w-full min-w-0">
-                        <NavMain items={data.navMain} />
-                    </div>
-                </ScrollArea>
-            </SidebarContent>
-
-            <SidebarFooter className="p-0">
-                <Separator />
-                <div className="py-3 text-center text-xs text-muted-foreground">
-                    VOS Web v2.0
-                </div>
-            </SidebarFooter>
-        </Sidebar>
+        <AppSidebarClient 
+            {...props} 
+            initialItems={items} 
+        />
     );
 }
