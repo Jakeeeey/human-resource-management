@@ -17,7 +17,8 @@ import { fullName, isDeletedUser } from "../../utils/format";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -185,13 +186,18 @@ export function SalesmanFormDialog(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl p-0 overflow-hidden">
+        <DialogHeader className="border-b px-6 py-4">
           <DialogTitle>{mode === "create" ? "Salesman Registration" : "Edit Salesman"}</DialogTitle>
+          <DialogDescription>
+            {mode === "create"
+              ? "Fill in the required fields to register a new salesman."
+              : "Update the salesman details and confirm to save changes."}
+          </DialogDescription>
         </DialogHeader>
 
         {/* Top filters style row */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-12 max-h-[70vh] overflow-y-auto overflow-x-hidden px-1 py-1">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-12 max-h-[70vh] overflow-y-auto overflow-x-hidden px-6 py-5">
           {/* Row 1: Employee Link (12) */}
           <div className="md:col-span-12 min-w-0 overflow-hidden">
             <Label>Employee Link</Label>
@@ -212,20 +218,39 @@ export function SalesmanFormDialog(props: Props) {
             </Select>
           </div>
 
+          <div className="md:col-span-12 -mt-1">
+            <p className="text-xs font-medium text-muted-foreground">Salesman Details</p>
+          </div>
+
           {/* Row 2: Salesman Info (6, 3, 3) */}
           <div className="md:col-span-6 min-w-0 overflow-hidden">
             <Label>Salesman Name</Label>
-            <Input value={salesmanName} onChange={(e) => setSalesmanName(e.target.value)} className="w-full" />
+            <Input
+              value={salesmanName}
+              onChange={(e) => setSalesmanName(e.target.value)}
+              placeholder="Enter salesman name"
+              className="w-full"
+            />
           </div>
 
           <div className="md:col-span-3 min-w-0 overflow-hidden">
             <Label>Salesman Code</Label>
-            <Input value={salesmanCode} onChange={(e) => setSalesmanCode(e.target.value)} className="w-full" />
+            <Input
+              value={salesmanCode}
+              onChange={(e) => setSalesmanCode(e.target.value)}
+              placeholder="e.g. SM-0001"
+              className="w-full"
+            />
           </div>
 
           <div className="md:col-span-3 min-w-0 overflow-hidden">
             <Label>Truck Plate</Label>
-            <Input value={truckPlate} onChange={(e) => setTruckPlate(e.target.value)} className="w-full" />
+            <Input
+              value={truckPlate}
+              onChange={(e) => setTruckPlate(e.target.value)}
+              placeholder="e.g. ABC-1234"
+              className="w-full"
+            />
           </div>
 
           {/* Row 3: Price Type & E-mail (4, 8) */}
@@ -252,6 +277,10 @@ export function SalesmanFormDialog(props: Props) {
 
           <div className="md:col-span-12 py-1">
               <Separator />
+          </div>
+
+          <div className="md:col-span-12 -mt-1">
+            <p className="text-xs font-medium text-muted-foreground">Contact & Location</p>
           </div>
 
           {/* Row 4: Contact & Location (6, 6) */}
@@ -288,6 +317,10 @@ export function SalesmanFormDialog(props: Props) {
 
           <div className="md:col-span-12 py-1">
               <Separator />
+          </div>
+
+          <div className="md:col-span-12 -mt-1">
+            <p className="text-xs font-medium text-muted-foreground">Business</p>
           </div>
 
           {/* Row 6: Business (6, 6) */}
@@ -368,6 +401,14 @@ export function SalesmanFormDialog(props: Props) {
             </Select>
           </div>
 
+          <div className="md:col-span-12 py-1">
+            <Separator />
+          </div>
+
+          <div className="md:col-span-12 -mt-1">
+            <p className="text-xs font-medium text-muted-foreground">Branching</p>
+          </div>
+
           {/* Row 8: Branching (6, 6) */}
           <div className="md:col-span-6 min-w-0 overflow-hidden">
             <Label>Branch</Label>
@@ -407,32 +448,41 @@ export function SalesmanFormDialog(props: Props) {
             </Select>
           </div>
 
-          <div className="md:col-span-12 flex flex-wrap items-center justify-start gap-10 pt-4">
-            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-              <Checkbox checked={isActive} onCheckedChange={(v) => setIsActive(Boolean(v))} />
-              Active
-            </label>
+          <div className="md:col-span-12">
+            <div className="rounded-lg border bg-muted/10 p-4 flex flex-wrap items-center justify-start gap-10">
+              <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                <Checkbox checked={isActive} onCheckedChange={(v) => setIsActive(Boolean(v))} />
+                Active
+              </label>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-              <Checkbox checked={isInventory} onCheckedChange={(v) => setIsInventory(Boolean(v))} />
-              Has Inventory
-            </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                <Checkbox checked={isInventory} onCheckedChange={(v) => setIsInventory(Boolean(v))} />
+                Has Inventory
+              </label>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-              <Checkbox checked={canCollect} onCheckedChange={(v) => setCanCollect(Boolean(v))} />
-              Can Collect
-            </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                <Checkbox checked={canCollect} onCheckedChange={(v) => setCanCollect(Boolean(v))} />
+                Can Collect
+              </label>
+            </div>
           </div>
         </div>
 
-        <DialogFooter className="mt-4">
+        <DialogFooter className="border-t bg-muted/20 px-6 py-4">
           <DialogClose asChild>
             <Button type="button" variant="outline" disabled={saving}>
               Cancel
             </Button>
           </DialogClose>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Confirm"}
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            aria-busy={saving}
+            className="gap-2"
+          >
+            {saving && <Spinner className="h-4 w-4" />}
+            <span>{saving ? "Saving..." : "Confirm"}</span>
           </Button>
         </DialogFooter>
       </DialogContent>
