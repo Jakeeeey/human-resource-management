@@ -8,16 +8,12 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../../../../_components/nav-user";
+import { NavUser } from "@/app/(human-resource-management)/hrm/_components/nav-user";
 
 import { cookies } from "next/headers";
 
 // ✅ Wire the module you asked for
-<<<<<<<< HEAD:src/app/(human-resource-management)/hrm/employee-admin/structure/sales-management/salesman-qr-code/page.tsx
-import { SalesmanQRCodeModule } from "@/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-qr-code/SalesmanQRCodeModule";
-========
 import { SalesmanQRCodeModule } from "@/modules/human-resource-management/employee-admin/sales-management/salesman-qr-code/SalesmanQRCodeModule";
->>>>>>>> c1f01f4099f6cdd02f56f81ffc836b4ec58bd25c:src/app/(human-resource-management)/hrm/employee-admin/sales-management/salesman-qr-code/page.tsx
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

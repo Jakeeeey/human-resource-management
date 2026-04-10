@@ -196,12 +196,7 @@ export function SalesmanFormDialog(props: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        {/* Top filters style row */}
-<<<<<<<< HEAD:src/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-12 max-h-[70vh] overflow-y-auto overflow-x-hidden px-1 py-1">
-========
         <div className="grid grid-cols-1 gap-4 md:grid-cols-12 max-h-[70vh] overflow-y-auto overflow-x-hidden px-6 py-5">
->>>>>>>> c1f01f4099f6cdd02f56f81ffc836b4ec58bd25c:src/modules/human-resource-management/employee-admin/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
           {/* Row 1: Employee Link (12) */}
           <div className="md:col-span-12 min-w-0 overflow-hidden">
             <Label>Employee Link</Label>
@@ -222,12 +217,6 @@ export function SalesmanFormDialog(props: Props) {
             </Select>
           </div>
 
-<<<<<<<< HEAD:src/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
-          {/* Row 2: Salesman Info (6, 3, 3) */}
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Salesman Name</Label>
-            <Input value={salesmanName} onChange={(e) => setSalesmanName(e.target.value)} className="w-full" />
-========
           <div className="md:col-span-12 -mt-1">
             <p className="text-xs font-medium text-muted-foreground">Salesman Details</p>
           </div>
@@ -241,35 +230,25 @@ export function SalesmanFormDialog(props: Props) {
               placeholder="Enter salesman name"
               className="w-full"
             />
->>>>>>>> c1f01f4099f6cdd02f56f81ffc836b4ec58bd25c:src/modules/human-resource-management/employee-admin/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
           </div>
-
           <div className="md:col-span-3 min-w-0 overflow-hidden">
             <Label>Salesman Code</Label>
-<<<<<<<< HEAD:src/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
-            <Input value={salesmanCode} onChange={(e) => setSalesmanCode(e.target.value)} className="w-full" />
-========
             <Input
               value={salesmanCode}
               onChange={(e) => setSalesmanCode(e.target.value)}
               placeholder="e.g. SM-0001"
               className="w-full"
             />
->>>>>>>> c1f01f4099f6cdd02f56f81ffc836b4ec58bd25c:src/modules/human-resource-management/employee-admin/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
           </div>
 
           <div className="md:col-span-3 min-w-0 overflow-hidden">
             <Label>Truck Plate</Label>
-<<<<<<<< HEAD:src/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
-            <Input value={truckPlate} onChange={(e) => setTruckPlate(e.target.value)} className="w-full" />
-========
             <Input
               value={truckPlate}
               onChange={(e) => setTruckPlate(e.target.value)}
               placeholder="e.g. ABC-1234"
               className="w-full"
             />
->>>>>>>> c1f01f4099f6cdd02f56f81ffc836b4ec58bd25c:src/modules/human-resource-management/employee-admin/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
           </div>
 
           {/* Row 3: Price Type & E-mail (4, 8) */}
@@ -293,182 +272,6 @@ export function SalesmanFormDialog(props: Props) {
             <Label>E-mail Address</Label>
             <Input value={(employee?.user_email ?? "").toString()} disabled className="bg-muted/30 w-full" />
           </div>
-<<<<<<<< HEAD:src/modules/human-resource-management/employee-admin/structrure/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
-
-          <div className="md:col-span-12 py-1">
-              <Separator />
-          </div>
-
-          {/* Row 4: Contact & Location (6, 6) */}
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Contact No.</Label>
-            <Input value={(employee?.user_contact ?? "").toString()} disabled className="bg-muted/30 w-full" />
-          </div>
-
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Province</Label>
-            <Input value={(employee?.user_province ?? "").toString()} disabled className="bg-muted/30 w-full" />
-          </div>
-
-          {/* Row 5: Details (4, 4, 4) */}
-          <div className="md:col-span-4 min-w-0 overflow-hidden">
-            <Label>City</Label>
-            <Input value={(employee?.user_city ?? "").toString()} disabled className="bg-muted/30 w-full" />
-          </div>
-
-          <div className="md:col-span-4 min-w-0 overflow-hidden">
-            <Label>Barangay</Label>
-            <Input value={(employee?.user_brgy ?? "").toString()} disabled className="bg-muted/30 w-full" />
-          </div>
-
-          <div className="md:col-span-4 min-w-0 overflow-hidden">
-            <Label>Inventory Day</Label>
-            <Select value="" onValueChange={() => { }} disabled>
-              <SelectTrigger className="opacity-60 bg-muted/30 w-full">
-                <SelectValue placeholder="(null)" className="truncate" />
-              </SelectTrigger>
-              <SelectContent />
-            </Select>
-          </div>
-
-          <div className="md:col-span-12 py-1">
-              <Separator />
-          </div>
-
-          {/* Row 6: Business (6, 6) */}
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Company</Label>
-            <Select
-              value={companyCode ? String(companyCode) : ""}
-              onValueChange={(v) => setCompanyCode(v ? Number(v) : null)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select company" className="truncate" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {companies.map((c) => (
-                  <SelectItem key={c.company_id} value={String(c.company_id)}>
-                    {c.company_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Supplier</Label>
-            <Select
-              value={supplierCode ? String(supplierCode) : ""}
-              onValueChange={(v) => setSupplierCode(v ? Number(v) : null)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select supplier" className="truncate" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
-                    {s.supplier_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Row 7: Org (6, 6) */}
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Division</Label>
-            <Select
-              value={divisionId ? String(divisionId) : ""}
-              onValueChange={(v) => setDivisionId(v ? Number(v) : null)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select division" className="truncate" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {divisions.map((d) => (
-                  <SelectItem key={d.division_id} value={String(d.division_id)}>
-                    {d.division_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Operation</Label>
-            <Select
-              value={operationId ? String(operationId) : ""}
-              onValueChange={(v) => setOperationId(v ? Number(v) : null)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select operation" className="truncate" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {operations.map((o) => (
-                  <SelectItem key={o.id} value={String(o.id)}>
-                    {o.operation_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Row 8: Branching (6, 6) */}
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Branch</Label>
-            <Select
-              value={branchId ? String(branchId) : ""}
-              onValueChange={(v) => setBranchId(v ? Number(v) : null)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select branch" className="truncate" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.branch_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="md:col-span-6 min-w-0 overflow-hidden">
-            <Label>Bad Branch</Label>
-            <Select
-              value={badBranchId ? String(badBranchId) : ""}
-              onValueChange={(v) => setBadBranchId(v ? Number(v) : null)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select bad branch" className="truncate" />
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                {branches.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.branch_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="md:col-span-12 flex flex-wrap items-center justify-start gap-10 pt-4">
-            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-              <Checkbox checked={isActive} onCheckedChange={(v) => setIsActive(Boolean(v))} />
-              Active
-            </label>
-
-            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-              <Checkbox checked={isInventory} onCheckedChange={(v) => setIsInventory(Boolean(v))} />
-              Has Inventory
-            </label>
-
-            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-              <Checkbox checked={canCollect} onCheckedChange={(v) => setCanCollect(Boolean(v))} />
-              Can Collect
-            </label>
-========
-
           <div className="md:col-span-12 py-1">
               <Separator />
           </div>
@@ -659,7 +462,6 @@ export function SalesmanFormDialog(props: Props) {
                 Can Collect
               </label>
             </div>
->>>>>>>> c1f01f4099f6cdd02f56f81ffc836b4ec58bd25c:src/modules/human-resource-management/employee-admin/sales-management/salesman-creation/components/SalesmanFormDialog.tsx
           </div>
         </div>
 
