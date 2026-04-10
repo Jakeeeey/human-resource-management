@@ -80,12 +80,8 @@ export class SubsystemService {
         subsystemId: number, 
         parentId: number | null = null
     ): Promise<void> {
-        // Flatten the current tree level to prepare for bulk/parallel sync
-        const itemsToUpdate: { id: string | number; payload: Partial<ModuleRegistration>; _original: ModuleRegistration }[] = [];
-        const itemsToCreate: { payload: Partial<ModuleRegistration>; _original: ModuleRegistration }[] = [];
-        const childrenToSync: { modules: ModuleRegistration[], parentId: number | null }[] = [];
-
-        modules.forEach((itemModule, index) => {
+        // Optimized: Trigger all sibling modules in parallel to reduce sequential wait time
+        await Promise.all(modules.map(async (itemModule, index) => {
             const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 5;
             
             const payload = {
@@ -99,61 +95,38 @@ export class SubsystemService {
                 parent_module_id: parentId
             };
 
-            if (isNew) {
-                itemsToCreate.push({ payload, _original: itemModule });
-            } else {
-                itemsToUpdate.push({ id: itemModule.id, payload, _original: itemModule });
-            }
-        });
+            let savedModuleId: string | number = itemModule.id;
 
-        // 1. Bulk Update existing items in parallel
-        if (itemsToUpdate.length > 0) {
-            await Promise.all(itemsToUpdate.map(async (item) => {
-                return fetch(`/api/hrm/subsystem-registration/modules?id=${item.id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(item.payload)
-                });
-            }));
-            
-            // Queue children of updated items
-            itemsToUpdate.forEach(item => {
-                if (item._original.subModules?.length) {
-                    childrenToSync.push({ 
-                        modules: item._original.subModules, 
-                        parentId: Number(item.id) 
+            try {
+                if (isNew) {
+                    // Create new module
+                    const response = await fetch(`/api/hrm/subsystem-registration/modules`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) {
+                        const { data } = await response.json();
+                        savedModuleId = data.id;
+                    }
+                } else {
+                    // Update existing module
+                    await fetch(`/api/hrm/subsystem-registration/modules?id=${itemModule.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
                     });
                 }
-            });
-        }
 
-        // 2. Process New Items (Parallel for current level, IDs passed to next)
-        if (itemsToCreate.length > 0) {
-            await Promise.all(itemsToCreate.map(async (item) => {
-                const response = await fetch(`/api/hrm/subsystem-registration/modules`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(item.payload)
-                });
-                
-                if (response.ok) {
-                    const { data } = await response.json();
-                    if (item._original.subModules?.length) {
-                        childrenToSync.push({ 
-                            modules: item._original.subModules, 
-                            parentId: Number(data.id) 
-                        });
-                    }
+                // Recursively sync sub-modules if any
+                // These will also run in parallel among themselves once the parent ID is secured
+                if (itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
+                    await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
                 }
-            }));
-        }
-
-        // 3. Process all children tiers in parallel
-        if (childrenToSync.length > 0) {
-            await Promise.all(childrenToSync.map(group => 
-                this.syncModulesRecursively(group.modules, subsystemId, group.parentId)
-            ));
-        }
+            } catch (err) {
+                console.error(`Failed to sync module: ${itemModule.title}`, err);
+            }
+        }));
     }
 
     static async createSubsystem(data: Partial<SubsystemRegistration>): Promise<SubsystemRegistration | null> {
@@ -205,10 +178,14 @@ export class SubsystemService {
                         const incomingIds = this.collectIds(data.modules);
                         const staleIds = dbIds.filter((dbId: number) => !incomingIds.includes(dbId));
                         
-                        // Bulk Parallel Delete
-                        await Promise.all(staleIds.map((sId: number) => 
-                            fetch(`/api/hrm/subsystem-registration/modules?id=${sId}`, { method: "DELETE" })
-                        ));
+                        // Optimized: Execute batch deletion instead of sequential requests
+                        if (staleIds.length > 0) {
+                            await fetch(`/api/hrm/subsystem-registration/modules`, { 
+                                method: "DELETE",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(staleIds)
+                            });
+                        }
                     }
                 } catch (pruneErr) {
                     console.error("Pruning failed:", pruneErr);
