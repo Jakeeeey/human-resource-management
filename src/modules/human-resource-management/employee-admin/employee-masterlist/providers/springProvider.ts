@@ -13,6 +13,7 @@ export interface CreateEmployeePayload {
   middleName?: string;
   lastName: string;
   suffixName?: string;
+  nickname?: string;
   contact: string;
   province: string;
   city: string;
