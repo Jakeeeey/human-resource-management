@@ -507,7 +507,7 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
                 } as React.CSSProperties
             }
         >
-            <SidebarMenu className="overflow-x-hidden gap-0">
+            <SidebarMenu className="overflow-x-hidden gap-1">
                 {items.length === 0 && searchTerm ? (
                     <div className="px-5 py-8 text-center animate-in fade-in slide-in-from-top-1 duration-300">
                         <div className="mx-auto size-12 rounded-2xl bg-sidebar-accent/30 flex items-center justify-center mb-3 border border-sidebar-border/50">

@@ -1,7 +1,7 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from "next/server"
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils"
 
-const COOKIE_NAME = "vos_access_token"
 const PROTECTED_PREFIXES = ["/dashboard", "/scm", "/fm", "/hrm", "/bia", "/arf", "/cafeteria"]
 const PUBLIC_FILE = /\.(.*)$/
 
@@ -9,18 +9,6 @@ function isProtectedPath(pathname: string) {
     return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
-function decodeJwt(token: string): Record<string, unknown> | null {
-    try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        while (s.length % 4) s += "=";
-        const json = Buffer.from(s, "base64").toString("utf8");
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
 
 export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_AUTH_DISABLED === "true") {
@@ -42,7 +30,8 @@ export async function middleware(req: NextRequest) {
     if (
         pathname === "/login" ||
         pathname.startsWith("/api/auth/login") ||
-        pathname.startsWith("/api/auth/logout")
+        pathname.startsWith("/api/auth/logout") ||
+        pathname.startsWith("/error/service-down")
     ) {
         return NextResponse.next()
     }
@@ -58,18 +47,29 @@ export async function middleware(req: NextRequest) {
         url.searchParams.set("next", pathname)
         return NextResponse.redirect(url)
     }
-
-    // --- Subsystem Authorization ---
-    const payload = decodeJwt(token);
+    const payload = decodeJwtPayload(token);
     
-    // Map path to subsystem ID and specific module slug
+    // Map path to subsystem ID and specific module slug (e.g. /hrm -> hrm)
     const subsystemMatch = PROTECTED_PREFIXES.find((p) => pathname.startsWith(p));
+    
     if (subsystemMatch) {
         const subsystemId = subsystemMatch.replace("/", "");
         
         // Dashboard is always allowed if logged in
         if (subsystemId === "dashboard" || subsystemId === "main-dashboard") {
             return NextResponse.next();
+        }
+
+        // --- 1. Subsystem Level Check (Short-Circuit via JWT) ---
+        const userSubsystems = (payload?.subsystems as string[]) || [];
+        const isUserAdmin = payload?.role === "ADMIN";
+
+        if (!isUserAdmin && !userSubsystems.includes(subsystemId)) {
+            console.warn(`[Middleware] Subsystem Blocked (JWT): User ${payload?.email} -> ${subsystemId}`);
+            const url = req.nextUrl.clone();
+            url.pathname = "/main-dashboard";
+            url.searchParams.set("error", "unauthorized_subsystem");
+            return NextResponse.redirect(url);
         }
 
         let authorizedSubsystemPaths: string[] = [];
@@ -118,9 +118,18 @@ export async function middleware(req: NextRequest) {
                     authorizedSubsystemPaths = (subData.data || []).map((row: { subsystem_id?: { base_path?: string } }) => row.subsystem_id?.base_path?.trim()).filter(Boolean) as string[];
                     authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
                     allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
-                } 
+                } else {
+                    // Fail-fast on server errors
+                    const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus" : "Spring Boot";
+                    throw new Error(service);
+                }
             } catch (err) {
-                 console.error("[Middleware] Failed to fetch permissions from Directus:", err);
+                 console.error("[Middleware] Critical Service Failure:", err);
+                 const service = err instanceof Error ? err.message : "Authorization System";
+                 const url = req.nextUrl.clone();
+                 url.pathname = "/error/service-down";
+                 url.searchParams.set("service", service);
+                 return NextResponse.redirect(url);
             }
         }
 
