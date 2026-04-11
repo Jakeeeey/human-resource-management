@@ -8,12 +8,13 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "@/app/(human-resource-management)/hrm/_components/nav-user";
+import { NavUser } from "../../../_components/nav-user";
 
 import { cookies } from "next/headers";
 
-// ✅ Wire the module you asked for
-import { SalesmanQRCodeModule } from "@/modules/human-resource-management/employee-admin/sales-management/salesman-qr-code/SalesmanQRCodeModule";
+// ✅ Wire the module
+
+import { SalesmanCreationModule } from "@/modules/human-resource-management/employee-admin/sales-management/salesman-creation/SalesmanCreationModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,16 +74,13 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
 }
 
 export default async function Page() {
-  // âœ… Next.js 16: cookies() is async
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
 
   const headerUser = buildHeaderUserFromToken(token);
 
   return (
-      // âœ… This fills the RIGHT column provided by SidebarInset (which is now fixed-height).
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {/* âœ… Topbar is fixed in place because ONLY <main> scrolls */}
         <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16 overflow-hidden">
           <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
             <SidebarTrigger className="-ml-1 shrink-0" />
@@ -109,7 +107,7 @@ export default async function Page() {
                   <BreadcrumbSeparator className="hidden md:block shrink-0" />
                   <BreadcrumbItem className="min-w-0 overflow-hidden">
                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                      Salesman QR Code
+                      Salesman Creation
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
@@ -122,11 +120,9 @@ export default async function Page() {
           </div>
         </header>
 
-        {/* âœ… Only content scrolls inside RIGHT column */}
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
-          <SalesmanQRCodeModule />
+          <SalesmanCreationModule />
         </main>
       </div>
   );
 }
-

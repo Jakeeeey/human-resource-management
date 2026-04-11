@@ -3,14 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cva } from "class-variance-authority";
+
 import {
     ChevronRight,
     ChevronDown,
     FileText,
     Folder,
     SearchX,
+    Sparkles,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -20,8 +22,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarMenuSub,
-    SidebarMenuSubButton,
-    SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
 
@@ -86,14 +86,12 @@ const SUB_WRAP_RESET = "mx-0 px-0 translate-x-0 border-l-0 w-full min-w-0 overfl
 
 const SUB_WRAP_L2 = cn(
     SUB_WRAP_RESET,
-    "relative py-0.5",
-    "before:content-[''] before:absolute before:left-4 before:top-0 before:bottom-0 before:w-px before:bg-sidebar-border/70"
+    "relative py-0.5"
 );
 
 const SUB_WRAP_L3 = cn(
     SUB_WRAP_RESET,
-    "relative py-0.5",
-    "before:content-[''] before:absolute before:left-9 before:top-0 before:bottom-0 before:w-px before:bg-sidebar-border/70"
+    "relative py-0.5"
 );
 
 const ROW = "flex w-full min-w-0 flex-nowrap items-center overflow-hidden";
@@ -112,13 +110,12 @@ const GAP_L2 = "gap-2";
 const GAP_L3 = "gap-2";
 
 const PILL_HOVER =
-    "hover:bg-[hsl(var(--vos-pill))] hover:text-[hsl(var(--vos-pill-foreground))] hover:shadow-sm " +
+    "hover:bg-[hsl(var(--vos-pill))] hover:text-[hsl(var(--vos-pill-foreground))] " +
     "dark:hover:!text-black";
 
 const PILL_ACTIVE =
     "group-data-[active=true]:bg-[hsl(var(--vos-pill))] " +
     "group-data-[active=true]:text-[hsl(var(--vos-pill-foreground))] " +
-    "group-data-[active=true]:shadow-sm " +
     "dark:group-data-[active=true]:!text-black";
 
 const OUTER_ROW_NO_GREY =
@@ -128,19 +125,6 @@ const OUTER_ROW_NO_GREY =
     "focus-visible:!ring-0";
 
 /* ---------------------------------- CVA ----------------------------------- */
-
-const subBtnVariants = cva(
-    cn("relative w-full min-w-0 overflow-hidden justify-start !translate-x-0 rounded-md"),
-    {
-        variants: {
-            level: {
-                2: "h-8 text-sm pl-7 pr-2",
-                3: "h-8 text-sm pl-12 pr-2",
-            },
-        },
-        defaultVariants: { level: 2 },
-    }
-);
 
 /* ---------------------------------- icons --------------------------------- */
 
@@ -176,7 +160,7 @@ const CHEVRON_ANIM = "transition-transform duration-200 ease-out";
 /* --------------------------------- soon badge -------------------------------- */
 function SoonBadge() {
     return (
-        <span className="ml-auto flex h-4 items-center rounded-full bg-amber-500/10 px-1.5 text-[8px] font-black uppercase tracking-tighter text-amber-600 border border-amber-500/20 shadow-sm">
+        <span className="ml-auto flex h-3.5 items-center rounded-[4px] bg-amber-500/5 px-1 text-[7px] font-black uppercase tracking-[0.2em] text-amber-600/80 border border-amber-500/10 shadow-none">
             Soon
         </span>
     );
@@ -218,45 +202,51 @@ interface RecursiveNavItemProps {
     openMap: Record<string, boolean>;
     toggleOpen: (key: string) => void;
     parentKey?: string;
-    isLast: boolean;
+    isLast?: boolean;
 }
 
-function RecursiveNavItem({
-    node,
-    depth,
-    pathname,
-    searchTerm,
-    openMap,
+function RecursiveNavItem({ 
+    node, 
+    depth, 
+    pathname, 
+    searchTerm, 
+    openMap, 
     toggleOpen,
     parentKey,
-    isLast,
+    isLast
 }: RecursiveNavItemProps) {
     const hasChildren = !!node.items?.length;
-    const currentKey = parentKey ? `${parentKey}::${node.title}` : node.title;
-    const isOpen = hasChildren ? !!openMap[currentKey] : false;
-    const isActive = isRouteActiveExact(pathname, node.url);
+    const isExact = isRouteActiveExact(pathname, node.url);
+    const key = parentKey ? `${parentKey}::${node.title}` : node.title;
+    const isOpen = hasChildren ? !!openMap[key] : false;
     const isClickable = node.url !== "#";
-    const isComingSoon = node.status === "comingSoon";
 
-    // Indentation: 0 -> 12px, 1 -> 32px, 2 -> 52px...
-    const indent = 12 + (depth * 20);
-    
-    // Parent Icon Center X (where our vertical line should be)
-    // L1 icon center = 22px
-    // L[d] icon center = (12 + d*20) + 8
-    const parentIconCenterX = depth === 0 ? 0 : depth === 1 ? 22 : (12 + (depth - 1) * 20) + 8;
+    // Indentation logic: Level 1 (0), Level 2 (7), Level 3 (12), Level 4 (17)...
+    const getPaddingClass = (d: number) => {
+        if (d === 0) return "";
+        if (d === 1) return "pl-7";
+        if (d === 2) return "pl-12";
+        // For d > 2, we can't use tailwind classes easily without JIT or dynamic style
+        return ""; 
+    };
 
-    const Icon = node.icon ?? (depth === 0 ? undefined : hasChildren ? Folder : FileText);
-    const iconClass = depth === 0 ? ICON_L1_CLASS : ICON_L2_CLASS;
-    const gapClass = depth === 0 ? GAP_L1 : GAP_L2;
+    const dynamicPadding = depth > 2 ? { paddingLeft: `${depth * 1.25 + 0.5}rem` } : {};
 
-    const content = (
-        <div className={cn(PILL_BASE, gapClass, PILL_HOVER, PILL_ACTIVE)}>
-            {Icon && <Icon className={iconClass} />}
+    const renderButtonContent = (
+        <div className={cn(PILL_BASE, depth === 0 ? GAP_L1 : (depth === 1 ? GAP_L2 : GAP_L3), PILL_HOVER, PILL_ACTIVE)}>
+            {(() => {
+                if (depth === 0) {
+                    const Icon = node.icon ?? Folder;
+                    return <Icon className={ICON_L1_CLASS} />;
+                }
+                if (depth === 1) return <L2Icon node={node} kind={hasChildren ? "parent" : "leaf"} />;
+                return <L3Icon node={node} />;
+            })()}
             <span className={LABEL}>
                 <HighlightMatch text={node.title} term={searchTerm} />
             </span>
-            {isComingSoon && <SoonBadge />}
+            {node.status === "comingSoon" && <SoonBadge />}
+
             {hasChildren && (
                 isOpen ? (
                     <ChevronDown className={cn("ml-auto size-4 shrink-0", CHEVRON_ANIM)} />
@@ -267,73 +257,147 @@ function RecursiveNavItem({
         </div>
     );
 
-    const buttonProps = {
-        tooltip: node.title,
-        className: cn(
-            "cursor-pointer min-w-0 overflow-hidden relative group/btn",
-            OUTER_ROW_NO_GREY,
-            isComingSoon && "opacity-60 cursor-not-allowed",
-            depth > 0 && "h-8 text-sm"
-        ),
-        ["data-active" as string]: isActive,
-        style: { paddingLeft: `${indent}px` },
-    };
 
-    const itemContent = (
-        <SidebarMenuItem className="min-w-0 overflow-hidden relative">
-            {/* Tree Connectors */}
-            {depth > 0 && (
-                <>
-                    {/* Vertical line from parent (only if we have a parentIconCenterX) */}
-                    <div 
-                        className={cn(
-                            "absolute top-0 w-px bg-sidebar-border/50 transition-colors group-hover/btn:bg-sidebar-border",
-                            isLast ? "h-4" : "h-full"
+    const nestedClass = cn(
+        "relative w-full flex items-center min-w-0 overflow-hidden cursor-pointer rounded-md",
+        depth > 2 ? "h-8 text-sm pr-2" : (depth === 1 ? "h-8 text-sm pl-7 pr-2" : "h-8 text-sm pl-12 pr-2"),
+        getPaddingClass(depth),
+        node.status === "comingSoon" && "opacity-60 cursor-not-allowed",
+        /* THE L-SHAPE CONNECTOR (Dashed Style) */
+        depth > 0 && [
+            // Vertical backbone (Full segment IF not last)
+            "before:content-[''] before:absolute before:bg-sidebar-border/30",
+            depth === 1 ? "before:left-4" : (depth === 2 ? "before:left-9" : ""),
+            depth > 2 && "before:left-[calc(var(--depth-offset)-1.25rem+1px)]",
+            "before:top-0 before:w-px",
+            isLast ? "before:h-4" : "before:h-full", // 4 is middle of h-8
+            "before:border-l before:border-dashed before:border-sidebar-border/40",
+
+            // Horizontal tick (The hook part of the L)
+            "after:content-[''] after:absolute after:bg-sidebar-border/30",
+            depth === 1 ? "after:left-4 after:w-3" : (depth === 2 ? "after:left-9 after:w-3" : ""),
+            depth > 2 && "after:left-[calc(var(--depth-offset)-1.25rem+1px)] after:w-3",
+            "after:top-4 after:h-px",
+            "after:border-t after:border-dashed after:border-sidebar-border/40",
+        ]
+    );
+
+    const dynamicStyle = {
+        ...dynamicPadding,
+        ...(depth > 2 ? { "--depth-offset": `${depth * 1.25 + 0.5}rem` } : {})
+    } as React.CSSProperties;
+
+    const sidebarItem = (
+        <SidebarMenuItem className="min-w-0 overflow-hidden">
+            {depth === 0 ? (
+                /* L1 ITEMS: Keep SidebarMenuButton for standard look */
+                hasChildren ? (
+                    <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                            tooltip={node.title}
+                            className={cn(OUTER_ROW_NO_GREY, "cursor-pointer min-w-0 overflow-hidden")}
+                            data-active={isExact}
+                        >
+                            <div className={ROW}>
+                                {renderButtonContent}
+                            </div>
+                        </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                ) : (
+                    <SidebarMenuButton
+                        asChild
+                        tooltip={node.title}
+                        className={cn(OUTER_ROW_NO_GREY, "cursor-pointer min-w-0 overflow-hidden")}
+                        data-active={isExact}
+                    >
+                        {isClickable && node.status !== "comingSoon" ? (
+                            <Link href={node.url} className={ROW}>
+                                {renderButtonContent}
+                            </Link>
+                        ) : (
+                            <div 
+                                className={cn(ROW, node.status === "comingSoon" && "opacity-60 cursor-not-allowed")}
+                                onClick={() => {
+                                    if (node.status === "comingSoon") {
+                                        toast.info("Stay Tuned!", {
+                                            description: `The "${node.title}" module is currently under development.`,
+                                            icon: <Sparkles className="size-4 text-amber-500" />,
+                                        });
+                                    }
+                                }}
+                            >
+                                {renderButtonContent}
+                            </div>
                         )}
-                        style={{ left: `${parentIconCenterX}px` }}
-                    />
-                    {/* Horizontal tick to current item */}
-                    <div 
-                        className="absolute h-px bg-sidebar-border/50 top-4 transition-colors group-hover/btn:bg-sidebar-border"
-                        style={{ 
-                            left: `${parentIconCenterX}px`,
-                            width: `${indent - parentIconCenterX}px`
-                        }}
-                    />
-                </>
-            )}
-
-            {hasChildren ? (
-                <CollapsibleTrigger asChild>
-                    <SidebarMenuButton {...buttonProps}>
-                        <div className={ROW}>{content}</div>
                     </SidebarMenuButton>
-                </CollapsibleTrigger>
+                )
             ) : (
-                <SidebarMenuButton asChild {...buttonProps}>
-                    {isClickable && !isComingSoon ? (
-                        <Link href={node.url} className={ROW}>{content}</Link>
+                /* NESTED ITEMS: Direct Button/Link to avoid shadcn backgrounds (The Grey Box) */
+                hasChildren ? (
+                    <CollapsibleTrigger asChild>
+                        <div 
+                            className={nestedClass}
+                            style={dynamicStyle}
+                            data-active={isExact}
+                        >
+                            <div className={ROW}>
+                                {renderButtonContent}
+                            </div>
+                        </div>
+                    </CollapsibleTrigger>
+                ) : (
+                    isClickable && node.status !== "comingSoon" ? (
+                        <Link 
+                            href={node.url} 
+                            className={nestedClass}
+                            style={dynamicStyle}
+                            data-active={isExact}
+                        >
+                            <div className={ROW}>
+                                {renderButtonContent}
+                            </div>
+                        </Link>
                     ) : (
-                        <div className={ROW}>{content}</div>
-                    )}
-                </SidebarMenuButton>
+                        <div 
+                            className={nestedClass}
+                            style={dynamicStyle}
+                            data-active={isExact}
+                            onClick={() => {
+                                if (node.status === "comingSoon") {
+                                    toast.info("Stay Tuned!", {
+                                        description: `The "${node.title}" module is currently under development.`,
+                                        icon: <Sparkles className="size-4 text-amber-500" />,
+                                    });
+                                }
+                            }}
+                        >
+                            <div className={ROW}>
+                                {renderButtonContent}
+                            </div>
+                        </div>
+                    )
+                )
             )}
 
+            {/* Recursion for Children */}
             {hasChildren && (
                 <div className={cn(DROP_WRAP, isOpen ? DROP_OPEN : DROP_CLOSED)}>
                     <div className={DROP_INNER}>
                         <CollapsibleContent forceMount>
-                            <SidebarMenuSub className="mx-0 px-0 translate-x-0 border-0 flex flex-col gap-0 relative">
+                            <SidebarMenuSub className={cn(
+                                depth === 0 ? SUB_WRAP_L2 : SUB_WRAP_L3,
+                                depth >= 2 && "mx-0 px-0 translate-x-0 border-l-0 w-full min-w-0 overflow-hidden relative py-0.5"
+                            )}>
                                 {node.items!.map((child, idx) => (
-                                    <RecursiveNavItem
-                                        key={`${currentKey}::${child.title}`}
-                                        node={child}
+                                    <RecursiveNavItem 
+                                        key={child.title}
+                                        node={child} 
+                                        parentKey={key}
                                         depth={depth + 1}
                                         pathname={pathname}
                                         searchTerm={searchTerm}
                                         openMap={openMap}
                                         toggleOpen={toggleOpen}
-                                        parentKey={currentKey}
                                         isLast={idx === node.items!.length - 1}
                                     />
                                 ))}
@@ -345,21 +409,53 @@ function RecursiveNavItem({
         </SidebarMenuItem>
     );
 
-    if (hasChildren) {
-        return (
-            <Collapsible
-                open={isOpen}
-                onOpenChange={() => toggleOpen(currentKey)}
-                asChild
-            >
-                {itemContent}
-            </Collapsible>
-        );
-    }
-
-    return itemContent;
+    return hasChildren ? (
+        <Collapsible
+            open={isOpen}
+            onOpenChange={() => toggleOpen(key)}
+            asChild
+        >
+            {sidebarItem}
+        </Collapsible>
+    ) : (
+        sidebarItem
+    );
 }
 
+/* -------------------------------- component -------------------------------- */
+
+/* ---------------------------------- helpers ------------------------------- */
+
+/**
+ * Recursive helper to expand parents of active routes or search matches.
+ */
+const getAutoOpenState = (
+    nodes: NavItem[],
+    currentPath: string,
+    search?: string,
+    parentKey?: string
+): Record<string, boolean> => {
+    return nodes.reduce<Record<string, boolean>>((acc, node) => {
+        const key = parentKey ? `${parentKey}::${node.title}` : node.title;
+        const hasChildren = !!node.items?.length;
+
+        let newState = { ...acc };
+
+        if (hasChildren) {
+            const isActive = hasActiveInTree(currentPath, node);
+            const isSearchMatch = !!(search && search.length > 0);
+
+            if (isActive || isSearchMatch) {
+                newState[key] = true;
+            }
+
+            const childrenState = getAutoOpenState(node.items!, currentPath, search, key);
+            newState = { ...newState, ...childrenState };
+        }
+
+        return newState;
+    }, {});
+};
 
 export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: string }) {
     const pathname = normalizePath(usePathname() || "/");
@@ -378,43 +474,28 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
 
     const [openMap, setOpenMap] = React.useState<Record<string, boolean>>({});
 
-    const toggleOpen = (key: string) => {
-        setOpenMap(prev => ({ ...prev, [key]: !prev[key] }));
-    };
 
-    // Auto-expand logic (Recursive)
     React.useEffect(() => {
-        const nextMap: Record<string, boolean> = {};
-        
-        function processNode(node: NavItem, parentKey?: string) {
-            const currentKey = parentKey ? `${parentKey}::${node.title}` : node.title;
-            const hasChildren = !!node.items?.length;
+        const nextState = getAutoOpenState(items, pathname, searchTerm);
+        setOpenMap((prev) => {
+            // Check if state actually changed to avoid infinite loop
+            const keys = Object.keys(nextState);
+            if (keys.length === 0 && Object.keys(prev).length === 0) return prev;
             
-            if (hasChildren) {
-                const isActiveInPath = hasActiveInTree(pathname, node);
-                const isSearchMatch = searchTerm && (
-                    node.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    node.items?.some(c => hasActiveInTree("", c))
-                );
-                
-                if (searchTerm || isActiveInPath) {
-                    nextMap[currentKey] = true;
+            let changed = false;
+            for (const k of keys) {
+                if (!prev[k]) {
+                    changed = true;
+                    break;
                 }
-                
-                node.items?.forEach(child => processNode(child, currentKey));
             }
-        }
-
-        items.forEach(item => processNode(item));
-        setOpenMap(prev => {
-            // Merge but only add true values from nextMap, don't overwrite manual closes if they didn't change
-            const merged = { ...prev };
-            Object.keys(nextMap).forEach(k => {
-                if (nextMap[k]) merged[k] = true;
-            });
-            return merged;
+            return changed ? { ...prev, ...nextState } : prev;
         });
     }, [pathname, items, searchTerm]);
+
+    const handleToggle = (key: string) => {
+        setOpenMap((prev) => ({ ...prev, [key]: !prev[key] }));
+    };
 
     return (
         <SidebarGroup
@@ -436,16 +517,15 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
                         <p className="text-[10px] text-muted-foreground/60 mt-1">Try another keyword</p>
                     </div>
                 ) : (
-                    items.map((item, idx) => (
-                        <RecursiveNavItem
-                            key={item.title}
-                            node={item}
-                            depth={0}
+                    items.map((l1) => (
+                        <RecursiveNavItem 
+                            key={l1.title} 
+                            node={l1} 
+                            depth={0} 
                             pathname={pathname}
                             searchTerm={searchTerm}
                             openMap={openMap}
-                            toggleOpen={toggleOpen}
-                            isLast={idx === items.length - 1}
+                            toggleOpen={handleToggle}
                         />
                     ))
                 )}

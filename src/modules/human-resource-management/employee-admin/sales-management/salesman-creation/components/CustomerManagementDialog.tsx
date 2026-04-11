@@ -14,9 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, X } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Printer, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Customer, SalesmanWithRelations } from "../types";
+import { exportSalesmanCustomersPDF } from "../utils/exportSalesmanCustomersPDF";
 
 interface CustomerManagementDialogProps {
     open: boolean;
@@ -36,6 +38,7 @@ export function CustomerManagementDialog({
     const [availableSearchQuery, setAvailableSearchQuery] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isPrinting, setIsPrinting] = useState(false);
 
     const customersApiUrl =
         "/api/hrm/employee-admin/structure/sales-management/salesman-creation/customers";
@@ -125,6 +128,28 @@ export function CustomerManagementDialog({
         return availableCustomers.filter((c) => customerMatchesQuery(c, availableSearchQuery));
     }, [availableCustomers, availableSearchQuery, customerMatchesQuery]);
 
+    const handlePrint = useCallback(async () => {
+        if (!salesman) return;
+
+        setIsPrinting(true);
+        const toastId = toast.loading("Generating printable PDF...");
+        try {
+            await exportSalesmanCustomersPDF({
+                salesman,
+                customers: assignedCustomers,
+            });
+            toast.success("Printable PDF generated", { id: toastId });
+        } catch (error) {
+            console.error("Error generating Salesman Customer PDF:", error);
+            toast.error("Failed to generate printable PDF", {
+                id: toastId,
+                description: error instanceof Error ? error.message : "Unexpected error occurred",
+            });
+        } finally {
+            setIsPrinting(false);
+        }
+    }, [assignedCustomers, salesman]);
+
     const handleToggleCustomer = (customerId: number) => {
         setAssignedCustomerIds((prev) => {
             const wasAssigned = prev.includes(customerId);
@@ -195,18 +220,20 @@ export function CustomerManagementDialog({
                         <span className="text-sm text-muted-foreground">
                             {assignedCustomerIds.length} customer(s) selected
                         </span>
-                        {assignedCustomerIds.length > 0 && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    setAssignedCustomerIds([]);
-                                    setLastAssignedCustomerId(null);
-                                }}
-                            >
-                                Clear All
-                            </Button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {assignedCustomerIds.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        setAssignedCustomerIds([]);
+                                        setLastAssignedCustomerId(null);
+                                    }}
+                                >
+                                    Clear All
+                                </Button>
+                            )}
+                        </div>
                     </div>
 
                     {isLoading ? (
@@ -435,11 +462,23 @@ export function CustomerManagementDialog({
                 <DialogFooter>
                     <Button
                         variant="outline"
-                        onClick={() => onOpenChange(false)}
-                        disabled={isSaving}
-                        className="w-full sm:w-auto"
+                        size="sm"
+                        onClick={handlePrint}
+                        disabled={isLoading || isPrinting || !salesman}
+                        aria-busy={isPrinting}
+                        className="gap-2"
                     >
-                        Cancel
+                        {isPrinting ? (
+                            <>
+                                <Spinner className="h-4 w-4" />
+                                <span>Generating...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Printer className="h-4 w-4" />
+                                <span>Print</span>
+                            </>
+                        )}
                     </Button>
                     <Button
                         onClick={handleSave}
