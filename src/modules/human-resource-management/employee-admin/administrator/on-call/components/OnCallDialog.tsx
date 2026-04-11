@@ -190,7 +190,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
-                    <section className="space-y-4 rounded-lg border p-6 bg-white shadow-sm">
+                    <section className="space-y-4 rounded-lg border p-6 bg-card shadow-sm">
                         <div className="space-y-1">
                             <h3 className="font-semibold text-base tracking-tight">Schedule Details</h3>
                             <p className="text-xs text-muted-foreground">Basic information about the on-call schedule</p>
@@ -261,7 +261,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                         </div>
                     </section>
 
-                    <section className="space-y-4 rounded-lg border p-6 bg-white shadow-sm">
+                    <section className="space-y-4 rounded-lg border p-6 bg-card shadow-sm">
                         <div className="space-y-1">
                             <h3 className="font-semibold text-base tracking-tight">Work Hours</h3>
                             <p className="text-xs text-muted-foreground">Define work schedule and break times</p>
@@ -339,7 +339,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                         </div>
                     </section>
 
-                    <section className="space-y-4 rounded-lg border p-6 bg-white shadow-sm">
+                    <section className="space-y-4 rounded-lg border p-6 bg-card shadow-sm">
                         <div className="space-y-1">
                             <h3 className="font-semibold text-base tracking-tight flex items-center gap-2">
                                 <Users className="h-4 w-4" />
@@ -369,7 +369,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                                             <Badge
                                                 key={u.user_id}
                                                 variant="secondary"
-                                                className="bg-white border text-xs py-1 pl-2 pr-1 gap-1 group animate-in fade-in zoom-in duration-200"
+                                                className="border text-xs py-1 pl-2 pr-1 gap-1 group animate-in fade-in zoom-in duration-200"
                                             >
                                                 {u.user_fname} {u.user_lname}
                                                 <button
@@ -454,7 +454,7 @@ function OnCallDialogContent({ open, onOpenChange, schedule }: OnCallDialogProps
                                                             {staff.user_fname} {staff.user_lname}
                                                         </label>
                                                         {isUnavailable && (
-                                                            <Badge variant="outline" className="text-[10px] py-0 h-4 border-amber-200 bg-amber-50 text-amber-700">
+                                                            <Badge variant="outline" className="text-[10px] py-0 h-4 border-amber-500/20 bg-amber-500/10 text-amber-500">
                                                                 Scheduled in {otherDept}
                                                             </Badge>
                                                         )}
