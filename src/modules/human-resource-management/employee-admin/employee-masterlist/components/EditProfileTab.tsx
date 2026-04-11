@@ -100,6 +100,7 @@ export interface EditEmployeeFormData {
   middleName: string;
   lastName: string;
   suffixName: string;
+  nickname: string;
   contact: string;
   birthday: string;
   gender: string;
@@ -191,6 +192,7 @@ export function EditProfileTab({
     middleName: user.middleName || "",
     lastName: user.lastName || "",
     suffixName: user.suffixName || "",
+    nickname: user.nickname || "",
     contact: user.contact || "",
     birthday: user.birthday || "",
     gender: (user.gender === "Male" || user.gender === "Female") ? user.gender : (user.gender ? "Other" : ""),
@@ -230,6 +232,7 @@ export function EditProfileTab({
       middleName: user.middleName || "",
       lastName: user.lastName || "",
       suffixName: user.suffixName || "",
+      nickname: user.nickname || "",
       contact: user.contact || "",
       birthday: user.birthday || "",
       gender: (user.gender === "Male" || user.gender === "Female") ? user.gender : (user.gender ? "Other" : ""),
@@ -388,6 +391,7 @@ export function EditProfileTab({
         middleName:   form.middleName || undefined,
         lastName:     form.lastName,
         suffixName:   form.suffixName || undefined,
+        nickname:     form.nickname || undefined,
         contact:      form.contact,
         birthday:     form.birthday || undefined,
         gender:       form.gender === "Other" ? form.gender_specify : (form.gender || undefined),
@@ -512,6 +516,9 @@ export function EditProfileTab({
           </Field>
           <Field label="Suffix Name">
             <Input className={inputCls} value={form.suffixName || ""} onChange={(e) => set("suffixName", e.target.value)} placeholder="e.g. Jr., III" />
+          </Field>
+          <Field label="Nickname">
+            <Input className={inputCls} value={form.nickname || ""} onChange={(e) => set("nickname", e.target.value)} placeholder="e.g. Juan" />
           </Field>
           <Field label="Gender" required>
             <Select value={form.gender} onValueChange={(v) => set("gender", v)} required>
