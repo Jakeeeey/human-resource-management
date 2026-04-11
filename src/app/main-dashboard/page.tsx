@@ -98,7 +98,7 @@ export default async function ERPMainDashboardPage() {
     const isAdmin = payload.role === "ADMIN";
     const allowedSubsystems = new Set(payload.subsystems || []);
     const directusBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-    const oldVosUrl = process.env.NEXT_PUBLIC_OLD_VOS_URL || "/";
+
 
     let subsystems: MappedSubsystem[] = [];
 

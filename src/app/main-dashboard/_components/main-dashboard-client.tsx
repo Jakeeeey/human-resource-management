@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import * as Icons from "lucide-react";
 import {
     ArrowUpRight,
@@ -15,7 +14,6 @@ import { UserMenu } from "@/components/dashboard/user-menu";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 export type Status = "active" | "comingSoon";
 
@@ -188,7 +186,7 @@ export default function MainDashboardClient({
     userFullName: string;
     userEmail: string;
 }) {
-    const [q, setQ] = React.useState("");
+    const q = ""; // State setter removed as search is managed by CommandPalette component logic
     const [isCompactHeader, setIsCompactHeader] = React.useState(false);
     const [recentIds, setRecentIds] = React.useState<string[]>([]);
 
