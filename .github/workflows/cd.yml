@@ -13,6 +13,10 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
+      - name: Fix Dubious Ownership
+        shell: cmd
+        run: git config --global --add safe.directory "c:\Users\Admin\Desktop\vos-web-v2-systems\human-resource-management"
+
       - name: Pull Latest Changes
         shell: cmd
         run: |
