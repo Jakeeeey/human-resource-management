@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -129,8 +130,9 @@ export function SalesmanCreationView() {
 
   if (!lookups && loading) {
       return (
-          <div className="flex items-center justify-center py-20 text-muted-foreground">
-              Loading metadata...
+        <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground">
+          <Spinner className="h-5 w-5" />
+          <span>Loading metadata...</span>
           </div>
       )
   }
@@ -164,20 +166,39 @@ export function SalesmanCreationView() {
               </Select>
             </div>
 
+            <div className="md:col-span-12 -mt-1">
+              <p className="text-xs font-medium text-muted-foreground">Salesman Details</p>
+            </div>
+
             {/* Row 2: Salesman Info (6, 3, 3) */}
             <div className="md:col-span-6 min-w-0 overflow-hidden">
               <Label>Salesman Name</Label>
-              <Input value={salesmanName} onChange={(e) => setSalesmanName(e.target.value)} className="w-full" />
+              <Input
+                value={salesmanName}
+                onChange={(e) => setSalesmanName(e.target.value)}
+                placeholder="Enter salesman name"
+                className="w-full"
+              />
             </div>
 
             <div className="md:col-span-3 min-w-0 overflow-hidden">
               <Label>Salesman Code</Label>
-              <Input value={salesmanCode} onChange={(e) => setSalesmanCode(e.target.value)} className="w-full" />
+              <Input
+                value={salesmanCode}
+                onChange={(e) => setSalesmanCode(e.target.value)}
+                placeholder="e.g. SM-0001"
+                className="w-full"
+              />
             </div>
 
             <div className="md:col-span-3 min-w-0 overflow-hidden">
               <Label>Truck Plate</Label>
-              <Input value={truckPlate} onChange={(e) => setTruckPlate(e.target.value)} className="w-full" />
+              <Input
+                value={truckPlate}
+                onChange={(e) => setTruckPlate(e.target.value)}
+                placeholder="e.g. ABC-1234"
+                className="w-full"
+              />
             </div>
 
             {/* Row 3: Price Type & E-mail (4, 8) */}
@@ -204,6 +225,10 @@ export function SalesmanCreationView() {
 
             <div className="md:col-span-12 py-1">
                 <Separator />
+            </div>
+
+            <div className="md:col-span-12 -mt-1">
+              <p className="text-xs font-medium text-muted-foreground">Contact & Location</p>
             </div>
 
             {/* Row 4: Contact & Location (6, 6) */}
@@ -240,6 +265,10 @@ export function SalesmanCreationView() {
 
             <div className="md:col-span-12 py-1">
                 <Separator />
+            </div>
+
+            <div className="md:col-span-12 -mt-1">
+              <p className="text-xs font-medium text-muted-foreground">Business</p>
             </div>
 
             {/* Row 6: Business (6, 6) */}
@@ -320,6 +349,14 @@ export function SalesmanCreationView() {
               </Select>
             </div>
 
+            <div className="md:col-span-12 py-1">
+              <Separator />
+            </div>
+
+            <div className="md:col-span-12 -mt-1">
+              <p className="text-xs font-medium text-muted-foreground">Branching</p>
+            </div>
+
             {/* Row 8: Branching (6, 6) */}
             <div className="md:col-span-6 min-w-0 overflow-hidden">
               <Label>Branch</Label>
@@ -359,21 +396,23 @@ export function SalesmanCreationView() {
               </Select>
             </div>
 
-            <div className="md:col-span-12 flex flex-wrap items-center justify-start gap-10 pt-4">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={isActive} onCheckedChange={(v) => setIsActive(Boolean(v))} />
-                Active
-              </label>
+            <div className="md:col-span-12">
+              <div className="rounded-lg border bg-muted/10 p-4 flex flex-wrap items-center justify-start gap-10">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={isActive} onCheckedChange={(v) => setIsActive(Boolean(v))} />
+                  Active
+                </label>
 
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={isInventory} onCheckedChange={(v) => setIsInventory(Boolean(v))} />
-                Has Inventory
-              </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={isInventory} onCheckedChange={(v) => setIsInventory(Boolean(v))} />
+                  Has Inventory
+                </label>
 
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={canCollect} onCheckedChange={(v) => setCanCollect(Boolean(v))} />
-                Can Collect
-              </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={canCollect} onCheckedChange={(v) => setCanCollect(Boolean(v))} />
+                  Can Collect
+                </label>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -381,8 +420,9 @@ export function SalesmanCreationView() {
           <Button variant="outline" onClick={() => router.back()} disabled={saving}>
             Back
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Registering..." : "Register Salesman"}
+          <Button onClick={handleSave} disabled={saving} aria-busy={saving} className="gap-2">
+            {saving && <Spinner className="h-4 w-4" />}
+            <span>{saving ? "Registering..." : "Register Salesman"}</span>
           </Button>
         </CardFooter>
       </Card>

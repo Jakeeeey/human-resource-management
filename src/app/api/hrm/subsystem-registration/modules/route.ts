@@ -41,7 +41,7 @@ async function proxy(req: NextRequest) {
       headers,
     };
 
-    if (["POST", "PATCH", "PUT"].includes(req.method)) {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
       const body = await req.json();
       fetchOptions.body = JSON.stringify(body);
     }

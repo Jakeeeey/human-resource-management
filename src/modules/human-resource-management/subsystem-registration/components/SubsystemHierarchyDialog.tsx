@@ -10,6 +10,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
     Plus, 
     Trash2, 
@@ -212,18 +223,17 @@ export function SubsystemHierarchyDialog({
     // Filter Logic for Tree (Side-effect free version)
     const filterTree = React.useCallback((items: ModuleRegistration[], query: string): ModuleRegistration[] => {
         if (!query) return items;
-        return items.filter(item => {
+        return items.reduce<ModuleRegistration[]>((acc, item) => {
             const matchesSelf = item.title.toLowerCase().includes(query.toLowerCase()) ||
                               item.base_path.toLowerCase().includes(query.toLowerCase());
             const filteredChildren = item.subModules ? filterTree(item.subModules, query) : [];
             const matchesChildren = filteredChildren.length > 0;
 
-            if (matchesChildren) {
-                item.subModules = filteredChildren;
-                return true;
+            if (matchesSelf || matchesChildren) {
+                acc.push({ ...item, subModules: matchesChildren ? filteredChildren : item.subModules });
             }
-            return matchesSelf;
-        });
+            return acc;
+        }, []);
     }, []);
 
     const displayedModules = React.useMemo(() => {
@@ -558,15 +568,40 @@ function RecursiveModuleItem({
                         </Button>
                     </div>
                     <Separator orientation="vertical" className="h-4 mx-0 sm:mx-0.5 opacity-10" />
-                    <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 sm:h-7 sm:w-7 rounded-xl text-destructive hover:bg-destructive/10 active:scale-90 transition-all" 
-                        title="Delete element"
-                        onClick={() => onDelete(item.id)}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 sm:h-7 sm:w-7 rounded-xl text-destructive hover:bg-destructive/10 active:scale-90 transition-all" 
+                                title="Delete element"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-2xl border-destructive/20 shadow-2xl">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="font-black tracking-tighter text-xl">
+                                    Delete Module?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription className="text-sm font-medium">
+                                    Are you sure you want to delete <span className="text-foreground font-bold">&quot;{item.title}&quot;</span>? 
+                                    This will remove the module and all its sub-modules from the current structure.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="mt-4 gap-2">
+                                <AlertDialogCancel className="rounded-xl border-muted-foreground/10 font-bold uppercase text-[10px]">
+                                    Cancel
+                                </AlertDialogCancel>
+                                <AlertDialogAction 
+                                    onClick={() => onDelete(item.id)}
+                                    className="rounded-xl bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] shadow-lg shadow-destructive/20"
+                                >
+                                    Confirm Delete
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             </div>
 
