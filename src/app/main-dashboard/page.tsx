@@ -11,6 +11,9 @@ const JwtPayloadSchema = z.object({
     sub: z.union([z.number(), z.string()]).optional(),
     role: z.string().optional(),
     subsystems: z.array(z.string()).optional(),
+    FirstName: z.string().optional(),
+    LastName: z.string().optional(),
+    email: z.string().optional(),
 }).passthrough();
 
 type JwtPayload = z.infer<typeof JwtPayloadSchema>;
@@ -133,10 +136,15 @@ export default async function ERPMainDashboardPage() {
         console.error("[Dashboard Server] Fetch Error:", err);
     }
 
+    const userFullName = [payload.FirstName, payload.LastName].filter(Boolean).join(" ") || "User";
+    const userEmail = payload.email || "";
+
     return (
         <MainDashboardClient 
             initialSubsystems={subsystems} 
-            oldVosUrl={oldVosUrl} 
+            userFirstName={payload.FirstName || "User"}
+            userFullName={userFullName}
+            userEmail={userEmail}
         />
     );
 }
