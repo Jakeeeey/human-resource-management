@@ -2,7 +2,6 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react"
 import { motion } from "framer-motion"
@@ -13,13 +12,11 @@ import { Button } from "@/components/ui/button"
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 
@@ -130,20 +127,21 @@ function LoginForm() {
     const pwHasError = Boolean(errors.hashPassword)
 
     return (
-        <div className="relative min-h-[calc(100dvh-64px)] overflow-hidden">
+        <div className="relative min-h-svh lg:min-h-[calc(100dvh-64px)] overflow-hidden flex flex-col">
             {/* Background Decor */}
             <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/2 rounded-full blur-3xl -z-10 animate-pulse" />
 
-            <div className="mx-auto flex min-h-[calc(100dvh-64px)] w-full max-w-6xl items-center justify-center px-4 py-12">
-                <div className="grid w-full gap-8 lg:grid-cols-2 lg:gap-16">
+            <div className="mx-auto flex flex-1 w-full max-w-6xl items-center justify-center px-4 py-6 sm:py-10">
+                <div className="grid w-full gap-10 lg:grid-cols-2 lg:gap-16 items-stretch">
                     {/* Left: Brand / intro */}
                     <motion.div 
                         initial={{ opacity: 0, x: -30 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.5, ease: "easeOut" }}
-                        className="hidden flex-col justify-between rounded-[2rem] border bg-card/40 backdrop-blur-md p-12 lg:flex relative overflow-hidden group shadow-2xl border-white/5"
+                        className="hidden flex-col justify-center gap-8 rounded-[2rem] border bg-card/40 backdrop-blur-md p-10 lg:flex relative overflow-hidden group shadow-2xl border-white/5 h-full"
                     >
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-primary/50 via-primary to-primary/50" />
                         <div className="absolute inset-0 bg-linear-to-br from-primary/5 to-transparent pointer-events-none" />
                         
                         <div className="relative z-10">
@@ -155,8 +153,8 @@ function LoginForm() {
                                 </div>
                             </div>
 
-                            <div className="mt-16 space-y-6">
-                                <h1 className="text-5xl font-black tracking-tighter leading-[0.95] uppercase decoration-primary/20 underline-offset-8">
+                            <div className="mt-4 space-y-3">
+                                <h1 className="text-4xl sm:text-5xl font-black tracking-tighter leading-[0.95] uppercase decoration-primary/20 underline-offset-8">
                                     Simplified <br />
                                     Business <br />
                                     <span className="text-primary italic">Management.</span>
@@ -167,7 +165,7 @@ function LoginForm() {
                             </div>
                         </div>
 
-                        <div className="relative z-10 space-y-10">
+                        <div className="relative z-10 space-y-6">
                             <div className="grid grid-cols-2 gap-y-4 gap-x-8">
                                  {['Supply Chain', 'Finance', 'Human Resources', 'Analytics'].map((feat) => (
                                      <div key={feat} className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-muted-foreground transition-colors hover:text-primary">
@@ -177,7 +175,7 @@ function LoginForm() {
                                  ))}
                             </div>
                             
-                            <div className="flex items-center gap-5 p-6 rounded-3xl bg-primary/5 border border-primary/10 backdrop-blur-sm group/security">
+                            <div className="flex items-center gap-4 p-5 rounded-3xl bg-primary/5 border border-primary/10 backdrop-blur-sm group/security">
                                 <div className="p-3 rounded-2xl bg-background border border-primary/20 shadow-xs transition-transform group-hover/security:scale-110">
                                     <ShieldCheck className="h-6 w-6 text-primary" />
                                 </div>
@@ -199,18 +197,23 @@ function LoginForm() {
                         transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
                         className="flex items-center justify-center"
                     >
-                        <Card className="w-full max-w-md border-0 shadow-2xl rounded-[2rem] bg-card/80 backdrop-blur-xl relative overflow-hidden">
+                        <Card className="w-full max-w-md border-0 shadow-2xl rounded-[2rem] bg-card/80 backdrop-blur-xl relative overflow-hidden h-full flex flex-col justify-center">
                             <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-primary/50 via-primary to-primary/50" />
                             
-                            <CardHeader className="space-y-1 pt-12 px-8">
-                                <CardTitle className="text-4xl font-black tracking-tighter uppercase">Sign in</CardTitle>
-                                <CardDescription className="font-bold tracking-tight text-muted-foreground/60 uppercase text-[10px] flex items-center gap-2">
-                                    Please enter your details below <ArrowRight className="h-3 w-3" />
-                                </CardDescription>
+                            <CardHeader className="space-y-1 pt-8 sm:pt-10 px-6 sm:px-8">
+                                {/* Mobile Brand Identity (Visible only on smaller screens) */}
+                                <div className="flex items-center gap-3 mb-6 lg:hidden">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border bg-background shadow-xs font-black text-base tracking-tighter">V</div>
+                                    <div className="flex flex-col">
+                                        <span className="text-base font-black tracking-tighter uppercase leading-none">VOS ERP</span>
+                                        <span className="text-[9px] font-black tracking-[0.2em] text-primary uppercase mt-1">v2.systems</span>
+                                    </div>
+                                </div>
+                                <CardTitle className="text-2xl sm:text-3xl font-black tracking-tighter uppercase text-center w-full">LOGIN</CardTitle>
                             </CardHeader>
 
-                            <CardContent className="px-8 pb-12">
-                                <form onSubmit={onSubmit} className="space-y-6">
+                            <CardContent className="px-6 sm:px-8 pb-8 sm:pb-10">
+                                <form onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
                                     {/* Email */}
                                     <div className="space-y-3">
                                         <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email Address</Label>
@@ -310,28 +313,19 @@ function LoginForm() {
                                         {loading ? (
                                             <div className="flex items-center gap-3">
                                                 <div className="h-4 w-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
-                                                Signing in...
+                                                LOGIN...
                                             </div>
                                         ) : (
-                                            "Sign In"
+                                            <span className="flex items-center justify-center">
+                                                LOGIN <ArrowRight className="ml-2 h-4 w-4" />
+                                            </span>
                                         )}
                                     </Button>
 
-                                    <div className="pt-4 space-y-4">
-                                        <p className="text-center text-[9px] font-bold text-muted-foreground/40 leading-relaxed uppercase tracking-widest mx-auto max-w-[200px]">
+                                    <div className="pt-2">
+                                        <p className="text-center text-[8px] font-bold text-muted-foreground/40 leading-tight uppercase tracking-widest mx-auto max-w-[180px]">
                                             By signing in, you agree to our internal safety policies.
                                         </p>
-                                        
-                                        <Separator className="opacity-30" />
-
-                                        <div className="text-center">
-                                            <Link 
-                                                className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 hover:text-primary transition-colors" 
-                                                href="/public"
-                                            >
-                                                [ Back to Home ]
-                                            </Link>
-                                        </div>
                                     </div>
                                 </form>
                             </CardContent>

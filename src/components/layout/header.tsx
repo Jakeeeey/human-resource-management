@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, LogIn, ChevronRight } from "lucide-react"
+import { Menu, ChevronRight } from "lucide-react"
 import { motion } from "framer-motion"
 
 import { Button } from "@/components/ui/button"
@@ -29,9 +29,23 @@ const MOBILE_NAV = [...NAV, { href: "/login", label: "Login" }]
 
 export function Header() {
     const pathname = usePathname()
+    const [scrolled, setScrolled] = React.useState(false)
+
+    React.useEffect(() => {
+        const handleScroll = () => setScrolled(window.scrollY > 20)
+        window.addEventListener("scroll", handleScroll)
+        return () => window.removeEventListener("scroll", handleScroll)
+    }, [])
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+        <header 
+            className={cn(
+                "fixed top-0 z-50 w-full transition-all duration-300",
+                scrolled 
+                    ? "bg-background/80 backdrop-blur-3xl border-b-2 border-primary/40 shadow-lg dark:shadow-primary/10" 
+                    : "bg-background/40 backdrop-blur-2xl border-b-2 border-primary/20 shadow-none"
+            )}
+        >
             <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
                 <Link href="/" className="flex items-center gap-3 group">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl border bg-card shadow-xs transition-all duration-300 group-hover:shadow-md group-hover:border-primary/50 group-hover:scale-105 active:scale-95 overflow-hidden relative">
@@ -39,8 +53,8 @@ export function Header() {
                         <span className="text-lg font-black tracking-tighter relative z-10">V</span>
                     </div>
                     <div className="leading-none flex flex-col pt-0.5">
-                        <div className="text-sm font-black tracking-tighter uppercase transition-colors group-hover:text-primary">VOS-WEB</div>
-                        <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase opacity-70">Corporate</div>
+                        <div className="text-sm font-black tracking-tighter uppercase transition-colors group-hover:text-primary leading-none">VOS-WEB</div>
+                        <div className="text-[9px] font-black tracking-[0.2em] text-muted-foreground uppercase opacity-50">Corporate</div>
                     </div>
                 </Link>
 
@@ -60,9 +74,9 @@ export function Header() {
                                             <Link 
                                                 href={item.href} 
                                                 className={cn(
-                                                    "relative rounded-xl px-4 py-2 text-sm font-bold tracking-tight transition-all duration-300",
-                                                    "hover:text-primary",
-                                                    active ? "text-primary" : "text-muted-foreground/80"
+                                                    "relative rounded-xl px-4 py-2 text-sm font-black tracking-tight transition-all duration-300",
+                                                    "hover:text-primary hover:scale-105 active:scale-95",
+                                                    active ? "text-primary" : "text-muted-foreground/70"
                                                 )}
                                             >
                                                 {item.label}
@@ -84,10 +98,10 @@ export function Header() {
                     </NavigationMenu>
 
                     <div className="flex items-center gap-2 pl-2">
-                        <Button asChild className="rounded-2xl cursor-pointer font-bold tracking-tight px-6 shadow-xs hover:shadow-md active:scale-95 transition-all">
+                        <Button asChild className="rounded-xl cursor-pointer font-black uppercase tracking-widest text-[10px] px-6 shadow-sm hover:shadow-primary/20 active:scale-95 transition-all">
                             <Link href="/login">
-                                <LogIn className="mr-2 h-4 w-4" />
                                 Login
+                                <ChevronRight className="ml-1 h-3 w-3 opacity-70" />
                             </Link>
                         </Button>
                         <Separator orientation="vertical" className="h-6 mx-1" />
