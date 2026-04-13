@@ -10,7 +10,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
     const pathname = usePathname()
 
     return (
-        <div className="min-h-dvh flex flex-col bg-background text-foreground overflow-x-hidden">
+        <div className="min-h-dvh flex flex-col bg-background text-foreground overflow-x-hidden pt-16">
             <Header />
             <AnimatePresence mode="wait">
                 <motion.main 

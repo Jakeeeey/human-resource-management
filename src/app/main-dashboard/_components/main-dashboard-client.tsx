@@ -7,7 +7,7 @@ import {
     ArrowUpRight,
     Timer,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 import { CommandPalette } from "@/components/dashboard/command-palette";
 import { UserMenu } from "@/components/dashboard/user-menu";
@@ -188,32 +188,18 @@ export default function MainDashboardClient({
 }) {
     const q = ""; // State setter removed as search is managed by CommandPalette component logic
     const [isCompactHeader, setIsCompactHeader] = React.useState(false);
-    const [recentIds, setRecentIds] = React.useState<string[]>([]);
 
     React.useEffect(() => {
         const onScroll = () => setIsCompactHeader(window.scrollY > 36);
         onScroll();
         window.addEventListener("scroll", onScroll, { passive: true });
 
-        // Load recents
-        const saved = localStorage.getItem("vos_recent_subsystems");
-        if (saved) {
-            try {
-                setRecentIds(JSON.parse(saved));
-            } catch (e) {
-                console.error("Failed to load recents", e);
-            }
-        }
-
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
     const trackAccess = (id: string) => {
-        setRecentIds((prev) => {
-            const next = [id, ...prev.filter((x) => x !== id)].slice(0, 4);
-            localStorage.setItem("vos_recent_subsystems", JSON.stringify(next));
-            return next;
-        });
+        // Access tracking disabled
+        console.log("Access tracking disabled for:", id);
     };
 
     const resolvedSubsystems = React.useMemo(() => {
@@ -302,34 +288,6 @@ export default function MainDashboardClient({
                     animate="show"
                     className="space-y-10"
                 >
-                    {/* Recently Accessed */}
-                    <AnimatePresence>
-                        {recentIds.length > 0 && !q && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="space-y-3"
-                            >
-                                <div className="flex items-center gap-2 px-1">
-                                    <Icons.Clock className="h-4 w-4 text-muted-foreground" />
-                                    <h2 className="text-xs font-black tracking-widest text-muted-foreground uppercase opacity-70">Recently Accessed</h2>
-                                </div>
-                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                    {recentIds.map((id) => {
-                                        const sub = resolvedSubsystems.find((s) => s.id === id);
-                                        if (!sub) return null;
-                                        return (
-                                            <motion.div key={`recent-${id}`} variants={itemVars}>
-                                                <RecentTile subsystem={sub} />
-                                            </motion.div>
-                                        );
-                                    })}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
                     <div className="space-y-10">
                     {filtered.length === 0 ? (
                         <Card className="border bg-background/50 p-8 backdrop-blur">
@@ -348,7 +306,7 @@ export default function MainDashboardClient({
                                         <div className="flex flex-wrap items-center gap-2">
                                             <div className="text-sm font-black tracking-tight uppercase">{meta.title}</div>
                                             <span className="inline-flex items-center rounded-full bg-primary/5 px-2.5 py-0.5 text-[10px] font-black text-primary ring-1 ring-primary/10 tracking-widest uppercase">
-                                                {group.items.length} Modules
+                                                {group.items.length} Subsystem/s
                                             </span>
                                         </div>
                                         <div className="mt-1 text-[11px] font-bold tracking-tight text-muted-foreground opacity-70 uppercase leading-none">{meta.description}</div>
@@ -468,35 +426,5 @@ function SubsystemTile({ subsystem, onAccess }: { subsystem: SubsystemItem; onAc
                 {content}
             </Link>
         </HoverLift>
-    );
-}
-
-function RecentTile({ subsystem }: { subsystem: SubsystemItem }) {
-    const Icon = subsystem.icon;
-
-    return (
-        <Link
-            href={subsystem.href || "#"}
-            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl"
-        >
-             <div className={cn(
-                "relative overflow-hidden rounded-2xl border bg-background p-4 shadow-sm",
-                "transition-all duration-300",
-                "hover:border-primary/30 hover:shadow-md active:scale-[0.98]"
-            )}>
-                 <div className="flex items-center gap-3">
-                    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-background shadow-xs", subsystem.accentClass)}>
-                        <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black tracking-tight">{subsystem.title}</div>
-                        <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase opacity-70">
-                            {subsystem.category}
-                        </div>
-                    </div>
-                    <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-all group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                 </div>
-            </div>
-        </Link>
     );
 }
