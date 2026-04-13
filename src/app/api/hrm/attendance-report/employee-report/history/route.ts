@@ -219,6 +219,7 @@ export async function GET(request: NextRequest) {
 
           log = {
             ...logObj,
+            approval_status: logObj.approve_status,
             directus_id: logObj.log_id ?? null,
             status: (!hasTimeIn && !hasTimeOut && !exemptStatuses.includes(rawStatus))
               ? 'Incomplete'
