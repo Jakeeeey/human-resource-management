@@ -97,6 +97,7 @@ export interface NewEmployeeFormData {
   user_mname: string;
   user_lname: string;
   suffix_name: string;
+  nickname: string;
   user_contact: string;
   user_bday: string;
   gender: string;
@@ -199,6 +200,7 @@ const EMPTY_FORM: NewEmployeeFormData = {
   user_mname: "",
   user_lname: "",
   suffix_name: "",
+  nickname: "",
   user_contact: "",
   user_bday: "",
   gender: "",
@@ -539,6 +541,14 @@ export function AddEmployeeModal({
                     value={form.suffix_name || ""}
                     onChange={(e) => set("suffix_name", e.target.value)}
                     placeholder="e.g. Jr., III"
+                  />
+                </Field>
+                <Field label="Nickname">
+                  <Input
+                    className={inputCls}
+                    value={form.nickname || ""}
+                    onChange={(e) => set("nickname", e.target.value)}
+                    placeholder="e.g. Juan"
                   />
                 </Field>
                 <Field label="Gender" required>

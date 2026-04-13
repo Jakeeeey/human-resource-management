@@ -26,7 +26,7 @@ interface AttendanceLog {
   log_date: string;
   time_in: string | null;
   time_out: string | null;
-  approval_status: string;
+  approve_status: string;
   [key: string]: unknown;
 }
 
@@ -130,7 +130,7 @@ export async function GET(req: NextRequest) {
     const filterParts = [];
 
     if (approvalStatus && approvalStatus !== "all") {
-      filterParts.push(`filter[approval_status][_eq]=${approvalStatus}`);
+      filterParts.push(`filter[approve_status][_eq]=${approvalStatus}`);
     }
 
     // Add date range filter if provided
@@ -152,7 +152,7 @@ export async function GET(req: NextRequest) {
     const filter = filterParts.join("&");
     // Only include fields that actually exist in the attendance_log table.
     // Calculations like work_minutes, late_minutes etc. are done in the mapping function.
-    const logFields = "log_id,user_id,department_id,log_date,time_in,time_out,approval_status,status";
+    const logFields = "log_id,user_id,department_id,log_date,time_in,time_out,approve_status,status";
     const finalUrl = `/items/attendance_log?${filter}${filter ? "&" : ""}sort=-log_date&limit=1000&fields=${logFields}`;
     console.log(`[DEBUG] Fetching logs: ${finalUrl} - route.ts:156`);
 
@@ -428,7 +428,7 @@ export async function GET(req: NextRequest) {
         // looks like it was saved with 'stale' values due to the previous calculation bug.
         // If calculation shows more minutes and there are no manual remarks, we favor calculation.
         const isStaleManualRecord =
-          log.approval_status === "pending" &&
+          log.approve_status === "pending" &&
           manualAdjustments.work_minutes < work_minutes &&
           !manualAdjustments.remarks;
 
@@ -444,6 +444,7 @@ export async function GET(req: NextRequest) {
 
       return {
         ...log,
+        approval_status: log.approve_status,
         user_fname: user?.user_fname || "Unknown",
         user_lname: user?.user_lname || "",
         user_mname: user?.user_mname || null,
@@ -522,7 +523,7 @@ export async function PATCH(req: NextRequest) {
       // 1. Update the attendance log status
       await directusFetch(`/items/attendance_log/${log_id}`, {
         method: "PATCH",
-        body: JSON.stringify({ approval_status: status }),
+        body: JSON.stringify({ approve_status: status }),
       });
 
       // 2. Upsert the approval record

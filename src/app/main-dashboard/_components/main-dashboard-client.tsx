@@ -2,32 +2,18 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import * as Icons from "lucide-react";
 import {
-    Search,
     ArrowUpRight,
-    Sparkles,
     Timer,
-    CheckCircle2,
-    Sun,
-    Moon,
-    Monitor,
-    ExternalLink,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
+import { CommandPalette } from "@/components/dashboard/command-palette";
+import { UserMenu } from "@/components/dashboard/user-menu";
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Card } from "@/components/ui/card";
 
 export type Status = "active" | "comingSoon";
 
@@ -93,45 +79,6 @@ const CATEGORY_META: Record<SubsystemCategory, { title: string; description: str
 const HEADER_OFFSET_EXPANDED = 188; // px
 const HEADER_OFFSET_COMPACT = 120; // px
 
-function DashboardFooter() {
-    return (
-        <footer className="fixed inset-x-0 bottom-0 z-50">
-            <div className="border-t bg-background/70 backdrop-blur">
-                <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-8">
-                    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <span className="text-sm font-semibold">VOS ERP</span>
-                            <Badge variant="secondary" className="h-6 px-2 text-[12px]">
-                                Internal
-                            </Badge>
-                            <span className="hidden sm:inline text-xs text-muted-foreground">
-                © {new Date().getFullYear()} Vertex Open Systems
-              </span>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button asChild variant="ghost" size="sm" className="h-8 px-2">
-                                <Link href="/docs">Docs</Link>
-                            </Button>
-                            <Button asChild variant="ghost" size="sm" className="h-8 px-2">
-                                <Link href="/support">Support</Link>
-                            </Button>
-                            <Button asChild variant="ghost" size="sm" className="h-8 px-2">
-                                <Link href="/status">Status</Link>
-                            </Button>
-
-                            <Separator orientation="vertical" className="hidden h-5 sm:block" />
-
-                            <span className="text-xs text-muted-foreground">
-                Build: <span className="font-medium text-foreground">V2</span>
-              </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </footer>
-    );
-}
 
 function normalize(s: string) {
     return (s || "").toLowerCase().trim();
@@ -166,7 +113,7 @@ function StatusBadge({ status }: { status: Status }) {
     if (status === "active") {
         return (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-500/20 dark:text-emerald-300">
-        <CheckCircle2 className="h-3.5 w-3.5" />
+        <Icons.CheckCircle2 className="h-3.5 w-3.5" />
         Active
       </span>
         );
@@ -203,52 +150,71 @@ function HoverLift({
     );
 }
 
-function ModeToggle() {
-    const { setTheme } = useTheme();
 
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="rounded-full">
-                    <Sun className="mr-2 h-4 w-4" />
-                    Theme
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                    <Sun className="mr-2 h-4 w-4" />
-                    Light
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                    <Moon className="mr-2 h-4 w-4" />
-                    Dark
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                    <Monitor className="mr-2 h-4 w-4" />
-                    System
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
+function getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
 }
+
+const containerVars = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.05,
+        },
+    },
+};
+
+const itemVars = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
+};
 
 export type DashboardRegistryItem = Omit<SubsystemItem, "icon">;
 
-interface MainDashboardClientProps {
-    initialSubsystems: DashboardRegistryItem[]; // Serialized data from server
-    oldVosUrl: string;
-}
-
-export default function MainDashboardClient({ initialSubsystems, oldVosUrl }: MainDashboardClientProps) {
-    const [q, setQ] = React.useState("");
+export default function MainDashboardClient({ 
+    initialSubsystems, 
+    userFirstName, 
+    userFullName, 
+    userEmail 
+}: { 
+    initialSubsystems: DashboardRegistryItem[]; 
+    userFirstName: string;
+    userFullName: string;
+    userEmail: string;
+}) {
+    const q = ""; // State setter removed as search is managed by CommandPalette component logic
     const [isCompactHeader, setIsCompactHeader] = React.useState(false);
+    const [recentIds, setRecentIds] = React.useState<string[]>([]);
 
     React.useEffect(() => {
         const onScroll = () => setIsCompactHeader(window.scrollY > 36);
         onScroll();
         window.addEventListener("scroll", onScroll, { passive: true });
+
+        // Load recents
+        const saved = localStorage.getItem("vos_recent_subsystems");
+        if (saved) {
+            try {
+                setRecentIds(JSON.parse(saved));
+            } catch (e) {
+                console.error("Failed to load recents", e);
+            }
+        }
+
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
+
+    const trackAccess = (id: string) => {
+        setRecentIds((prev) => {
+            const next = [id, ...prev.filter((x) => x !== id)].slice(0, 4);
+            localStorage.setItem("vos_recent_subsystems", JSON.stringify(next));
+            return next;
+        });
+    };
 
     const resolvedSubsystems = React.useMemo(() => {
         return initialSubsystems.map((s): SubsystemItem => {
@@ -281,78 +247,90 @@ export default function MainDashboardClient({ initialSubsystems, oldVosUrl }: Ma
             <header className="fixed inset-x-0 top-0 z-50 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
                 <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-8">
                     <div className={cn("transition-all duration-200", isCompactHeader ? "py-3" : "py-5")}>
-                        <div className="flex items-center justify-end gap-2">
-                            <Button asChild variant="secondary" size="sm" className="rounded-full">
-                                <a href={oldVosUrl} target="_blank" rel="noopener noreferrer" aria-label="Open Old VOS">
-                                    Open Old VOS <ExternalLink className="ml-2 h-4 w-4" />
-                                </a>
-                            </Button>
-                            <ModeToggle />
-                        </div>
-
-                        <div className={cn("mt-3 grid gap-4 lg:grid-cols-[1fr_520px] lg:items-start", isCompactHeader && "mt-2")}>
+                         <div className="flex items-center justify-between gap-4">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-3">
-                                    <div className={cn("inline-flex items-center justify-center rounded-2xl border bg-background/70 shadow-sm", isCompactHeader ? "h-9 w-9" : "h-10 w-10")}>
-                                        <Sparkles className="h-5 w-5 text-muted-foreground" />
-                                    </div>
+                                     <div className={cn("inline-flex items-center justify-center rounded-2xl border bg-background shadow-xs", isCompactHeader ? "h-9 w-9" : "h-10 w-10")}>
+                                         <Icons.Sparkles className="h-5 w-5 text-muted-foreground" />
+                                     </div>
 
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
-                      <span className={cn("font-semibold tracking-tight", isCompactHeader ? "text-base" : "text-lg sm:text-xl")}>
-                        VOS ERP
-                      </span>
-                                            <Badge variant="secondary" className="h-6 px-2 text-[12px]">
+                                            <span className={cn("font-black tracking-tighter uppercase", isCompactHeader ? "text-base" : "text-lg sm:text-2xl")}>
+                                                VOS ERP
+                                            </span>
+                                            <Badge variant="secondary" className="h-6 px-2 text-[10px] font-black tracking-widest uppercase opacity-70">
                                                 Internal
                                             </Badge>
                                         </div>
 
                                         {!isCompactHeader ? (
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                Subsystems overview (filtered by position access).
+                                            <p className="mt-1 text-xs font-bold tracking-tight text-muted-foreground">
+                                                {getGreeting()}, <span className="text-foreground">{userFirstName}</span>. Welcome to your command center.
                                             </p>
                                         ) : null}
                                     </div>
                                 </div>
-
-                                <div className={cn("mt-3 flex flex-wrap items-center gap-2", !isCompactHeader && "mt-4")}>
-                                    <Badge variant="secondary" className="h-6 px-2 text-[12px]">
-                                        Visible Subsystems: {resolvedSubsystems.length}
-                                    </Badge>
-                                    <Badge variant="secondary" className="h-6 px-2 text-[12px]">
-                                        Active (Visible): {totalActiveVisible}
-                                    </Badge>
-                                </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <div className="relative">
-                                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        value={q}
-                                        onChange={(e) => setQ(e.target.value)}
-                                        placeholder="Search subsystems/submodules…"
-                                        className="pl-9 bg-background/70 backdrop-blur"
-                                    />
-                                </div>
-
-                                {!isCompactHeader ? (
-                                    <div className="text-xs text-muted-foreground text-right italic font-medium">
-                                        Access is strictly enforced based on your assigned permissions.
-                                    </div>
-                                ) : null}
+                            <div className="flex items-center gap-3">
+                                <CommandPalette subsystems={resolvedSubsystems} />
+                                <UserMenu fullName={userFullName} email={userEmail} />
                             </div>
                         </div>
+
+                        <div className={cn("mt-4 flex flex-wrap items-center gap-2", isCompactHeader && "hidden")}>
+                                     <Badge variant="outline" className="h-6 px-2 text-[10px] font-bold tracking-tight bg-background border-border shadow-xs">
+                                        Visible Subsystems: <span className="ml-1 text-foreground font-black">{resolvedSubsystems.length}</span>
+                                    </Badge>
+                                    <Badge variant="outline" className="h-6 px-2 text-[10px] font-bold tracking-tight bg-background border-border shadow-xs">
+                                        Active (Visible): <span className="ml-1 text-foreground font-black">{totalActiveVisible}</span>
+                                    </Badge>
+                                </div>
+                        </div>
                     </div>
-                </div>
             </header>
 
             {/* CONTENT (push down for fixed header) */}
             <main
-                className="mx-auto w-full max-w-[1400px] px-4 pb-24 sm:px-8 sm:pb-28 flex-1"
+                className="mx-auto w-full max-w-[1400px] px-4 pb-12 sm:px-8 sm:pb-16 flex-1"
                 style={{ paddingTop: headerOffset }}
             >
-                <div className="space-y-8">
+                <motion.div 
+                    variants={containerVars}
+                    initial="hidden"
+                    animate="show"
+                    className="space-y-10"
+                >
+                    {/* Recently Accessed */}
+                    <AnimatePresence>
+                        {recentIds.length > 0 && !q && (
+                            <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="space-y-3"
+                            >
+                                <div className="flex items-center gap-2 px-1">
+                                    <Icons.Clock className="h-4 w-4 text-muted-foreground" />
+                                    <h2 className="text-xs font-black tracking-widest text-muted-foreground uppercase opacity-70">Recently Accessed</h2>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                    {recentIds.map((id) => {
+                                        const sub = resolvedSubsystems.find((s) => s.id === id);
+                                        if (!sub) return null;
+                                        return (
+                                            <motion.div key={`recent-${id}`} variants={itemVars}>
+                                                <RecentTile subsystem={sub} />
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <div className="space-y-10">
                     {filtered.length === 0 ? (
                         <Card className="border bg-background/50 p-8 backdrop-blur">
                             <div className="text-sm text-muted-foreground">
@@ -365,51 +343,44 @@ export default function MainDashboardClient({ initialSubsystems, oldVosUrl }: Ma
                         grouped.map((group) => {
                             const meta = CATEGORY_META[group.category];
                             return (
-                                <div key={group.category}>
-                                    <div className="mb-3">
+                                <motion.div key={group.category} variants={itemVars}>
+                                    <div className="mb-4 px-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <div className="text-sm font-semibold">{meta.title}</div>
-                                            <span className="inline-flex items-center rounded-full bg-zinc-900/5 px-2.5 py-0.5 text-[11px] font-medium text-zinc-700 ring-1 ring-zinc-900/10 dark:bg-white/5 dark:text-zinc-200 dark:ring-white/10">
-                        {group.items.length} Subsystems
-                      </span>
+                                            <div className="text-sm font-black tracking-tight uppercase">{meta.title}</div>
+                                            <span className="inline-flex items-center rounded-full bg-primary/5 px-2.5 py-0.5 text-[10px] font-black text-primary ring-1 ring-primary/10 tracking-widest uppercase">
+                                                {group.items.length} Modules
+                                            </span>
                                         </div>
-                                        <div className="mt-1 text-xs text-muted-foreground">{meta.description}</div>
+                                        <div className="mt-1 text-[11px] font-bold tracking-tight text-muted-foreground opacity-70 uppercase leading-none">{meta.description}</div>
                                     </div>
 
-                                    <Card className="border bg-background/50 p-4 backdrop-blur">
-                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                            {group.items.map((s) => (
-                                                <SubsystemTile key={s.id} subsystem={s} />
-                                            ))}
-                                        </div>
-
-                                        <Separator className="mt-4 opacity-70" />
-                                        <div className="mt-3 text-xs text-muted-foreground">
-                                            Coming Soon subsystems remain non-clickable.
-                                        </div>
-                                    </Card>
-                                </div>
+                                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                        {group.items.map((s) => (
+                                            <SubsystemTile key={s.id} subsystem={s} onAccess={() => trackAccess(s.id)} />
+                                        ))}
+                                    </div>
+                                </motion.div>
                             );
                         })
                     )}
                 </div>
+                </motion.div>
             </main>
 
-            <DashboardFooter />
         </div>
     );
 }
 
-function SubsystemTile({ subsystem }: { subsystem: SubsystemItem }) {
+function SubsystemTile({ subsystem, onAccess }: { subsystem: SubsystemItem; onAccess?: () => void }) {
     const isComing = subsystem.status === "comingSoon";
     const Icon = subsystem.icon;
 
     const content = (
         <div
             className={cn(
-                "group relative overflow-hidden rounded-2xl border bg-background/70 p-4 shadow-sm backdrop-blur",
+                "group relative overflow-hidden rounded-2xl border bg-background p-4 shadow-sm",
                 "transition-all duration-200",
-                "hover:border-zinc-900/10 dark:hover:border-white/10",
+                "hover:border-primary/20 hover:shadow-md",
                 isComing && "cursor-not-allowed"
             )}
         >
@@ -421,7 +392,7 @@ function SubsystemTile({ subsystem }: { subsystem: SubsystemItem }) {
             <div className="relative flex items-start gap-3">
                 <div
                     className={cn(
-                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-background/70 shadow-sm backdrop-blur",
+                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-background shadow-xs",
                         subsystem.accentClass
                     )}
                 >
@@ -490,11 +461,42 @@ function SubsystemTile({ subsystem }: { subsystem: SubsystemItem }) {
         <HoverLift>
             <Link
                 href={subsystem.href}
+                onClick={onAccess}
                 className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl"
                 aria-label={`Open ${subsystem.title}`}
             >
                 {content}
             </Link>
         </HoverLift>
+    );
+}
+
+function RecentTile({ subsystem }: { subsystem: SubsystemItem }) {
+    const Icon = subsystem.icon;
+
+    return (
+        <Link
+            href={subsystem.href || "#"}
+            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl"
+        >
+             <div className={cn(
+                "relative overflow-hidden rounded-2xl border bg-background p-4 shadow-sm",
+                "transition-all duration-300",
+                "hover:border-primary/30 hover:shadow-md active:scale-[0.98]"
+            )}>
+                 <div className="flex items-center gap-3">
+                    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-background shadow-xs", subsystem.accentClass)}>
+                        <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black tracking-tight">{subsystem.title}</div>
+                        <div className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase opacity-70">
+                            {subsystem.category}
+                        </div>
+                    </div>
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-all group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                 </div>
+            </div>
+        </Link>
     );
 }

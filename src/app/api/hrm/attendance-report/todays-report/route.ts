@@ -139,7 +139,7 @@ console.log('[DEBUG] sample log_dates:', testRes.data.map((l: Record<string,unkn
         break_start:     log.break_start     ?? schedFields.break_start,
         break_end:       log.break_end       ?? schedFields.break_end,
         status:          log.status          ?? 'Absent',
-        approval_status: log.approval_status ?? '',
+        approval_status: log.approve_status ?? '',
         image_time_in:   log.image_time_in   ?? null,
         image_time_out:  log.image_time_out  ?? null,
         user_fname:      (user as Record<string, unknown>).user_fname    ?? '—',

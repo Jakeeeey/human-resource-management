@@ -8,11 +8,11 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  Users, 
-  UserPlus, 
+import {
+  Users,
+  UserPlus,
   FileText,
-  AlertCircle, 
+  AlertCircle,
   RefreshCw,
   BarChart3
 } from "lucide-react";
@@ -49,45 +49,46 @@ export default function EmployeeMasterlistModule() {
     try {
       await createEmployeeSpring({
         // Account
-        email:        data.user_email,
+        email: data.user_email,
         hashPassword: data.user_password,
         // Personal
-        firstName:  data.user_fname,
+        firstName: data.user_fname,
         middleName: data.user_mname || undefined,
-        lastName:   data.user_lname,
+        lastName: data.user_lname,
         suffixName: data.suffix_name || undefined,
-        contact:    data.user_contact,
-        birthday:   data.user_bday   || undefined,
-        gender:     data.gender === "Other" ? data.gender_specify : (data.gender || undefined),
+        nickname: data.nickname || undefined,
+        contact: data.user_contact,
+        birthday: data.user_bday || undefined,
+        gender: data.gender === "Other" ? data.gender_specify : (data.gender || undefined),
         civilStatus: data.civil_status || undefined,
         nationality: data.nationality || undefined,
         placeOfBirth: data.place_of_birth || undefined,
-        bloodType:   data.blood_type   || undefined,
-        religion:    data.religion     || undefined,
-        spouseName:  data.spouse_name  || undefined,
+        bloodType: data.blood_type || undefined,
+        religion: data.religion || undefined,
+        spouseName: data.spouse_name || undefined,
         // Address
         province: data.user_province,
-        city:     data.user_city,
-        brgy:     data.user_brgy,
+        city: data.user_city,
+        brgy: data.user_brgy,
         // Emergency
-        emergencyContactName:   data.emergency_contact_name   || undefined,
+        emergencyContactName: data.emergency_contact_name || undefined,
         emergencyContactNumber: data.emergency_contact_number || undefined,
         // Work
-        department:   data.user_department ? String(data.user_department) : undefined,
-        position:     data.user_position,
-        dateOfHire:   data.user_dateOfHire,
-        rfid:         data.rf_id           || undefined,
-        biometricId:  data.biometric_id    || undefined,
-        admin:        data.isAdmin,
-        role:         data.role,
-        tags:         "Employee", // or however you want to handle tags
+        department: data.user_department ? String(data.user_department) : undefined,
+        position: data.user_position,
+        dateOfHire: data.user_dateOfHire,
+        rfid: data.rf_id || undefined,
+        biometricId: data.biometric_id || undefined,
+        admin: data.isAdmin,
+        role: data.role,
+        tags: "Employee", // or however you want to handle tags
         // sss, philhealth, etc from fields
-        sssNumber:    data.user_sss        || undefined,
+        sssNumber: data.user_sss || undefined,
         philHealthNumber: data.user_philhealth || undefined,
-        tinNumber:    data.user_tin        || undefined,
-        pagibigNumber:data.user_pagibig    || undefined,
+        tinNumber: data.user_tin || undefined,
+        pagibigNumber: data.user_pagibig || undefined,
         // Media
-        image:     data._userImageId ?? undefined,
+        image: data._userImageId ?? undefined,
         signature: data._signatureId ?? undefined,
       });
 
@@ -128,11 +129,11 @@ export default function EmployeeMasterlistModule() {
             <p className="text-red-800">
               {error?.message || "There was a problem connecting to the HR database. Please check your connection or try again later."}
             </p>
-            <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => refetch()} 
-                className="w-fit bg-background hover:bg-red-50 border-red-200"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="w-fit bg-background hover:bg-red-50 border-red-200"
             >
               <RefreshCw className="mr-2 h-4 w-4" /> Reconnect Now
             </Button>
@@ -144,7 +145,7 @@ export default function EmployeeMasterlistModule() {
 
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto px-4 py-8 overflow-x-hidden">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b pb-6">
         <div className="space-y-2">
           <div className="flex items-center gap-3 mb-1">
             <div className="p-2.5 bg-primary/10 rounded-2xl shadow-inner border border-primary/5">
@@ -178,10 +179,10 @@ export default function EmployeeMasterlistModule() {
             <UserPlus className="mr-2 h-4 w-4" />
             New Employee
           </Button>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
-            onClick={() => refetch()} 
+            onClick={() => refetch()}
             disabled={isLoading}
             className="rounded-xl hover:bg-muted/50 h-10 w-10 transition-transform active:rotate-180 duration-500"
             title="Refresh Registry"
@@ -192,41 +193,41 @@ export default function EmployeeMasterlistModule() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="flex items-center justify-between border-b pb-1">
-          <TabsList className="bg-transparent h-12 w-fit p-0 gap-8">
-            <TabsTrigger 
-              value="list" 
-              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-12 px-2 gap-2"
-            >
-              <Users className="h-4 w-4" /> Master List
-            </TabsTrigger>
-            <TabsTrigger 
-              value="analytics" 
-              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-12 px-2 gap-2"
-            >
-              <BarChart3 className="h-4 w-4" /> HR Analytics
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-6 relative gap-0.5">
+        <TabsList className="bg-transparent h-11 w-fit p-0 gap-1 flex relative pl-6" style={{ marginBottom: "-1px" }}>
+          <TabsTrigger
+            value="list"
+            className="bg-muted/20 border-border/40 data-[state=active]:bg-card data-[state=active]:border-border data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-b-transparent data-[state=active]:!shadow-none border rounded-t-xl rounded-b-none h-11 px-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground data-[state=active]:text-foreground transition-all hover:bg-muted/30 relative z-0 data-[state=active]:z-30 flex-none"
+          >
+            <Users className="h-4 w-4" /> Master List
+          </TabsTrigger>
+          <TabsTrigger
+            value="analytics"
+            className="bg-muted/20 border-border/40 data-[state=active]:bg-card data-[state=active]:border-border data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-b-transparent data-[state=active]:!shadow-none border rounded-t-xl rounded-b-none h-11 px-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground data-[state=active]:text-foreground transition-all hover:bg-muted/30 relative z-0 data-[state=active]:z-30 flex-none"
+          >
+            <BarChart3 className="h-4 w-4" /> HR Analytics
+          </TabsTrigger>
+        </TabsList>
 
-        <TabsContent value="list" className="mt-0">
-          <div className="bg-card rounded-3xl border shadow-xl shadow-foreground/5 overflow-hidden transition-all duration-300">
-            <EmployeeTable 
-                data={employees} 
-                departments={departments}
-                isLoading={isLoading} 
-                onViewDetails={(user) => {
-                  setSelectedEmployee(user);
-                  setIsDetailsModalOpen(true);
-                }}
-                onDeleteEmployee={removeEmployee}
+        <TabsContent value="list" className="mt-0 border-none outline-none relative z-20">
+          <div className="bg-card rounded-xl border shadow-xl shadow-foreground/5 overflow-hidden transition-all duration-300">
+            <EmployeeTable
+              data={employees}
+              departments={departments}
+              isLoading={isLoading}
+              onViewDetails={(user) => {
+                setSelectedEmployee(user);
+                setIsDetailsModalOpen(true);
+              }}
+              onDeleteEmployee={removeEmployee}
             />
           </div>
         </TabsContent>
 
-        <TabsContent value="analytics" className="mt-0">
-          <EmployeeInfographics employees={employees} departments={departments} />
+        <TabsContent value="analytics" className="mt-0 border-none outline-none relative z-20">
+          <div className="bg-card rounded-xl border shadow-xl shadow-foreground/5 overflow-hidden transition-all duration-300 p-8">
+            <EmployeeInfographics employees={employees} departments={departments} />
+          </div>
         </TabsContent>
       </Tabs>
 
