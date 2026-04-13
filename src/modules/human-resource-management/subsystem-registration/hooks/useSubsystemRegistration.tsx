@@ -31,6 +31,9 @@ export function useSubsystemRegistration() {
     const handleUpdateHierarchy = async (updated: SubsystemRegistration) => {
         const success = await updateResource(String(updated.id), updated);
         if (success) {
+            // Better: updateResource already calls fetchData. 
+            // We update the local state with the same data we just successfully sent.
+            setHierarchySubsystem(updated); 
             toast.success(`Updated hierarchy for ${updated.title}`);
             return true;
         } else {
