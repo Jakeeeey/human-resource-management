@@ -1,0 +1,30 @@
+name: Deploy to Local Server
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [master]
+    types: [completed]
+
+jobs:
+  deploy:
+    name: Auto-Pull Update
+    runs-on: [self-hosted, hrm]
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Fix Dubious Ownership
+        shell: cmd
+        run: git config --global --add safe.directory "c:\Users\Admin\Desktop\vos-web-v2-systems\human-resource-management"
+
+      - name: Pull Latest Changes
+        shell: cmd
+        run: |
+          cd /d "c:\Users\Admin\Desktop\vos-web-v2-systems\human-resource-management"
+          git pull origin master
+
+      - name: Install Dependencies (If needed)
+        shell: cmd
+        run: |
+          cd /d "c:\Users\Admin\Desktop\vos-web-v2-systems\human-resource-management"
+          npm install

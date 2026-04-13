@@ -64,6 +64,8 @@ import imageCompression from "browser-image-compression";
 import { toast } from "sonner";
 
 const UPLOAD_API = "/api/hrm/employee-admin/employee-master-list/upload";
+const MAX_FILE_SIZE_MB = 10;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 interface EmployeeFilesTabProps {
   user: User;
@@ -439,8 +441,16 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
                     setDraggedOverGridFolder(null);
                     const droppedFiles = Array.from(e.dataTransfer.files);
                     if (droppedFiles.length > 0) {
+                      const largeFiles = droppedFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+                      if (largeFiles.length > 0) {
+                        toast.error(`Some files are too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+                      }
+                      
+                      const validFiles = droppedFiles.filter(f => f.size <= MAX_FILE_SIZE_BYTES);
+                      if (validFiles.length === 0) return;
+
                       const typeId = folder.id !== 'uncategorized' ? folder.id.toString() : "";
-                      const fileItems = droppedFiles.map(file => ({
+                      const fileItems = validFiles.map(file => ({
                         file,
                         name: file.name.replace(/\.[^/.]+$/, ""),
                         id: Math.random().toString(36).substring(7)
@@ -502,8 +512,16 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
               setIsDraggingFolder(false);
               const droppedFiles = Array.from(e.dataTransfer.files);
               if (droppedFiles.length > 0) {
+                const largeFiles = droppedFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+                if (largeFiles.length > 0) {
+                  toast.error(`Some files are too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+                }
+                
+                const validFiles = droppedFiles.filter(f => f.size <= MAX_FILE_SIZE_BYTES);
+                if (validFiles.length === 0) return;
+
                 const typeId = types.find(t => t.name === selectedFolder)?.id?.toString() || "";
-                const fileItems = droppedFiles.map(file => ({
+                const fileItems = validFiles.map(file => ({
                   file,
                   name: file.name.replace(/\.[^/.]+$/, ""),
                   id: Math.random().toString(36).substring(7)
@@ -819,17 +837,25 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
                 multiple
                 ref={fileInputRef}
                 onChange={(e) => {
-                  const newFiles = Array.from(e.target.files || []);
-                  if (newFiles.length > 0) {
-                    const fileItems = newFiles.map(file => ({
-                      file,
-                      name: file.name.replace(/\.[^/.]+$/, ""),
-                      id: Math.random().toString(36).substring(7)
-                    }));
-                    setUploadBatch({ 
-                      ...uploadBatch, 
-                      files: [...uploadBatch.files, ...fileItems] 
-                    });
+                  const selectedFiles = Array.from(e.target.files || []);
+                  if (selectedFiles.length > 0) {
+                    const largeFiles = selectedFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+                    if (largeFiles.length > 0) {
+                      toast.error(`${largeFiles.length === 1 ? 'A file is' : 'Some files are'} too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+                    }
+
+                    const validFiles = selectedFiles.filter(f => f.size <= MAX_FILE_SIZE_BYTES);
+                    if (validFiles.length > 0) {
+                      const fileItems = validFiles.map(file => ({
+                        file,
+                        name: file.name.replace(/\.[[^/.]+$/, ""),
+                        id: Math.random().toString(36).substring(7)
+                      }));
+                      setUploadBatch({ 
+                        ...uploadBatch, 
+                        files: [...uploadBatch.files, ...fileItems] 
+                      });
+                    }
                   }
                 }}
               />
@@ -851,17 +877,25 @@ export function EmployeeFilesTab({ user }: EmployeeFilesTabProps) {
                   setIsDragging(false);
                   const droppedFiles = Array.from(e.dataTransfer.files);
                   if (droppedFiles.length > 0) {
-                    const fileItems = droppedFiles.map(file => ({
-                      file,
-                      name: file.name.replace(/\.[^/.]+$/, ""),
-                      id: Math.random().toString(36).substring(7)
-                    }));
-                    setUploadBatch({ 
-                      ...uploadBatch, 
-                      files: [...uploadBatch.files, ...fileItems] 
-                    });
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = "";
+                    const largeFiles = droppedFiles.filter(f => f.size > MAX_FILE_SIZE_BYTES);
+                    if (largeFiles.length > 0) {
+                      toast.error(`Some files are too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
+                    }
+
+                    const validFiles = droppedFiles.filter(f => f.size <= MAX_FILE_SIZE_BYTES);
+                    if (validFiles.length > 0) {
+                      const fileItems = validFiles.map(file => ({
+                        file,
+                        name: file.name.replace(/\.[^/.]+$/, ""),
+                        id: Math.random().toString(36).substring(7)
+                      }));
+                      setUploadBatch({ 
+                        ...uploadBatch, 
+                        files: [...uploadBatch.files, ...fileItems] 
+                      });
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
                     }
                   }
                 }}

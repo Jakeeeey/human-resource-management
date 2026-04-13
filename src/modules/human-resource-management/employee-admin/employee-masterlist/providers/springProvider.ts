@@ -12,6 +12,8 @@ export interface CreateEmployeePayload {
   firstName: string;
   middleName?: string;
   lastName: string;
+  suffixName?: string;
+  nickname?: string;
   contact: string;
   province: string;
   city: string;
@@ -23,13 +25,20 @@ export interface CreateEmployeePayload {
   pagibigNumber?: string;
   position: string;
   dateOfHire: string;
-  birthday?: string;
   tags?: string;
-  image?: string;           // Directus file UUID (stored as reference)
-  signature?: string;       // Directus file UUID (stored as reference)
+  birthday?: string;
+  gender?: string;
+  civilStatus?: string;
+  nationality?: string;
+  placeOfBirth?: string;
+  bloodType?: string;
+  religion?: string;
+  spouseName?: string;
+  image?: string | null;     // Directus file UUID or path
+  signature?: string | null; // Directus file UUID or path
   externalId?: string;
   biometricId?: string;
-  rfId?: string;
+  rfid?: string;
   admin?: boolean;
   role?: string;
   emergencyContactName?: string;
@@ -52,11 +61,13 @@ export async function createEmployeeSpring(
     body: JSON.stringify(payload),
   });
 
-  const data = await res.json().catch(() => ({}));
-
+  const data = await res.json().catch(() => null);
+  
   if (!res.ok) {
-    // Serialise the whole error body so callers can extract field-level messages
-    throw new Error(JSON.stringify(data));
+    const errorMsg = data 
+      ? JSON.stringify(data) 
+      : `Server Error: ${res.status} ${res.statusText}`;
+    throw new Error(errorMsg);
   }
 
   return data as CreateEmployeeResponse;
@@ -84,10 +95,13 @@ export async function updateEmployeeSpring(
     body: JSON.stringify(payload),
   });
 
-  const data = await res.json().catch(() => ({}));
-
+  const data = await res.json().catch(() => null);
+  
   if (!res.ok) {
-    throw new Error(JSON.stringify(data));
+    const errorMsg = data 
+      ? JSON.stringify(data) 
+      : `Server Error: ${res.status} ${res.statusText}`;
+    throw new Error(errorMsg);
   }
 
   return data as UpdateEmployeeResponse;
