@@ -57,6 +57,11 @@ export function SubsystemRegistrationTable({
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
+        initialState: {
+            pagination: {
+                pageSize: 50,
+            },
+        },
         state: {
             sorting,
             columnFilters,
@@ -76,31 +81,34 @@ export function SubsystemRegistrationTable({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-                <div className="relative w-full max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
                     <Input
-                        placeholder="Search subsystems..."
+                        placeholder="Quick search subsystems..."
                         value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
                         onChange={(event) =>
                             table.getColumn("title")?.setFilterValue(event.target.value)
                         }
-                        className="pl-8"
+                        className="pl-9 h-10 rounded-xl bg-muted/20 border-muted-foreground/10 focus-visible:ring-primary/20 backdrop-blur-sm transition-all text-xs font-medium"
                     />
                 </div>
-                <Button onClick={onAdd}>
-                    <Plus className="mr-2 h-4 w-4" />
+                <Button 
+                    onClick={onAdd}
+                    className="h-10 rounded-xl px-6 font-black shadow-xl shadow-primary/20 bg-primary text-[10px] uppercase tracking-widest transition-all active:scale-95 gap-2"
+                >
+                    <Plus className="h-4 w-4" />
                     Register Subsystem
                 </Button>
             </div>
 
-            <div className="rounded-md border bg-card">
+            <div className="rounded-2xl border bg-card shadow-2xl shadow-primary/[0.02] overflow-hidden">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-muted/10">
                         {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
+                            <TableRow key={headerGroup.id} className="hover:bg-transparent border-b-muted-foreground/5">
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id}>
+                                    <TableHead key={header.id} className="h-11 px-4 text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70">
                                         {header.isPlaceholder
                                             ? null
                                             : flexRender(

@@ -16,8 +16,29 @@ export function useEmployeeMasterlist() {
   const fetchEmployees = useCallback(async () => {
     try {
       const data = await provider.listEmployees();
-      // Filter out soft-deleted employees
-      const activeEmployees = data.filter(emp => !emp.isDeleted);
+      
+      // Broadened filtering logic for soft-deleted employees.
+      // Handles: isDeleted, is_deleted, deleted
+      // Types: Boolean, String ("1", "true"), Number (1, 0), Buffer/Object from DB
+      const activeEmployees = data.filter(emp => {
+        const val = emp.isDeleted ?? (emp as unknown as Record<string, unknown>).is_deleted ?? (emp as unknown as Record<string, unknown>).deleted;
+        if (val === undefined || val === null) return true; // Keep if flag is missing
+        
+        // 1. Handle standard Buffer/Object from DB: { type: "Buffer", data: [1] }
+        if (typeof val === 'object' && 'data' in val && Array.isArray(val.data)) {
+          return val.data[0] === 0;
+        }
+        
+        // 2. Handle Strings: "1", "0", "true", "false"
+        if (typeof val === 'string') {
+          const s = val.toLowerCase();
+          return s !== '1' && s !== 'true';
+        }
+        
+        // 3. Handle Number/Boolean: 1/0, true/false
+        return !val;
+      });
+      
       setEmployees(activeEmployees);
     } catch (err) {
       throw err;
@@ -57,6 +78,13 @@ export function useEmployeeMasterlist() {
       toast.success("Employee record deleted successfully");
     } catch (e) {
       const err = e as Error;
+      // If the error message contains 404, it likely means the record is already gone.
+      // We should refresh the list anyway to clear the table.
+      if (err.message.includes("404")) {
+        await fetchEmployees();
+        toast.info("Registry updated. Record was already deleted or not found.");
+        return;
+      }
       toast.error(err.message || "Failed to delete employee");
       throw err;
     }

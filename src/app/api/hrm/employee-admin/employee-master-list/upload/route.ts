@@ -19,11 +19,11 @@ export async function POST(req: Request) {
     const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
     const TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 
-    // Folder UUIDs from .env.local
-    const FOLDER_IDS: Record<string, string | undefined> = {
-      profile: process.env.DIRECTUS_FOLDER_PROFILE_IMAGES,
-      signature: process.env.DIRECTUS_FOLDER_EMPLOYEE_SIGNATURES,
-      employee_file: "f5049617-71e1-422a-9c94-12c3ddc27d7c",
+    // Folder names matching Directus
+    const FOLDER_NAMES: Record<string, string> = {
+      profile: "profile_images",
+      signature: "employee_signatures",
+      employee_file: "201_emp_files",
     };
 
     if (!DIRECTUS_URL) {
@@ -31,6 +31,30 @@ export async function POST(req: Request) {
         { error: "Upstream API base not configured" },
         { status: 500 }
       );
+    }
+
+    // Determine target folder name based on type
+    const targetFolderName = FOLDER_NAMES[type];
+    let folderId: string | undefined;
+
+    if (targetFolderName) {
+      try {
+        const folderRes = await fetch(`${DIRECTUS_URL}/folders?filter[name][_eq]=${targetFolderName}`, {
+          headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
+        });
+        if (folderRes.ok) {
+          const folderData = await folderRes.json();
+          if (folderData.data && folderData.data.length > 0) {
+            folderId = folderData.data[0].id;
+          } else {
+            console.warn(`[upload] Folder "${targetFolderName}" not found in Directus.`);
+          }
+        } else {
+          console.error(`[upload] Failed to fetch folder "${targetFolderName}":`, await folderRes.text());
+        }
+      } catch (err) {
+        console.error(`[upload] Error fetching folder "${targetFolderName}":`, err);
+      }
     }
 
     // Receive the file from the browser
@@ -42,19 +66,25 @@ export async function POST(req: Request) {
     const outgoingForm = new FormData();
 
     // 1. Folder metadata FIRST
-    const folderId = FOLDER_IDS[type];
     if (folderId) {
       outgoingForm.append("folder", folderId);
     } else {
-      console.warn(`[upload] No folder ID for type="${type}". PROFILE=${process.env.DIRECTUS_FOLDER_PROFILE_IMAGES} SIG=${process.env.DIRECTUS_FOLDER_EMPLOYEE_SIGNATURES}`);
+      console.warn(`[upload] No valid folder ID resolved for type="${type}"`);
     }
 
     // 2. File binary AFTER metadata
     const file = incomingForm.get("file");
-    if (!file) {
+    if (!file || !(file instanceof Blob)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
-    outgoingForm.append("file", file as Blob);
+
+    // --- Hard Limit Check (10MB) ---
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; 
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "File too large (Max 10MB)" }, { status: 413 });
+    }
+
+    outgoingForm.append("file", file);
 
     const response = await fetch(`${DIRECTUS_URL}/files`, {
       method: "POST",
