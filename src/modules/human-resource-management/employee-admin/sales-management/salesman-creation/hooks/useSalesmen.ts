@@ -2,6 +2,12 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSalesmanFilterContext } from "../Provider/SalesmanFilterProvider";
+import {
+    createSalesman as createSalesmanApi,
+    deleteSalesman as deleteSalesmanApi,
+    getSalesmanCreationData,
+    updateSalesman as updateSalesmanApi,
+} from "../Provider/fetchProvider";
 import type {
     SalesmanWithRelations,
     User,
@@ -50,13 +56,7 @@ export function useSalesmen(): UseSalesmenReturn {
                 setIsLoading(true);
             }
 
-            const res = await fetch("/api/hrm/employee-admin/structure/sales-management/salesman-creation", {
-                cache: "no-store"
-            });
-
-            if (!res.ok) throw new Error(`API error: ${res.status}`);
-
-            const data = await res.json();
+            const data = await getSalesmanCreationData();
             setAllSalesmen(data.salesmen || []);
             setUsers(data.users || []);
             setDivisions(data.divisions || []);
@@ -112,19 +112,7 @@ export function useSalesmen(): UseSalesmenReturn {
 
     const createSalesman = useCallback(
         async (data: Record<string, unknown>) => {
-            const res = await fetch("/api/hrm/employee-admin/structure/sales-management/salesman-creation", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data),
-            });
-
-            if (!res.ok) {
-                const errorData = (await res.json().catch(() => null)) as
-                    | { error?: string; message?: string }
-                    | null;
-                const message = errorData?.message || errorData?.error || "Failed to create salesman";
-                throw new Error(message);
-            }
+            await createSalesmanApi(data);
 
             await fetchData(false);
         },
@@ -133,19 +121,7 @@ export function useSalesmen(): UseSalesmenReturn {
 
     const updateSalesman = useCallback(
         async (id: number, data: Record<string, unknown>) => {
-            const res = await fetch("/api/hrm/employee-admin/structure/sales-management/salesman-creation", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id, ...data }),
-            });
-
-            if (!res.ok) {
-                const errorData = (await res.json().catch(() => null)) as
-                    | { error?: string; message?: string }
-                    | null;
-                const message = errorData?.message || errorData?.error || "Failed to update salesman";
-                throw new Error(message);
-            }
+            await updateSalesmanApi(id, data);
 
             await fetchData(false);
         },
@@ -154,17 +130,7 @@ export function useSalesmen(): UseSalesmenReturn {
 
     const deleteSalesman = useCallback(
         async (id: number) => {
-            const res = await fetch(`/api/hrm/employee-admin/structure/sales-management/salesman-creation?id=${id}`, {
-                method: "DELETE",
-            });
-
-            if (!res.ok) {
-                const errorData = (await res.json().catch(() => null)) as
-                    | { error?: string; message?: string }
-                    | null;
-                const message = errorData?.message || errorData?.error || "Failed to delete salesman";
-                throw new Error(message);
-            }
+            await deleteSalesmanApi(id);
 
             await fetchData(false);
         },
