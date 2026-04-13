@@ -155,7 +155,7 @@ export function OnCallTable() {
                                             )}
                                             {item.grace_period !== undefined && (
                                                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                                                    <span className="font-semibold uppercase text-[9px] bg-blue-50 text-blue-700 px-1 rounded border border-blue-100">Grace:</span>
+                                                    <span className="font-semibold uppercase text-[9px] bg-blue-500/10 text-blue-500 px-1 rounded border border-blue-500/20">Grace:</span>
                                                     <span>{item.grace_period} min</span>
                                                 </div>
                                             )}

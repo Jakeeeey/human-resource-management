@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
 import { z } from "zod";
 
-const COOKIE_NAME = "vos_access_token";
 
 /**
  * Zod Schemas derived from SQL DDL
@@ -47,18 +47,6 @@ interface TempNavItem extends NavItem {
     items: TempNavItem[];
 }
 
-function decodeJwt(token: string): Record<string, string | number | string[]> | null {
-    try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        while (s.length % 4) s += "=";
-        const json = Buffer.from(s, "base64").toString("utf8");
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
 
 /**
  * Fetches the sidebar navigation tree.
@@ -73,7 +61,7 @@ export async function getSidebarNavigation(): Promise<NavItem[]> {
 
         if (!token) return [];
 
-        const payload = decodeJwt(token);
+        const payload = decodeJwtPayload(token);
         const userId = payload?.id || payload?.user_id || payload?.sub;
         const role = payload?.role; 
 

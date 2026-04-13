@@ -59,7 +59,7 @@ function OnCallContent() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl border p-4 shadow-sm flex flex-col gap-4">
+            <div className="bg-card rounded-xl border p-4 shadow-sm flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">All Schedules</h2>
                     <ScmAdvancedFilters
