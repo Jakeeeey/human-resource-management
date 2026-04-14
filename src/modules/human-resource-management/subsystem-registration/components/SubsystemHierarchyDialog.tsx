@@ -47,7 +47,6 @@ import { Separator } from "@/components/ui/separator";
 import { IconPicker } from "./IconPicker";
 import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
 import { toast } from "sonner";
-import { MoveUp, MoveDown } from "lucide-react";
 
 interface SubsystemHierarchyDialogProps {
     open: boolean;
