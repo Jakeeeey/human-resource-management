@@ -29,16 +29,14 @@ export function useSubsystemRegistration() {
     };
 
     const handleUpdateHierarchy = async (updated: SubsystemRegistration) => {
-        const success = await updateResource(String(updated.id), updated);
-        if (success) {
-            // Better: updateResource already calls fetchData. 
-            // We update the local state with the same data we just successfully sent.
+        const result = await updateResource(String(updated.id), updated);
+        if (result.success) {
             setHierarchySubsystem(updated); 
             toast.success(`Updated hierarchy for ${updated.title}`);
-            return true;
+            return { success: true };
         } else {
-            toast.error("Failed to update hierarchy");
-            return false;
+            toast.error(result.message || "Failed to update hierarchy");
+            return result;
         }
     };
 
@@ -56,12 +54,12 @@ export function useSubsystemRegistration() {
     const handleSubmit = async (data: Partial<SubsystemRegistration>) => {
         if (selectedSubsystem) {
             // Edit
-            const success = await updateResource(String(selectedSubsystem.id), data);
-            if (success) {
+            const result = await updateResource(String(selectedSubsystem.id), data);
+            if (result.success) {
                 toast.success(`Updated ${data.title}`);
                 return true;
             } else {
-                toast.error(`Failed to update ${data.title}`);
+                toast.error(result.message || `Failed to update ${data.title}`);
                 return false;
             }
         } else {

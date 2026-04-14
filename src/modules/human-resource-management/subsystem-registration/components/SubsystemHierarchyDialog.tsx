@@ -46,12 +46,14 @@ import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { IconPicker } from "./IconPicker";
 import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
+import { toast } from "sonner";
+import { MoveUp, MoveDown } from "lucide-react";
 
 interface SubsystemHierarchyDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     subsystem: SubsystemRegistration | null;
-    onUpdate: (updatedSubsystem: SubsystemRegistration) => Promise<boolean>;
+    onUpdate: (updatedSubsystem: SubsystemRegistration) => Promise<{ success: boolean; message?: string }>;
 }
 
 export function SubsystemHierarchyDialog({
@@ -223,18 +225,55 @@ export function SubsystemHierarchyDialog({
 
     const handleCollapseAll = () => setExpandedIds(new Set());
 
+    const findDuplicateSlugs = (items: ModuleRegistration[]): { title: string; parentTitle: string; slug: string } | null => {
+        const slugs = new Set<string>();
+        let duplicateInfo: { title: string; parentTitle: string; slug: string } | null = null;
+
+        const traverse = (list: ModuleRegistration[], parentTitle: string = "Root") => {
+            for (const item of list) {
+                const s = item.slug || "";
+                if (s && slugs.has(s)) {
+                    duplicateInfo = { title: item.title, parentTitle, slug: s };
+                    return;
+                }
+                slugs.add(s);
+                if (item.subModules) traverse(item.subModules, item.title);
+                if (duplicateInfo) return;
+            }
+        };
+
+        traverse(items, "Root");
+        return duplicateInfo;
+    };
+
     const handleSave = async () => {
         if (!subsystem) return;
+
+        // 1. Validation: Check for duplicates within this subsystem hierarchy
+        const duplicate = findDuplicateSlugs(modules);
+        if (duplicate) {
+            toast.error("Duplicate Module Detected", {
+                description: `The module "${duplicate.title}" already exists in the "${duplicate.parentTitle}" folder. Each module in this subsystem must have a unique slug.`,
+                duration: 6000,
+            });
+            return;
+        }
+
         setIsSaving(true);
         try {
-            const success = await onUpdate({ ...subsystem, modules });
-            if (success) {
+            const result = await onUpdate({ ...subsystem, modules });
+            if (result.success) {
                 // Live Sync: Force refresh the sidebar navigation via Custom Event
                 window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
                 onOpenChange(false);
+                // Success message is handled by the hook
+            } else {
+                // Error message is handled by the hook, but we can add more context here if needed
+                console.error("Save failed:", result.message);
             }
         } catch (error) {
             console.error("Failed to save hierarchy:", error);
+            toast.error("An unexpected connection error occurred while saving.");
         } finally {
             setIsSaving(false);
         }

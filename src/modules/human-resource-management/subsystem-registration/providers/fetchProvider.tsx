@@ -9,7 +9,7 @@ interface SubsystemRegistrationFetchContextType {
     isLoading: boolean;
     refetch: () => Promise<void>;
     addResource: (data: Partial<SubsystemRegistration>) => Promise<boolean>;
-    updateResource: (id: string, data: Partial<SubsystemRegistration>) => Promise<boolean>;
+    updateResource: (id: string, data: Partial<SubsystemRegistration>) => Promise<{ success: boolean; message?: string }>;
     removeResource: (id: string) => Promise<boolean>;
 }
 
@@ -50,12 +50,11 @@ export function SubsystemRegistrationFetchProvider({
     };
 
     const updateResource = async (id: string, data: Partial<SubsystemRegistration>) => {
-        const success = await SubsystemService.updateSubsystem(id, data);
-        if (success) {
+        const result = await SubsystemService.updateSubsystem(id, data);
+        if (result.success) {
             await fetchData();
-            return true;
         }
-        return false;
+        return result;
     };
 
     const removeResource = async (id: string) => {
