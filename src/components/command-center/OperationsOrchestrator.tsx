@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { motion } from "framer-motion"
+// import { motion } from "framer-motion"
 import { TerminalUnit } from "./TerminalUnit"
 import { GlassCard } from "./GlassCard"
 import { HardDrive, Truck, Box, Briefcase, Cpu, Cloud, Database, Network } from "lucide-react"

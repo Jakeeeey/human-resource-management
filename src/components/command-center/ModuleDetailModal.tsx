@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Cpu, Database, Shield, Globe, BarChart3, Users } from "lucide-react"
+import { X } from "lucide-react"
 
 interface ModuleDetailModalProps {
     isOpen: boolean
@@ -62,7 +62,7 @@ export function ModuleDetailModal({ isOpen, onClose, moduleName, accent, data }:
                         {/* Content */}
                         <div className="p-8 space-y-8">
                             <p className="text-lg text-white/60 leading-relaxed italic">
-                                "{data.description}"
+                                &quot;{data.description}&quot;
                             </p>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

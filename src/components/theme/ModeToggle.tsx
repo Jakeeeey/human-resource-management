@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Moon, Sun, Monitor } from "lucide-react"
-import { useTheme } from "next-themes"
+// import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -14,7 +14,6 @@ import {
 import { useThemeTransition } from "@/components/theme/ThemeTransitionOverlay"
 
 export function ModeToggle() {
-    const { resolvedTheme } = useTheme()
     const { triggerTransition } = useThemeTransition()
     const [mounted, setMounted] = React.useState(false)
 
@@ -30,7 +29,6 @@ export function ModeToggle() {
         )
     }
 
-    const isDark = resolvedTheme === "dark"
 
     return (
         <DropdownMenu>

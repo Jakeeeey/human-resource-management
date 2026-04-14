@@ -16,7 +16,6 @@ export default function ThemeProvider({
             enableSystem
             disableTransitionOnChange
             enableColorScheme={false}
-            nonce="next-themes-script"
         >
             {children}
         </NextThemesProvider>

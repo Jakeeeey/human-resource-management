@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { motion } from "framer-motion"
+// import { motion } from "framer-motion"
 import { GlassCard } from "./GlassCard"
 import { Sparkline } from "./Sparkline"
 import { Activity, ShieldCheck, Target, Zap } from "lucide-react"
@@ -48,7 +48,6 @@ export function MissionStatsGrid() {
                 <GlassCard 
                     key={stat.label} 
                     accent={stat.accent} 
-                    pulse={i === 0}
                     className="p-5"
                     transition={{ delay: i * 0.1, duration: 0.5, ease: "easeOut" }}
                 >

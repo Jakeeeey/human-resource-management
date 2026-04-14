@@ -42,7 +42,7 @@ export function MatrixAuditLog() {
                             exit={{ opacity: 0, y: 20 }}
                             className="text-[9px] flex items-center gap-3 py-1 group border-l border-white/5 pl-3 transition-colors hover:bg-rose-500/5 hover:border-rose-500/30"
                         >
-                            <span className="text-slate-400 dark:text-white/20">[{new Date().toLocaleTimeString([], { hour12: false })}]</span>
+                            <span className="text-slate-400 dark:text-white/20" suppressHydrationWarning>[{new Date().toLocaleTimeString([], { hour12: false })}]</span>
                             <span className="text-rose-500 font-bold p-0.5 rounded bg-rose-500/10 border border-rose-500/20">{event.type}</span>
                             <span className="text-slate-700 dark:text-white/60">{event.action}</span>
                             <span className="text-cyan-500 ml-auto opacity-0 group-hover:opacity-100 transition-opacity">{event.id}</span>

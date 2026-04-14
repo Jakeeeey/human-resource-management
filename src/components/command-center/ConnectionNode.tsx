@@ -7,7 +7,6 @@ import {
     Link2, 
     UserPlus, 
     Share2,
-    Calendar,
     Clock
 } from "lucide-react"
 import { GlassCard } from "./GlassCard"

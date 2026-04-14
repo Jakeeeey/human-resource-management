@@ -7,14 +7,12 @@ import { cn } from "@/lib/utils"
 interface GlassCardProps extends HTMLMotionProps<"div"> {
     children: React.ReactNode
     accent?: "cyan" | "indigo" | "rose" | "emerald" | "amber" | "violet"
-    pulse?: boolean
 }
 
 export function GlassCard({ 
     children, 
     className, 
     accent = "cyan", 
-    pulse = false,
     initial = { opacity: 0, y: 30 },
     whileInView = { opacity: 1, y: 0 },
     viewport = { once: true, margin: "-20px" },
@@ -32,14 +30,6 @@ export function GlassCard({
         violet: "from-violet-600/10 dark:from-violet-500/10",
     }[accent]
 
-    const borderColor = {
-        cyan: "border-cyan-500/10 dark:border-cyan-500/20 shadow-[0_0_15px_-5px_rgba(6,182,212,0.1)]",
-        indigo: "border-indigo-500/10 dark:border-indigo-500/20 shadow-[0_0_15px_-5px_rgba(79,70,229,0.1)]",
-        rose: "border-rose-500/10 dark:border-rose-500/20 shadow-[0_0_15px_-5px_rgba(225,29,72,0.1)]",
-        emerald: "border-emerald-500/10 dark:border-emerald-500/20 shadow-[0_0_15px_-5px_rgba(5,150,105,0.1)]",
-        amber: "border-amber-500/10 dark:border-amber-500/20 shadow-[0_0_15px_-5px_rgba(245,158,11,0.1)]",
-        violet: "border-violet-500/10 dark:border-violet-500/20 shadow-[0_0_15px_-5px_rgba(139,92,246,0.1)]",
-    }[accent]
 
     return (
         <motion.div 

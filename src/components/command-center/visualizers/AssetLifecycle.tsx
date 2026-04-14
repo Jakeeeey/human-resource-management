@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { motion } from "framer-motion"
+// import { motion } from "framer-motion"
 import { ChevronRight, ShieldCheck, Hammer, RotateCcw, Trash2 } from "lucide-react"
 
 export function AssetLifecycle() {

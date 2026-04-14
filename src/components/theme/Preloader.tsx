@@ -10,8 +10,14 @@ export function Preloader() {
     const [isLoading, setIsLoading] = useState(true)
     const pathname = usePathname()
 
-    useEffect(() => {
+    const [prevPathname, setPrevPathname] = useState(pathname)
+
+    if (pathname !== prevPathname) {
+        setPrevPathname(pathname)
         setIsLoading(true)
+    }
+
+    useEffect(() => {
         const timer = setTimeout(() => {
             setIsLoading(false)
         }, 2400) // Loader stays up for 3s to let resources load and bar fill

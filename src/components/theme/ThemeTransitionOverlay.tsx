@@ -65,7 +65,7 @@ export function ThemeTransitionProvider({ children }: { children: React.ReactNod
             }, totalOutTime * 1000 + 100)
             return () => clearTimeout(t)
         }
-    }, [phase])
+    }, [phase, pendingTheme, setTheme, totalInTime])
 
     const isGoingDark = targetTheme === "dark"
     const active = phase !== "idle"

@@ -2,16 +2,15 @@
 
 import * as React from "react"
 import { motion, useScroll, useTransform } from "framer-motion"
+import Image from "next/image"
 import {
     Shield,
-    Zap,
     BarChart3,
     Settings,
     Users,
     Database,
     Globe,
     Cpu,
-    ChevronDown,
     LayoutDashboard
 } from "lucide-react"
 
@@ -28,7 +27,7 @@ import { LiquidityMeter } from "@/components/command-center/visualizers/Liquidit
 import { AssetLifecycle } from "@/components/command-center/visualizers/AssetLifecycle"
 import { InventoryTreadmill } from "@/components/command-center/visualizers/InventoryTreadmill"
 import { ReceivablesAging } from "@/components/command-center/visualizers/ReceivablesAging"
-import { RiskRadar } from "@/components/command-center/visualizers/RiskRadar"
+// import { RiskRadar } from "@/components/command-center/visualizers/RiskRadar"
 import { MatrixAuditLog } from "@/components/command-center/visualizers/MatrixAuditLog"
 
 // Previous Visualizers (Now repurposed)
@@ -37,20 +36,25 @@ import { AnalyticsWorkbench } from "@/components/command-center/AnalyticsWorkben
 import { GlobalHealthViz } from "@/components/command-center/GlobalHealthViz"
 
 // Interactive Modal
-import { ModuleDetailModal } from "@/components/command-center/ModuleDetailModal"
+import { ModuleDetailModal, type ModuleDetailModalProps } from "@/components/command-center/ModuleDetailModal"
 
 export default function LandingPage() {
     const { scrollY } = useScroll()
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = React.useState(false)
+    interface ModuleData {
+        description: string;
+        stats: { label: string; value: string; trend?: string }[];
+    }
+
     const [activeModule, setActiveModule] = React.useState<{
         name: string;
         accent: "cyan" | "indigo" | "rose" | "emerald" | "amber" | "violet";
-        data: any;
+        data: ModuleData;
     } | null>(null)
 
-    const openModule = (name: string, accent: any, data: any) => {
+    const openModule = (name: string, accent: ModuleDetailModalProps["accent"], data: ModuleData) => {
         setActiveModule({ name, accent, data })
         setIsModalOpen(true)
     }
@@ -74,26 +78,24 @@ export default function LandingPage() {
         }
     }
 
-    // Update active panel based on scroll
+    // Update active panel based on scroll (Hero to Horizontal transition)
     React.useEffect(() => {
         const handleScroll = () => {
             const y = window.scrollY;
             const vh = window.innerHeight;
-            const vw = window.innerWidth;
-            const trackWidth = vw * 6;
 
+            // Only handle the "Hero vs Content" logic here.
+            // Content panels (1-6) are handled by HorizontalScrollContainer callback.
             if (y < vh * 0.5) {
                 setActivePanel(0);
-            } else {
-                const relativeY = y - vh;
-                const panelIndex = Math.round((relativeY / trackWidth) * 5) + 1;
-                setActivePanel(Math.min(6, Math.max(1, panelIndex)));
+            } else if (activePanel === 0 && y >= vh * 0.5) {
+                setActivePanel(1);
             }
         };
 
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [activePanel]);
 
     // Hero Scroll Parallax
     const opacity = useTransform(scrollY, [0, 400], [1, 0])
@@ -204,11 +206,11 @@ export default function LandingPage() {
             {/* 1. HERO UNIT */}
             <section id="hero" className="relative h-screen flex flex-col items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-950">
                 <motion.div style={{ y: bgY }} className="absolute inset-0 z-0 block dark:hidden">
-                    <img src="/images/hero_dashboard_light.png" alt="Backdrop" className="w-full h-full object-cover opacity-60" />
+                    <Image src="/images/hero_dashboard_light.png" alt="Backdrop" fill priority className="object-cover opacity-60" />
                     <div className="absolute inset-0 bg-gradient-to-b from-slate-50/40 via-transparent to-slate-50" />
                 </motion.div>
                 <motion.div style={{ y: bgY }} className="absolute inset-0 z-0 hidden dark:block opacity-30 grayscale-[0.5] contrast-125">
-                    <img src="/images/hero_dashboard.png" alt="Backdrop" className="w-full h-full object-cover" />
+                    <Image src="/images/hero_dashboard.png" alt="Backdrop" fill priority className="object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/20 to-slate-950" />
                 </motion.div>
 
@@ -261,7 +263,7 @@ export default function LandingPage() {
             </section>
 
             {/* GSAP HORIZONTAL SCROLL TRIGGER */}
-            <HorizontalScrollContainer>
+            <HorizontalScrollContainer activePanel={activePanel} onIndexChange={setActivePanel}>
                 {/* 2. HRM — Human Resource Management (CYAN) */}
                 <HorizontalPanel className="px-6 md:px-12 lg:px-24 overflow-hidden">
                     {/* Background Aura */}
