@@ -123,16 +123,36 @@ export function SubsystemHierarchyDialog({
     };
 
     const handleUpdateItem = (id: string | number, data: Partial<ModuleRegistration>, parentPath: string = "") => {
+        const generateSlug = (t: string) => t.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+        // Helper: Recursively updates base_path for all children when parent path changes
+        const updateChildrenPaths = (items: ModuleRegistration[], newParentPath: string): ModuleRegistration[] => {
+            return items.map(child => {
+                const childSlug = child.slug || generateSlug(child.title);
+                const newPath = `${newParentPath}/${childSlug}`;
+                return {
+                    ...child,
+                    base_path: newPath,
+                    subModules: child.subModules ? updateChildrenPaths(child.subModules, newPath) : []
+                };
+            });
+        };
+
         setModules(prev => updateInTree(prev, id, item => {
             const updated = { ...item, ...data };
-            // Helper: Slug from title
-            const generateSlug = (t: string) => t.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
+            // Logic: If title changed and no manual path provided, update slug and path
             if (data.title && !data.base_path) {
                 const slug = generateSlug(data.title);
                 updated.slug = slug;
                 updated.base_path = `${parentPath}/${slug}`;
             }
+
+            // Logic: If path or title (slug) changed, update all descendants
+            if (updated.base_path !== item.base_path && updated.subModules && updated.subModules.length > 0) {
+                updated.subModules = updateChildrenPaths(updated.subModules, updated.base_path);
+            }
+
             return updated;
         }));
     };
