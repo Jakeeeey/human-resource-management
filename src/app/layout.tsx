@@ -5,6 +5,7 @@ import "./globals.css"
 
 import ThemeProvider from "@/components/theme/ThemeProvider"
 import ThemeSettingsProvider from "@/components/theme/ThemeSettingsProvider"
+import { ThemeTransitionProvider } from "@/components/theme/ThemeTransitionOverlay"
 import { Toaster } from "@/components/ui/sonner"
 
 const geistSans = Geist({
@@ -29,10 +30,12 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+            <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
                 <ThemeProvider>
                     <ThemeSettingsProvider>
-                        {children}
+                        <ThemeTransitionProvider>
+                            {children}
+                        </ThemeTransitionProvider>
                     </ThemeSettingsProvider>
 
                     {/* Global toast host (Sonner / shadcn) */}
