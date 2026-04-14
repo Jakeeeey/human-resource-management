@@ -63,18 +63,17 @@ export default function LandingPage() {
 
     // Sidebar Navigation Logic
     const scrollToPanel = (index: number) => {
-        const vh = window.innerHeight;
-        const vw = window.innerWidth;
-        const trackWidth = vw * 6; // Matching w-[600vw] in HorizontalScrollContainer
-
         if (index === 0) {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setActivePanel(0);
+            if ((window as any).lenis) {
+                (window as any).lenis.scrollTo(0, { duration: 1.2 });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         } else {
-            // Horizontal panels start at 1vh.
-            // Distribute 6 panels across the trackWidth.
-            const horizontalIndex = index - 1;
-            const scrollTarget = vh + (horizontalIndex / 5) * trackWidth;
-            window.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+            // Set the state, and the HorizontalScrollContainer will detect the prop change
+            // and trigger its internal goToSection() which has the mathematically exact ScrollTrigger targets.
+            setActivePanel(index);
         }
     }
 

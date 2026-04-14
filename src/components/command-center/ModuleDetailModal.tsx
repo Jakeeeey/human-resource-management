@@ -4,7 +4,7 @@ import * as React from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
 
-interface ModuleDetailModalProps {
+export interface ModuleDetailModalProps {
     isOpen: boolean
     onClose: () => void
     moduleName: string

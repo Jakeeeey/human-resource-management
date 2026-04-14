@@ -28,7 +28,7 @@ export function HorizontalScrollContainer({
 
         const ctx = gsap.context(() => {
             // Pinning the container
-            ScrollTrigger.create({
+            const st = ScrollTrigger.create({
                 trigger: containerRef.current,
                 pin: true,
                 start: "top top",
@@ -52,21 +52,23 @@ export function HorizontalScrollContainer({
                 // Animate horizontal track
                 tl.to(sections, {
                     xPercent: -100 * index,
-                    duration: 0.8,
-                    ease: "power2.inOut",
+                    duration: 1.2,
+                    ease: "power4.inOut",
                     overwrite: true
                 }, 0)
 
-                // Sync vertical scroll
-                const vh = window.innerHeight
-                const trackWidth = scrollWrapperRef.current?.offsetWidth || window.innerWidth * 6
-                const scrollTarget = vh + (index / amount) * (trackWidth - window.innerWidth)
+                // Sync vertical scroll to exact GSAP pin boundaries
+                const scrollTarget = st.start + (index / amount) * (st.end - st.start)
                 
-                tl.to(window, {
-                    scrollTo: { y: scrollTarget, autoKill: false },
-                    duration: 0.8,
-                    ease: "power2.inOut"
-                }, 0)
+                if (window.lenis) {
+                    window.lenis.scrollTo(scrollTarget, { duration: 1.2, lock: true })
+                } else {
+                    tl.to(window, {
+                        scrollTo: { y: scrollTarget, autoKill: false },
+                        duration: 1.2,
+                        ease: "power4.inOut"
+                    }, 0)
+                }
 
                 if (!skipNotify && onIndexChange) {
                     onIndexChange(index + 1)
@@ -83,8 +85,18 @@ export function HorizontalScrollContainer({
             const obs = Observer.create({
                 target: containerRef.current,
                 type: "wheel,touch,pointer",
-                onDown: () => !isAnimating.current && currentIndex.current < amount && goToSection(currentIndex.current + 1),
-                onUp: () => !isAnimating.current && currentIndex.current > 0 && goToSection(currentIndex.current - 1),
+                onDown: () => {
+                    if (!st.isActive) return
+                    if (!isAnimating.current && currentIndex.current < amount) {
+                        goToSection(currentIndex.current + 1)
+                    }
+                },
+                onUp: () => {
+                    if (!st.isActive) return
+                    if (!isAnimating.current && currentIndex.current > 0) {
+                        goToSection(currentIndex.current - 1)
+                    }
+                },
                 tolerance: 20,
                 preventDefault: false
             })
