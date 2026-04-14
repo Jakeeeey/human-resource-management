@@ -3,7 +3,7 @@
 import React, { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { Observer } from 'gsap/Observer'
+import { Observer } from 'gsap/all'
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin'
 
 gsap.registerPlugin(ScrollTrigger, Observer, ScrollToPlugin)
@@ -61,6 +61,7 @@ export function HorizontalScrollContainer({
                 const scrollTarget = st.start + (index / amount) * (st.end - st.start)
                 
                 if (window.lenis) {
+                    // @ts-expect-error - lenis is dynamically injected
                     window.lenis.scrollTo(scrollTarget, { duration: 1.2, lock: true })
                 } else {
                     tl.to(window, {

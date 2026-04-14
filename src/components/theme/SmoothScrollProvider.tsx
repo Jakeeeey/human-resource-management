@@ -5,25 +5,17 @@ import Lenis from 'lenis';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-declare global {
-    interface Window {
-        lenis: Lenis | undefined;
-    }
-}
-
 export function SmoothScrollProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const lenis = new Lenis({
             duration: 1.2,
             easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-            direction: 'vertical',
-            gestureDirection: 'vertical',
-            smoothWheel: true,
             wheelMultiplier: 1,
             touchMultiplier: 2,
             infinite: false,
         })
 
+        // @ts-expect-error - dynamic injection
         window.lenis = lenis;
         lenis.on('scroll', ScrollTrigger.update)
 
@@ -40,6 +32,7 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
         return () => {
             gsap.ticker.remove(raf)
             lenis.destroy()
+            // @ts-expect-error - dynamic injection
             window.lenis = null;
         }
     }, [])

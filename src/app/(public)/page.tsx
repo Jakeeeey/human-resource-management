@@ -65,8 +65,9 @@ export default function LandingPage() {
     const scrollToPanel = (index: number) => {
         if (index === 0) {
             setActivePanel(0);
-            if ((window as any).lenis) {
-                (window as any).lenis.scrollTo(0, { duration: 1.2 });
+            if (window.lenis) {
+                // @ts-expect-error - lenis is dynamically injected
+                window.lenis.scrollTo(0, { duration: 1.2 });
             } else {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
