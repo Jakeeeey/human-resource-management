@@ -79,10 +79,10 @@ export class SubsystemService {
         modules: ModuleRegistration[], 
         subsystemId: number, 
         parentId: number | null = null
-    ): Promise<void> {
-        // Optimized: Trigger all sibling modules in parallel to reduce sequential wait time
-        await Promise.all(modules.map(async (itemModule, index) => {
-            const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 5;
+    ): Promise<boolean> {
+        // Optimized: Trigger all sibling modules in parallel
+        const results = await Promise.all(modules.map(async (itemModule, index) => {
+            const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 10;
             
             const payload = {
                 slug: itemModule.slug || "",
@@ -96,6 +96,7 @@ export class SubsystemService {
             };
 
             let savedModuleId: string | number = itemModule.id;
+            let success = true;
 
             try {
                 if (isNew) {
@@ -108,25 +109,41 @@ export class SubsystemService {
                     if (response.ok) {
                         const { data } = await response.json();
                         savedModuleId = data.id;
+                    } else {
+                        success = false;
                     }
                 } else {
-                    // Update existing module
-                    await fetch(`/api/hrm/subsystem-registration/modules?id=${itemModule.id}`, {
+                    // Update existing module - verify if path param or query param is needed
+                    const response = await fetch(`/api/hrm/subsystem-registration/modules?id=${itemModule.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(payload)
                     });
+                    if (!response.ok) {
+                        // Fallback: Try with path parameter if query parameter failed
+                        const secondaryResponse = await fetch(`/api/hrm/subsystem-registration/modules/${itemModule.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!secondaryResponse.ok) success = false;
+                    }
                 }
 
                 // Recursively sync sub-modules if any
-                // These will also run in parallel among themselves once the parent ID is secured
-                if (itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
-                    await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
+                if (success && itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
+                    const childrenSuccess = await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
+                    if (!childrenSuccess) success = false;
                 }
+
+                return success;
             } catch (err) {
                 console.error(`Failed to sync module: ${itemModule.title}`, err);
+                return false;
             }
         }));
+
+        return results.every(res => res === true);
     }
 
     static async createSubsystem(data: Partial<SubsystemRegistration>): Promise<SubsystemRegistration | null> {
@@ -168,6 +185,7 @@ export class SubsystemService {
                 body: JSON.stringify(subsystemPayload)
             });
 
+            let modulesSuccess = true;
             if (data.modules) {
                 // 2. PRUNING: Bulk Delete stale modules in parallel
                 try {
@@ -192,10 +210,10 @@ export class SubsystemService {
                 }
 
                 // 3. Batch Sync Current Hierarchy
-                await this.syncModulesRecursively(data.modules, subsystemId);
+                modulesSuccess = await this.syncModulesRecursively(data.modules, subsystemId);
             }
 
-            return response.ok;
+            return response.ok && modulesSuccess;
         } catch (error) {
             console.error("Error updating subsystem:", error);
             return false;
