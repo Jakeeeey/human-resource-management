@@ -19,6 +19,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -52,6 +53,16 @@ interface SalesmanFormData {
     canCollect: boolean;
     inventory_day: string;
 }
+
+const INVENTORY_DAYS = [
+    { value: "2", label: "Monday" },
+    { value: "3", label: "Tuesday" },
+    { value: "4", label: "Wednesday" },
+    { value: "5", label: "Thursday" },
+    { value: "6", label: "Friday" },
+    { value: "7", label: "Saturday" },
+    { value: "1", label: "Sunday" },
+] as const;
 
 interface SalesmanDialogProps {
     open: boolean;
@@ -107,6 +118,7 @@ export function SalesmanDialog({
     });
 
     const selectedEmployeeId = form.watch("employee_id");
+    const hasInventory = form.watch("isInventory");
     const selectedEmployee = users.find((u) => u.user_id.toString() === selectedEmployeeId);
 
     const selectableUsers = useMemo(() => {
@@ -188,6 +200,12 @@ export function SalesmanDialog({
         }
     }, [open, salesman, form]);
 
+    useEffect(() => {
+        if (!hasInventory) {
+            form.setValue("inventory_day", "");
+        }
+    }, [hasInventory, form]);
+
     const handleSubmit = async (data: SalesmanFormData) => {
         setIsSubmitting(true);
         const toastId = toast.loading(isEdit ? "Updating salesman..." : "Creating salesman...");
@@ -215,7 +233,10 @@ export function SalesmanDialog({
                 isActive: data.isActive ? 1 : 0,
                 isInventory: data.isInventory ? 1 : 0,
                 canCollect: data.canCollect ? 1 : 0,
-                inventory_day: data.inventory_day ? parseInt(data.inventory_day, 10) : null,
+                inventory_day:
+                    data.isInventory && data.inventory_day
+                        ? parseInt(data.inventory_day, 10)
+                        : null,
                 modified_date: new Date().toISOString(),
             };
 
@@ -453,28 +474,39 @@ export function SalesmanDialog({
                                 name="inventory_day"
                                 rules={{
                                     validate: (value) => {
-                                        if (!value) return true;
-                                        const numericValue = Number(value);
-                                        if (Number.isNaN(numericValue)) return "Inventory day must be a number";
-                                        return numericValue >= 0 || "Inventory day cannot be negative";
+                                        if (!form.getValues("isInventory")) return true;
+                                        return (
+                                            Boolean(value) ||
+                                            "Inventory day is required when Has Inventory is enabled"
+                                        );
                                     },
                                 }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Inventory Day</FormLabel>
                                         <FormControl>
-                                            <Input
+                                            <Select
                                                 value={field.value}
-                                                onChange={(e) => {
-                                                    const next = e.target.value;
-                                                    if (next.startsWith("-")) return;
-                                                    field.onChange(e);
-                                                }}
-                                                type="number"
-                                                min={1}
-                                                max={31}
-                                                placeholder="Day of month"
-                                            />
+                                                onValueChange={field.onChange}
+                                                disabled={!hasInventory}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue
+                                                        placeholder={
+                                                            hasInventory
+                                                                ? "Select day of week"
+                                                                : "Enable Has Inventory first"
+                                                        }
+                                                    />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {INVENTORY_DAYS.map((day) => (
+                                                        <SelectItem key={day.value} value={day.value}>
+                                                            {day.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>

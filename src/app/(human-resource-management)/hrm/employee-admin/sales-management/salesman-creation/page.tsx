@@ -98,10 +98,6 @@ export default async function Page() {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block shrink-0" />
                   <BreadcrumbItem className="hidden md:block shrink-0">
-                    <BreadcrumbLink href="#">Structure</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block shrink-0" />
-                  <BreadcrumbItem className="hidden md:block shrink-0">
                     <BreadcrumbLink href="#">Sales Management</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block shrink-0" />
