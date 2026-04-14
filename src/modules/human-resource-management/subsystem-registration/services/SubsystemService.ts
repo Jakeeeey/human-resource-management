@@ -79,7 +79,7 @@ export class SubsystemService {
         modules: ModuleRegistration[], 
         subsystemId: number, 
         parentId: number | null = null
-    ): Promise<boolean> {
+    ): Promise<true | string> {
         // Optimized: Trigger all sibling modules in parallel
         const results = await Promise.all(modules.map(async (itemModule, index) => {
             const isNew = !itemModule.id || isNaN(Number(itemModule.id)) || String(itemModule.id).length > 10;
@@ -96,7 +96,7 @@ export class SubsystemService {
             };
 
             let savedModuleId: string | number = itemModule.id;
-            let success = true;
+            let currentError = "";
 
             try {
                 if (isNew) {
@@ -110,10 +110,13 @@ export class SubsystemService {
                         const { data } = await response.json();
                         savedModuleId = data.id;
                     } else {
-                        success = false;
+                        const errorData = await response.json();
+                        // Extract Directus error if available
+                        currentError = errorData.details?.errors?.[0]?.message || `Failed to create module "${itemModule.title}"`;
+                        return currentError;
                     }
                 } else {
-                    // Update existing module - verify if path param or query param is needed
+                    // Update existing module
                     const response = await fetch(`/api/hrm/subsystem-registration/modules?id=${itemModule.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
@@ -126,24 +129,35 @@ export class SubsystemService {
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify(payload)
                         });
-                        if (!secondaryResponse.ok) success = false;
+                        if (!secondaryResponse.ok) {
+                             const errorData = await secondaryResponse.json();
+                             currentError = errorData.details?.errors?.[0]?.message || `Failed to update module "${itemModule.title}"`;
+                             return currentError;
+                        }
                     }
                 }
 
                 // Recursively sync sub-modules if any
-                if (success && itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
-                    const childrenSuccess = await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
-                    if (!childrenSuccess) success = false;
+                if (itemModule.subModules && itemModule.subModules.length > 0 && savedModuleId) {
+                    const childrenResult = await this.syncModulesRecursively(itemModule.subModules, subsystemId, Number(savedModuleId));
+                    if (childrenResult !== true) return childrenResult;
                 }
 
-                return success;
+                return true;
             } catch (err) {
                 console.error(`Failed to sync module: ${itemModule.title}`, err);
-                return false;
+                return `Connection error syncing "${itemModule.title}"`;
             }
         }));
 
-        return results.every(res => res === true);
+        const errors: string[] = [];
+        results.forEach((res, index) => {
+            if (res !== true) {
+                errors.push(typeof res === 'string' ? res : `Module "${modules[index].title}" failed to sync.`);
+            }
+        });
+
+        return errors.length > 0 ? errors.join(" | ") : true;
     }
 
     static async createSubsystem(data: Partial<SubsystemRegistration>): Promise<SubsystemRegistration | null> {
@@ -172,7 +186,7 @@ export class SubsystemService {
         }
     }
 
-    static async updateSubsystem(id: string, data: Partial<SubsystemRegistration>): Promise<boolean> {
+    static async updateSubsystem(id: string, data: Partial<SubsystemRegistration>): Promise<{ success: boolean; message?: string }> {
         try {
             const subsystemId = Number(id);
             const subsystemPayload = { ...data };
@@ -185,7 +199,10 @@ export class SubsystemService {
                 body: JSON.stringify(subsystemPayload)
             });
 
-            let modulesSuccess = true;
+            if (!response.ok) {
+                return { success: false, message: "Failed to update subsystem metadata." };
+            }
+
             if (data.modules) {
                 // 2. PRUNING: Bulk Delete stale modules in parallel
                 try {
@@ -196,7 +213,6 @@ export class SubsystemService {
                         const incomingIds = this.collectIds(data.modules);
                         const staleIds = dbIds.filter((dbId: number) => !incomingIds.includes(dbId));
                         
-                        // Optimized: Execute batch deletion instead of sequential requests
                         if (staleIds.length > 0) {
                             await fetch(`/api/hrm/subsystem-registration/modules`, { 
                                 method: "DELETE",
@@ -210,13 +226,16 @@ export class SubsystemService {
                 }
 
                 // 3. Batch Sync Current Hierarchy
-                modulesSuccess = await this.syncModulesRecursively(data.modules, subsystemId);
+                const modulesResult = await this.syncModulesRecursively(data.modules, subsystemId);
+                if (modulesResult !== true) {
+                    return { success: false, message: modulesResult };
+                }
             }
 
-            return response.ok && modulesSuccess;
+            return { success: true };
         } catch (error) {
             console.error("Error updating subsystem:", error);
-            return false;
+            return { success: false, message: error instanceof Error ? error.message : "Unknown error occurred" };
         }
     }
 
