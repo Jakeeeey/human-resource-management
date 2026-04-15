@@ -23,7 +23,7 @@ import {
     SidebarMenuItem,
     SidebarMenuSub,
 } from "@/components/ui/sidebar";
-import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
+import { NavItem } from "@/types/navigation";
 
 import { THEME_SETTINGS_EVENT } from "@/components/theme/theme-settings";
 
@@ -533,5 +533,3 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
         </SidebarGroup>
     );
 }
-
-

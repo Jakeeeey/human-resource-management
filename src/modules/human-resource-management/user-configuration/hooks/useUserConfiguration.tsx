@@ -7,7 +7,7 @@ import { SubsystemRegistration, ModuleRegistration } from "@/modules/human-resou
 import { UserService } from "../services/UserService";
 import { extractAllSlugs, extractAllIds } from "../utils/permissionUtils";
 import { toast } from "sonner";
-import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
+import { APP_SIDEBAR_REFRESH_EVENT } from "@/components/shared/app-sidebar/app-sidebar-events";
 
 export function useUserConfiguration() {
     const { 
@@ -78,7 +78,7 @@ export function useUserConfiguration() {
             fetchPage(currentPage, true);
             
             // Trigger Sidebar Refresh
-            window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
+            window.dispatchEvent(new CustomEvent(APP_SIDEBAR_REFRESH_EVENT));
         } else {
             toast.error("Failed to persist permission changes.");
             fetchPage(currentPage, true);
@@ -150,7 +150,7 @@ export function useUserConfiguration() {
             fetchPage(currentPage, true);
             
             // Trigger Sidebar Refresh via Custom Event
-            window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
+            window.dispatchEvent(new CustomEvent(APP_SIDEBAR_REFRESH_EVENT));
         } else {
             toast.error("Failed to persist granular changes.");
             fetchPage(currentPage, true);
