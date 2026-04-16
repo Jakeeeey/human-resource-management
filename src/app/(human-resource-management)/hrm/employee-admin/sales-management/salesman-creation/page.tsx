@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../../../_components/nav-user";
+import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
@@ -95,10 +95,6 @@ export default async function Page() {
                 <BreadcrumbList className="min-w-0 overflow-hidden">
                   <BreadcrumbItem className="hidden md:block shrink-0">
                     <BreadcrumbLink href="#">Employee Admin</BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator className="hidden md:block shrink-0" />
-                  <BreadcrumbItem className="hidden md:block shrink-0">
-                    <BreadcrumbLink href="#">Structure</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block shrink-0" />
                   <BreadcrumbItem className="hidden md:block shrink-0">

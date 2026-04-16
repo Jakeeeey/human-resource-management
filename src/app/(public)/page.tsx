@@ -270,6 +270,40 @@ export default function LandingPage() {
                             className="w-full h-full object-cover blur-[120px]"
                         />
                     </div>
+                    {/* Watermark */}
+                    <div className="absolute top-1/2 left-0 -translate-y-1/2 -rotate-90 select-none pointer-events-none opacity-5 dark:opacity-10 z-0">
+                        <span className="text-[15rem] font-black uppercase tracking-tighter whitespace-nowrap italic leading-none text-cyan-500">HUMAN_RESOURCE</span>
+                    </div>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8 }}
+                        className="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 items-center relative z-10"
+                    >
+                        <div className="lg:col-span-7 order-2 lg:order-1">
+                            <GlassCard className="p-8 cursor-pointer relative z-10" accent="cyan" onClick={() => openModule("HRM", "cyan", MODULE_DATA.HRM)}>
+                                <WorkforcePulse />
+                            </GlassCard>
+                        </div>
+                        <div className="lg:col-span-5 space-y-8 order-1 lg:order-2 text-right">
+                            <div className="space-y-4">
+                                <h2 className="text-5xl md:text-[5rem] font-black uppercase tracking-tighter italic leading-[0.9] text-slate-900 dark:text-white">
+                                    Human <br /><span className="text-cyan-500">Resource</span>
+                                </h2>
+                                <p className="text-lg font-medium text-slate-600 dark:text-white/40 leading-relaxed max-w-md ml-auto">
+                                    Personnel and workforce data HQ, managing employee lifecycle and attendance tracking with RBAC compliance.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={() => openModule("HRM", "cyan", MODULE_DATA.HRM)}
+                                className="rounded-full bg-cyan-500/10 border border-cyan-500/50 text-cyan-700 dark:text-cyan-400 font-black uppercase tracking-widest text-[10px] px-10 h-12 hover:bg-cyan-500 hover:text-white transition-all shadow-[0_0_30px_rgba(6,182,212,0.1)]"
+                            >
+                                Open Telemetry
+                            </Button>
+                        </div>
+                    </motion.div>
+                </HorizontalPanel>
 
                     {/* Watermark Typography */}
                     <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
@@ -764,3 +798,4 @@ export default function LandingPage() {
         </div>
     )
 }
+

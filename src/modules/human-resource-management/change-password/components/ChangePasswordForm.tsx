@@ -90,7 +90,7 @@ export const ChangePasswordForm = () => {
                                         { label: "One uppercase letter", met: /[A-Z]/.test(form.watch("newPassword") || "") },
                                         { label: "One lowercase letter", met: /[a-z]/.test(form.watch("newPassword") || "") },
                                         { label: "One digit (0-9)", met: /\d/.test(form.watch("newPassword") || "") },
-                                        { label: "One special character (@$!%*?&)", met: /[@$!%*?&]/.test(form.watch("newPassword") || "") },
+                                        { label: "One special character (!@#$%^&*()_+-=[]{};':\"\\|,.<>?`~)", met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>?`~]/.test(form.watch("newPassword") || "") },
                                     ].map((req, i) => (
                                         <div key={i} className="flex items-center gap-2">
                                             <div className={cn(
