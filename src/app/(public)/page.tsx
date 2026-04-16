@@ -5,22 +5,18 @@ import { motion, useScroll, useTransform } from "framer-motion"
 import Image from "next/image"
 import {
     Shield,
-    BarChart3,
     Settings,
-    Users,
-    Database,
-    Globe,
     Cpu,
     LayoutDashboard,
-    Activity,
-    Binary,
-    Terminal
+    Binary
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { MissionStatsGrid } from "@/components/command-center/MissionStatsGrid"
 import { GlassCard } from "@/components/command-center/GlassCard"
 import { cn } from "@/lib/utils"
+
+import { SUBSYSTEMS } from "@/modules/cms/constants/subsystems"
 
 import { HorizontalScrollContainer, HorizontalPanel } from "@/components/command-center/HorizontalScrollContainer"
 
@@ -134,56 +130,16 @@ export default function LandingPage() {
     const y = useTransform(scrollY, [0, 400], [0, 100])
     const bgY = useTransform(scrollY, [0, 1000], [0, 300])
 
-    const MODULE_DATA = {
-        HRM: {
-            description: "Real-time workforce activity and shift dynamics. Monitoring attendance velocity and core department load.",
-            stats: [
-                { label: "Total Headcount", value: "2,840", trend: "+12%" },
-                { label: "Active Shift", value: "842 Personnel", trend: "NOMINAL" },
-                { label: "Punctuality Rate", value: "94.2%", trend: "STABLE" }
-            ]
-        },
-        FIN: {
-            description: "Fiscal orchestration and asset monitoring. High-precision cashflow management and ledger auditing.",
-            stats: [
-                { label: "Available Liquidity", value: "₱4.24M", trend: "OPTIMAL" },
-                { label: "Daily Burn Velocity", value: "-₱14.2K", trend: "-2%" },
-                { label: "Fixed Assets", value: "842 Nodes" }
-            ]
-        },
-        SCM: {
-            description: "Inventory and logistics orchestration layer. End-to-end supply chain visibility and fleet dispatch telemetry.",
-            stats: [
-                { label: "Inventory Accuracy", value: "97.4%", trend: "+1.2%" },
-                { label: "Fleet Active", value: "14/15", trend: "+1" },
-                { label: "Turnover Rate", value: "14.2X" }
-            ]
-        },
-        CRM: {
-            description: "Revenue pipeline and client hub. Real-time billing cycles and accounts receivable lifecycle management.",
-            stats: [
-                { label: "Active Clients", value: "3,204", trend: "+84" },
-                { label: "Invoice Conversion", value: "94.2%", trend: "HIGH" },
-                { label: "Recycled Orders", value: "12%" }
-            ]
-        },
-        BI: {
-            description: "The system brain. Analyzing cross-domain trends for strategic decision making and risk mitigation.",
-            stats: [
-                { label: "System Integrity", value: "94.8%", trend: "SECURE" },
-                { label: "Data Throughput", value: "1.2TB", trend: "NOMINAL" },
-                { label: "Risk Mitigation", value: "FAST" }
-            ]
-        },
-        ARF: {
-            description: "Assurance and transparency layer. Monitoring every system-wide audit action for non-repudiable logging.",
-            stats: [
-                { label: "Compliance Health", value: "99.8%", trend: "+0.3%" },
-                { label: "Open Findings", value: "3 Minor", trend: "LOW" },
-                { label: "Audit Gap Velocity", value: "0.1s" }
-            ]
-        }
-    }
+    const MODULE_DATA = React.useMemo(() => {
+        const data: Record<string, ModuleData> = {}
+        SUBSYSTEMS.forEach(sub => {
+            data[sub.id] = {
+                description: sub.description,
+                stats: sub.stats
+            }
+        })
+        return data
+    }, [])
 
     return (
         <div className="relative min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-sans selection:bg-cyan-500/30 overflow-hidden">
@@ -200,12 +156,15 @@ export default function LandingPage() {
             <div className="fixed left-6 top-1/2 -translate-y-1/2 z-40 hidden xl:flex flex-col gap-4">
                 {[
                     { icon: LayoutDashboard, label: "HERO", color: "text-slate-400" },
-                    { icon: Cpu, label: "HRM", color: "text-cyan-500" },
-                    { icon: Database, label: "FIN", color: "text-emerald-500" },
-                    { icon: Globe, label: "SCM", color: "text-amber-500" },
-                    { icon: Users, label: "CRM", color: "text-indigo-500" },
-                    { icon: BarChart3, label: "BI", color: "text-violet-500" },
-                    { icon: Shield, label: "ARF", color: "text-rose-500" },
+                    ...SUBSYSTEMS.map(sub => ({
+                        icon: sub.id === "HRM" ? Cpu : sub.icon, // Original use Cpu for HRM in sidebar
+                        label: sub.id,
+                        color: sub.accent === "cyan" ? "text-cyan-500" :
+                               sub.accent === "emerald" ? "text-emerald-500" :
+                               sub.accent === "amber" ? "text-amber-500" :
+                               sub.accent === "indigo" ? "text-indigo-500" :
+                               sub.accent === "violet" ? "text-violet-500" : "text-rose-500"
+                    })),
                     { icon: Binary, label: "CORE", color: "text-slate-400" },
                 ].map((item, i) => (
                     <motion.button

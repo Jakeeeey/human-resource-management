@@ -3,24 +3,14 @@
 import * as React from "react"
 import { motion } from "framer-motion"
 import { 
-    Users, 
-    Database, 
-    Globe, 
-    BarChart3, 
-    Shield, 
-    Cpu,
-    ArrowRight,
     CheckCircle2,
     Activity,
     Terminal,
     Link2,
-    Zap,
-    Box,
-    Receipt,
-    ClipboardList,
-    TrendingUp,
     ShieldCheck
 } from "lucide-react"
+
+import { SUBSYSTEMS } from "@/modules/cms/constants/subsystems"
 
 import { Button } from "@/components/ui/button"
 import { GlassCard } from "@/components/command-center/GlassCard"
@@ -73,62 +63,7 @@ export default function ServicesPage() {
                 {/* SUBSYSTEMS GRID */}
                 <section className="pb-32 px-6">
                     <div className="max-w-7xl mx-auto space-y-12">
-                        {[
-                            {
-                                id: "HRM",
-                                title: "Human Resource Management",
-                                accent: "cyan",
-                                icon: Users,
-                                description: "The central repository for personnel and workforce data, managed for operational efficiency and compliance. Covers the entire employee lifecycle—from recruitment to daily clock-ins and complex payroll disbursements.",
-                                entities: ["Employee (ID, Dept, Position)", "AttendanceRecord (DeviceID, Status)", "Schedule (Rotation, Duration)"],
-                                analytics: ["Headcount Dynamics (Turnover)", "Punctuality Index", "Labor Cost Distribution"]
-                            },
-                            {
-                                id: "FIN",
-                                title: "Financial Management",
-                                accent: "emerald",
-                                icon: Database,
-                                description: "High-precision fiscal orchestration and asset lifecycle monitoring. Transforms operational activities into verifiable financial statements while providing real-time economic vitality metrics.",
-                                entities: ["Asset (Condition, LifeSpan)", "TreasuryData (Liquidity, Burn)", "AccountingEntry (GLAccount, Debit/Credit)"],
-                                analytics: ["Liquidity Ratio", "Asset Depreciation Tracking", "Spend Velocity (Daily Burn)"]
-                            },
-                            {
-                                id: "SCM",
-                                title: "Supply Chain Management",
-                                accent: "amber",
-                                icon: Box,
-                                description: "The orchestration layer for inventory, logistics, and vendor relationships. Ensures operational continuity through rigorous stock controls and logistics dispatch telemetry.",
-                                entities: ["Product (SKU, ReorderPoint)", "PurchaseOrder (Supplier, Status)", "LogisticsShipment (TruckID, Route)"],
-                                analytics: ["Inventory Turnover", "Supplier Fulfillment Rate", "Fleet Fuel Efficiency"]
-                            },
-                            {
-                                id: "CRM",
-                                title: "Customer Relationship",
-                                accent: "indigo",
-                                icon: Globe,
-                                description: "Driving the revenue pipeline through managed customer interactions and streamlined billing workflows. Focuses on maintaining high service levels while managing complex receivable lifecycles.",
-                                entities: ["Customer (TIN, CreditLimit)", "SalesOrder (OrderID, Status)", "Invoice (NetAmount, Discount)"],
-                                analytics: ["Receivables Aging (30/60/90+)", "Invoice Conversion Rate", "Client Retention Index"]
-                            },
-                            {
-                                id: "BIA",
-                                title: "Business Intelligence",
-                                accent: "violet",
-                                icon: BarChart3,
-                                description: "The 'Brain' of the ecosystem, aggregating data from all modules for strategic decision-making. Correlates cross-domain trends to identify bottleneck risks before they impact the bottom line.",
-                                entities: ["Cross-Domain Trends", "Strategic KPIs", "Management Heatmaps"],
-                                analytics: ["Profitability Margins", "Operational Risk Forecasting", "Global System Health Score"]
-                            },
-                            {
-                                id: "ARF",
-                                title: "Audit & Findings",
-                                accent: "rose",
-                                icon: Shield,
-                                description: "The assurance layer ensuring transparency and compliance. Maintains non-repudiable logs of sensitive actions and tracks remediation of compliance gaps discovered during audits.",
-                                entities: ["AuditLog (UserID, ActionType)", "Finding (Description, Severity)", "ComplianceCheckpoint"],
-                                analytics: ["Compliance Health Score", "Risk Remediation Velocity", "Audit Trail Coverage"]
-                            }
-                        ].map((sub, i) => (
+                        {SUBSYSTEMS.map((sub, i) => (
                             <motion.div
                                 key={sub.id}
                                 initial={{ opacity: 0, y: 30 }}
@@ -136,7 +71,7 @@ export default function ServicesPage() {
                                 viewport={{ once: true, margin: "-10%" }}
                                 transition={{ duration: 0.6, delay: i * 0.05 }}
                             >
-                                <GlassCard className="p-8 md:p-12 border-slate-200 dark:border-white/5 overflow-hidden group" accent={sub.accent as any}>
+                                <GlassCard className="p-8 md:p-12 border-slate-200 dark:border-white/5 overflow-hidden group" accent={sub.accent as "cyan" | "emerald" | "amber" | "indigo" | "violet" | "rose"}>
                                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 relative z-10">
                                         {/* Content Left */}
                                         <div className="lg:col-span-7 space-y-8">

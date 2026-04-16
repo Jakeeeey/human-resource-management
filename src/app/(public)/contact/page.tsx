@@ -4,12 +4,8 @@ import * as React from "react"
 import { motion } from "framer-motion"
 import { 
     Mail, 
-    Phone, 
     MapPin, 
-    Globe, 
-    Users, 
     ArrowRight,
-    CheckCircle2,
     Clock,
     ShieldCheck
 } from "lucide-react"

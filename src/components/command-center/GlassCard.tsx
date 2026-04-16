@@ -22,34 +22,34 @@ export function GlassCard({
 
     const accentConfigs = {
         cyan: {
-            glow: "from-cyan-500/5 dark:from-cyan-500/10",
+            glow: "from-cyan-600/10 dark:from-cyan-400/20",
             border: "group-hover:border-cyan-500/30",
-            shadow: "group-hover:shadow-cyan-500/10"
+            orb: "bg-cyan-600 dark:bg-cyan-400"
         },
         indigo: {
-            glow: "from-indigo-500/5 dark:from-indigo-500/10",
+            glow: "from-indigo-600/10 dark:from-indigo-400/20",
             border: "group-hover:border-indigo-500/30",
-            shadow: "group-hover:shadow-indigo-500/10"
+            orb: "bg-indigo-600 dark:bg-indigo-400"
         },
         rose: {
-            glow: "from-rose-500/5 dark:from-rose-500/10",
+            glow: "from-rose-600/10 dark:from-rose-400/20",
             border: "group-hover:border-rose-500/30",
-            shadow: "group-hover:shadow-rose-500/10"
+            orb: "bg-rose-600 dark:bg-rose-400"
         },
         emerald: {
-            glow: "from-emerald-500/5 dark:from-emerald-500/10",
+            glow: "from-emerald-600/10 dark:from-emerald-400/20",
             border: "group-hover:border-emerald-500/30",
-            shadow: "group-hover:shadow-emerald-500/10"
+            orb: "bg-emerald-600 dark:bg-emerald-400"
         },
         amber: {
-            glow: "from-amber-500/5 dark:from-amber-500/10",
+            glow: "from-amber-600/10 dark:from-amber-400/20",
             border: "group-hover:border-amber-500/30",
-            shadow: "group-hover:shadow-amber-500/10"
+            orb: "bg-amber-600 dark:bg-amber-400"
         },
         violet: {
-            glow: "from-violet-500/5 dark:from-violet-500/10",
+            glow: "from-violet-600/10 dark:from-violet-400/20",
             border: "group-hover:border-violet-500/30",
-            shadow: "group-hover:shadow-violet-500/10"
+            orb: "bg-violet-600 dark:bg-violet-400"
         },
     }
 
@@ -62,34 +62,47 @@ export function GlassCard({
             viewport={viewport}
             transition={transition}
             className={cn(
-                "relative group overflow-hidden rounded-[2rem] border bg-white/40 border-slate-900/5 dark:bg-slate-950/40 dark:border-white/5 backdrop-blur-3xl transition-all duration-700",
-                "shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.8)]",
-                "hover:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)] dark:hover:shadow-[0_32px_64px_-16px_rgba(0,0,0,0.9)]",
-                "hover:bg-white/60 dark:hover:bg-slate-900/60",
+                "relative group overflow-hidden rounded-3xl transition-all duration-700",
+                "bg-radial-gradient from-white/40 to-white/10 dark:from-slate-950/60 dark:to-slate-950/40",
+                "backdrop-blur-[40px] saturate-[180%]",
+                "border border-slate-900/10 dark:border-white/10",
+                "shadow-[0_8px_32px_0_rgba(0,0,0,0.05)] dark:shadow-[0_16px_48px_0_rgba(0,0,0,0.4)]",
+                "hover:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)]",
+                "hover:scale-[1.02] hover:bg-white/60 dark:hover:bg-slate-900/70",
                 config.border,
                 className
             )}
             {...props}
         >
-            {/* Inner Volumetric Lighting */}
-            <div className="absolute inset-0 pointer-events-none rounded-[2rem] shadow-[inset_0_1px_1px_rgba(255,255,255,0.1)] dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] z-20" />
+            {/* Glossy Reflection (Top-Left) */}
+            <div className="absolute inset-0 bg-linear-to-br from-white/10 via-transparent to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            
+            {/* Inner Volumetric Lighting / Rim Light (Removed secondary ring) */}
+            <div className="absolute inset-px pointer-events-none rounded-3xl z-20" />
             
             {/* Ambient Base Glow */}
             <div className={cn(
-                "absolute -inset-px bg-linear-to-br opacity-20 dark:opacity-30 blur-2xl transition-opacity duration-700 pointer-events-none group-hover:opacity-40",
+                "absolute -inset-px bg-linear-to-br opacity-10 dark:opacity-30 blur-2xl transition-opacity duration-700 pointer-events-none group-hover:opacity-30",
                 config.glow,
                 "to-transparent"
             )} />
 
-            {/* Accent Highlight (Top Corner) */}
-            <div className={cn(
-                "absolute -top-24 -right-24 w-48 h-48 rounded-full blur-[64px] opacity-0 transition-opacity duration-1000 group-hover:opacity-20",
-                accent === "cyan" ? "bg-cyan-500" :
-                accent === "indigo" ? "bg-indigo-500" :
-                accent === "rose" ? "bg-rose-500" :
-                accent === "emerald" ? "bg-emerald-500" :
-                accent === "amber" ? "bg-amber-500" : "bg-violet-500"
-            )} />
+            {/* Accent Highlight (Floating Orb) */}
+            <motion.div 
+                animate={{
+                    x: [0, 20, 0],
+                    y: [0, -20, 0],
+                }}
+                transition={{
+                    duration: 5,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                }}
+                className={cn(
+                    "absolute -top-12 -right-12 w-48 h-48 rounded-full blur-[64px] opacity-10 transition-opacity duration-1000 group-hover:opacity-30",
+                    config.orb
+                )} 
+            />
 
             <div className="relative z-10 h-full">
                 {children}

@@ -2,27 +2,15 @@
 
 import * as React from "react"
 import { motion } from "framer-motion"
-import Image from "next/image"
 import { 
-    Shield, 
     Target, 
-    Users, 
     Sparkles, 
-    Zap, 
-    Server, 
-    Smartphone, 
-    HeadphonesIcon,
-    ArrowRight,
-    Building2,
-    CheckCircle2,
-    Calendar,
-    Globe
+    ArrowRight
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { GlassCard } from "@/components/command-center/GlassCard"
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
 
 export default function AboutPage() {
     return (
