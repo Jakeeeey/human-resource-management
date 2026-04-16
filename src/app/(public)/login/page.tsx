@@ -2,9 +2,9 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Eye, EyeOff, Lock, Mail } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck } from "lucide-react"
+import { motion } from "framer-motion"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -12,13 +12,11 @@ import { Button } from "@/components/ui/button"
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 
@@ -58,14 +56,13 @@ type FieldErrors = {
 
 export default function LoginPage() {
     return (
-        <React.Suspense fallback={<div className="min-h-dvh flex items-center justify-center">Loading...</div>}>
+        <React.Suspense fallback={<div className="min-h-dvh flex items-center justify-center font-black tracking-widest text-xs uppercase animate-pulse">Initializing Portal...</div>}>
             <LoginForm />
         </React.Suspense>
     )
 }
 
 function LoginForm() {
-    const router = useRouter()
     const searchParams = useSearchParams()
 
     const [showPw, setShowPw] = React.useState(false)
@@ -112,9 +109,10 @@ function LoginForm() {
 
             toast.success("Signed in", { description: "Welcome back." })
 
-            const next = searchParams.get("next") || "/main-dashboard"
-            router.replace(next)
-            router.refresh()
+            let next = searchParams.get("next") || "/main-dashboard"
+            if (!next.startsWith("/")) next = "/main-dashboard"
+
+            window.location.href = next
         } catch (err: unknown) {
             const errorInfo = err as { message?: string };
             const raw = errorInfo?.message ? String(errorInfo.message) : "Network error. Please try again."
@@ -129,55 +127,105 @@ function LoginForm() {
     const pwHasError = Boolean(errors.hashPassword)
 
     return (
-        <div className="min-h-dvh bg-background">
-            <div className="mx-auto flex min-h-dvh w-full max-w-6xl items-center justify-center px-4">
-                <div className="grid w-full gap-6 lg:grid-cols-2 lg:gap-10">
-                    {/* Left: Brand / intro */}
-                    <div className="hidden flex-col justify-center rounded-2xl border bg-card p-10 lg:flex">
-                        <div className="flex items-center gap-2">
-                            <div className="text-lg font-semibold">VOS ERP</div>
-                            <Badge variant="secondary" className="text-[11px]">
-                                vos-web-v2
-                            </Badge>
-                        </div>
+        <div className="relative min-h-svh lg:min-h-[calc(100dvh-64px)] overflow-hidden flex flex-col">
+            {/* Background Decor */}
+            <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/2 rounded-full blur-3xl -z-10 animate-pulse" />
 
-                        <div className="mt-6 space-y-3">
-                            <div className="text-3xl font-semibold tracking-tight">Welcome back.</div>
-                            <div className="text-sm text-muted-foreground">
-                                Sign in to access your assigned systems: Supply Chain, Finance, HR, BI, and
-                                Audit. Authentication is JWT-based and stored via secure HttpOnly cookies.
+            <div className="mx-auto flex flex-1 w-full max-w-6xl items-center justify-center px-4 py-6 sm:py-10">
+                <div className="grid w-full gap-10 lg:grid-cols-2 lg:gap-16 items-stretch">
+                    {/* Left: Brand / intro */}
+                    <motion.div 
+                        initial={{ opacity: 0, x: -30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="hidden flex-col justify-center gap-8 rounded-[2rem] border bg-card/40 backdrop-blur-md p-10 lg:flex relative overflow-hidden group shadow-2xl border-white/5 h-full"
+                    >
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-primary/50 via-primary to-primary/50" />
+                        <div className="absolute inset-0 bg-linear-to-br from-primary/5 to-transparent pointer-events-none" />
+                        
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border bg-background shadow-xs font-black text-xl tracking-tighter">V</div>
+                                <div className="flex flex-col">
+                                    <span className="text-xl font-black tracking-tighter uppercase leading-none">VOS ERP</span>
+                                    <span className="text-[10px] font-black tracking-[0.2em] text-primary uppercase mt-1">v2.systems</span>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 space-y-3">
+                                <h1 className="text-4xl sm:text-5xl font-black tracking-tighter leading-[0.95] uppercase decoration-primary/20 underline-offset-8">
+                                    Simplified <br />
+                                    Business <br />
+                                    <span className="text-primary italic">Management.</span>
+                                </h1>
+                                <p className="max-w-sm text-base font-bold text-muted-foreground/80 leading-relaxed tracking-tight">
+                                    Manage your organization&apos;s resources efficiently with our easy-to-use ERP system.
+                                </p>
                             </div>
                         </div>
 
-                        <Separator className="my-8" />
-
-                        <div className="text-sm text-muted-foreground">
-                            Tip: If you are redirected here, you are not authenticated yet.
+                        <div className="relative z-10 space-y-6">
+                            <div className="grid grid-cols-2 gap-y-4 gap-x-8">
+                                 {['Supply Chain', 'Finance', 'Human Resources', 'Analytics'].map((feat) => (
+                                     <div key={feat} className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-muted-foreground transition-colors hover:text-primary">
+                                          <div className="h-1.5 w-1.5 rounded-full bg-primary/50" />
+                                          {feat}
+                                     </div>
+                                 ))}
+                            </div>
+                            
+                            <div className="flex items-center gap-4 p-5 rounded-3xl bg-primary/5 border border-primary/10 backdrop-blur-sm group/security">
+                                <div className="p-3 rounded-2xl bg-background border border-primary/20 shadow-xs transition-transform group-hover/security:scale-110">
+                                    <ShieldCheck className="h-6 w-6 text-primary" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs font-black uppercase tracking-tight flex items-center gap-2">
+                                        Secure Login Protected
+                                        <Badge variant="outline" className="text-[9px] h-4 px-1 rounded-sm border-primary/30 text-primary font-black uppercase">Active</Badge>
+                                    </p>
+                                    <p className="text-[10px] text-muted-foreground font-bold tracking-tight">Your data is encrypted and saved securely for your protection.</p>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Right: Form */}
-                    <div className="flex items-center justify-center">
-                        <Card className="w-full max-w-md">
-                            <CardHeader className="space-y-1">
-                                <CardTitle className="text-2xl">Sign in</CardTitle>
-                                <CardDescription>Enter your credentials to continue.</CardDescription>
+                    <motion.div 
+                        initial={{ opacity: 0, x: 30 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
+                        className="flex items-center justify-center"
+                    >
+                        <Card className="w-full max-w-md border-0 shadow-2xl rounded-[2rem] bg-card/80 backdrop-blur-xl relative overflow-hidden h-full flex flex-col justify-center">
+                            <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-primary/50 via-primary to-primary/50" />
+                            
+                            <CardHeader className="space-y-1 pt-8 sm:pt-10 px-6 sm:px-8">
+                                {/* Mobile Brand Identity (Visible only on smaller screens) */}
+                                <div className="flex items-center gap-3 mb-6 lg:hidden">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border bg-background shadow-xs font-black text-base tracking-tighter">V</div>
+                                    <div className="flex flex-col">
+                                        <span className="text-base font-black tracking-tighter uppercase leading-none">VOS ERP</span>
+                                        <span className="text-[9px] font-black tracking-[0.2em] text-primary uppercase mt-1">v2.systems</span>
+                                    </div>
+                                </div>
+                                <CardTitle className="text-2xl sm:text-3xl font-black tracking-tighter uppercase text-center w-full">LOGIN</CardTitle>
                             </CardHeader>
 
-                            <CardContent>
-                                <form onSubmit={onSubmit} className="space-y-4">
+                            <CardContent className="px-6 sm:px-8 pb-8 sm:pb-10">
+                                <form onSubmit={onSubmit} className="space-y-4 sm:space-y-5">
                                     {/* Email */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">Email</Label>
-                                        <div className="relative">
-                                            <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <div className="space-y-3">
+                                        <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Email Address</Label>
+                                        <div className="relative group/field">
+                                            <Mail className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within/field:text-primary" />
                                             <Input
                                                 id="email"
                                                 type="email"
                                                 placeholder="name@company.com"
                                                 className={cn(
-                                                    "pl-9",
-                                                    emailHasError && "border-destructive focus-visible:ring-destructive"
+                                                    "h-12 pl-11 rounded-xl bg-muted/30 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 transition-all font-bold tracking-tight",
+                                                    emailHasError && "bg-destructive/5 ring-1 ring-destructive"
                                                 )}
                                                 autoComplete="email"
                                                 value={email}
@@ -187,28 +235,32 @@ function LoginForm() {
                                                 }}
                                                 disabled={loading}
                                                 aria-invalid={emailHasError}
-                                                aria-describedby={emailHasError ? "email-error" : undefined}
                                             />
                                         </div>
-                                        {emailHasError ? (
-                                            <p id="email-error" className="text-xs text-destructive">
+                                        {emailHasError && (
+                                            <p className="text-[10px] font-black uppercase tracking-tight text-destructive animate-in fade-in slide-in-from-top-1">
                                                 {errors.email}
                                             </p>
-                                        ) : null}
+                                        )}
                                     </div>
 
                                     {/* Password */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="password">Password</Label>
-                                        <div className="relative">
-                                            <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="password" title="password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Password</Label>
+                                            <Button variant="link" type="button" className="h-auto p-0 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 hover:text-primary transition-colors" disabled>
+                                                Forgot Password?
+                                            </Button>
+                                        </div>
+                                        <div className="relative group/field">
+                                            <Lock className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground transition-colors group-focus-within/field:text-primary" />
                                             <Input
                                                 id="password"
                                                 type={showPw ? "text" : "password"}
                                                 placeholder="••••••••"
                                                 className={cn(
-                                                    "pl-9 pr-10",
-                                                    pwHasError && "border-destructive focus-visible:ring-destructive"
+                                                    "h-12 pl-11 pr-12 rounded-xl bg-muted/30 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 transition-all font-bold tracking-tight",
+                                                    pwHasError && "bg-destructive/5 ring-1 ring-destructive"
                                                 )}
                                                 autoComplete="current-password"
                                                 value={hashPassword}
@@ -219,14 +271,13 @@ function LoginForm() {
                                                 }}
                                                 disabled={loading}
                                                 aria-invalid={pwHasError}
-                                                aria-describedby={pwHasError ? "password-error" : undefined}
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPw((s) => !s)}
                                                 className={cn(
-                                                    "absolute right-2 top-1 inline-flex h-7 w-7 items-center justify-center rounded-md",
-                                                    "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                                    "absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-8 w-8 items-center justify-center rounded-lg",
+                                                    "text-muted-foreground hover:bg-background hover:text-primary transition-all active:scale-90"
                                                 )}
                                                 aria-label={showPw ? "Hide password" : "Show password"}
                                                 disabled={loading}
@@ -234,50 +285,52 @@ function LoginForm() {
                                                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                             </button>
                                         </div>
-                                        {pwHasError ? (
-                                            <p id="password-error" className="text-xs text-destructive">
+                                        {pwHasError && (
+                                            <p className="text-[10px] font-black uppercase tracking-tight text-destructive animate-in fade-in slide-in-from-top-1">
                                                 {errors.hashPassword}
                                             </p>
-                                        ) : null}
+                                        )}
                                     </div>
 
-                                    <div className="flex items-center justify-between">
-                                        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Checkbox
-                                                id="remember"
-                                                checked={remember}
-                                                onCheckedChange={(v) => setRemember(Boolean(v))}
-                                                disabled={loading}
-                                            />
+                                    <div className="flex items-center gap-3 py-2">
+                                        <Checkbox
+                                            id="remember"
+                                            checked={remember}
+                                            onCheckedChange={(v) => setRemember(Boolean(v))}
+                                            disabled={loading}
+                                            className="rounded-md h-5 w-5 border-muted-foreground/20 data-[state=checked]:bg-primary transition-colors"
+                                        />
+                                        <label htmlFor="remember" className="text-xs font-bold tracking-tight text-muted-foreground/80 cursor-pointer select-none">
                                             Remember me
                                         </label>
-
-                                        <Button variant="link" type="button" className="px-0 text-sm" disabled>
-                                            Forgot password
-                                        </Button>
                                     </div>
 
-                                    <Button type="submit" className="w-full" disabled={loading}>
-                                        {loading ? "Signing in..." : "Sign in"}
+                                    <Button 
+                                        type="submit" 
+                                        className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-[0.98] transition-all" 
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-4 w-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
+                                                LOGIN...
+                                            </div>
+                                        ) : (
+                                            <span className="flex items-center justify-center">
+                                                LOGIN <ArrowRight className="ml-2 h-4 w-4" />
+                                            </span>
+                                        )}
                                     </Button>
 
-                                    <div className="pt-2 text-center text-xs text-muted-foreground">
-                                        By continuing you agree to the internal policies of your organization.
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="text-center text-xs text-muted-foreground">
-                                        Go to{" "}
-                                        <Link className="underline underline-offset-4 hover:text-foreground" href="/public">
-                                            home
-                                        </Link>{" "}
-                                        (middleware will redirect you back here if not authenticated)
+                                    <div className="pt-2">
+                                        <p className="text-center text-[8px] font-bold text-muted-foreground/40 leading-tight uppercase tracking-widest mx-auto max-w-[180px]">
+                                            By signing in, you agree to our internal safety policies.
+                                        </p>
                                     </div>
                                 </form>
                             </CardContent>
                         </Card>
-                    </div>
+                    </motion.div>
                 </div>
             </div>
         </div>

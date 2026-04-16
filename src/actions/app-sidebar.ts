@@ -1,8 +1,7 @@
 import { cookies } from "next/headers";
-import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { NavItem } from "@/types/navigation";
 import { z } from "zod";
-
-const COOKIE_NAME = "vos_access_token";
 
 /**
  * Zod Schemas derived from SQL DDL
@@ -47,33 +46,20 @@ interface TempNavItem extends NavItem {
     items: TempNavItem[];
 }
 
-function decodeJwt(token: string): Record<string, string | number | string[]> | null {
-    try {
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-        while (s.length % 4) s += "=";
-        const json = Buffer.from(s, "base64").toString("utf8");
-        return JSON.parse(json);
-    } catch {
-        return null;
-    }
-}
-
 /**
- * Fetches the sidebar navigation tree.
+ * Fetches the sidebar navigation tree for a specific subsystem.
  * Uses a hybrid approach:
  * - Admin: Master List from Directus
  * - User: Authorized List from Spring Boot SQL View
  */
-export async function getSidebarNavigation(): Promise<NavItem[]> {
+export async function getSidebarNavigation(subsystemSlug: string): Promise<NavItem[]> {
     try {
         const cookieStore = await cookies();
         const token = cookieStore.get(COOKIE_NAME)?.value;
 
         if (!token) return [];
 
-        const payload = decodeJwt(token);
+        const payload = decodeJwtPayload(token);
         const userId = payload?.id || payload?.user_id || payload?.sub;
         const role = payload?.role; 
 
@@ -83,10 +69,10 @@ export async function getSidebarNavigation(): Promise<NavItem[]> {
 
         if (role === "ADMIN") {
             const directusBase = process.env.NEXT_PUBLIC_API_BASE_URL;
-            const hrmFilter = encodeURIComponent(JSON.stringify({ 
-                subsystem_id: { slug: { _eq: "hrm" } } 
+            const filter = encodeURIComponent(JSON.stringify({ 
+                subsystem_id: { slug: { _eq: subsystemSlug } } 
             }));
-            const url = `${directusBase?.replace(/\/+$/, "")}/items/modules?filter=${hrmFilter}&sort=sort&limit=-1`;
+            const url = `${directusBase?.replace(/\/+$/, "")}/items/modules?filter=${filter}&sort=sort&limit=-1`;
             
             const res = await fetch(url, {
                 headers: { "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` },
@@ -115,7 +101,7 @@ export async function getSidebarNavigation(): Promise<NavItem[]> {
             const springBase = process.env.SPRING_API_BASE_URL;
             if (!springBase) return [];
             
-            const url = `${springBase.replace(/\/+$/, "")}/api/view-user-authorized-module/all?subsystem_slug=hrm`;
+            const url = `${springBase.replace(/\/+$/, "")}/api/view-user-authorized-module/all?subsystem_slug=${subsystemSlug}`;
             
             const res = await fetch(url, {
                 headers: {
@@ -130,7 +116,7 @@ export async function getSidebarNavigation(): Promise<NavItem[]> {
                 const validatedData = z.array(SpringModuleSchema).parse(jsonResponse || []);
                 
                 modulesToProcess = validatedData
-                    .filter((m: SpringModule) => m.userId === Number(userId))
+                    .filter((m: SpringModule) => m.userId === Number(userId) && m.subsystemSlug === subsystemSlug)
                     .map((m: SpringModule) => ({
                         moduleId: m.moduleId,
                         title: m.title,

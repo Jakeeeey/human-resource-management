@@ -8,10 +8,10 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { NavUser } from "../_components/nav-user";
+import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 import { cookies } from "next/headers";
 import { SubsystemRegistrationModule } from "@/modules/human-resource-management/subsystem-registration";
-// import ComingSoon from "../_components/ComingSoon";
+// import ComingSoon from "@/components/shared/ComingSoon";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

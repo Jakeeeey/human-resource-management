@@ -12,10 +12,10 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
-import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
+import { NavItem } from "@/types/navigation";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { SIDEBAR_REFRESH_EVENT } from "./sidebar-events";
+import { APP_SIDEBAR_REFRESH_EVENT } from "./app-sidebar-events";
 import {
     Sidebar,
     SidebarContent,
@@ -34,10 +34,12 @@ const getIcon = (name?: string | null): LucideIcon => {
 
 interface AppSidebarClientProps extends ComponentProps<typeof Sidebar> {
     initialItems: NavItem[]; // Data from Spring Boot via Server Component
+    subsystemTitle?: string; // e.g., "Human Resource Management"
 }
 
 export function AppSidebarClient({
     initialItems,
+    subsystemTitle = "System Module",
     className,
     ...props
 }: AppSidebarClientProps) {
@@ -48,10 +50,10 @@ export function AppSidebarClient({
     // Live Sync: Listen for structure changes and refresh the sidebar
     React.useEffect(() => {
         const handleRefresh = () => {
-            router.refresh(); // Tells Next.js to re-fetch the server component (app-sidebar.tsx)
+            router.refresh(); // Tells Next.js to re-fetch the server component
         };
-        window.addEventListener(SIDEBAR_REFRESH_EVENT, handleRefresh);
-        return () => window.removeEventListener(SIDEBAR_REFRESH_EVENT, handleRefresh);
+        window.addEventListener(APP_SIDEBAR_REFRESH_EVENT, handleRefresh);
+        return () => window.removeEventListener(APP_SIDEBAR_REFRESH_EVENT, handleRefresh);
     }, [router]);
 
     // Keyboard shortcut for search
@@ -133,7 +135,7 @@ export function AppSidebarClient({
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-medium">VOS Web</span>
                                     <span className="truncate text-xs text-muted-foreground">
-                                        Human Resource Management
+                                        {subsystemTitle}
                                     </span>
                                 </div>
                             </Link>

@@ -23,7 +23,7 @@ import {
     SidebarMenuItem,
     SidebarMenuSub,
 } from "@/components/ui/sidebar";
-import { NavItem } from "@/modules/human-resource-management/subsystem-registration/types";
+import { NavItem } from "@/types/navigation";
 
 import { THEME_SETTINGS_EVENT } from "@/components/theme/theme-settings";
 
@@ -507,7 +507,7 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
                 } as React.CSSProperties
             }
         >
-            <SidebarMenu className="overflow-x-hidden gap-0">
+            <SidebarMenu className="overflow-x-hidden gap-1">
                 {items.length === 0 && searchTerm ? (
                     <div className="px-5 py-8 text-center animate-in fade-in slide-in-from-top-1 duration-300">
                         <div className="mx-auto size-12 rounded-2xl bg-sidebar-accent/30 flex items-center justify-center mb-3 border border-sidebar-border/50">
@@ -533,5 +533,3 @@ export function NavMain({ items, searchTerm }: { items: NavItem[]; searchTerm?: 
         </SidebarGroup>
     );
 }
-
-
