@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils"
 
-const PROTECTED_PREFIXES = ["/dashboard", "/scm", "/fm", "/hrm", "/bia", "/arf", "/cafeteria"]
+const PROTECTED_PREFIXES = ["/dashboard", "/scm", "/fm", "/hrm", "/bia", "/arf", "/cafeteria", "/crm"]
 const PUBLIC_FILE = /\.(.*)$/
 
 function isProtectedPath(pathname: string) {
