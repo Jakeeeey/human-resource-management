@@ -10,10 +10,12 @@ interface UserConfigurationFetchContextType {
     users: UserSubsystemAccess[];
     subsystems: SubsystemRegistration[];
     isLoading: boolean;
+    isFirstLoad: boolean;
     currentPage: number;
     totalCount: number;
     pageSize: number;
-    fetchPage: (page: number, quiet?: boolean) => Promise<void>;
+    searchTerm: string;
+    fetchPage: (page: number, quiet?: boolean, search?: string) => Promise<void>;
     updateUserPermissions: (
         userId: string, 
         permissions: string[], 
@@ -39,23 +41,43 @@ export function UserConfigurationFetchProvider({
     const [isLoading, setIsLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalCount, setTotalCount] = useState(0);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-    const fetchPage = useCallback(async (page: number, quiet = false) => {
-        if (!quiet) setIsLoading(true);
+    const fetchPage = useCallback(async (page: number, quiet = false, search?: string) => {
+        // Only show global loading if it's the first time or not quiet
+        const shouldShowLoading = isFirstLoad || !quiet;
+        if (shouldShowLoading) setIsLoading(true);
+        else if (quiet) setIsLoading(true); 
+        
         try {
+            const activeSearch = search !== undefined ? search : searchTerm;
             const offset = page * LIMIT;
             
-            // 1. Fetch Subsystems and Users in parallel
+            // 1. Fetch Subsystems (Cached) and Users in parallel
+            // Note: UserService.getSubsystemsRegistry() now handles its own internal caching
             const [subsystemData, { users: userData, total }] = await Promise.all([
                 UserService.getSubsystemsRegistry(),
-                UserService.getUsers(LIMIT, offset)
+                UserService.getUsers(LIMIT, offset, activeSearch)
             ]);
+
+            if (search !== undefined) setSearchTerm(search);
             
-            // 2. Bulk Fetch Permissions for the users on this page (Junction Table IDs & Slugs)
+            // 2. Immediate Return if no users
+            if (userData.length === 0) {
+                setSubsystems(subsystemData);
+                setUsers([]);
+                setTotalCount(0);
+                setCurrentPage(page);
+                setIsFirstLoad(false);
+                return;
+            }
+
+            // 3. Bulk Fetch Permissions
             const userIds = userData.map(u => u.user_id);
             const permissionsMap = await UserService.getPermissionsForUsers(userIds);
 
-            // 3. Merge permissions into user objects
+            // 4. Merge permissions
             const mergedUsers = userData.map(user => {
                 const p = permissionsMap[user.user_id] || { 
                     subsystemSlugs: [], 
@@ -80,13 +102,14 @@ export function UserConfigurationFetchProvider({
             setUsers(mergedUsers);
             setTotalCount(total);
             setCurrentPage(page);
+            setIsFirstLoad(false);
         } catch (error) {
             console.error("Failed to load configuration data:", error);
             toast.error("Failed to load users or permissions from the database.");
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [isFirstLoad, searchTerm]);
 
     useEffect(() => {
         fetchPage(0);
@@ -119,9 +142,11 @@ export function UserConfigurationFetchProvider({
                 users,
                 subsystems,
                 isLoading,
+                isFirstLoad,
                 currentPage,
                 totalCount,
                 pageSize: LIMIT,
+                searchTerm,
                 fetchPage,
                 updateUserPermissions,
             },
