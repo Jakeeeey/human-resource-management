@@ -1,14 +1,14 @@
 import { z } from "zod";
 
 /**
- * Regex for strong password:
- * - At least 8 characters (User requested 15-64, so we adjust accordingly)
+ * Regex for strong password — mirrors server-side @Pattern validation:
  * - At least one uppercase letter
  * - At least one lowercase letter
  * - At least one digit
- * - At least one special character
+ * - At least one special character from: !@#$%^&*()_+-=[]{};':"\\|,.<>?`~
+ * Character set is kept in sync with the Spring Boot @Pattern annotation.
  */
-export const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+export const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>?`~])[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>?`~]{8,}$/;
 
 export const ChangePasswordSchema = z.object({
     oldPassword: z.string().min(1, "Old password is required"),
