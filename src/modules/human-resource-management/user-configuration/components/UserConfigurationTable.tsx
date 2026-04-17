@@ -5,10 +5,7 @@ import {
     flexRender,
     getCoreRowModel,
     getFilteredRowModel,
-    getSortedRowModel,
     useReactTable,
-    type ColumnFiltersState,
-    type SortingState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -71,6 +68,7 @@ export function UserConfigurationTable({
 
     const columns = useMemo(() => createColumns(subsystems, onToggleAccess, onConfigure), [subsystems, onToggleAccess, onConfigure]);
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
