@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { motion } from "framer-motion"
-import { 
+import {
     CheckCircle2,
     Activity,
     Terminal,
@@ -38,18 +38,18 @@ export default function ServicesPage() {
                                 ERP V2 ARCHITECTURE // SUBSYSTEM DEEP DIVE
                             </Badge>
                         </motion.div>
-                        
-                        <motion.h1 
+
+                        <motion.h1
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 }}
                             className="text-5xl md:text-8xl font-black uppercase tracking-tighter italic leading-[0.9] text-slate-900 dark:text-white"
                         >
                             Unified Digital <br />
-                            <span className="text-cyan-600 dark:text-cyan-400">Nervous System</span>
+                            <span className="text-cyan-600 dark:text-cyan-400">ERP System</span>
                         </motion.h1>
 
-                        <motion.p 
+                        <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 }}
@@ -79,11 +79,11 @@ export default function ServicesPage() {
                                                 <div className={cn(
                                                     "w-14 h-14 rounded-2xl flex items-center justify-center border",
                                                     sub.accent === "cyan" ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-600 dark:text-cyan-400" :
-                                                    sub.accent === "emerald" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
-                                                    sub.accent === "amber" ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400" :
-                                                    sub.accent === "indigo" ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400" :
-                                                    sub.accent === "violet" ? "bg-violet-500/10 border-violet-500/20 text-violet-600 dark:text-violet-400" :
-                                                    "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"
+                                                        sub.accent === "emerald" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
+                                                            sub.accent === "amber" ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400" :
+                                                                sub.accent === "indigo" ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-600 dark:text-indigo-400" :
+                                                                    sub.accent === "violet" ? "bg-violet-500/10 border-violet-500/20 text-violet-600 dark:text-violet-400" :
+                                                                        "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400"
                                                 )}>
                                                     <sub.icon className="w-7 h-7" />
                                                 </div>
@@ -148,10 +148,10 @@ export default function ServicesPage() {
                 {/* DATA SYNERGY SECTION */}
                 <section className="py-32 px-6 bg-slate-100 dark:bg-slate-950/40 border-t border-slate-200 dark:border-white/5 relative overflow-hidden">
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[500px] bg-cyan-500/5 blur-[180px] rounded-full pointer-events-none" />
-                    
+
                     <div className="max-w-7xl mx-auto space-y-20 relative z-10">
                         <div className="text-center space-y-4">
-                            <motion.h2 
+                            <motion.h2
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 whileInView={{ opacity: 1, scale: 1 }}
                                 viewport={{ once: true }}
@@ -166,25 +166,25 @@ export default function ServicesPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             {[
-                                { 
-                                    title: "Procure-to-Pay", 
-                                    path: "SCM ↔ Finance", 
-                                    desc: "SCM purchase orders automatically generate Accounts Payable entries, informing Treasury of incoming cash requirements." 
+                                {
+                                    title: "Procure-to-Pay",
+                                    path: "SCM ↔ Finance",
+                                    desc: "SCM purchase orders automatically generate Accounts Payable entries, informing Treasury of incoming cash requirements."
                                 },
-                                { 
-                                    title: "Order-to-Cash", 
-                                    path: "CRM ↔ SCM ↔ Finance", 
-                                    desc: "Sales cycles verify credit, reserve stock, generate receivables, and update GL balances in a concurrent workflow." 
+                                {
+                                    title: "Order-to-Cash",
+                                    path: "CRM ↔ SCM ↔ Finance",
+                                    desc: "Sales cycles verify credit, reserve stock, generate receivables, and update GL balances in a concurrent workflow."
                                 },
-                                { 
-                                    title: "Labor Transformation", 
-                                    path: "HRM ↔ Finance ↔ BI", 
-                                    desc: "Raw attendance data translates to payroll liabilities while BI calculates labor cost-per-unit for margin analysis." 
+                                {
+                                    title: "Labor Transformation",
+                                    path: "HRM ↔ Finance ↔ BI",
+                                    desc: "Raw attendance data translates to payroll liabilities while BI calculates labor cost-per-unit for margin analysis."
                                 },
-                                { 
-                                    title: "Compliance Oversight", 
-                                    path: "Audit ↔ All Modules", 
-                                    desc: "The Audit engine tracks critical events site-wide, ensuring total transparency across every sensitive transaction." 
+                                {
+                                    title: "Compliance Oversight",
+                                    path: "Audit ↔ All Modules",
+                                    desc: "The Audit engine tracks critical events site-wide, ensuring total transparency across every sensitive transaction."
                                 }
                             ].map((loop, i) => (
                                 <motion.div
@@ -211,7 +211,7 @@ export default function ServicesPage() {
                         </div>
 
                         <div className="pt-20 text-center">
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true }}

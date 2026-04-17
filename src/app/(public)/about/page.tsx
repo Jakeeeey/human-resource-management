@@ -2,14 +2,13 @@
 
 import * as React from "react"
 import { motion } from "framer-motion"
-import { 
-    Target, 
-    Sparkles, 
+import {
+    Target,
+    Sparkles,
     ArrowRight
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { GlassCard } from "@/components/command-center/GlassCard"
 import { Badge } from "@/components/ui/badge"
 
 export default function AboutPage() {
@@ -34,8 +33,8 @@ export default function AboutPage() {
                                 OUR IDENTITY // VERTEX TECHNOLOGIES
                             </Badge>
                         </motion.div>
-                        
-                        <motion.h1 
+
+                        <motion.h1
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.1 }}
@@ -45,7 +44,7 @@ export default function AboutPage() {
                             <span className="text-cyan-600 dark:text-cyan-400">Communities & Businesses</span>
                         </motion.h1>
 
-                        <motion.p 
+                        <motion.p
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.2 }}
@@ -73,7 +72,7 @@ export default function AboutPage() {
                 {/* MISSION SECTION (CORE) */}
                 <section className="py-24 px-6 border-y border-slate-200 dark:border-white/5 bg-white/50 dark:bg-slate-900/20 backdrop-blur-md">
                     <div className="max-w-4xl mx-auto space-y-12 text-center">
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             whileInView={{ opacity: 1, scale: 1 }}
                             viewport={{ once: true }}
@@ -85,7 +84,7 @@ export default function AboutPage() {
                             <p className="text-xl text-slate-600 dark:text-white/50 leading-relaxed font-medium italic border-l-4 border-cyan-500/30 pl-8 text-left">
                                 To empower LGUs and enterprises by replacing complex workflows with simple, reliable, and innovative software solutions. We drive measurable impact, allowing our partners to focus on what they do best: serving citizens and growing businesses.
                             </p>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8">
                                 <div className="p-8 rounded-3xl bg-white/50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/5 space-y-4 text-left">
                                     <div className="w-12 h-12 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20">
@@ -107,7 +106,7 @@ export default function AboutPage() {
                 </section>
 
                 {/* STATS SECTION */}
-                <section className="py-24 px-6 overflow-hidden relative">
+                {/*  <section className="py-24 px-6 overflow-hidden relative">
                     <div className="absolute inset-0 z-0">
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[300px] bg-cyan-500/5 blur-[120px]" />
                     </div>
@@ -134,10 +133,10 @@ export default function AboutPage() {
                             </motion.div>
                         ))}
                     </div>
-                </section>
+                </section>*/}
 
                 {/* LEADERSHIP TEAM */}
-                <section className="py-24 px-6 bg-slate-50 dark:bg-slate-950/20">
+                {/*           <section className="py-24 px-6 bg-slate-50 dark:bg-slate-950/20">
                     <div className="max-w-7xl mx-auto space-y-16">
                         <div className="flex flex-col md:flex-row items-end justify-between gap-6 border-b border-slate-200 dark:border-white/5 pb-8">
                             <div className="space-y-2">
@@ -180,11 +179,11 @@ export default function AboutPage() {
                             ))}
                         </div>
                     </div>
-                </section>
+                </section>*/}
 
                 {/* FINAL BRAND TAGLINE */}
                 <section className="py-24 px-6 text-center">
-                    <motion.p 
+                    <motion.p
                         initial={{ opacity: 0 }}
                         whileInView={{ opacity: 1 }}
                         viewport={{ once: true }}
