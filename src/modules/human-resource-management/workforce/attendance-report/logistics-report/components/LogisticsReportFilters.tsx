@@ -60,7 +60,6 @@ export function LogisticsReportFilters({
               <Input
                 type="date"
                 value={startDate}
-                max={endDate}
                 onChange={(event) => onStartDateChange(event.target.value)}
                 className="w-auto h-9"
               />
@@ -73,7 +72,6 @@ export function LogisticsReportFilters({
               <Input
                 type="date"
                 value={endDate}
-                min={startDate}
                 onChange={(event) => onEndDateChange(event.target.value)}
                 className="w-auto h-9"
               />

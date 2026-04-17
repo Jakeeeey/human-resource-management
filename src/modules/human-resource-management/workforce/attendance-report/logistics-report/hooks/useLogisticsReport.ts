@@ -12,8 +12,8 @@ import { getDefaultDateRange } from "../utils/report";
 const defaultDateRange = getDefaultDateRange();
 
 const initialMeta: LogisticsReportMeta = {
-  startDate: defaultDateRange.startDate,
-  endDate: defaultDateRange.endDate,
+  startDate: "",
+  endDate: "",
   totalDispatches: 0,
   totalStaff: 0,
   presentCount: 0,
@@ -27,11 +27,12 @@ export function useLogisticsReport() {
   const [endDate, setEndDate] = useState(defaultDateRange.endDate);
   const [dispatches, setDispatches] = useState<DispatchAttendance[]>([]);
   const [meta, setMeta] = useState<LogisticsReportMeta>(initialMeta);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [hasUserFiltered, setHasUserFiltered] = useState(false);
 
   async function loadReport(range?: LogisticsReportDateRange) {
     const selectedRange = range ?? { startDate, endDate };
@@ -40,7 +41,14 @@ export function useLogisticsReport() {
     setError(null);
 
     try {
-      const query = new URLSearchParams({ ...selectedRange });
+      const query = new URLSearchParams();
+      if (selectedRange.startDate) {
+        query.append("startDate", selectedRange.startDate);
+      }
+      if (selectedRange.endDate) {
+        query.append("endDate", selectedRange.endDate);
+      }
+      
       const response = await fetch(
         `/api/hrm/logistics-report?${query.toString()}`,
         {
@@ -71,9 +79,17 @@ export function useLogisticsReport() {
   }
 
   useEffect(() => {
-    void loadReport({ startDate, endDate });
+    // Load all data on initial mount (no date filters)
+    void loadReport({ startDate: "", endDate: "" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate]);
+  }, []);
+
+  useEffect(() => {
+    if (hasUserFiltered) {
+      void loadReport({ startDate, endDate });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, hasUserFiltered]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -129,5 +145,6 @@ export function useLogisticsReport() {
     setCurrentPage,
     setPageSize,
     loadReport,
+    setHasUserFiltered,
   };
 }

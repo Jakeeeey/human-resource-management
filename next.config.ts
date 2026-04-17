@@ -1,17 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ['msi-4', 'msi-lo'],
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: '100.110.197.61',
-        port: '8056',
-        pathname: '/uploads/**',
-      },
-    ],
-  },
+  allowedDevOrigins:[
+    'localhost',
+    '100.127.242.29'
+  ]
+     
+  
 };
 
 export default nextConfig;

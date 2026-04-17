@@ -3,8 +3,8 @@ import { DispatchAttendance } from "../type";
 
 export function getDefaultDateRange() {
 	return {
-		startDate: toISODate(new Date(2025, 0, 1)),
-		endDate: toISODate(new Date(2025, 11, 30)),
+		startDate: "",
+		endDate: "",
 	};
 }
 

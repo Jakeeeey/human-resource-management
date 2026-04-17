@@ -27,6 +27,7 @@ export default function LogisticsReportModule() {
     setCurrentPage,
     setPageSize,
     loadReport,
+    setHasUserFiltered,
   } = useLogisticsReport();
 
   return (
@@ -41,9 +42,17 @@ export default function LogisticsReportModule() {
         endDate={endDate}
         searchQuery={searchQuery}
         isLoading={isLoading}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-        onSearchQueryChange={setSearchQuery}
+        onStartDateChange={(date) => {
+          setHasUserFiltered(true);
+          setStartDate(date);
+        }}
+        onEndDateChange={(date) => {
+          setHasUserFiltered(true);
+          setEndDate(date);
+        }}
+        onSearchQueryChange={(query) => {
+          setSearchQuery(query);
+        }}
       />
 
       <LogisticsReportSummary meta={meta} />
