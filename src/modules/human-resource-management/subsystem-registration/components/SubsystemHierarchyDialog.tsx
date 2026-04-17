@@ -45,9 +45,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { IconPicker } from "./IconPicker";
-import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
+import { APP_SIDEBAR_REFRESH_EVENT } from "@/components/shared/app-sidebar/app-sidebar-events";
 import { toast } from "sonner";
-import { MoveUp, MoveDown } from "lucide-react";
 
 interface SubsystemHierarchyDialogProps {
     open: boolean;
@@ -264,7 +263,7 @@ export function SubsystemHierarchyDialog({
             const result = await onUpdate({ ...subsystem, modules });
             if (result.success) {
                 // Live Sync: Force refresh the sidebar navigation via Custom Event
-                window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
+                window.dispatchEvent(new CustomEvent(APP_SIDEBAR_REFRESH_EVENT));
                 onOpenChange(false);
                 // Success message is handled by the hook
             } else {
