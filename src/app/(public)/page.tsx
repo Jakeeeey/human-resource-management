@@ -7,18 +7,17 @@ import {
     Shield,
     Settings,
     Cpu,
-    LayoutDashboard,
     Binary
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { MissionStatsGrid } from "@/components/command-center/MissionStatsGrid"
 import { GlassCard } from "@/components/command-center/GlassCard"
-import { cn } from "@/lib/utils"
 
 import { SUBSYSTEMS } from "@/modules/cms/constants/subsystems"
 
 import { HorizontalScrollContainer, HorizontalPanel } from "@/components/command-center/HorizontalScrollContainer"
+import { CommandSidebar } from "@/components/command-center/CommandSidebar"
 
 // Specialized Visualizers
 import { WorkforcePulse } from "@/components/command-center/visualizers/WorkforcePulse"
@@ -152,41 +151,11 @@ export default function LandingPage() {
                 data={activeModule?.data || { description: "", stats: [] }}
             />
 
-            {/* Sidebar Subsystem Switcher (Quick Nav) */}
-            <div className="fixed left-6 top-1/2 -translate-y-1/2 z-40 hidden xl:flex flex-col gap-4">
-                {[
-                    { icon: LayoutDashboard, label: "HERO", color: "text-slate-400" },
-                    ...SUBSYSTEMS.map(sub => ({
-                        icon: sub.id === "HRM" ? Cpu : sub.icon, // Original use Cpu for HRM in sidebar
-                        label: sub.id,
-                        color: sub.accent === "cyan" ? "text-cyan-500" :
-                            sub.accent === "emerald" ? "text-emerald-500" :
-                                sub.accent === "amber" ? "text-amber-500" :
-                                    sub.accent === "indigo" ? "text-indigo-500" :
-                                        sub.accent === "violet" ? "text-violet-500" : "text-rose-500"
-                    })),
-                    { icon: Binary, label: "CORE", color: "text-slate-400" },
-                ].map((item, i) => (
-                    <motion.button
-                        key={item.label}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 1 + i * 0.1 }}
-                        onClick={() => scrollToPanel(i)}
-                        className="group relative flex items-center gap-4"
-                    >
-                        <div className={cn(
-                            "w-10 h-10 rounded-xl border border-slate-900/10 dark:border-white/10 bg-slate-50/50 dark:bg-slate-950/50 backdrop-blur-xl flex items-center justify-center transition-all",
-                            activePanel === i ? "border-cyan-500 bg-cyan-500/10" : "",
-                        )}>
-                            <item.icon className={cn("w-5 h-5 text-slate-500 dark:text-white/40 transition-colors", activePanel === i ? item.color : `group-hover:${item.color}`)} />
-                        </div>
-                        <span className={cn("absolute left-14 text-[10px] font-black uppercase opacity-0 group-hover:opacity-100 transition-opacity tracking-widest", item.color)}>
-                            {item.label}
-                        </span>
-                    </motion.button>
-                ))}
-            </div>
+            <CommandSidebar 
+                activePanel={activePanel}
+                onPanelSelect={scrollToPanel}
+                subsystems={SUBSYSTEMS}
+            />
 
             {/* 1. HERO UNIT */}
             <section id="hero" className="relative h-screen flex flex-col items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -254,20 +223,13 @@ export default function LandingPage() {
                 <HorizontalPanel className="px-6 md:px-12 lg:px-24 overflow-hidden">
                     {/* Background Aura */}
                     <div className="absolute inset-0 z-0">
-                        <motion.img
-                            initial={{ scale: 1.2, opacity: 0 }}
-                            whileInView={{ scale: 1, opacity: 0.15 }}
-                            animate={{
-                                scale: [1, 1.05, 1],
-                                opacity: [0.15, 0.25, 0.15]
-                            }}
-                            transition={{
-                                duration: 8,
-                                repeat: Infinity,
-                                ease: "easeInOut"
-                            }}
+                        <Image
                             src="/hrm_tech_bg_1776080411521.png"
-                            className="w-full h-full object-cover blur-[120px]"
+                            fill
+                            sizes="100vw"
+                            alt=""
+                            unoptimized
+                            className="object-cover blur-[120px] opacity-15 animate-orb-pulse will-change-transform"
                         />
                     </div>
 
@@ -333,12 +295,13 @@ export default function LandingPage() {
             <HorizontalPanel className="px-6 md:px-12 lg:px-24 overflow-hidden">
                 {/* Background Aura */}
                 <div className="absolute inset-0 z-0">
-                    <motion.img
-                        initial={{ scale: 1.1, opacity: 0 }}
-                        whileInView={{ scale: 1, opacity: 0.12 }}
-                        transition={{ duration: 2.5 }}
+                    <Image
                         src="/finance_tech_bg_1776080430564.png"
-                        className="w-full h-full object-cover blur-[100px]"
+                        fill
+                        sizes="100vw"
+                        alt=""
+                        unoptimized
+                        className="object-cover blur-[100px] opacity-12 animate-orb-pulse will-change-transform"
                     />
                 </div>
 
@@ -397,12 +360,13 @@ export default function LandingPage() {
             <HorizontalPanel className="px-6 md:px-12 lg:px-24 overflow-hidden bg-slate-100/50 dark:bg-slate-900/10">
                 {/* Background Map Wash */}
                 <div className="absolute inset-x-0 bottom-0 top-1/4 z-0">
-                    <motion.img
-                        initial={{ y: 100, opacity: 0 }}
-                        whileInView={{ y: 0, opacity: 0.2 }}
-                        transition={{ duration: 2 }}
+                    <Image
                         src="/scm_tech_bg_v2_1776080502518.png"
-                        className="w-full h-full object-cover blur-[80px]"
+                        fill
+                        sizes="100vw"
+                        alt=""
+                        unoptimized
+                        className="object-cover blur-[80px] opacity-20 animate-orb-pulse will-change-transform"
                     />
                 </div>
 
@@ -471,12 +435,13 @@ export default function LandingPage() {
             <HorizontalPanel className="px-6 md:px-12 lg:px-24 overflow-hidden">
                 {/* Background Aura */}
                 <div className="absolute inset-0 z-0">
-                    <motion.img
-                        initial={{ scale: 1.3, opacity: 0 }}
-                        whileInView={{ scale: 1, opacity: 0.15 }}
-                        transition={{ duration: 2.5 }}
+                    <Image
                         src="/crm_tech_bg_1776080448439.png"
-                        className="w-full h-full object-cover blur-[140px]"
+                        fill
+                        sizes="100vw"
+                        alt=""
+                        unoptimized
+                        className="object-cover blur-[140px] opacity-15 animate-orb-pulse will-change-transform"
                     />
                 </div>
 
@@ -544,12 +509,13 @@ export default function LandingPage() {
             <HorizontalPanel className="px-6 md:px-12 lg:px-24 overflow-hidden relative">
                 {/* Background Aura */}
                 <div className="absolute inset-x-0 bottom-0 top-0 z-0 flex items-center justify-center">
-                    <motion.img
-                        initial={{ scale: 0.8, opacity: 0 }}
-                        whileInView={{ scale: 1.2, opacity: 0.2 }}
-                        transition={{ duration: 3 }}
+                    <Image
                         src="/bi_tech_bg_1776080465405.png"
-                        className="w-[120%] h-[120%] object-cover blur-[100px]"
+                        fill
+                        sizes="100vw"
+                        alt=""
+                        unoptimized
+                        className="object-cover blur-[100px] opacity-20 animate-orb-pulse will-change-transform"
                     />
                 </div>
 
@@ -604,12 +570,13 @@ export default function LandingPage() {
             <HorizontalPanel className="px-6 md:px-12 lg:px-24 overflow-hidden relative">
                 {/* Background Aura */}
                 <div className="absolute inset-0 z-0">
-                    <motion.img
-                        initial={{ scale: 1.2, opacity: 0 }}
-                        whileInView={{ scale: 1, opacity: 0.1 }}
-                        transition={{ duration: 2 }}
+                    <Image
                         src="/arf_tech_bg_1776080481672.png"
-                        className="w-full h-full object-cover blur-[150px]"
+                        fill
+                        sizes="100vw"
+                        alt=""
+                        unoptimized
+                        className="object-cover blur-[150px] opacity-10 animate-orb-pulse will-change-transform"
                     />
                 </div>
 

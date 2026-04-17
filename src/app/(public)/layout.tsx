@@ -30,7 +30,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                     </SmoothScrollProvider>
                 </motion.main>
             </AnimatePresence>
-            <Footer />
+            {pathname !== '/login' && <Footer />}
         </div>
     )
 }
