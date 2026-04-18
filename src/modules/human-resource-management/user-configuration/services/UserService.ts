@@ -7,16 +7,19 @@ interface RawModule extends ModuleRegistration {
 }
 
 export class UserService {
+    private static cachedSubsystems: SubsystemRegistration[] | null = null;
+
     /**
      * Fetches real users from the system.
      * Maps to UserSubsystemAccess type.
      */
-    static async getUsers(limit = 50, offset = 0): Promise<{ users: UserSubsystemAccess[], total: number }> {
+    static async getUsers(limit = 50, offset = 0, search = ""): Promise<{ users: UserSubsystemAccess[], total: number }> {
         let users: UserSubsystemAccess[] = [];
         let total = 0;
         try {
             // Fetch from our local proxy route with pagination params
-            const response = await fetch(`/api/hrm/user-configuration/users?limit=${limit}&offset=${offset}`);
+            const searchParam = search ? `&search=${encodeURIComponent(search)}` : "";
+            const response = await fetch(`/api/hrm/user-configuration/users?limit=${limit}&offset=${offset}${searchParam}`);
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 console.error("Failed to fetch users from /api/hrm/user-configuration/users:", {
@@ -36,12 +39,10 @@ export class UserService {
                 user_fname?: string;
                 user_mname?: string;
                 user_lname?: string;
-                user_image?: string;
             }) => ({
                 user_id: String(user.user_id || ""),
                 email: user.user_email || "No Email",
                 full_name: `${user.user_fname || ""} ${user.user_mname ? user.user_mname + " " : ""}${user.user_lname || ""}`.trim() || "Unknown User",
-                avatar_url: user.user_image || null,
                 authorized_subsystems: [], // To be populated by bulk fetch
             }));
 
@@ -180,6 +181,8 @@ export class UserService {
     }
 
     static async getSubsystemsRegistry(): Promise<SubsystemRegistration[]> {
+        if (this.cachedSubsystems) return this.cachedSubsystems;
+
         try {
             // Fetch subsystems and all modules in parallel for User Configuration registry
             const [subsystemsRes, modulesRes] = await Promise.all([
@@ -234,6 +237,7 @@ export class UserService {
                 } as SubsystemRegistration;
             });
 
+            this.cachedSubsystems = finalSubsystems;
             return finalSubsystems;
         } catch (error) {
             console.error("Error fetching subsystems registry for User Config:", error);
