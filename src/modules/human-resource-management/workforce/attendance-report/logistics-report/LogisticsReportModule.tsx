@@ -30,38 +30,37 @@ export default function LogisticsReportModule() {
   } = useLogisticsReport();
 
   return (
-    <div className="space-y-6">
-      <LogisticsReportHeader
-        isLoading={isLoading}
-        onRefresh={() => void loadReport()}
-      />
-
-      <LogisticsReportFilters
-        startDate={startDate}
-        endDate={endDate}
-        searchQuery={searchQuery}
-        isLoading={isLoading}
-        onStartDateChange={setStartDate}
-        onEndDateChange={setEndDate}
-        onSearchQueryChange={setSearchQuery}
-      />
-
-      <LogisticsReportSummary meta={meta} />
-
-      <LogisticsDispatchList
-        dispatches={paginatedDispatches}
-        meta={meta}
-        isLoading={isLoading}
-        error={error}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        totalItems={totalItems}
-        totalPages={totalPages}
-        startRow={startRow}
-        endRow={endRow}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
-      />
-    </div>
-  );
+    <>
+      <div className="space-y-6">
+        <LogisticsReportHeader
+          isLoading={isLoading}
+          onRefresh={() => void loadReport()}
+        />
+        <LogisticsReportFilters
+          startDate={startDate}
+          endDate={endDate}
+          searchQuery={searchQuery}
+          isLoading={isLoading}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onSearchQueryChange={setSearchQuery}
+        />
+        <LogisticsReportSummary meta={meta} />
+        <LogisticsDispatchList
+          dispatches={paginatedDispatches}
+          meta={meta}
+          isLoading={isLoading}
+          error={error}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          totalPages={totalPages}
+          startRow={startRow}
+          endRow={endRow}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
+      </div>
+    </>
+);
 }

@@ -227,7 +227,7 @@ export function useAttendance(date?: string): UseAttendanceResult {
     try {
       const params = new URLSearchParams({ date: targetDate });
       const res = await fetch(
-        `/api/hrm/attendance-report/todays-report?${params}`,
+        `/api/hrm/workforce/attendance-report/todays-report?${params}`,
         { credentials: 'include' }
       );
 
