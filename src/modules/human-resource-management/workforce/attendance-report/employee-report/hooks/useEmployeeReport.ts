@@ -118,7 +118,11 @@ function computeOvertime(
 
 function computeLate(timeIn: string | null, workStart: string | null, grace: number): number {
   if (!timeIn || !workStart) return 0;
-  return Math.max(0, toMins(timeIn) - (toMins(workStart) + grace));
+  const minsAfterGrace = toMins(timeIn) - (toMins(workStart) + grace);
+  // Within grace period → on time
+  if (minsAfterGrace <= 0) return 0;
+  // Beyond grace → late is counted from workStart (grace minutes are included)
+  return toMins(timeIn) - toMins(workStart);
 }
 
 function computeUndertime(timeOut: string | null, workEnd: string | null): number {

@@ -111,7 +111,7 @@ export default function TodaysReportModule() {
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
-              {["All","Present","Absent","Not Present","Rest Day"].map((s) => (
+              {["All","Present","Absent","Rest Day"].map((s) => (
                 <SelectItem key={s} value={s} className="text-xs">{s === "All" ? "All Statuses" : s}</SelectItem>
               ))}
             </SelectContent>
