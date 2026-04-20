@@ -9,9 +9,12 @@ The main table for employee/user information.
 CREATE TABLE `user` (
   `user_id` int NOT NULL AUTO_INCREMENT,
   `user_email` varchar(255) NOT NULL,
+  `user_password` varchar(255) DEFAULT NULL, -- Hash stored here
   `user_fname` varchar(255) NOT NULL,
   `user_mname` varchar(255) DEFAULT NULL,
   `user_lname` varchar(255) NOT NULL,
+  `suffix_name` varchar(50) DEFAULT NULL,
+  `nickname` varchar(50) DEFAULT NULL,
   `user_contact` varchar(255) NOT NULL,
   `user_province` varchar(255) NOT NULL,
   `user_city` varchar(255) NOT NULL,
@@ -20,17 +23,32 @@ CREATE TABLE `user` (
   `user_sss` varchar(255) DEFAULT NULL,
   `user_philhealth` varchar(255) DEFAULT NULL,
   `user_tin` varchar(255) DEFAULT NULL,
+  `user_pagibig` varchar(255) DEFAULT NULL,
   `user_position` varchar(255) NOT NULL,
   `user_dateOfHire` date NOT NULL,
   `user_tags` varchar(255) DEFAULT NULL,
   `user_bday` date DEFAULT NULL,
+  `gender` varchar(50) DEFAULT NULL,
+  `civil_status` varchar(50) DEFAULT NULL,
+  `nationality` varchar(100) DEFAULT NULL,
+  `place_of_birth` varchar(255) DEFAULT NULL,
+  `blood_type` varchar(10) DEFAULT NULL,
+  `religion` varchar(100) DEFAULT NULL,
+  `spouse_name` varchar(255) DEFAULT NULL,
   `role_id` int DEFAULT NULL,
   `user_image` text,
+  `user_signature` text,
   `isAdmin` tinyint(1) NOT NULL DEFAULT '0',
   `role` varchar(10) NOT NULL DEFAULT 'USER',
   `isDeleted` bit(1) DEFAULT NULL,
+  `biometric_id` varchar(255) DEFAULT NULL,
+  `rf_id` varchar(255) DEFAULT NULL,
+  `external_id` varchar(255) DEFAULT NULL,
+  `emergency_contact_name` varchar(255) DEFAULT NULL,
+  `emergency_contact_number` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 ```
 
 ### department

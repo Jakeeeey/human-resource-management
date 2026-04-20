@@ -51,7 +51,7 @@ export function Header() {
             <div className="mx-auto flex items-center gap-4 px-6 md:px-8">
                 <Link href="/" className="flex items-center gap-3 group">
                     <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900/[0.02] dark:bg-white/[0.02] border border-slate-900/5 dark:border-white/5 shadow-xs transition-all duration-300 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] group-hover:border-cyan-500/50 overflow-hidden">
-                        <Image src={vosLogo} alt="VOS" fill className="object-contain p-2 dark:invert-0 invert" />
+                        <Image src={vosLogo} alt="VOS" fill sizes="40px" className="object-contain p-2 dark:invert-0 invert" />
                     </div>
                     <div className="leading-none flex flex-col justify-center">
                         <div className="text-sm font-black tracking-tighter italic uppercase transition-colors text-slate-900 dark:text-white group-hover:text-cyan-500 dark:group-hover:text-cyan-400">VOS-<span className="text-cyan-600 dark:text-cyan-500">WEB</span></div>
@@ -120,7 +120,7 @@ export function Header() {
                             <SheetHeader className="text-left mb-8">
                                 <SheetTitle className="flex items-center gap-4">
                                     <div className="relative h-10 w-10 rounded-xl bg-slate-900/[0.02] dark:bg-white/[0.02] border border-slate-900/5 dark:border-white/5 flex items-center justify-center p-2">
-                                        <Image src={vosLogo} alt="VOS" fill className="object-contain p-2 dark:invert-0 invert" />
+                                        <Image src={vosLogo} alt="VOS" fill sizes="40px" className="object-contain p-2 dark:invert-0 invert" />
                                     </div>
                                     <span className="font-black tracking-tighter italic uppercase text-lg text-slate-900 dark:text-white">OMNI-<span className="text-cyan-600 dark:text-cyan-500">VOS</span></span>
                                 </SheetTitle>
