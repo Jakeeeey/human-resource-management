@@ -312,7 +312,6 @@ export default function DepartmentReportModule() {
         </>
       )}
       </div>
-      <Toaster />
     </>
   );
 }

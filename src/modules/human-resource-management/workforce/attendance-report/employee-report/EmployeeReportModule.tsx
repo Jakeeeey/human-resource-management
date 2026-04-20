@@ -107,7 +107,6 @@ export default function EmployeeReportModule() {
           <EmployeeListView onSelect={setSelected} />
         )}
       </div>
-      <Toaster />
     </>
   );
 }

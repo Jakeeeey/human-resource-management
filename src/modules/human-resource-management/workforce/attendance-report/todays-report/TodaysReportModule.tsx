@@ -192,7 +192,6 @@ export default function TodaysReportModule() {
         </div>
         <TimeLogsTable records={filtered} total={records.length} />
       </div>
-      <Toaster />
     </>
   );
 }
