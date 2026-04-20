@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/select";
 import { Users, UserX, CalendarCheck, AlarmClock, Download } from "lucide-react";
 import { useAttendance } from "./hooks/useAttendance";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { LiveClock }           from "./components/LiveClock";
 import { MetricCard }          from "./components/MetricCards";

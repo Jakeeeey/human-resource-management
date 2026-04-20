@@ -101,7 +101,7 @@ export default async function Page() {
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Today's Report
+                                        Employee File Record List
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
