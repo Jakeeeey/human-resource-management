@@ -7,7 +7,6 @@ import { EmployeeListView }      from "./components/EmployeeListView";
 import { EmployeeHistoryView }   from "./components/EmployeeHistoryView";
 import type { Employee }         from "./hooks/useEmployeeReport";
 import { useEmployeeAttendance } from "./hooks/useEmployeeReport";
-import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 
 // ── Inner panel: owns the data fetch for a selected employee ──────────────────
@@ -107,7 +106,6 @@ export default function EmployeeReportModule() {
           <EmployeeListView onSelect={setSelected} />
         )}
       </div>
-      <Toaster />
     </>
   );
 }

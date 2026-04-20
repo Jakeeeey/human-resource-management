@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download } from 'lucide-react';
 import { useDepartmentReport } from './hooks/useDepartmentReport';
-import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { PdfEngine }           from '@/components/pdf-layout-design/PdfEngine';
 import { pdfTemplateService }  from '@/components/pdf-layout-design/services/pdf-template';
@@ -312,7 +311,6 @@ export default function DepartmentReportModule() {
         </>
       )}
       </div>
-      <Toaster />
     </>
   );
 }
