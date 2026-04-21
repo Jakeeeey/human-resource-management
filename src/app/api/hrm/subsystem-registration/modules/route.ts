@@ -11,23 +11,18 @@ async function proxy(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
-  const limit = searchParams.get("limit") || "100";
-  const filter = searchParams.get("filter");
-  const fields = searchParams.get("fields") || "*";
-  const sort = searchParams.get("sort");
   
   // Construct upstream URL
   let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/modules`;
-  if (id) {
-    upstreamUrl += `/${id}`;
-  } else {
-    // Forward query params for listing
-    const queryParams = new URLSearchParams();
-    queryParams.set("limit", limit);
-    queryParams.set("fields", fields);
-    if (filter) queryParams.set("filter", filter);
-    if (sort) queryParams.set("sort", sort);
-    upstreamUrl += `?${queryParams.toString()}`;
+  if (id) upstreamUrl += `/${id}`;
+
+  // Forward all query parameters from the client to upstream
+  const queryParams = new URLSearchParams(searchParams);
+  queryParams.delete("id"); // Remove proxy-specific internal param
+  
+  const queryString = queryParams.toString();
+  if (queryString) {
+    upstreamUrl += (upstreamUrl.includes("?") ? "&" : "?") + queryString;
   }
 
   const headers = new Headers();
@@ -43,6 +38,9 @@ async function proxy(req: NextRequest) {
 
     if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
       const body = await req.json();
+      if (req.method === "DELETE") {
+        console.log(`[Subsystem Reg - Modules Proxy] Purging modules:`, body);
+      }
       fetchOptions.body = JSON.stringify(body);
     }
 
