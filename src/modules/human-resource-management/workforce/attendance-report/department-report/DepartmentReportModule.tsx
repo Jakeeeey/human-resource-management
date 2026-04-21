@@ -1,13 +1,14 @@
 "use client";
 
 // department-report/DepartmentReportModule.tsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Input }    from '@/components/ui/input';
 import { Button }   from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download } from 'lucide-react';
 import { useDepartmentReport } from './hooks/useDepartmentReport';
+import { toast } from 'sonner';
 import { PdfEngine }           from '@/components/pdf-layout-design/PdfEngine';
 import { pdfTemplateService }  from '@/components/pdf-layout-design/services/pdf-template';
 import autoTable               from 'jspdf-autotable';
@@ -152,44 +153,88 @@ async function handleExportDeptPDF(
 
 export default function DepartmentReportModule() {
   const yesterday = getYesterdayStr();
+  const toastIdRef = useRef<string | number | null>(null);
+  const mountedRef = useRef(true);
 
-  // deptId starts null — logs are NOT fetched until this is set
+  // null = "not explicitly chosen yet, use first dept from list"
   const [deptId, setDeptId] = useState<number | null>(null);
   const [from,   setFrom]   = useState(yesterday);
   const [to,     setTo]     = useState(yesterday);
   const [search, setSearch] = useState('');
 
-  const { loading, loadingDepts, error, rows, departments, refetch } =
-    useDepartmentReport(deptId, from, to);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (toastIdRef.current) {
+        toast.dismiss(toastIdRef.current);
+      }
+    };
+  }, []);
 
-  // Derive the effective department ID without calling setState inside an effect.
-  // Once the dept list loads, use departments[0] as the default if nothing is
-  // selected yet. The Select's onValueChange then makes it permanent state.
+  // Step 1: fetch dept list (lightweight — hook blocks log fetch when deptId is null)
+  const { loadingDepts, departments } =
+    useDepartmentReport(null, from, to); // First fetch only departments list
+
+  // Derive the effective dept to show in the Select and pass into the hook.
+  // When deptId is null (first load), fall back to departments[0].
+  // This is pure derivation — no setState, no effect.
   const effectiveDeptId = useMemo<number | null>(() => {
     if (deptId !== null) return deptId;
     return departments[0]?.department_id ?? null;
   }, [deptId, departments]);
 
+  // Step 2: Once we have an effective department, fetch its logs
+  const logsResult = useDepartmentReport(effectiveDeptId, from, to);
+
+  useEffect(() => {
+    if (!mountedRef.current) return;
+    
+    if (logsResult.loading) {
+      if (!toastIdRef.current) {
+        toastIdRef.current = toast.loading("Fetching department data...");
+      }
+    } else if (toastIdRef.current) {
+      const currentId = toastIdRef.current;
+      toast.dismiss(currentId);
+      toastIdRef.current = null;
+      
+      if (logsResult.error) {
+        toast.error(`Error: ${logsResult.error}`);
+      } else if (logsResult.rows.length > 0) {
+        toast.success(`Loaded ${logsResult.rows.length} records`);
+      }
+    }
+  }, [logsResult.loading, logsResult.error, logsResult.rows.length]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return rows;
+    if (!search.trim()) return logsResult.rows;
     const q = search.toLowerCase();
-    return rows.filter((r) =>
+    return logsResult.rows.filter((r) =>
       `${r.user_fname} ${r.user_lname}`.toLowerCase().includes(q)
     );
-  }, [rows, search]);
+  }, [logsResult.rows, search]);
 
-  // Show skeleton while dept list is loading or no dept is resolvable yet
-  if (loadingDepts || effectiveDeptId === null) return <PageSkeleton />;
+  // Show skeleton while the dept list is still loading
+  if (loadingDepts) return <PageSkeleton />;
 
-  if (error) return (
+  // Dept list loaded but empty (shouldn't happen in production)
+  if (effectiveDeptId === null) return (
+    <div className="p-8 text-center text-sm text-muted-foreground">
+      No departments found.
+    </div>
+  );
+
+  if (logsResult.error) return (
     <div className="p-8 text-center m-8 border border-red-500/20 bg-red-500/5 rounded-lg">
-      <p className="text-red-500 font-medium">Error: {error}</p>
-      <Button variant="outline" className="mt-4" onClick={refetch}>Retry</Button>
+      <p className="text-red-500 font-medium">Error: {logsResult.error}</p>
+      <Button variant="outline" className="mt-4" onClick={logsResult.refetch}>Retry</Button>
     </div>
   );
 
   return (
-    <div className="p-6 bg-background text-foreground min-h-screen space-y-6 w-full box-border overflow-hidden">
+    <>
+      <div className="p-6 bg-background text-foreground min-h-screen space-y-6 w-full box-border overflow-hidden">
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Department Reports</h1>
@@ -231,8 +276,12 @@ export default function DepartmentReportModule() {
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 w-[200px] text-sm" />
 
-        {search && (
-          <Button variant="ghost" size="sm" onClick={() => setSearch('')}
+        {(from !== yesterday || to !== yesterday || search) && (
+          <Button variant="ghost" size="sm" onClick={() => {
+            setFrom(yesterday);
+            setTo(yesterday);
+            setSearch('');
+          }}
             className="h-9 px-2.5 text-sm text-muted-foreground hover:text-foreground">
             ✕ Clear
           </Button>
@@ -250,7 +299,7 @@ export default function DepartmentReportModule() {
         </Button>
       </div>
 
-      {loading ? (
+      {logsResult.loading ? (
         <div className="space-y-4">
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-64 w-full" />
@@ -261,6 +310,7 @@ export default function DepartmentReportModule() {
           <AttendanceTable rows={filtered} />
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }

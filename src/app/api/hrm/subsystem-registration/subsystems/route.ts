@@ -16,9 +16,18 @@ async function proxy(req: NextRequest) {
   let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/subsystems`;
   if (id) upstreamUrl += `/${id}`;
 
-  // Add fields for GET if no ID (listing)
-  if (req.method === "GET" && !id) {
-    upstreamUrl += `?fields=*,modules.*,modules.subModules.*`;
+  // Forward all query parameters from the client to upstream
+  const queryParams = new URLSearchParams(searchParams);
+  queryParams.delete("id"); // Remove proxy-specific internal param
+  
+  // Always include fields for listing if not explicitly provided
+  if (req.method === "GET" && !id && !queryParams.has("fields")) {
+    queryParams.set("fields", "*,modules.*,modules.subModules.*");
+  }
+  
+  const queryString = queryParams.toString();
+  if (queryString) {
+    upstreamUrl += (upstreamUrl.includes("?") ? "&" : "?") + queryString;
   }
   
   const headers = new Headers();
