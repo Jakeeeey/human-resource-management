@@ -64,7 +64,7 @@ export function GlassCard({
             className={cn(
                 "relative group overflow-hidden rounded-3xl transition-all duration-700",
                 "bg-radial-gradient from-white/40 to-white/10 dark:from-slate-950/60 dark:to-slate-950/40",
-                "backdrop-blur-[40px] saturate-[180%]",
+                "backdrop-blur-[16px] will-change-transform",
                 "border border-slate-900/10 dark:border-white/10",
                 "shadow-[0_8px_32px_0_rgba(0,0,0,0.05)] dark:shadow-[0_16px_48px_0_rgba(0,0,0,0.4)]",
                 "hover:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.15)] dark:hover:shadow-[0_32px_80px_-16px_rgba(0,0,0,0.8)]",
