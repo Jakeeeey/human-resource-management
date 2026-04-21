@@ -101,12 +101,12 @@ const SUB_WRAP_L3 = cn(
 );
 
 const ROW = "flex w-full min-w-0 flex-nowrap items-center overflow-hidden";
-const LABEL = "min-w-0 w-0 flex-1 truncate";
+const LABEL = "min-w-0 flex-1 truncate !whitespace-nowrap";
 
 /* ----------------------------- pill (hover + active) ------------------------ */
 
 const PILL_BASE =
-    "flex min-w-0 flex-1 items-center " +
+    "flex min-w-0 flex-1 items-center flex-nowrap whitespace-nowrap " +
     "rounded-[var(--radius)] px-3 py-1.5 " +
     "bg-transparent text-inherit shadow-none " +
     "transition-[background-color,color,box-shadow] duration-150";
@@ -179,20 +179,20 @@ function HighlightMatch({ text, term }: { text: string; term?: string }) {
     const parts = text.split(new RegExp(`(${safeTerm})`, "gi"));
 
     return (
-        <>
+        <span className="inline whitespace-nowrap">
             {parts.map((part, i) =>
                 part.toLowerCase() === term.toLowerCase() ? (
                     <span
                         key={i}
-                        className="text-amber-600 font-bold underline decoration-2 underline-offset-[3px] decoration-amber-500/40"
+                        className="inline text-amber-600 font-bold underline decoration-2 underline-offset-[3px] decoration-amber-500/40 whitespace-nowrap"
                     >
                         {part}
                     </span>
                 ) : (
-                    <span key={i}>{part}</span>
+                    <span key={i} className="inline whitespace-nowrap">{part}</span>
                 )
             )}
-        </>
+        </span>
     );
 }
 
@@ -221,7 +221,7 @@ function TruncatedLabel({
                 <TooltipTrigger asChild onMouseEnter={checkTruncation}>
                     <span 
                         ref={textRef} 
-                        className={cn("min-w-0 flex-1 truncate", className)}
+                        className={cn("inline-block max-w-full truncate !whitespace-nowrap", className)}
                     >
                         <HighlightMatch text={text} term={term} />
                     </span>
