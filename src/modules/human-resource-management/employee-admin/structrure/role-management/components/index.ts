@@ -6,3 +6,5 @@ export * from "./SalesmanTab";
 export * from "./RoleAssignmentDialog";
 export * from "./TablePagination";
 export * from "./ExpenseReviewCommitteeTab";
+export * from "./TAAssignmentDialog";
+export * from "./TimeAndAttendanceCommitteeTab";
