@@ -1,6 +1,5 @@
 "use client";
 
-// department-report/DepartmentReportModule.tsx
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Input }    from '@/components/ui/input';
 import { Button }   from '@/components/ui/button';
@@ -156,7 +155,7 @@ export default function DepartmentReportModule() {
   const toastIdRef = useRef<string | number | null>(null);
   const mountedRef = useRef(true);
 
-  // null = "not explicitly chosen yet, use first dept from list"
+  // null = no department selected yet
   const [deptId, setDeptId] = useState<number | null>(null);
   const [from,   setFrom]   = useState(yesterday);
   const [to,     setTo]     = useState(yesterday);
@@ -166,30 +165,18 @@ export default function DepartmentReportModule() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (toastIdRef.current) {
-        toast.dismiss(toastIdRef.current);
-      }
+      if (toastIdRef.current) toast.dismiss(toastIdRef.current);
     };
   }, []);
 
-  // Step 1: fetch dept list (lightweight — hook blocks log fetch when deptId is null)
-  const { loadingDepts, departments } =
-    useDepartmentReport(null, from, to); // First fetch only departments list
+  // Fetch dept list only (pass null so hook skips log fetch)
+  const { loadingDepts, departments } = useDepartmentReport(null, from, to);
 
-  // Derive the effective dept to show in the Select and pass into the hook.
-  // When deptId is null (first load), fall back to departments[0].
-  // This is pure derivation — no setState, no effect.
-  const effectiveDeptId = useMemo<number | null>(() => {
-    if (deptId !== null) return deptId;
-    return departments[0]?.department_id ?? null;
-  }, [deptId, departments]);
-
-  // Step 2: Once we have an effective department, fetch its logs
-  const logsResult = useDepartmentReport(effectiveDeptId, from, to);
+  // Only fetch logs when a department is explicitly selected
+  const logsResult = useDepartmentReport(deptId, from, to);
 
   useEffect(() => {
-    if (!mountedRef.current) return;
-    
+    if (!mountedRef.current || deptId === null) return;
     if (logsResult.loading) {
       if (!toastIdRef.current) {
         toastIdRef.current = toast.loading("Fetching department data...");
@@ -198,14 +185,13 @@ export default function DepartmentReportModule() {
       const currentId = toastIdRef.current;
       toast.dismiss(currentId);
       toastIdRef.current = null;
-      
       if (logsResult.error) {
         toast.error(`Error: ${logsResult.error}`);
       } else if (logsResult.rows.length > 0) {
         toast.success(`Loaded ${logsResult.rows.length} records`);
       }
     }
-  }, [logsResult.loading, logsResult.error, logsResult.rows.length]);
+  }, [logsResult.loading, logsResult.error, logsResult.rows.length, deptId]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return logsResult.rows;
@@ -215,15 +201,7 @@ export default function DepartmentReportModule() {
     );
   }, [logsResult.rows, search]);
 
-  // Show skeleton while the dept list is still loading
   if (loadingDepts) return <PageSkeleton />;
-
-  // Dept list loaded but empty (shouldn't happen in production)
-  if (effectiveDeptId === null) return (
-    <div className="p-8 text-center text-sm text-muted-foreground">
-      No departments found.
-    </div>
-  );
 
   if (logsResult.error) return (
     <div className="p-8 text-center m-8 border border-red-500/20 bg-red-500/5 rounded-lg">
@@ -233,9 +211,7 @@ export default function DepartmentReportModule() {
   );
 
   return (
-    <>
-      <div className="p-6 bg-background text-foreground min-h-screen space-y-6 w-full box-border overflow-hidden">
-
+    <div className="p-6 bg-background text-foreground min-h-screen space-y-6 w-full box-border overflow-hidden">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Department Reports</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -244,12 +220,13 @@ export default function DepartmentReportModule() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {/* ── Department selector ── */}
         <Select
-          value={String(effectiveDeptId)}
+          value={deptId !== null ? String(deptId) : ''}
           onValueChange={(v) => setDeptId(Number(v))}
         >
           <SelectTrigger className="h-9 w-[200px] text-sm">
-            <SelectValue placeholder="Select department…" />
+            <SelectValue placeholder="Select Department" />
           </SelectTrigger>
           <SelectContent className="max-h-60">
             {departments.map((d) => (
@@ -277,11 +254,7 @@ export default function DepartmentReportModule() {
           className="h-9 w-[200px] text-sm" />
 
         {(from !== yesterday || to !== yesterday || search) && (
-          <Button variant="ghost" size="sm" onClick={() => {
-            setFrom(yesterday);
-            setTo(yesterday);
-            setSearch('');
-          }}
+          <Button variant="ghost" size="sm" onClick={() => { setFrom(yesterday); setTo(yesterday); setSearch(''); }}
             className="h-9 px-2.5 text-sm text-muted-foreground hover:text-foreground">
             ✕ Clear
           </Button>
@@ -289,9 +262,12 @@ export default function DepartmentReportModule() {
 
         <div className="flex-1" />
 
-        <Button variant="outline" size="sm" className="h-9 px-4 text-sm gap-2"
+        <Button
+          variant="outline" size="sm"
+          className="h-9 px-4 text-sm gap-2"
+          disabled={deptId === null}
           onClick={() => {
-            const dept = departments.find((d) => d.department_id === effectiveDeptId);
+            const dept = departments.find((d) => d.department_id === deptId);
             if (dept) handleExportDeptPDF(dept.department_name, filtered as unknown as TableRow[], from, to);
           }}
         >
@@ -299,7 +275,13 @@ export default function DepartmentReportModule() {
         </Button>
       </div>
 
-      {logsResult.loading ? (
+      {/* ── No department selected yet ── */}
+      {deptId === null ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-24 text-center">
+          <p className="text-base font-medium text-muted-foreground">Select a Department</p>
+          <p className="text-sm text-muted-foreground mt-1">Choose a department above to view its attendance report.</p>
+        </div>
+      ) : logsResult.loading ? (
         <div className="space-y-4">
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-64 w-full" />
@@ -310,7 +292,6 @@ export default function DepartmentReportModule() {
           <AttendanceTable rows={filtered} />
         </>
       )}
-      </div>
-    </>
+    </div>
   );
 }
