@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
-import { CommandPalette } from "@/components/dashboard/command-palette";
-import { UserMenu } from "@/components/dashboard/user-menu";
+import { CommandPalette } from "@/components/main-dashboard/command-palette";
+import { UserMenu } from "@/components/main-dashboard/user-menu";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
