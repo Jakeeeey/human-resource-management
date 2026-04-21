@@ -27,7 +27,7 @@ export function useLogisticsReport() {
   const [endDate, setEndDate] = useState(defaultDateRange.endDate);
   const [dispatches, setDispatches] = useState<DispatchAttendance[]>([]);
   const [meta, setMeta] = useState<LogisticsReportMeta>(initialMeta);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);

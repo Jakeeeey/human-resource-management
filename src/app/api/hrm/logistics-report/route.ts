@@ -69,16 +69,6 @@ interface DispatchAttendanceGroup {
 	staff: DispatchStaffAttendance[];
 }
 
-function getDefaultDateRange() {
-	const now = new Date();
-	const year = now.getFullYear();
-
-	return {
-		startDate: `${year}-01-01`,
-		endDate: `${year}-12-31`,
-	};
-}
-
 function isDateString(value: string | null): value is string {
 	if (!value) return false;
 	if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -211,19 +201,19 @@ function buildDispatchGroups(
 }
 
 export async function GET(request: NextRequest) {
-	const defaults = getDefaultDateRange();
 	const searchParams = request.nextUrl.searchParams;
 	const vosToken = request.cookies.get("vos_access_token")?.value;
 	const authHeader = request.headers.get("authorization") || "";
 	const rawStartDate = searchParams.get("startDate");
-	const startDate = isDateString(rawStartDate)
-		? rawStartDate
-		: defaults.startDate;
-	
+	const startDate = isDateString(rawStartDate) ? rawStartDate : "";
+
 	const rawEndDate = searchParams.get("endDate");
-	const endDate = isDateString(rawEndDate)
-		? rawEndDate
-		: defaults.endDate;
+	const endDate = isDateString(rawEndDate) ? rawEndDate : "";
+
+	// Some upstream implementations return a default-limited dataset when date
+	// parameters are omitted. Use a wide range when a bound isn't supplied.
+	const upstreamStartDate = startDate || "2000-01-01";
+	const upstreamEndDate = endDate || "2100-12-31";
 	const debug = searchParams.get("debug") === "1";
 
 	const springApiBaseUrl =
@@ -273,8 +263,8 @@ export async function GET(request: NextRequest) {
 		const upstreamUrl = new URL(
 			`${springApiBaseUrl.replace(/\/+$/, "")}${LOGISTICS_REPORT_PATH}`
 		);
-		upstreamUrl.searchParams.set("startDate", startDate);
-		upstreamUrl.searchParams.set("endDate", endDate);
+		upstreamUrl.searchParams.set("startDate", upstreamStartDate);
+		upstreamUrl.searchParams.set("endDate", upstreamEndDate);
 
 		let response: Response | null = null;
 

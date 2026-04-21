@@ -62,6 +62,14 @@ export function LogisticsDispatchList({
 }: LogisticsDispatchListProps) {
   const hasNoResults = totalItems === 0;
 
+  const rangeLabel = meta.startDate && meta.endDate
+    ? `Range: ${meta.startDate} to ${meta.endDate}`
+    : meta.startDate
+      ? `Range: from ${meta.startDate}`
+      : meta.endDate
+        ? `Range: until ${meta.endDate}`
+        : "Range: All dates";
+
   const itemRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const handleValueChange = (value: string) => {
@@ -81,9 +89,7 @@ export function LogisticsDispatchList({
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <CardTitle>List of Post Dispatch Plan</CardTitle>
-            <CardDescription>
-              Range: {meta.startDate} to {meta.endDate}
-            </CardDescription>
+            <CardDescription>{rangeLabel}</CardDescription>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -106,9 +112,9 @@ export function LogisticsDispatchList({
 
         {isLoading ? (
           <div className="space-y-3">
-            <div className="h-20 animate-pulse rounded-lg bg-muted" />
-            <div className="h-20 animate-pulse rounded-lg bg-muted" />
-            <div className="h-20 animate-pulse rounded-lg bg-muted" />
+            <div className="h-20 animate-pulse rounded-lg bg-muted-foreground/15 dark:bg-muted" />
+            <div className="h-20 animate-pulse rounded-lg bg-muted-foreground/15 dark:bg-muted" />
+            <div className="h-20 animate-pulse rounded-lg bg-muted-foreground/15 dark:bg-muted" />
           </div>
         ) : hasNoResults ? (
           <div className="rounded-lg border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
