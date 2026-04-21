@@ -7,7 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Users, UserX, CalendarCheck, AlarmClock, Download } from "lucide-react";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import { Check, ChevronsUpDown, Users, UserX, CalendarCheck, AlarmClock, Download } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useAttendance } from "./hooks/useAttendance";
 import { toast } from "sonner";
 import { LiveClock }           from "./components/LiveClock";
@@ -46,19 +53,20 @@ export default function TodaysReportModule() {
   const [deptFilter,        setDeptFilter]        = useState("All");
   const [search,            setSearch]            = useState("");
 
+  // Combobox state
+  const [deptOpen,    setDeptOpen]    = useState(false);
+  const [deptSearch,  setDeptSearch]  = useState("");
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (toastIdRef.current) {
-        toast.dismiss(toastIdRef.current);
-      }
+      if (toastIdRef.current) toast.dismiss(toastIdRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (!mountedRef.current) return;
-    
     if (loading) {
       if (!toastIdRef.current) {
         toastIdRef.current = toast.loading("Fetching attendance data...");
@@ -67,7 +75,6 @@ export default function TodaysReportModule() {
       const currentId = toastIdRef.current;
       toast.dismiss(currentId);
       toastIdRef.current = null;
-      
       if (error) {
         toast.error(`Error: ${error}`);
       } else if (records.length > 0) {
@@ -76,6 +83,13 @@ export default function TodaysReportModule() {
     }
   }, [loading, error, records.length]);
 
+  // Filtered dept list for combobox search
+  const filteredDepts = useMemo(() =>
+    departments.filter((d) =>
+      d.department_name.toLowerCase().includes(deptSearch.toLowerCase())
+    ),
+    [departments, deptSearch]
+  );
 
   const isFiltered = statusFilter !== "All" || punctualityFilter !== "All" || deptFilter !== "All" || search !== "";
   const filtered = useMemo(() =>
@@ -83,10 +97,15 @@ export default function TodaysReportModule() {
     [records, statusFilter, punctualityFilter, deptFilter, search]
   );
   const chartRecords = isFiltered ? filtered : records;
+
   const clearFilters = () => {
-    setStatusFilter("All"); setPunctualityFilter("All");
-    setDeptFilter("All"); setSearch("");
+    setStatusFilter("All");
+    setPunctualityFilter("All");
+    setDeptFilter("All");
+    setSearch("");
+    setDeptSearch("");
   };
+
   if (loading) return <PageSkeleton />;
 
   if (error) return (
@@ -106,7 +125,9 @@ export default function TodaysReportModule() {
           </div>
           <LiveClock />
         </div>
+
         <div className="flex flex-wrap items-center gap-2 w-full min-w-0">
+          {/* Status */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="All Statuses" /></SelectTrigger>
             <SelectContent>
@@ -115,6 +136,8 @@ export default function TodaysReportModule() {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Punctuality */}
           <Select value={punctualityFilter} onValueChange={setPunctualityFilter}>
             <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="All Punctuality" /></SelectTrigger>
             <SelectContent>
@@ -123,21 +146,71 @@ export default function TodaysReportModule() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={deptFilter} onValueChange={setDeptFilter}>
-            <SelectTrigger className="h-9 w-[170px] text-xs"><SelectValue placeholder="All Departments" /></SelectTrigger>
-            <SelectContent className="max-h-60">
-              <SelectItem value="All" className="text-xs text-muted-foreground">All Departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d.department_id} value={d.department_name} className="text-xs">{d.department_name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+
+          {/* ── Searchable Department Combobox ── */}
+          <Popover open={deptOpen} onOpenChange={setDeptOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={deptOpen}
+                className="h-9 w-[180px] text-xs justify-between font-normal"
+              >
+                <span className="truncate">
+                  {deptFilter === "All"
+                    ? "All Departments"
+                    : deptFilter}
+                </span>
+                <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-0" align="start">
+              <Command>
+                <CommandInput
+                  placeholder="Search department..."
+                  className="text-xs h-8"
+                  value={deptSearch}
+                  onValueChange={setDeptSearch}
+                />
+                <CommandList>
+                  <CommandEmpty className="text-xs py-3 text-center text-muted-foreground">
+                    No department found.
+                  </CommandEmpty>
+                  <CommandGroup>
+                    {/* All option */}
+                    <CommandItem
+                      value="All"
+                      onSelect={() => { setDeptFilter("All"); setDeptSearch(""); setDeptOpen(false); }}
+                      className="text-xs"
+                    >
+                      <Check className={cn("mr-2 h-3.5 w-3.5", deptFilter === "All" ? "opacity-100" : "opacity-0")} />
+                      All Departments
+                    </CommandItem>
+                    {filteredDepts.map((d) => (
+                      <CommandItem
+                        key={d.department_id}
+                        value={d.department_name}
+                        onSelect={() => { setDeptFilter(d.department_name); setDeptSearch(""); setDeptOpen(false); }}
+                        className="text-xs"
+                      >
+                        <Check className={cn("mr-2 h-3.5 w-3.5", deptFilter === d.department_name ? "opacity-100" : "opacity-0")} />
+                        {d.department_name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+
+          {/* Name search */}
           <Input
             placeholder="Search by name or email…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-9 w-[220px] text-xs"
           />
+
           {isFiltered && (
             <Button variant="ghost" size="sm" onClick={clearFilters}
               className="h-9 px-2.5 text-xs text-muted-foreground hover:text-foreground gap-1.5">
@@ -150,15 +223,16 @@ export default function TodaysReportModule() {
               <span className="font-semibold text-foreground">{records.length}</span> records
             </p>
           )}
+
           <Button
-            variant="outline"
-            size="sm"
+            variant="outline" size="sm"
             className="h-9 px-3 text-xs gap-1.5 ml-auto"
             onClick={() => exportAttendancePDF(filtered as unknown as AttendanceRecord[])}
           >
             <Download className="h-3.5 w-3.5" /> Export PDF
           </Button>
         </div>
+
         <div className="grid gap-4 grid-cols-2 md:grid-cols-4 w-full">
           <MetricCard
             title="Present"
@@ -185,10 +259,12 @@ export default function TodaysReportModule() {
             icon={<AlarmClock className="h-4 w-4" />}
           />
         </div>
+
         <div className="grid gap-4 md:grid-cols-2 w-full">
           <PunctualityPieChart records={chartRecords} isFiltered={isFiltered} />
           <DepartmentBarChart  records={chartRecords} isFiltered={isFiltered} />
         </div>
+
         <TimeLogsTable records={filtered} total={records.length} />
       </div>
     </>
