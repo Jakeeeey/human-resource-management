@@ -17,6 +17,7 @@ export function useUserConfiguration() {
         currentPage, 
         totalCount, 
         pageSize, 
+        searchTerm,
         fetchPage,
         updateUserPermissions,
     } = useUserConfigurationFetchContext();
@@ -33,11 +34,12 @@ export function useUserConfiguration() {
      * MANUAL-ADD Model: Turning ON only adds the subsystem.
      * AUTO-CLEANUP Model: Turning OFF removes the subsystem AND all its module permissions.
      */
-    const handleToggleAccess = useCallback(async (userId: string, subsystemId: string, authorized: boolean) => {
+    const handleToggleAccess = useCallback(async (userId: string, subsystemId: string | number, authorized: boolean) => {
         const user = users.find(u => u.user_id === userId);
-        const subRegistry = subsystems.find(s => s.slug === subsystemId);
+        const subRegistry = subsystems.find(s => Number(s.id) === Number(subsystemId));
         if (!user || !subRegistry) return;
 
+        const subSlug = subRegistry.slug;
         const slugsInSubsystem = extractAllSlugs(subRegistry);
         const subPk = Number(subRegistry.id);
 
@@ -48,7 +50,7 @@ export function useUserConfiguration() {
         });
 
         const newSlugs = authorized
-            ? Array.from(new Set([...user.authorized_subsystems, subsystemId]))
+            ? Array.from(new Set([...user.authorized_subsystems, subSlug]))
             : user.authorized_subsystems.filter((slug) => !slugsInSubsystem.includes(slug));
         
         const newSubIds = authorized
@@ -168,6 +170,7 @@ export function useUserConfiguration() {
         setIsPermissionsOpen,
         activeUser,
         activeSubsystem,
+        searchTerm,
         fetchPage,
         handleToggleAccess,
         handleConfigure,

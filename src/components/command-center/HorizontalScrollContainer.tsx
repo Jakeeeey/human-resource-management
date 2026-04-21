@@ -79,8 +79,8 @@ export function HorizontalScrollContainer({
                     tl.to(scrollWrapperRef.current, {
                         xPercent: pos.x,
                         yPercent: pos.y,
-                        duration: 1.4,
-                        ease: "expo.inOut",
+                        duration: 0.9,
+                        ease: "power3.inOut",
                         force3D: true,
                         overwrite: true
                     }, 0)
@@ -90,12 +90,12 @@ export function HorizontalScrollContainer({
                     
                     if (window.lenis) {
                         // @ts-expect-error - lenis is dynamically injected
-                        window.lenis.scrollTo(scrollTarget, { duration: 1.2, lock: true })
+                        window.lenis.scrollTo(scrollTarget, { duration: 0.8, lock: true })
                     } else {
                         tl.to(window, {
                             scrollTo: { y: scrollTarget, autoKill: false },
-                            duration: 1.2,
-                            ease: "power4.inOut"
+                            duration: 0.8,
+                            ease: "power3.inOut"
                         }, 0)
                     }
 

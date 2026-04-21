@@ -15,9 +15,14 @@ async function proxy(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const limit = searchParams.get("limit") || "1000";
   const offset = searchParams.get("offset") || "0";
+  const search = searchParams.get("search");
 
   // Strictly use items/user with fields matched to the provided DDL
-  const upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user?limit=${limit}&offset=${offset}&fields=user_id,user_email,user_fname,user_mname,user_lname,user_image&meta=filter_count`;
+  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user?limit=${limit}&offset=${offset}&fields=user_id,user_email,user_fname,user_mname,user_lname&meta=filter_count&filter[role][_neq]=ADMIN`;
+  
+  if (search) {
+    upstreamUrl += `&search=${encodeURIComponent(search)}`;
+  }
   
   const headers = new Headers();
   headers.set("content-type", "application/json");
