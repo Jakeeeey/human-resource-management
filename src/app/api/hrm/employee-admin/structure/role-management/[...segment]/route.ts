@@ -53,6 +53,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
     case "salesmen":
       upstreamPath = "/items/salesman?fields=id,salesman_name,salesman_code&limit=500";
       break;
+    case "ta-draft-approvers":
+      upstreamPath = "/items/ta_draft_approvers?fields=*,department_id.*,approver_id.*&limit=500&filter[is_deleted][_eq]=0";
+      break;
+    case "departments":
+      upstreamPath = "/items/department?fields=department_id,department_name&limit=500";
+      break;
     default:
       // Fallback for sub-resources or IDs
       if (segment.startsWith("executives/")) upstreamPath = `/items/executive/${segments[1]}`;
@@ -61,6 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
       else if (segment.startsWith("salesman-assignments/")) upstreamPath = `/items/salesman_per_supervisor/${segments[1]}`;
       else if (segment.startsWith("review-committees/")) upstreamPath = `/items/target_setting_approver/${segments[1]}`;
       else if (segment.startsWith("expense-review-committees/")) upstreamPath = `/items/disbursement_draft_approver/${segments[1]}`;
+      else if (segment.startsWith("ta-draft-approvers/")) upstreamPath = `/items/ta_draft_approvers/${segments[1]}`;
       break;
   }
 
@@ -138,6 +145,8 @@ async function handleMutation(req: NextRequest, segments: string[], method: stri
     case "division-heads": upstreamPath = "/items/division_sales_head"; break;
     case "supervisors": upstreamPath = "/items/supervisor_per_division"; break;
     case "salesman-assignments": upstreamPath = "/items/salesman_per_supervisor"; break;
+    case "ta-draft-approvers": upstreamPath = "/items/ta_draft_approvers"; break;
+    case "departments": upstreamPath = "/items/department"; break;
     default:
       return NextResponse.json({ error: `Invalid proxy segment: ${segment}` }, { status: 400 });
   }
@@ -177,9 +186,34 @@ async function handleMutation(req: NextRequest, segments: string[], method: stri
       };
     }
 
-    if (method === "DELETE") {
-      finalMethod = "PATCH";
-      finalBody = { is_deleted: 1 };
+    if (method === "DELETE" || (method === "PATCH" && id)) {
+      // For DELETE, we actually use PATCH for soft delete
+      if (method === "DELETE") {
+        finalMethod = "PATCH";
+        finalBody = { is_deleted: 1 };
+      }
+
+      // Inject UPDATED audit fields
+      const token = req.cookies.get("vos_access_token")?.value;
+      let updated_by = null;
+      if (token) {
+        try {
+          const payloadBuffer = Buffer.from(token.split('.')[1], 'base64');
+          const payload = JSON.parse(payloadBuffer.toString('utf-8'));
+          if (payload.sub) {
+            updated_by = Number(payload.sub);
+          }
+        } catch (e) {
+          console.error("Failed to parse jwt cookie payload for update", e);
+        }
+      }
+
+      const phTime = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" }).replace("T", " ");
+      finalBody = {
+        ...finalBody,
+        ...(updated_by ? { updated_by } : {}),
+        updated_at: phTime
+      };
     }
 
     const res = await fetch(`${UPSTREAM_BASE}${upstreamPath}`, {
