@@ -8,21 +8,15 @@ import { Button } from "@/components/ui/button";
 import { UserSubsystemAccess } from "../types";
 import { SubsystemRegistration } from "@/modules/human-resource-management/subsystem-registration/types";
 import { cn } from "@/lib/utils";
-import { 
-    Avatar, 
-    AvatarFallback, 
-    AvatarImage 
-} from "@/components/ui/avatar";
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getDirectusAssetUrl } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 
 export const createColumns = (
     subsystems: SubsystemRegistration[],
-    onToggleAccess: (userId: string, subsystemId: string, authorized: boolean) => void,
+    onToggleAccess: (userId: string, subsystemId: string | number, authorized: boolean) => void,
     onConfigure: (user: UserSubsystemAccess, subsystem: SubsystemRegistration) => void
 ): ColumnDef<UserSubsystemAccess>[] => [
     {
@@ -31,23 +25,10 @@ export const createColumns = (
         cell: ({ row }) => {
             const user = row.original;
             const displayName = user.full_name || "Unknown User";
-            const initials = displayName
-                .split(" ")
-                .filter(Boolean)
-                .map((n) => n[0])
-                .join("")
-                .toUpperCase() || "?";
-
             return (
-                <div className="flex items-center gap-3 py-1">
-                    <Avatar className="h-8 w-8 border shadow-sm">
-                        <AvatarImage src={user.avatar_url ? getDirectusAssetUrl(user.avatar_url) : `https://avatar.iran.liara.run/username?username=${displayName}`} />
-                        <AvatarFallback className="bg-primary/5 text-primary text-[10px] font-bold">{initials}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col min-w-[200px]">
-                        <span className="font-bold text-sm leading-tight">{displayName}</span>
-                        <span className="text-[10px] text-muted-foreground font-medium">{user.email || "No Email"}</span>
-                    </div>
+                <div className="flex flex-col min-w-[200px] py-1">
+                    <span className="font-bold text-sm leading-tight">{displayName}</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">{user.email || "No Email"}</span>
                 </div>
             );
         },
@@ -70,14 +51,14 @@ export const createColumns = (
         ),
         cell: ({ row }) => {
             const user = row.original;
-            const isAuthorized = user.authorized_subsystems.includes(sys.slug);
+            const isAuthorized = (user.authorized_subsystem_ids || []).includes(Number(sys.id));
             
             return (
                 <div className="flex items-center justify-center gap-2 min-w-[90px]">
                     <Checkbox
                         checked={isAuthorized}
                         onCheckedChange={(checked) => 
-                            onToggleAccess(user.user_id, sys.slug, !!checked)
+                            onToggleAccess(user.user_id, sys.id, !!checked)
                         }
                         className="h-5 w-5 rounded-md border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                     />

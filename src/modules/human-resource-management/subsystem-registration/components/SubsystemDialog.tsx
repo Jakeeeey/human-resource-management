@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Plus, Settings2, Sparkles, Box, LayoutGrid } from "lucide-react";
+import { Loader2, Plus, Settings2, Sparkles, Box, LayoutGrid, AlertTriangle } from "lucide-react";
 import { SubsystemRegistration, SUBSYSTEM_CATEGORIES } from "../types";
 import { cn } from "@/lib/utils";
 import { IconPicker } from "./IconPicker";
@@ -70,12 +70,22 @@ export function SubsystemDialog({
 
     const handleChange = (field: keyof SubsystemRegistration, value: string) => {
         if (field === "slug") {
-            const processedSlug = value.toLowerCase().replace(/\s+/g, "-");
+            const processedSlug = value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
             setFormData((prev) => ({ 
                 ...prev, 
                 slug: processedSlug,
-                base_path: `/${processedSlug}`
+                // Only auto-update base_path if it hasn't been manually diverged or if it's a new registration
+                base_path: !isEdit || prev.base_path === `/${prev.slug}` ? `/${processedSlug}` : prev.base_path
             }));
+            return;
+        }
+        if (field === "base_path") {
+            // Ensure base_path always starts with / and has no spaces
+            let processedPath = value.toLowerCase().replace(/\s+/g, "-");
+            if (processedPath && !processedPath.startsWith("/")) {
+                processedPath = "/" + processedPath;
+            }
+            setFormData((prev) => ({ ...prev, base_path: processedPath }));
             return;
         }
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -125,7 +135,6 @@ export function SubsystemDialog({
                                     onChange={(e) => handleChange("slug", e.target.value)}
                                     className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-muted/5 font-mono text-[11px] font-bold tracking-tighter placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
                                     placeholder="e.g. scm"
-                                    disabled={isEdit}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -171,12 +180,27 @@ export function SubsystemDialog({
                                 <Input
                                     id="base_path"
                                     value={formData.base_path}
-                                    readOnly
-                                    className="h-10 rounded-xl border-muted-foreground/10 bg-muted/20 font-mono text-[11px] font-bold text-primary/60 tracking-tighter cursor-not-allowed placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
+                                    onChange={(e) => handleChange("base_path", e.target.value)}
+                                    className="h-10 rounded-xl border-muted-foreground/10 bg-card font-mono text-[11px] font-bold text-primary tracking-tighter placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
                                     placeholder="e.g. /scm"
                                 />
                             </div>
                         </div>
+
+                        {/* Path Change Warning */}
+                        {isEdit && formData.base_path !== subsystem?.base_path && (
+                            <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="mt-0.5 bg-orange-500/20 p-1.5 rounded-lg shadow-inner">
+                                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-orange-700">Warning: Path Modification</p>
+                                    <p className="text-[9px] font-bold text-orange-600/80 leading-relaxed uppercase">
+                                        Changing the Base Path will automatically update all sub-modules. Existing browser bookmarks will be broken.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label htmlFor="subtitle" className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70">Description/Subtitle</Label>

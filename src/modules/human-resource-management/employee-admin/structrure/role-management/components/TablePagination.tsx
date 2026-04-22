@@ -138,13 +138,14 @@ export function usePagination<T>(items: T[], defaultPageSize = 5) {
     setCurrentPage(1);
   }, [items.length, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const paginatedItems = items.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const safeItems = Array.isArray(items) ? items : [];
+  const totalPages = Math.max(1, Math.ceil(safeItems.length / pageSize));
+  const paginatedItems = safeItems.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return {
     currentPage,
     totalPages,
-    totalItems: items.length,
+    totalItems: safeItems.length,
     pageSize,
     paginatedItems,
     onPageChange: setCurrentPage,

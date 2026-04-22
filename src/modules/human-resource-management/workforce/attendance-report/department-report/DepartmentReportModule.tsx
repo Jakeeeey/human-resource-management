@@ -1,13 +1,13 @@
 "use client";
 
-// department-report/DepartmentReportModule.tsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Input }    from '@/components/ui/input';
 import { Button }   from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download } from 'lucide-react';
 import { useDepartmentReport } from './hooks/useDepartmentReport';
+import { toast } from 'sonner';
 import { PdfEngine }           from '@/components/pdf-layout-design/PdfEngine';
 import { pdfTemplateService }  from '@/components/pdf-layout-design/services/pdf-template';
 import autoTable               from 'jspdf-autotable';
@@ -152,45 +152,66 @@ async function handleExportDeptPDF(
 
 export default function DepartmentReportModule() {
   const yesterday = getYesterdayStr();
+  const toastIdRef = useRef<string | number | null>(null);
+  const mountedRef = useRef(true);
 
-  // deptId starts null — logs are NOT fetched until this is set
+  // null = no department selected yet
   const [deptId, setDeptId] = useState<number | null>(null);
   const [from,   setFrom]   = useState(yesterday);
   const [to,     setTo]     = useState(yesterday);
   const [search, setSearch] = useState('');
 
-  const { loading, loadingDepts, error, rows, departments, refetch } =
-    useDepartmentReport(deptId, from, to);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (toastIdRef.current) toast.dismiss(toastIdRef.current);
+    };
+  }, []);
 
-  // Derive the effective department ID without calling setState inside an effect.
-  // Once the dept list loads, use departments[0] as the default if nothing is
-  // selected yet. The Select's onValueChange then makes it permanent state.
-  const effectiveDeptId = useMemo<number | null>(() => {
-    if (deptId !== null) return deptId;
-    return departments[0]?.department_id ?? null;
-  }, [deptId, departments]);
+  // Fetch dept list only (pass null so hook skips log fetch)
+  const { loadingDepts, departments } = useDepartmentReport(null, from, to);
+
+  // Only fetch logs when a department is explicitly selected
+  const logsResult = useDepartmentReport(deptId, from, to);
+
+  useEffect(() => {
+    if (!mountedRef.current || deptId === null) return;
+    if (logsResult.loading) {
+      if (!toastIdRef.current) {
+        toastIdRef.current = toast.loading("Fetching department data...");
+      }
+    } else if (toastIdRef.current) {
+      const currentId = toastIdRef.current;
+      toast.dismiss(currentId);
+      toastIdRef.current = null;
+      if (logsResult.error) {
+        toast.error(`Error: ${logsResult.error}`);
+      } else if (logsResult.rows.length > 0) {
+        toast.success(`Loaded ${logsResult.rows.length} records`);
+      }
+    }
+  }, [logsResult.loading, logsResult.error, logsResult.rows.length, deptId]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return rows;
+    if (!search.trim()) return logsResult.rows;
     const q = search.toLowerCase();
-    return rows.filter((r) =>
+    return logsResult.rows.filter((r) =>
       `${r.user_fname} ${r.user_lname}`.toLowerCase().includes(q)
     );
-  }, [rows, search]);
+  }, [logsResult.rows, search]);
 
-  // Show skeleton while dept list is loading or no dept is resolvable yet
-  if (loadingDepts || effectiveDeptId === null) return <PageSkeleton />;
+  if (loadingDepts) return <PageSkeleton />;
 
-  if (error) return (
+  if (logsResult.error) return (
     <div className="p-8 text-center m-8 border border-red-500/20 bg-red-500/5 rounded-lg">
-      <p className="text-red-500 font-medium">Error: {error}</p>
-      <Button variant="outline" className="mt-4" onClick={refetch}>Retry</Button>
+      <p className="text-red-500 font-medium">Error: {logsResult.error}</p>
+      <Button variant="outline" className="mt-4" onClick={logsResult.refetch}>Retry</Button>
     </div>
   );
 
   return (
     <div className="p-6 bg-background text-foreground min-h-screen space-y-6 w-full box-border overflow-hidden">
-
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Department Reports</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -199,12 +220,13 @@ export default function DepartmentReportModule() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        {/* ── Department selector ── */}
         <Select
-          value={String(effectiveDeptId)}
+          value={deptId !== null ? String(deptId) : ''}
           onValueChange={(v) => setDeptId(Number(v))}
         >
           <SelectTrigger className="h-9 w-[200px] text-sm">
-            <SelectValue placeholder="Select department…" />
+            <SelectValue placeholder="Select Department" />
           </SelectTrigger>
           <SelectContent className="max-h-60">
             {departments.map((d) => (
@@ -231,8 +253,8 @@ export default function DepartmentReportModule() {
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 w-[200px] text-sm" />
 
-        {search && (
-          <Button variant="ghost" size="sm" onClick={() => setSearch('')}
+        {(from !== yesterday || to !== yesterday || search) && (
+          <Button variant="ghost" size="sm" onClick={() => { setFrom(yesterday); setTo(yesterday); setSearch(''); }}
             className="h-9 px-2.5 text-sm text-muted-foreground hover:text-foreground">
             ✕ Clear
           </Button>
@@ -240,9 +262,12 @@ export default function DepartmentReportModule() {
 
         <div className="flex-1" />
 
-        <Button variant="outline" size="sm" className="h-9 px-4 text-sm gap-2"
+        <Button
+          variant="outline" size="sm"
+          className="h-9 px-4 text-sm gap-2"
+          disabled={deptId === null}
           onClick={() => {
-            const dept = departments.find((d) => d.department_id === effectiveDeptId);
+            const dept = departments.find((d) => d.department_id === deptId);
             if (dept) handleExportDeptPDF(dept.department_name, filtered as unknown as TableRow[], from, to);
           }}
         >
@@ -250,7 +275,13 @@ export default function DepartmentReportModule() {
         </Button>
       </div>
 
-      {loading ? (
+      {/* ── No department selected yet ── */}
+      {deptId === null ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-24 text-center">
+          <p className="text-base font-medium text-muted-foreground">Select a Department</p>
+          <p className="text-sm text-muted-foreground mt-1">Choose a department above to view its attendance report.</p>
+        </div>
+      ) : logsResult.loading ? (
         <div className="space-y-4">
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-64 w-full" />

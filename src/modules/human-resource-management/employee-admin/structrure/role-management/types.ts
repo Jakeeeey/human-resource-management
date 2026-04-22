@@ -14,6 +14,12 @@ export interface Division {
     division_code: string;
 }
 
+export interface Department {
+    department_id: number;
+    department_name: string;
+    department_code?: string;
+}
+
 export interface Salesman {
     id: number;
     salesman_name: string;
@@ -70,10 +76,25 @@ export interface ExpenseReviewCommittee {
     created_at?: string;
 }
 
+export interface TAApprover {
+    id: number;
+    department_id: number | Department;
+    approver_id: number | SystemUser;
+    level: number;
+    is_deleted?: number;
+    created_at?: string;
+    created_by?: number;
+    updated_at?: string;
+    updated_by?: number;
+}
+
+export type RoleManagementCategory = "hierarchy" | "committee";
+
 export type RoleManagementTab =
     | "executive"
     | "review-committee"
     | "expense-review-committee"
     | "division-head"
     | "supervisor"
-    | "salesman";
+    | "salesman"
+    | "ta-committee";
