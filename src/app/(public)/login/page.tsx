@@ -66,22 +66,24 @@ function LoginForm() {
     const [hashPassword, setHashPassword] = React.useState("")
     const [remember, setRemember] = React.useState(false)
 
-    // Mouse Parallax for Background
+    // Mouse Parallax for Background - Optimized with window listener
     const mouseX = useMotionValue(0)
     const mouseY = useMotionValue(0)
-    const springX = useSpring(mouseX, { stiffness: 50, damping: 20 })
-    const springY = useSpring(mouseY, { stiffness: 50, damping: 20 })
+    // Spring config for smooth parallax
+    const springConfig = { damping: 25, stiffness: 150, mass: 0.5 };
+    const springX = useSpring(mouseX, springConfig);
+    const springY = useSpring(mouseY, springConfig);
 
-    const gridX = useTransform(springX, [-500, 500], [30, -30])
-    const gridY = useTransform(springY, [-500, 500], [30, -30])
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        const { clientX, clientY } = e
-        const centerX = window.innerWidth / 2
-        const centerY = window.innerHeight / 2
-        mouseX.set(clientX - centerX)
-        mouseY.set(clientY - centerY)
-    }
+    React.useEffect(() => {
+        const handleMove = (e: MouseEvent) => {
+            const centerX = window.innerWidth / 2
+            const centerY = window.innerHeight / 2
+            mouseX.set(e.clientX - centerX)
+            mouseY.set(e.clientY - centerY)
+        }
+        window.addEventListener("mousemove", handleMove, { passive: true })
+        return () => window.removeEventListener("mousemove", handleMove)
+    }, [mouseX, mouseY])
 
     const validate = React.useCallback((): boolean => {
         if (!String(email).trim()) return false
@@ -125,59 +127,90 @@ function LoginForm() {
         hidden: { opacity: 0 },
         visible: { 
             opacity: 1,
-            transition: { staggerChildren: 0.15, delayChildren: 0.3 }
+            transition: { staggerChildren: 0.1, delayChildren: 0.2 }
         }
     }
 
     const moduleVariants: Variants = {
-        hidden: { opacity: 0, y: 20, scale: 0.98 },
+        hidden: { opacity: 0, y: 15, scale: 0.99 },
         visible: { 
             opacity: 1, 
             y: 0, 
             scale: 1,
-            transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] }
+            transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
         }
     }
 
     return (
-        <div 
-            onMouseMove={handleMouseMove}
-            className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30"
-        >
+        <div className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950">
             {/* --- IMMERSIVE BACKGROUND SYSTEM --- */}
             
-            {/* Layer 0: Background Base */}
-            <div className="absolute inset-0 -z-50 bg-slate-50 dark:bg-slate-950" />
-
             {/* Layer 1: Subtle radial gradient for light mode depth */}
-            <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.06),transparent)] dark:hidden" />
+            <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.04),transparent)] dark:hidden" />
             
-            {/* Layer 2: Grid Overlay */}
-            <motion.div 
-                style={{ x: gridX, y: gridY }}
-                className="absolute inset-0 z-0 opacity-30 pointer-events-none"
-            >
-                <div 
-                    className="absolute inset-0"
-                    style={{
-                        backgroundImage: `linear-gradient(rgba(6, 182, 212, 0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.12) 1px, transparent 1px)`,
-                        backgroundSize: '80px 80px'
-                    }}
-                />
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-500 to-transparent animate-scan" />
-            </motion.div>
+            {/* --- DIRECTUS-INSPIRED FLUID GRADIENT SYSTEM --- */}
+            
+            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-slate-50 dark:bg-[#020617]">
+                {/* Layer 1: The Moving Fluid Core (Increased Visibility) */}
+                <div className="absolute inset-0 z-0 opacity-40 dark:opacity-60">
+                    <motion.div 
+                        animate={{ 
+                            x: [0, 180, -120, 0], 
+                            y: [0, 200, 100, 0],
+                            scale: [1, 1.5, 0.7, 1],
+                            rotate: [0, 180, 360]
+                        }}
+                        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                        className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] bg-indigo-500/40 dark:bg-indigo-600/30 blur-[80px] rounded-full will-change-transform"
+                    />
+                    
+                    <motion.div 
+                        animate={{ 
+                            x: [0, -200, 150, 0], 
+                            y: [0, -180, 250, 0],
+                            scale: [1.4, 0.8, 1.6, 1.4],
+                            rotate: [360, 180, 0]
+                        }}
+                        transition={{ duration: 18, repeat: Infinity, ease: "linear", delay: 1 }}
+                        className="absolute -bottom-[20%] -right-[10%] w-[80%] h-[80%] bg-cyan-500/40 dark:bg-cyan-600/30 blur-[90px] rounded-full will-change-transform"
+                    />
 
-            {/* Layer 4: Dynamic Orbs */}
-            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+                    <motion.div 
+                        animate={{ 
+                            x: [0, 100, -150, 0], 
+                            y: [100, -100, 100],
+                            scale: [1, 1.2, 1],
+                        }}
+                        transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+                        className="absolute top-[20%] right-[10%] w-[40%] h-[40%] bg-violet-500/30 dark:bg-violet-600/20 blur-[70px] rounded-full will-change-transform"
+                    />
+                </div>
+
+                {/* Layer 2: Static Glass "Blades" (Perfectly Symmetrical & Centered) */}
+                <div className="absolute inset-0 z-10 flex items-center justify-center">
+                    {/* Left Diagonal Blade */}
+                    <div className="absolute top-0 -left-[15%] w-[45%] h-full bg-white/[0.05] dark:bg-white/[0.01] backdrop-blur-[40px] dark:backdrop-blur-[80px] border-r border-indigo-500/10 dark:border-white/10 -rotate-12 shadow-[20px_0_100px_rgba(0,0,0,0.05)]" />
+                    
+                    {/* Right Diagonal Blade (Mirror) */}
+                    <div className="absolute top-0 -right-[15%] w-[45%] h-full bg-white/[0.05] dark:bg-white/[0.01] backdrop-blur-[40px] dark:backdrop-blur-[80px] border-l border-cyan-500/10 dark:border-white/10 rotate-12 shadow-[-20px_0_100px_rgba(0,0,0,0.05)]" />
+
+                    {/* Horizontal Symmetrical Panel */}
+                    <div className="absolute top-[25%] left-0 right-0 h-[25%] bg-white/[0.02] dark:bg-white/[0.01] backdrop-blur-[20px] border-y border-indigo-500/5 dark:border-white/5" />
+                </div>
+
+                {/* Layer 3: Interaction & Grain */}
                 <motion.div 
-                    animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.6, 0.3], x: [0, 120, 0], y: [0, -60, 0] }}
-                    transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                    className="absolute -top-1/4 -right-1/4 w-full h-full bg-cyan-600/20 blur-[200px] rounded-full" 
+                    style={{ 
+                        x: useTransform(springX, [-500, 500], [-20, 20]),
+                        y: useTransform(springY, [-500, 500], [-20, 20]),
+                    }}
+                    className="absolute inset-0 z-20 bg-[radial-gradient(circle_at_50%_50%,rgba(6,182,212,0.1),transparent)] will-change-transform"
                 />
-                <motion.div 
-                    animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.5, 0.2], x: [0, -100, 0], y: [0, 120, 0] }}
-                    transition={{ duration: 15, repeat: Infinity, ease: "linear", delay: 1 }}
-                    className="absolute -bottom-1/4 -left-1/4 w-full h-full bg-indigo-600/20 blur-[200px] rounded-full" 
+
+                <div className="absolute inset-0 z-30 opacity-[0.1] dark:opacity-[0.15] pointer-events-none mix-blend-overlay"
+                    style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3C%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+                    }}
                 />
             </div>
 
@@ -192,7 +225,7 @@ function LoginForm() {
                 <div className="w-full max-w-[440px] space-y-6">
                     {/* [TOP] SYSTEM BRANDING ACCENT */}
                     <motion.div variants={moduleVariants} className="flex flex-col items-center gap-3 mb-2">
-                        <div className="p-3 rounded-2xl bg-cyan-500/10 shadow-[0_0_30px_rgba(6,182,212,0.2)] border border-cyan-500/20">
+                        <div className="p-3 rounded-2xl bg-cyan-500/10 shadow-[0_0_30px_rgba(6,182,212,0.15)] border border-cyan-500/20">
                             <LayoutDashboard className="w-7 h-7 text-cyan-600 dark:text-cyan-400" />
                         </div>
                         <div className="text-center">
@@ -202,8 +235,8 @@ function LoginForm() {
                     </motion.div>
 
                     {/* [CENTER] LOGIN FORM */}
-                    <GlassCard variants={moduleVariants} className="relative overflow-hidden p-0 shadow-2xl" accent="indigo">
-                        <div className="flex flex-col h-full bg-white/40 dark:bg-slate-900/40 backdrop-blur-md">
+                    <GlassCard variants={moduleVariants} className="relative overflow-hidden p-0 shadow-2xl border-white/20 dark:border-white/10" accent="indigo">
+                        <div className="flex flex-col h-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl">
                             <div className="p-8 border-b border-slate-200 dark:border-white/5 flex flex-col items-center gap-2">
                                 <h2 className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic text-center leading-none">
                                     Account <span className="text-cyan-500 dark:text-cyan-400">Login</span>
@@ -294,16 +327,6 @@ function LoginForm() {
 
                 </div>
             </motion.main>
-            
-            <style jsx global>{`
-                @keyframes scan {
-                    from { transform: translateY(-100%); }
-                    to { transform: translateY(100vh); }
-                }
-                .animate-scan {
-                    animation: scan 7s linear infinite;
-                }
-            `}</style>
         </div>
     )
 }

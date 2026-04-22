@@ -9,6 +9,17 @@ export default function ThemeProvider({
 }: {
     children: React.ReactNode;
 }) {
+    const [mounted, setMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Prevent hydration error/mismatch in React 19
+    if (!mounted) {
+        return <>{children}</>;
+    }
+
     return (
         <NextThemesProvider
             attribute="class"
