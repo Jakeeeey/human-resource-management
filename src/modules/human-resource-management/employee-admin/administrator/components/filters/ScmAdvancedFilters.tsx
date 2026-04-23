@@ -11,6 +11,8 @@ import {
 import { useScmFilters } from "@/modules/human-resource-management/employee-admin/administrator/providers/ScmFilterProvider";
 import { ScmDateRangePicker } from "@/modules/human-resource-management/employee-admin/administrator/components/shared/ScmDateRangePicker";
 
+import { SearchableSelect } from "@/components/ui/searchable-select";
+
 interface ScmAdvancedFiltersProps {
   suppliers: string[];
   branches?: string[];
@@ -49,6 +51,16 @@ export function ScmAdvancedFilters({
     selectedDepartment,
     setSelectedDepartment
   } = useScmFilters();
+
+  const deptOptions = React.useMemo(() => {
+    return [
+      { value: "all", label: "All Departments" },
+      ...departments.map((d) => ({
+        value: d.id.toString(),
+        label: d.name,
+      })),
+    ];
+  }, [departments]);
 
   return (
     <div className="flex flex-wrap gap-2 items-center">
@@ -115,21 +127,16 @@ export function ScmAdvancedFilters({
       {showDepartment && (
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Filter by Department:</span>
-          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Departments" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Departments</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d.id} value={d.id.toString()}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            options={deptOptions}
+            value={selectedDepartment}
+            onValueChange={setSelectedDepartment}
+            placeholder="All Departments"
+            className="w-[200px]"
+          />
         </div>
       )}
     </div>
   );
 }
+
