@@ -105,9 +105,6 @@ export async function GET(request: NextRequest) {
     const scheds:       Record<string, unknown>[] = schedRes.data       ?? [];
     const oncallList:   Record<string, unknown>[] = oncallListRes.data  ?? [];
     const oncallScheds: Record<string, unknown>[] = oncallSchedRes.data ?? [];
-    // Temporarily in route.ts
-const testRes = await fetchCollection('attendance_log', { limit: '3' });
-
 
     console.log(`[HRM/Attendance] logs=${logs.length} users=${users.length} depts=${depts.length} scheds=${scheds.length}`);
 
