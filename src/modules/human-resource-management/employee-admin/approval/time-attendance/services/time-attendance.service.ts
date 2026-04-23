@@ -63,7 +63,7 @@ export class TAApprovalService {
       const res = await fetch(url, { headers: this.getHeaders() });
       if (!res.ok) return [];
       const { data } = await res.json();
-      console.log("[TAService] Departments fetched:", data?.length ?? 0);
+
       return Array.isArray(data) ? data : [];
     } catch (err) {
       console.error("[TAService] Failed to fetch departments:", err);
@@ -268,7 +268,7 @@ export class TAApprovalService {
       if (filters?.endDate)   url += `&filter[filed_at][_lte]=${filters.endDate}`;
 
       const res = await fetch(url, { headers: this.getHeaders() });
-      console.log(`[TAService] MyRequests (${type}):`, { status: res.status });
+
 
       if (!res.ok) continue;
       const { data } = await res.json();

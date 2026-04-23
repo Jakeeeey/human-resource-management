@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    console.log("[TAApproval API] GET  authUserId:", authUserId);
+
 
     // ── Resolve HR Head status early (used in multiple branches) ─────────────
     const isHRHead = await TAApprovalService.isHRDepartmentHead(authUserId);
@@ -82,21 +82,21 @@ export async function GET(req: NextRequest) {
     if (searchParams.get("action") === "logs") {
       const limit = Number(searchParams.get("limit") || "50");
       const data = await TAApprovalService.fetchApproverLogs(authUserId, limit, isHRHead);
-      console.log(`[TAApproval API] Logs for ${authUserId} (isHRHead: ${isHRHead}):`, data.length);
+
       return NextResponse.json({ success: true, data });
     }
 
     // ── Branch: requests filed BY the current user ("My Submissions") ─────────
     if (searchParams.get("mode") === "mine") {
       const data = await TAApprovalService.fetchMyRequests(authUserId, filters);
-      console.log(`[TAApproval API] MyRequests for ${authUserId}:`, data.length);
+
       return NextResponse.json({ success: true, data });
     }
 
     // ── Default: manager approval queue ──────────────────────────────────────
     const data = await TAApprovalService.fetchManagerQueue(authUserId, filters, isHRHead);
     
-    console.log(`[TAApproval API] ManagerQueue for ${authUserId}:`, data.length, "isHRHead:", isHRHead);
+
     
     return NextResponse.json({ 
       success: true, 
