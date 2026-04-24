@@ -30,7 +30,7 @@ export function useTAApproval() {
       const res = await fetch("/api/hrm/employee-admin/approval/time-attendance?action=departments");
       const result = await res.json();
       if (result.success) {
-        console.log("[useTAApproval] Departments loaded:", result.data?.length);
+
         setDepartments(result.data ?? []);
       } else {
         console.error("[useTAApproval] Failed to load departments:", result.error);
@@ -167,7 +167,7 @@ export function useTAApproval() {
     // 2. PASSIVE REFRESH: Only hit the server when the user returns to the tab.
     // This eliminates background load entirely while keeping data fresh when needed.
     const handleFocus = () => {
-      console.log("[useTAApproval] Passive refresh triggered by window focus");
+
       smartRefresh();
     };
 

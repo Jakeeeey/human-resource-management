@@ -119,8 +119,11 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    const payload = decodeJwtPayload(token);
+    const firstName = payload?.FirstName ?? "User";
+
     const res = NextResponse.json(
-        { ok: true },
+        { ok: true, firstName },
         { headers: { "Cache-Control": "no-store" } }
     );
 
