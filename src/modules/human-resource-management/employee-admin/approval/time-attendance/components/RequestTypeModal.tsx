@@ -328,7 +328,7 @@ function EmployeeRequestsDrawer({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   type: RequestType;
-  employee: { name: string; position: string };
+  employee: { name: string; position: string; department?: string };
   requests: AnyTARequest[];
   onAction: (payload: TAActionPayload) => Promise<boolean | void>;
   isActing: boolean;

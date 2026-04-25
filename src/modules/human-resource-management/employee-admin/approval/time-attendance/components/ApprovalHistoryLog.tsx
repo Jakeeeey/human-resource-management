@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { ApprovalLogEntry, LeaveRequest, OvertimeRequest, UndertimeRequest } from "../types";
+import { ApprovalLogEntry, LeaveRequest, OvertimeRequest, UndertimeRequest, UserDetails } from "../types";
 import {
   CheckCircle2,
   XCircle,
@@ -133,15 +133,14 @@ function LogRow({ entry }: { entry: ApprovalLogEntry }) {
             <span className="not-italic font-black text-foreground uppercase tracking-tight">
               {entry.approver_id && typeof entry.approver_id === 'object' 
                 ? (
-                   (entry.approver_id as any).user_fname || 
-                   (entry.approver_id as any).first_name || 
-                   (entry.approver_id as any).fname || 
-                   "Unknown"
-                  ) + " " + (
-                   (entry.approver_id as any).user_lname || 
-                   (entry.approver_id as any).last_name || 
-                   (entry.approver_id as any).lname || 
-                   ""
+                   ((entry.approver_id as UserDetails).user_fname || 
+                    (entry.approver_id as Record<string, string>).first_name || 
+                    (entry.approver_id as Record<string, string>).fname || 
+                    "Unknown") + " " + 
+                   ((entry.approver_id as UserDetails).user_lname || 
+                    (entry.approver_id as Record<string, string>).last_name || 
+                    (entry.approver_id as Record<string, string>).lname || 
+                    "")
                   )
                 : (typeof entry.approver_id === 'number' ? `Approver #${entry.approver_id}` : "System")}
             </span>
@@ -273,7 +272,7 @@ export function ApprovalHistoryLog({ logs, isLoading, onRefresh }: ApprovalHisto
           uid = log.requester.user_id;
           name = `${log.requester.user_fname} ${log.requester.user_lname}`.trim();
           position = log.requester.user_position ?? "Employee";
-          department = (log.requester as any).user_department?.department_name ?? "";
+          department = log.requester.user_department?.department_name ?? "";
         } else if (typeof log.requester === "number") {
           uid = log.requester;
           name = `Unknown User #${log.requester}`;
@@ -370,7 +369,7 @@ export function ApprovalHistoryLog({ logs, isLoading, onRefresh }: ApprovalHisto
               key={group.id}
               name={group.name}
               position={group.position}
-              department={(group as any).department}
+              department={group.department}
               logs={group.logs}
             />
           ))}

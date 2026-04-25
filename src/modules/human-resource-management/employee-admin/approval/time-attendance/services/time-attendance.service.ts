@@ -241,8 +241,9 @@ export class TAApprovalService {
     // 4. Bulk fetch department names (BASED ON USER TABLE)
     const deptIds = enriched
       .map((item) => {
-        const u = item.user_id as any;
-        return typeof u?.user_department === "number" ? u.user_department : (u?.user_department as any)?.id;
+        const u = item.user_id as UserDetails | null;
+        const uDept = u?.user_department;
+        return typeof uDept === "number" ? uDept : (uDept as unknown as { id: number })?.id;
       })
       .filter((id) => id !== undefined && id !== null);
     
@@ -260,14 +261,15 @@ export class TAApprovalService {
           }
 
           enriched = enriched.map((item) => {
-            const u = item.user_id as any;
-            const dId = typeof u?.user_department === "number" ? u.user_department : (u?.user_department as any)?.id;
+            const u = item.user_id as UserDetails | null;
+            const uDept = u?.user_department;
+            const dId = typeof uDept === "number" ? uDept : (uDept as unknown as { id: number })?.id;
             
             if (dId && deptMap.has(dId)) {
               const deptName = deptMap.get(dId);
               // Inject into user object
               if (typeof item.user_id === "object" && item.user_id !== null) {
-                (item.user_id as any).user_department = { department_name: deptName };
+                (item.user_id as UserDetails).user_department = { department_name: deptName };
               }
               return { ...item, department_name: deptName }; // For backward compatibility in code
             }
@@ -361,7 +363,7 @@ export class TAApprovalService {
     // Resolve approver names manually since approver_id is an INT
     const approverIds = data.map(log => Number(log.approver_id)).filter(id => !!id);
     const uniqueIds = Array.from(new Set(approverIds));
-    const userMap = new Map<number, any>();
+    const userMap = new Map<number, UserDetails>();
 
     if (uniqueIds.length > 0) {
       const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department.department_name`;
@@ -456,7 +458,7 @@ export class TAApprovalService {
     });
 
     const uniqueUserIds = Array.from(userIdsSet);
-    let userMap = new Map();
+    const userMap = new Map<number, UserDetails>();
 
     if (uniqueUserIds.length > 0) {
       const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueUserIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department`;
@@ -465,12 +467,9 @@ export class TAApprovalService {
         if (userRes.ok) {
           const { data: userData } = await userRes.json();
           if (Array.isArray(userData)) {
-            userData.forEach((u: any) => {
-              const uid = Number(u.user_id || u.id);
+            userData.forEach((u: UserDetails) => {
+              const uid = Number(u.user_id);
               if (uid) userMap.set(uid, u);
-              // Also map by the string version and other potential ID field
-              if (u.user_id) userMap.set(Number(u.user_id), u);
-              if (u.id) userMap.set(Number(u.id), u);
             });
           }
         }
@@ -482,7 +481,8 @@ export class TAApprovalService {
     // ── Bulk fetch department names for logs (BASED ON USER TABLE) ──
     const deptIdsSet = new Set<number>();
     userMap.forEach((u) => {
-      const dId = typeof u.user_department === "number" ? u.user_department : u.user_department?.id;
+      const uDept = u.user_department;
+      const dId = typeof uDept === "number" ? uDept : (uDept as unknown as { id: number })?.id;
       if (dId) deptIdsSet.add(Number(dId));
     });
 
@@ -531,7 +531,7 @@ export class TAApprovalService {
 
       // 3. Authorization Check
       if (isHRHead) return true;
-      const actId = Number(typeof logItem.approver_id === 'object' ? (logItem.approver_id as any)?.user_id : logItem.approver_id);
+      const actId = Number(typeof logItem.approver_id === 'object' ? (logItem.approver_id as UserDetails)?.user_id : logItem.approver_id);
       if (actId === approverId) return true;
 
       const deptId = details.department_id;
@@ -541,21 +541,22 @@ export class TAApprovalService {
 
     // Final mapping and limiting to output size
     const mapped = filtered.map((item) => {
-      const log = item as Record<string, any>;
+      const log = item as Record<string, unknown>;
       
       // requester
-      const r = log.requester as any;
-      const rid = r ? (typeof r === "number" ? r : (r.user_id || r.id)) : null;
+      const r = log.requester;
+      const rid = r ? (typeof r === "number" ? r : (r as UserDetails).user_id) : null;
       const requester = rid && userMap.has(Number(rid)) ? JSON.parse(JSON.stringify(userMap.get(Number(rid)))) : r;
 
       // approver 
-      const a = log.approver_id as any;
-      const aid = a ? (typeof a === "number" ? a : (a.user_id || a.id)) : null;
+      const a = log.approver_id;
+      const aid = a ? (typeof a === "number" ? a : (a as UserDetails).user_id) : null;
       const approver = aid && userMap.has(Number(aid)) ? userMap.get(Number(aid)) : a;
 
       // Inject department name into requester if available
-      const ur = requester as any;
-      const dId = typeof ur?.user_department === "number" ? ur.user_department : ur?.user_department?.id;
+      const ur = requester as UserDetails | null;
+      const uDept = ur?.user_department;
+      const dId = typeof uDept === "number" ? uDept : (uDept as unknown as { id: number })?.id;
       const deptName = dId ? deptMap.get(Number(dId)) : "";
       
       if (ur && typeof ur === 'object' && deptName) {
