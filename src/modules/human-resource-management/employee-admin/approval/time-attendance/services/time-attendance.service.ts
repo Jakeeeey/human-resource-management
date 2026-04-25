@@ -205,7 +205,9 @@ export class TAApprovalService {
       return true;
     });
 
-    // 3. Bulk fetch user details to replace integer user_id with user objects
+    let enriched = deduped;
+
+    // 3. Bulk fetch user details
     const userIds = deduped
       .map((item) => typeof item.user_id === "number" ? item.user_id : (item.user_id as UserDetails)?.user_id)
       .filter((id) => id !== undefined && id !== null);
@@ -213,7 +215,7 @@ export class TAApprovalService {
     const uniqueUserIds = Array.from(new Set(userIds)) as number[];
     
     if (uniqueUserIds.length > 0) {
-      const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueUserIds.join(",")}&fields=user_id,user_fname,user_lname,user_position`;
+      const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueUserIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department`;
       try {
         const userRes = await fetch(userUrl, { headers: this.getHeaders() });
         if (userRes.ok) {
@@ -223,7 +225,7 @@ export class TAApprovalService {
             userData.forEach((u) => userMap.set(u.user_id, u));
           }
           
-          return deduped.map((item) => {
+          enriched = enriched.map((item) => {
             const uId = typeof item.user_id === "number" ? item.user_id : (item.user_id as UserDetails)?.user_id;
             if (uId && userMap.has(uId)) {
               return { ...item, user_id: userMap.get(uId) };
@@ -236,7 +238,48 @@ export class TAApprovalService {
       }
     }
 
-    return deduped;
+    // 4. Bulk fetch department names (BASED ON USER TABLE)
+    const deptIds = enriched
+      .map((item) => {
+        const u = item.user_id as any;
+        return typeof u?.user_department === "number" ? u.user_department : (u?.user_department as any)?.id;
+      })
+      .filter((id) => id !== undefined && id !== null);
+    
+    const uniqueDeptIds = Array.from(new Set(deptIds)) as number[];
+
+    if (uniqueDeptIds.length > 0) {
+      const deptUrl = `${this.API_BASE}/items/department?filter[department_id][_in]=${uniqueDeptIds.join(",")}&fields=department_id,department_name`;
+      try {
+        const deptRes = await fetch(deptUrl, { headers: this.getHeaders() });
+        if (deptRes.ok) {
+          const { data: deptData } = await deptRes.json();
+          const deptMap = new Map();
+          if (Array.isArray(deptData)) {
+            deptData.forEach((d) => deptMap.set(d.department_id, d.department_name));
+          }
+
+          enriched = enriched.map((item) => {
+            const u = item.user_id as any;
+            const dId = typeof u?.user_department === "number" ? u.user_department : (u?.user_department as any)?.id;
+            
+            if (dId && deptMap.has(dId)) {
+              const deptName = deptMap.get(dId);
+              // Inject into user object
+              if (typeof item.user_id === "object" && item.user_id !== null) {
+                (item.user_id as any).user_department = { department_name: deptName };
+              }
+              return { ...item, department_name: deptName }; // For backward compatibility in code
+            }
+            return item;
+          });
+        }
+      } catch (err) {
+        console.error("[TAService] Failed to bulk fetch departments:", err);
+      }
+    }
+
+    return enriched;
   }
 
   // ─── My Submissions ─────────────────────────────────────────────────────────
@@ -307,13 +350,38 @@ export class TAApprovalService {
       `${this.API_BASE}/items/ta_approval_history` +
       `?filter[request_id][_eq]=${requestId}` +
       `&filter[request_type][_eq]=${type}` +
-      `&fields=*,approver_id.user_fname,approver_id.user_lname,approver_id.user_position` +
+      `&fields=history_id,request_id,request_type,approver_id,status_after,remarks,created_at` +
       `&sort=created_at`;
 
     const res = await fetch(url, { headers: this.getHeaders() });
     if (!res.ok) return [];
     const { data } = await res.json();
-    return (Array.isArray(data) ? data : []) as HistoryLog[];
+    if (!Array.isArray(data) || data.length === 0) return [];
+
+    // Resolve approver names manually since approver_id is an INT
+    const approverIds = data.map(log => Number(log.approver_id)).filter(id => !!id);
+    const uniqueIds = Array.from(new Set(approverIds));
+    const userMap = new Map<number, any>();
+
+    if (uniqueIds.length > 0) {
+      const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department.department_name`;
+      try {
+        const uRes = await fetch(userUrl, { headers: this.getHeaders() });
+        if (uRes.ok) {
+          const { data: users } = await uRes.json();
+          if (Array.isArray(users)) {
+            users.forEach(u => userMap.set(Number(u.user_id), u));
+          }
+        }
+      } catch (e) {
+        console.error("[TAService] History user fetch failed:", e);
+      }
+    }
+
+    return data.map(log => ({
+      ...log,
+      approver_id: userMap.get(Number(log.approver_id)) || { user_fname: "System", user_lname: "", user_position: "VOS" }
+    })) as HistoryLog[];
   }
 
   /**
@@ -321,17 +389,26 @@ export class TAApprovalService {
    * For HR Head (isHRHead=true): returns ALL logs globally.
    * For regular approvers: returns logs where they were the acting approver.
    */
-  static async fetchApproverLogs(approverId: number, limit = 100, isHRHead = false): Promise<ApprovalLogEntry[]> {
-    // We fetch a larger pool of logs and filter by department in memory
-    // to allow L1/L2/L3 to see the progress of requests in their departments.
+  static async fetchApproverLogs(
+    approverId: number, 
+    limit = 100, 
+    isHRHead = false,
+    filters?: TAFilterOptions
+  ): Promise<ApprovalLogEntry[]> {
+    // We fetch a larger pool of logs and filter by department/cutoff in memory
+    // because history entries are polymorphic and we need to check the request's actual date.
     const assignments = !isHRHead ? await this.fetchApproverAssignments(approverId) : [];
     const assignedDeptIds = assignments.map(a => Number(a.department_id));
 
-    const url =
-      `${this.API_BASE}/items/ta_approval_history` +
-      `?fields=history_id,request_id,request_type,status_after,remarks,created_at,approver_id.user_id,approver_id.user_fname,approver_id.user_lname` +
-      `&sort[]=-created_at` +
-      `&limit=${limit}`;
+    const search = new URLSearchParams();
+    search.set("fields", "history_id,request_id,request_type,status_after,remarks,created_at,approver_id");
+    search.set("sort[]", "-created_at");
+    
+    // Fetch a larger set to ensure we find enough matches after request-date filtering
+    const fetchLimit = filters?.startDate ? 500 : limit;
+    search.set("limit", String(fetchLimit));
+
+    const url = `${this.API_BASE}/items/ta_approval_history?${search.toString()}`;
 
     const res = await fetch(url, { headers: this.getHeaders() });
     if (!res.ok) {
@@ -350,10 +427,10 @@ export class TAApprovalService {
 
           const reqRes = await fetch(
             `${this.API_BASE}/items/${collection}/${log.request_id}` +
-            `?fields=*`,
+            `?fields=*,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_position,user_id.user_department.department_name`,
             { headers: this.getHeaders() }
           );
-          if (!reqRes.ok) return { ...log, requester: null, request_details: null };
+          if (!reqRes.ok) return { ...log, requester: null, current_status: null, request_details: null };
           const { data: req } = await reqRes.json();
           // temporarily assign raw user_id to requester, we will map it next
           const r = req as Record<string, unknown>;
@@ -364,58 +441,131 @@ export class TAApprovalService {
       })
     );
 
-    // ── Bulk fetch user details to replace integer user_id with user objects ──
-    const userIds = enriched
-      .map((item) => {
-        const req = (item as Record<string, unknown>).requester as UserDetails | null;
-        return typeof req === "number" ? req : (req as UserDetails | null)?.user_id;
-      })
-      .filter((id) => id !== undefined && id !== null);
+    // ── Bulk fetch user details (for Requesters and Approvers) ──
+    const userIdsSet = new Set<number>();
+    enriched.forEach((item) => {
+      const log = item as Record<string, unknown>;
+      // requester
+      const r = log.requester as UserDetails | number | null;
+      const rid = typeof r === "number" ? r : (r as UserDetails | null)?.user_id;
+      if (rid) userIdsSet.add(rid);
+      // approver
+      const a = log.approver_id as UserDetails | number | null;
+      const aid = typeof a === "number" ? a : (a as UserDetails | null)?.user_id;
+      if (aid) userIdsSet.add(aid);
+    });
 
-    const uniqueUserIds = Array.from(new Set(userIds)) as number[];
+    const uniqueUserIds = Array.from(userIdsSet);
+    let userMap = new Map();
 
     if (uniqueUserIds.length > 0) {
-      const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueUserIds.join(",")}&fields=user_id,user_fname,user_lname,user_position`;
+      const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueUserIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department`;
       try {
         const userRes = await fetch(userUrl, { headers: this.getHeaders() });
         if (userRes.ok) {
           const { data: userData } = await userRes.json();
-          const userMap = new Map();
           if (Array.isArray(userData)) {
-            userData.forEach((u: UserDetails) => userMap.set(u.user_id, u));
+            userData.forEach((u: any) => {
+              const uid = Number(u.user_id || u.id);
+              if (uid) userMap.set(uid, u);
+              // Also map by the string version and other potential ID field
+              if (u.user_id) userMap.set(Number(u.user_id), u);
+              if (u.id) userMap.set(Number(u.id), u);
+            });
           }
-
-          return enriched.map((item) => {
-            const req = (item as Record<string, unknown>).requester as UserDetails | null;
-            const uId = typeof req === "number" ? (req as number) : (req as UserDetails | null)?.user_id;
-            if (uId && userMap.has(uId)) {
-              return { ...item, requester: userMap.get(uId) };
-            }
-            return item;
-          }) as ApprovalLogEntry[];
         }
       } catch (err) {
         console.error("[TAService] Failed to bulk fetch users for logs:", err);
       }
     }
 
-    if (isHRHead) return enriched as ApprovalLogEntry[];
+    // ── Bulk fetch department names for logs (BASED ON USER TABLE) ──
+    const deptIdsSet = new Set<number>();
+    userMap.forEach((u) => {
+      const dId = typeof u.user_department === "number" ? u.user_department : u.user_department?.id;
+      if (dId) deptIdsSet.add(Number(dId));
+    });
 
-    // In-memory filter for regular approvers
+    const uniqueDeptIds = Array.from(deptIdsSet);
+    const deptMap = new Map();
+    if (uniqueDeptIds.length > 0) {
+      const deptUrl = `${this.API_BASE}/items/department?filter[department_id][_in]=${uniqueDeptIds.join(",")}&fields=department_id,department_name`;
+      try {
+        const deptRes = await fetch(deptUrl, { headers: this.getHeaders() });
+        if (deptRes.ok) {
+          const { data: deptData } = await deptRes.json();
+          if (Array.isArray(deptData)) {
+            deptData.forEach((d) => deptMap.set(d.department_id, d.department_name));
+          }
+        }
+      } catch (err) {
+        console.error("[TAService] Failed to bulk fetch departments for logs:", err);
+      }
+    }
+
+    // In-memory filter for Cutoff (Request Date) & Department
     const filtered = enriched.filter(item => {
-      // 1. If they were the acting approver, show it.
       const logItem = item as Record<string, unknown>;
-      const approverIdObj = logItem.approver_id as UserDetails | null;
-      const actId = typeof logItem.approver_id === 'object' ? approverIdObj?.user_id : logItem.approver_id;
-      if (Number(actId) === approverId) return true;
+      const details = logItem.request_details as Record<string, unknown> | null;
+      if (!details) return false;
 
-      // 2. If it belongs to their department, show it.
-      const deptId = (logItem.request_details as Record<string, unknown> | null)?.department_id;
+      // 1. Cutoff Filter
+      if (filters?.startDate || filters?.endDate) {
+        const rType = logItem.request_type as string;
+        let refDate = details.filed_at as string;
+        if (rType === 'leave') refDate = (details.leave_start as string) || refDate;
+        else if (rType === 'overtime' || rType === 'undertime') refDate = (details.request_date as string) || refDate;
+
+        if (refDate) {
+          if (filters.startDate && refDate < filters.startDate) return false;
+          if (filters.endDate && refDate > filters.endDate) return false;
+        }
+      }
+
+      // 2. Department Filter
+      if (filters?.departmentId) {
+        const deptId = details.department_id;
+        const normalizedDeptId = typeof deptId === 'object' ? Number((deptId as Record<string, unknown>)?.id) : Number(deptId);
+        if (normalizedDeptId !== filters.departmentId) return false;
+      }
+
+      // 3. Authorization Check
+      if (isHRHead) return true;
+      const actId = Number(typeof logItem.approver_id === 'object' ? (logItem.approver_id as any)?.user_id : logItem.approver_id);
+      if (actId === approverId) return true;
+
+      const deptId = details.department_id;
       const normalizedDeptId = typeof deptId === 'object' ? Number((deptId as Record<string, unknown>)?.id) : Number(deptId);
       return assignedDeptIds.includes(normalizedDeptId);
     });
 
-    return filtered as ApprovalLogEntry[];
+    // Final mapping and limiting to output size
+    const mapped = filtered.map((item) => {
+      const log = item as Record<string, any>;
+      
+      // requester
+      const r = log.requester as any;
+      const rid = r ? (typeof r === "number" ? r : (r.user_id || r.id)) : null;
+      const requester = rid && userMap.has(Number(rid)) ? JSON.parse(JSON.stringify(userMap.get(Number(rid)))) : r;
+
+      // approver 
+      const a = log.approver_id as any;
+      const aid = a ? (typeof a === "number" ? a : (a.user_id || a.id)) : null;
+      const approver = aid && userMap.has(Number(aid)) ? userMap.get(Number(aid)) : a;
+
+      // Inject department name into requester if available
+      const ur = requester as any;
+      const dId = typeof ur?.user_department === "number" ? ur.user_department : ur?.user_department?.id;
+      const deptName = dId ? deptMap.get(Number(dId)) : "";
+      
+      if (ur && typeof ur === 'object' && deptName) {
+        ur.user_department = { department_name: deptName };
+      }
+
+      return { ...log, requester, approver_id: approver };
+    }) as ApprovalLogEntry[];
+
+    return mapped.slice(0, limit);
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -622,6 +772,10 @@ export class TAApprovalService {
     if (!patchRes.ok) throw new Error("Failed to update request state");
 
     // 3. Create Audit History entry
+    // Use the action to determine logical status for log if it differs from request status
+    let statusForLog = nextStatus;
+    if (action === "return") statusForLog = "returned";
+
     await fetch(`${this.API_BASE}/items/ta_approval_history`, {
       method: "POST",
       headers: this.getHeaders(),
@@ -629,7 +783,7 @@ export class TAApprovalService {
         request_id: requestId,
         request_type: type,
         approver_id: currentApproverId,
-        status_after: nextStatus,
+        status_after: statusForLog,
         remarks: remarks,
         created_at: phtTimestamp,
       }),

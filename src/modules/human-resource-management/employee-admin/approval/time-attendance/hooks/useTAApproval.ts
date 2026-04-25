@@ -85,7 +85,14 @@ export function useTAApproval() {
   const fetchApprovalLogs = useCallback(async () => {
     setIsLogsLoading(true);
     try {
-      const res    = await fetch("/api/hrm/employee-admin/approval/time-attendance?action=logs&limit=100");
+      const query = new URLSearchParams();
+      query.append("action", "logs");
+      query.append("limit", "100");
+      if (filters.startDate) query.append("startDate", filters.startDate);
+      if (filters.endDate)   query.append("endDate",   filters.endDate);
+      if (filters.departmentId) query.append("departmentId", String(filters.departmentId));
+
+      const res    = await fetch(`/api/hrm/employee-admin/approval/time-attendance?${query.toString()}`);
       const result = await res.json();
       if (result.success) {
         setApprovalLogs(result.data);
@@ -95,7 +102,7 @@ export function useTAApproval() {
     } finally {
       setIsLogsLoading(false);
     }
-  }, []);
+  }, [filters.startDate, filters.endDate, filters.departmentId]);
 
   // ── Single-request audit trail ────────────────────────────────────────────
   const fetchHistory = useCallback(async (requestId: number, type: string) => {

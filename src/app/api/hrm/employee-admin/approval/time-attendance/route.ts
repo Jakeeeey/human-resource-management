@@ -80,8 +80,8 @@ export async function GET(req: NextRequest) {
 
     // ── Branch: all history logs ─────────────────────────────────────────────
     if (searchParams.get("action") === "logs") {
-      const limit = Number(searchParams.get("limit") || "50");
-      const data = await TAApprovalService.fetchApproverLogs(authUserId, limit, isHRHead);
+      const limit = Number(searchParams.get("limit") || "100");
+      const data = await TAApprovalService.fetchApproverLogs(authUserId, limit, isHRHead, filters);
 
       return NextResponse.json({ success: true, data });
     }
