@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     const userId = payload?.id || payload?.user_id || payload?.sub;
 
     // Fetch user details to get department
-    console.log(`[DEBUG] Fetching current user: /items/user/${userId} - route.ts:117`);
+
     const userResponse = await directusFetch(
       `/items/user/${userId}?fields=user_id,user_department,isAdmin,role`
     );
@@ -154,11 +154,11 @@ export async function GET(req: NextRequest) {
     // Calculations like work_minutes, late_minutes etc. are done in the mapping function.
     const logFields = "log_id,user_id,department_id,log_date,time_in,time_out,approve_status,status";
     const finalUrl = `/items/attendance_log?${filter}${filter ? "&" : ""}sort=-log_date&limit=1000&fields=${logFields}`;
-    console.log(`[DEBUG] Fetching logs: ${finalUrl} - route.ts:156`);
+
 
     // Fetch attendance logs
     const attendanceResponse = await directusFetch(finalUrl);
-    console.log(`[DEBUG] Logs fetched: ${attendanceResponse.data?.length || 0} items - route.ts:160`);
+
 
     const logs = attendanceResponse.data || [];
 
@@ -257,7 +257,7 @@ export async function GET(req: NextRequest) {
       // const dayOfWeek = format(new Date(log.log_date), "EEEE");
       const userDeptId = user?.user_department;
 
-      console.log(`[DEBUG] Processing Log ID: ${log.log_id} | User: ${log.user_id} | LogDate: ${log.log_date} | UserDept: ${userDeptId} - route.ts:259`);
+
 
       // 1. Check Oncall Priority
       const userOncallEntries = oncallList.filter((entry: { user_id: number; dept_sched_id: number }) =>
@@ -267,7 +267,7 @@ export async function GET(req: NextRequest) {
       let schedule: Sched | null = null;
 
       if (userOncallEntries.length > 0) {
-        console.log(`[DEBUG] Found ${userOncallEntries.length} oncall_list entries for user ${log.user_id} - route.ts:269`);
+
         for (const entry of userOncallEntries) {
           // As verified by user example (Turn 446): oncall_list.dept_sched_id connects to oncall_schedule.id
           // The oncall schedule must only apply if its schedule_date matches the log's date
@@ -309,13 +309,13 @@ export async function GET(req: NextRequest) {
           });
 
           if (ocSched) {
-            console.log(`[DEBUG] Found ONCALL mapping via list: User ${log.user_id} > SchedID ${ocSched.id} (${ocSched.work_start}${ocSched.work_end}) - route.ts:290`);
+
             schedule = {
               time_in: ocSched.work_start,
               time_out: ocSched.work_end,
               grace_period: Number(ocSched.grace_period ?? 5)
             };
-            console.log(`[DEBUG] Final Schedule Object (ONCALL): - route.ts:296`, schedule);
+
             break;
           }
         }
@@ -338,18 +338,18 @@ export async function GET(req: NextRequest) {
         );
 
         if (deptSched) {
-          console.log(`[DEBUG] FOUND DEPT SCHED: ${JSON.stringify(deptSched)} - route.ts:319`);
+
           schedule = {
             time_in: deptSched.work_start,
             time_out: deptSched.work_end,
             grace_period: Number(deptSched.grace_period ?? 5)
           };
-          console.log(`[DEBUG] Final Schedule Object (DEPT): - route.ts:325`, schedule);
+
         }
       }
 
       if (!schedule) {
-        console.log(`[DEBUG] !!! NO SCHEDULE FOUND for user ${log.user_id} on date ${log.log_date} - route.ts:330`);
+
       }
 
       let work_minutes = 0;
@@ -369,7 +369,7 @@ export async function GET(req: NextRequest) {
           undertime_minutes = 240;
           work_minutes = 480;
           overtime_minutes = 0;
-          console.log(`[DEBUG] Time in beyond time out for user ${log.user_id}: setting 240 late, 240 undertime - route.ts:350`);
+
         } else {
           // ALWAYS calculate Lateness if they timed in before scheduled time out
           const diffInMs = actualIn.getTime() - schedIn.getTime();
@@ -412,7 +412,7 @@ export async function GET(req: NextRequest) {
               undertime_minutes = 240;
             }
             overtime_minutes = 0;
-            console.log(`[DEBUG] Missing time_out for user ${log.user_id}: setting 480 work, ${late_minutes} late, ${undertime_minutes} undertime - route.ts:388`);
+
           }
         }
       }
@@ -422,7 +422,7 @@ export async function GET(req: NextRequest) {
       const manualAdjustments = approvalsMap.get(approvalKey);
 
       if (manualAdjustments) {
-        console.log(`[DEBUG] Found manual adjustments for user ${log.user_id} on ${log.log_date}: - route.ts:398`, manualAdjustments);
+
 
         // If it's a pending log, we might want to favor calculation if the manual record
         // looks like it was saved with 'stale' values due to the previous calculation bug.
@@ -438,7 +438,7 @@ export async function GET(req: NextRequest) {
           undertime_minutes = manualAdjustments.undertime_minutes ?? undertime_minutes;
           overtime_minutes = manualAdjustments.overtime_minutes ?? overtime_minutes;
         } else {
-          console.log(`[DEBUG] Ignoring likely stale manual record for user ${log.user_id} - route.ts:414`);
+
         }
       }
 

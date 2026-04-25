@@ -13,10 +13,6 @@ export function GlassCard({
     children, 
     className, 
     accent = "cyan", 
-    initial = { opacity: 0, y: 30 },
-    whileInView = { opacity: 1, y: 0 },
-    viewport = { once: true, margin: "-20px" },
-    transition = { duration: 0.5, ease: "easeOut" },
     ...props 
 }: GlassCardProps) {
 
@@ -57,10 +53,6 @@ export function GlassCard({
 
     return (
         <motion.div 
-            initial={initial}
-            whileInView={whileInView}
-            viewport={viewport}
-            transition={transition}
             className={cn(
                 "relative group overflow-hidden rounded-3xl transition-all duration-700",
                 "bg-radial-gradient from-white/40 to-white/10 dark:from-slate-950/60 dark:to-slate-950/40",
