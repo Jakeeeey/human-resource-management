@@ -203,20 +203,24 @@ export default function TAApprovalModule() {
               <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Department</span>
             </div>
             <Combobox
-              value={selectedDepartmentId !== undefined ? String(selectedDepartmentId) : ""}
-              onValueChange={(val) => setSelectedDepartmentId(val && val !== "" ? Number(val) : undefined)}
+              value={departments.find(d => d.department_id === selectedDepartmentId)?.department_name ?? ""}
+              onValueChange={(val) => {
+                const dept = departments.find(d => d.department_name === val);
+                setSelectedDepartmentId(dept?.department_id);
+              }}
             >
               <ComboboxInput
-                className="h-9 w-56 rounded-xl border-amber-300/50 bg-amber-50/50 text-xs font-semibold text-amber-800 focus-visible:ring-amber-400"
+                className="h-9 w-56 rounded-xl border-amber-300/50 bg-amber-50/50 text-xs font-semibold text-amber-800 focus-visible:ring-amber-400 cursor-pointer"
                 placeholder="All Departments"
                 showClear={!!selectedDepartmentId}
+                readOnly
               />
               <ComboboxContent>
                 <ComboboxList>
                   <ComboboxEmpty>No department found.</ComboboxEmpty>
                   <ComboboxItem value="">All Departments</ComboboxItem>
                   {departments.map((d) => (
-                    <ComboboxItem key={d.department_id} value={String(d.department_id)}>
+                    <ComboboxItem key={d.department_id} value={d.department_name}>
                       {d.department_name}
                     </ComboboxItem>
                   ))}

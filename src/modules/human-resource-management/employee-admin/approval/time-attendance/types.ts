@@ -6,6 +6,9 @@ export interface UserDetails {
   user_fname: string;
   user_lname: string;
   user_position?: string;
+  user_department?: {
+    department_name: string;
+  } | null;
 }
 
 export interface Department {
@@ -61,7 +64,8 @@ export interface TAApproverMapping {
 
 export interface BaseRequest {
   user_id: number | UserDetails;
-  department_id: number | null;
+  department_id: number | { id: number; department_name: string } | null;
+  department_name?: string; // Manually resolved name
   status: RequestStatus;
   current_approval_level: number;
   approver_id: number | null;
