@@ -7,7 +7,9 @@ import {
   Division,
   Salesman,
   ReviewCommittee,
-  ExpenseReviewCommittee
+  ExpenseReviewCommittee,
+  TAApprover,
+  Department
 } from "../types";
 
 const PROXY_BASE = "/api/hrm/employee-admin/structure/role-management";
@@ -35,8 +37,12 @@ async function request<T>(method: string, endpoint: string, body?: Record<string
 
   if (res.status === 204) return {} as T;
   const json = await res.json();
-  // Unwrap Directus data wrapper if present
-  return (json.data !== undefined ? json.data : json) as T;
+  // Unwrap common data wrappers
+  if (json.data !== undefined) return json.data as T;
+  if (json.departments !== undefined) return json.departments as T;
+  if (json.users !== undefined) return json.users as T;
+  if (json.divisions !== undefined) return json.divisions as T;
+  return json as T;
 }
 
 // --- Helpers ---
@@ -50,6 +56,10 @@ export async function listDivisions(): Promise<Division[]> {
 
 export async function listSalesmen(): Promise<Salesman[]> {
   return request<Salesman[]>("GET", `${PROXY_BASE}/salesmen`);
+}
+
+export async function listDepartments(): Promise<Department[]> {
+  return request<Department[]>("GET", `${PROXY_BASE}/departments`);
 }
 
 // --- Executives ---
@@ -131,4 +141,17 @@ export async function createSalesmanAssignment(supervisorPerDivisionId: number, 
 
 export async function deleteSalesmanAssignment(id: number): Promise<void> {
   await request("DELETE", `${PROXY_BASE}/salesman-assignments/${id}`);
+}
+
+// --- TA Draft Approvers ---
+export async function listTAApprovers(): Promise<TAApprover[]> {
+  return request<TAApprover[]>("GET", `${PROXY_BASE}/ta-draft-approvers`);
+}
+
+export async function createTAApprover(data: Partial<TAApprover>): Promise<void> {
+  await request("POST", `${PROXY_BASE}/ta-draft-approvers`, data);
+}
+
+export async function deleteTAApprover(id: number): Promise<void> {
+  await request("DELETE", `${PROXY_BASE}/ta-draft-approvers/${id}`);
 }

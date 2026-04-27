@@ -24,6 +24,7 @@ export async function POST(req: Request) {
       profile: "profile_images",
       signature: "employee_signatures",
       employee_file: "201_emp_files",
+      hr_attachment: "hr_attachments",
     };
 
     if (!DIRECTUS_URL) {

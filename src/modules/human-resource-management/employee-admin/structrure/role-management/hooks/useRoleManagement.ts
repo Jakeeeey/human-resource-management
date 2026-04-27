@@ -10,9 +10,11 @@ import {
   SalesmanPerSupervisor,
   ReviewCommittee,
   ExpenseReviewCommittee,
+  TAApprover,
   SystemUser,
   Division,
-  Salesman
+  Salesman,
+  Department
 } from "../types";
 
 export function useRoleManagement() {
@@ -20,12 +22,14 @@ export function useRoleManagement() {
   const [reviewCommittee, setReviewCommittee] = useState<ReviewCommittee[]>([]);
   const [divisionHeads, setDivisionHeads] = useState<DivisionSalesHead[]>([]);
   const [expenseReviewCommittee, setExpenseReviewCommittee] = useState<ExpenseReviewCommittee[]>([]);
+  const [taApprovers, setTaApprovers] = useState<TAApprover[]>([]);
   const [supervisors, setSupervisors] = useState<SupervisorPerDivision[]>([]);
   const [salesmanAssignments, setSalesmanAssignments] = useState<SalesmanPerSupervisor[]>([]);
 
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -62,18 +66,25 @@ export function useRoleManagement() {
     setSalesmanAssignments(sa);
   }, []);
 
+  const fetchTAApprovers = useCallback(async () => {
+    const ta = await provider.listTAApprovers();
+    setTaApprovers(ta);
+  }, []);
+
 
 
   const fetchReferenceData = useCallback(async () => {
     try {
-      const [u, d, s] = await Promise.all([
+      const [u, d, s, depts] = await Promise.all([
         provider.listUsers(),
         provider.listDivisions(),
         provider.listSalesmen(),
+        provider.listDepartments(),
       ]);
       setUsers(u);
       setDivisions(d);
       setSalesmen(s);
+      setDepartments(depts);
     } catch (err) {
       console.error("Failed to fetch reference data", err);
     }
@@ -91,6 +102,7 @@ export function useRoleManagement() {
         fetchDivisionHeads(),
         fetchSupervisors(),
         fetchSalesmanAssignments(),
+        fetchTAApprovers(),
         fetchReferenceData()
       ]);
     } catch (err) {
@@ -99,7 +111,7 @@ export function useRoleManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchExecutives, fetchReviewCommittee, fetchExpenseReviewCommittee, fetchDivisionHeads, fetchSupervisors, fetchSalesmanAssignments, fetchReferenceData]);
+  }, [fetchExecutives, fetchReviewCommittee, fetchExpenseReviewCommittee, fetchDivisionHeads, fetchSupervisors, fetchSalesmanAssignments, fetchTAApprovers, fetchReferenceData]);
 
   useEffect(() => {
     fetchData();
@@ -272,6 +284,32 @@ export function useRoleManagement() {
     }
   };
 
+  const createTAApprover = async (data: Partial<TAApprover>) => {
+    try {
+      await provider.createTAApprover(data);
+      await fetchTAApprovers();
+      toast.success("Time and Attendance approver assigned");
+    } catch (e) {
+      const err = e as Error;
+      console.error(err);
+      toast.error(err.message || "Failed to assign TA approver");
+      throw err;
+    }
+  };
+
+  const deleteTAApprover = async (id: number) => {
+    try {
+      await provider.deleteTAApprover(id);
+      await fetchTAApprovers();
+      toast.success("Time and Attendance approver removed");
+    } catch (e) {
+      const err = e as Error;
+      console.error(err);
+      toast.error(err.message || "Failed to remove TA approver");
+      throw err;
+    }
+  };
+
   return {
     executives,
     reviewCommittee,
@@ -279,9 +317,11 @@ export function useRoleManagement() {
     divisionHeads,
     supervisors,
     salesmanAssignments,
+    taApprovers,
     users,
     divisions,
     salesmen,
+    departments,
     isLoading,
     isError,
     error,
@@ -297,6 +337,8 @@ export function useRoleManagement() {
     createSupervisor,
     deleteSupervisor,
     createSalesmanAssignment,
-    deleteSalesmanAssignment
+    deleteSalesmanAssignment,
+    createTAApprover,
+    deleteTAApprover
   };
 }

@@ -30,8 +30,15 @@ export default function OnCallPage() {
 
 function OnCallContent() {
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-    const { departments } = useDepartments();
+    const { departments, users, isLoading: isLoadingDeps } = useDepartments();
     const { refresh, isLoading: isRefreshing } = useOnCall();
+
+    const mappedDepartments = React.useMemo(() => {
+        return departments.map((d: { department_id: number | string; department_name: string }) => ({
+            id: d.department_name,
+            name: d.department_name
+        }));
+    }, [departments]);
 
     return (
         <div className="flex flex-col gap-6 p-6">
@@ -63,7 +70,7 @@ function OnCallContent() {
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">All Schedules</h2>
                     <ScmAdvancedFilters
-                        departments={departments.map((d: { department_name: string }) => ({ id: d.department_name, name: d.department_name }))}
+                        departments={mappedDepartments}
                         showDepartment={true}
                         showSupplier={false}
                         showDateRange={false}
@@ -71,12 +78,16 @@ function OnCallContent() {
                     />
                 </div>
 
-                <OnCallTable />
+                <OnCallTable departments={departments} users={users} isLoadingDeps={isLoadingDeps} />
             </div>
+
 
             <OnCallDialog
                 open={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
+                departments={departments}
+                users={users}
+                isLoadingDeps={isLoadingDeps}
             />
         </div>
     );

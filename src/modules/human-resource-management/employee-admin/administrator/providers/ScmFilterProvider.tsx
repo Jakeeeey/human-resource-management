@@ -52,7 +52,8 @@ export function ScmFilterProvider({ children }: { children: React.ReactNode }) {
   const selectedRiskStatus = searchParams.get("risk_status") || "all";
   const selectedDepartment = searchParams.get("department") || "all";
 
-  const updateFilters = (updates: Record<string, string | undefined>) => {
+  // useCallback so consumers don't re-render just because ScmFilterProvider re-rendered
+  const updateFilters = React.useCallback((updates: Record<string, string | undefined>) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(updates).forEach(([key, value]) => {
       if (value && value !== "all") {
@@ -62,30 +63,47 @@ export function ScmFilterProvider({ children }: { children: React.ReactNode }) {
       }
     });
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  };
+  }, [searchParams, router, pathname]);
 
-  const setDateRange = (range: DateRange | undefined) => {
+  const setDateRange = React.useCallback((range: DateRange | undefined) => {
     updateFilters({
       from: range?.from ? format(range.from, "yyyy-MM-dd") : undefined,
       to: range?.to ? format(range.to, "yyyy-MM-dd") : undefined,
     });
-  };
+  }, [updateFilters]);
+
+  const setSelectedSupplier = React.useCallback((val: string) => updateFilters({ supplier: val }), [updateFilters]);
+  const setSelectedBranch = React.useCallback((val: string) => updateFilters({ branch_name: val }), [updateFilters]);
+  const setSelectedRiskStatus = React.useCallback((val: string) => updateFilters({ risk_status: val }), [updateFilters]);
+  const setSelectedDepartment = React.useCallback((val: string) => updateFilters({ department: val }), [updateFilters]);
+
+  // Memoize the full context value to prevent cascading re-renders across all consumers
+  const contextValue = useMemo(() => ({
+    dateRange,
+    setDateRange,
+    selectedSupplier,
+    setSelectedSupplier,
+    selectedBranch,
+    setSelectedBranch,
+    selectedRiskStatus,
+    setSelectedRiskStatus,
+    selectedDepartment,
+    setSelectedDepartment,
+  }), [
+    dateRange,
+    setDateRange,
+    selectedSupplier,
+    setSelectedSupplier,
+    selectedBranch,
+    setSelectedBranch,
+    selectedRiskStatus,
+    setSelectedRiskStatus,
+    selectedDepartment,
+    setSelectedDepartment,
+  ]);
 
   return (
-    <ScmFilterContext.Provider
-      value={{
-        dateRange,
-        setDateRange,
-        selectedSupplier,
-        setSelectedSupplier: (val) => updateFilters({ supplier: val }),
-        selectedBranch,
-        setSelectedBranch: (val) => updateFilters({ branch_name: val }),
-        selectedRiskStatus,
-        setSelectedRiskStatus: (val) => updateFilters({ risk_status: val }),
-        selectedDepartment,
-        setSelectedDepartment: (val) => updateFilters({ department: val }),
-      }}
-    >
+    <ScmFilterContext.Provider value={contextValue}>
       {children}
     </ScmFilterContext.Provider>
   );
