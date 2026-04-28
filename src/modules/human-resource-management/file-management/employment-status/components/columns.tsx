@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Eye, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, Eye, MoreHorizontal, Pencil} from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -95,7 +95,6 @@ function formatDateTime(value: string): string {
 export const createColumns = (
     onView: (record: EmploymentStatus) => void,
     onEdit: (record: EmploymentStatus) => void,
-    onDelete: (record: EmploymentStatus) => void
 ): ColumnDef<EmploymentStatus>[] => [
     {
         id: "no",
@@ -229,13 +228,6 @@ export const createColumns = (
                             Edit
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        {/* <DropdownMenuItem
-                            onClick={() => onDelete(record)}
-                            className="text-red-600 focus:text-red-600"
-                        >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                        </DropdownMenuItem> */}
                     </DropdownMenuContent>
                 </DropdownMenu>
             );

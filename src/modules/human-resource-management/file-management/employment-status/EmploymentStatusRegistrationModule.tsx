@@ -20,7 +20,6 @@ function EmploymentStatusRegistrationModuleContent() {
         refetch,
         createRecord,
         updateRecord,
-        deleteRecord,
     } = useEmploymentStatusRegistration();
 
     const handleCreate = async (data: EmploymentStatusFormData) => {
@@ -43,15 +42,6 @@ function EmploymentStatusRegistrationModuleContent() {
         }
     };
 
-    const handleDelete = async (id: number) => {
-        try {
-            await deleteRecord(id);
-            toast.success("Employment status deleted successfully");
-        } catch {
-            toast.error("Failed to delete employment status");
-            throw new Error("Delete failed");
-        }
-    };
 
     if (isError) {
         return (
@@ -99,7 +89,7 @@ function EmploymentStatusRegistrationModuleContent() {
                 isLoading={isLoading}
                 onCreateRecord={handleCreate}
                 onUpdateRecord={handleUpdate}
-                onDeleteRecord={handleDelete}
+    
             />
         </div>
     );

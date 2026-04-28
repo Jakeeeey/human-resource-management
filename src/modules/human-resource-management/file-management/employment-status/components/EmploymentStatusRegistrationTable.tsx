@@ -32,7 +32,6 @@ import { ChevronDown, Plus } from "lucide-react";
 import { createColumns } from "./columns";
 import { EmploymentStatusRegistrationToolbar } from "./EmploymentStatusRegistrationToolbar";
 import { EmploymentStatusRegistrationDialog } from "./EmploymentStatusRegistrationDialog";
-import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { EmploymentStatusRegistrationViewDialog } from "./EmploymentStatusRegistrationViewDialog";
 
 interface EmploymentStatusRegistrationTableProps {
@@ -40,7 +39,6 @@ interface EmploymentStatusRegistrationTableProps {
     isLoading?: boolean;
     onCreateRecord: (data: EmploymentStatusFormData) => Promise<void>;
     onUpdateRecord: (id: number, data: EmploymentStatusFormData) => Promise<void>;
-    onDeleteRecord: (id: number) => Promise<void>;
 }
 
 export function EmploymentStatusRegistrationTable({
@@ -48,7 +46,6 @@ export function EmploymentStatusRegistrationTable({
     isLoading = false,
     onCreateRecord,
     onUpdateRecord,
-    onDeleteRecord,
 }: EmploymentStatusRegistrationTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] =
@@ -59,7 +56,6 @@ export function EmploymentStatusRegistrationTable({
 
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
     const [editDialogOpen, setEditDialogOpen] = React.useState(false);
-    const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
     const [viewDialogOpen, setViewDialogOpen] = React.useState(false);
     const [selectedRecord, setSelectedRecord] =
         React.useState<EmploymentStatus | null>(null);
@@ -74,22 +70,10 @@ export function EmploymentStatusRegistrationTable({
         setEditDialogOpen(true);
     }, []);
 
-    const handleDelete = React.useCallback((record: EmploymentStatus) => {
-        setSelectedRecord(record);
-        setDeleteDialogOpen(true);
-    }, []);
-
-    const handleConfirmDelete = async () => {
-        if (selectedRecord) {
-            await onDeleteRecord(selectedRecord.id);
-            setDeleteDialogOpen(false);
-            setSelectedRecord(null);
-        }
-    };
 
     const columns = React.useMemo(
-        () => createColumns(handleView, handleEdit, handleDelete),
-        [handleView, handleEdit, handleDelete]
+        () => createColumns(handleView, handleEdit),
+        [handleView, handleEdit]
     );
 
     // eslint-disable-next-line react-hooks/incompatible-library
@@ -276,13 +260,6 @@ export function EmploymentStatusRegistrationTable({
                         await onUpdateRecord(selectedRecord.id, data);
                     }
                 }}
-            />
-
-            <DeleteConfirmDialog
-                open={deleteDialogOpen}
-                onOpenChange={setDeleteDialogOpen}
-                record={selectedRecord}
-                onConfirm={handleConfirmDelete}
             />
 
             <EmploymentStatusRegistrationViewDialog
