@@ -39,19 +39,20 @@ export function DepartmentFilterProvider({ children }: { children: React.ReactNo
         setFilters(DEFAULT_FILTERS);
     }, []);
 
+    const contextValue = React.useMemo(() => ({
+        filters,
+        updateSearch,
+        updateFromDate,
+        updateToDate,
+        resetFilters,
+    }), [filters, updateSearch, updateFromDate, updateToDate, resetFilters]);
+
     return (
-        <DepartmentFilterContext.Provider
-            value={{
-                filters,
-                updateSearch,
-                updateFromDate,
-                updateToDate,
-                resetFilters,
-            }}
-        >
+        <DepartmentFilterContext.Provider value={contextValue}>
             {children}
         </DepartmentFilterContext.Provider>
     );
+
 }
 
 export function useDepartmentFilterContext() {

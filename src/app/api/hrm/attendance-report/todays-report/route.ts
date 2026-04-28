@@ -105,9 +105,6 @@ export async function GET(request: NextRequest) {
     const scheds:       Record<string, unknown>[] = schedRes.data       ?? [];
     const oncallList:   Record<string, unknown>[] = oncallListRes.data  ?? [];
     const oncallScheds: Record<string, unknown>[] = oncallSchedRes.data ?? [];
-    // Temporarily in route.ts
-const testRes = await fetchCollection('attendance_log', { limit: '3' });
-console.log('[DEBUG] sample log_dates:', testRes.data.map((l: Record<string,unknown>) => l.log_date));
 
     console.log(`[HRM/Attendance] logs=${logs.length} users=${users.length} depts=${depts.length} scheds=${scheds.length}`);
 
@@ -139,7 +136,7 @@ console.log('[DEBUG] sample log_dates:', testRes.data.map((l: Record<string,unkn
         break_start:     log.break_start     ?? schedFields.break_start,
         break_end:       log.break_end       ?? schedFields.break_end,
         status:          log.status          ?? 'Absent',
-        approval_status: log.approval_status ?? '',
+        approval_status: log.approve_status ?? '',
         image_time_in:   log.image_time_in   ?? null,
         image_time_out:  log.image_time_out  ?? null,
         user_fname:      (user as Record<string, unknown>).user_fname    ?? '—',

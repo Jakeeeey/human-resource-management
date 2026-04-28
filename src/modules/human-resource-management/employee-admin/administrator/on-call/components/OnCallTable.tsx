@@ -29,37 +29,20 @@ import { OnCallDialog } from "./OnCallDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatInManilaTime } from "../../utils/utils";
 import type { EnrichedOnCallSchedule } from "../types/on-call.schema";
+import type { DepartmentWithRelations, User } from "../../../structrure/department/types";
 
-export function OnCallTable() {
+interface OnCallTableProps {
+    departments: DepartmentWithRelations[];
+    users: User[];
+    isLoadingDeps?: boolean;
+}
+
+export function OnCallTable({ departments, users, isLoadingDeps = false }: OnCallTableProps) {
     const { data, isLoading, error, deleteSchedule, refresh } = useOnCall();
     const [selectedSchedule, setSelectedSchedule] = React.useState<EnrichedOnCallSchedule | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
     const [idToDelete, setIdToDelete] = React.useState<number | null>(null);
-
-    if (isLoading) {
-        return (
-            <div className="space-y-3">
-                <Skeleton className="h-[400px] w-full" />
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription className="flex items-center justify-between">
-                    <span>{error}</span>
-                    <Button variant="outline" size="sm" onClick={() => refresh()}>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Retry
-                    </Button>
-                </AlertDescription>
-            </Alert>
-        );
-    }
 
     const handleEdit = (schedule: EnrichedOnCallSchedule) => {
         setSelectedSchedule(schedule);
@@ -88,8 +71,34 @@ export function OnCallTable() {
         }
     };
 
-    return (
-        <>
+    // Render body content based on state without early returns,
+    // so dialogs remain mounted throughout loading/error cycles.
+    const renderBody = () => {
+        if (isLoading) {
+            return (
+                <div className="space-y-3">
+                    <Skeleton className="h-[400px] w-full" />
+                </div>
+            );
+        }
+
+        if (error) {
+            return (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription className="flex items-center justify-between">
+                        <span>{error}</span>
+                        <Button variant="outline" size="sm" onClick={() => refresh()}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Retry
+                        </Button>
+                    </AlertDescription>
+                </Alert>
+            );
+        }
+
+        return (
             <div className="rounded-md border">
                 <Table>
                     <TableHeader>
@@ -200,31 +209,49 @@ export function OnCallTable() {
                     </TableBody>
                 </Table>
             </div>
+        );
+    };
 
+    return (
+        <>
+            {renderBody()}
+
+            {/* Edit dialog is always in the tree when a schedule is selected,
+                so it never unmounts mid-refresh and avoids Radix UI re-mount loops */}
             {selectedSchedule && (
                 <OnCallDialog
                     open={isEditDialogOpen}
                     onOpenChange={setIsEditDialogOpen}
                     schedule={selectedSchedule}
+                    departments={departments}
+                    users={users}
+                    isLoadingDeps={isLoadingDeps}
                 />
             )}
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
+                <AlertDialogContent className="max-w-md bg-card border-none shadow-2xl p-8 rounded-2xl animate-in fade-in zoom-in-95 duration-300">
+                    <AlertDialogHeader className="space-y-4">
+                        <div className="mx-auto w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-2">
+                             <Trash2 className="h-8 w-8 text-red-600" />
+                        </div>
+                        <AlertDialogTitle className="text-2xl font-bold text-center">Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription className="text-center text-base">
                             This action cannot be undone. This will permanently delete the on-call schedule for this department and date.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                            Delete
+                    <AlertDialogFooter className="flex-col sm:flex-row gap-4 mt-8 pt-6 border-t">
+                        <AlertDialogCancel className="w-full sm:w-1/2 h-12 rounded-xl font-semibold border-none hover:bg-muted/50 transition-all">Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={handleDelete} 
+                            className="w-full sm:w-1/2 h-12 rounded-xl font-bold bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/20 transition-all active:scale-95"
+                        >
+                            Delete Schedule
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
         </>
     );
 }

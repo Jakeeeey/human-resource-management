@@ -6,11 +6,15 @@ import { Footer } from "@/components/layout/footer"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePathname } from "next/navigation"
 
+import { Preloader } from "@/components/theme/Preloader"
+import { SmoothScrollProvider } from "@/components/theme/SmoothScrollProvider"
+
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname()
 
     return (
         <div className="min-h-dvh flex flex-col bg-background text-foreground overflow-x-hidden">
+            <Preloader />
             <Header />
             <AnimatePresence mode="wait">
                 <motion.main 
@@ -21,10 +25,12 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                     className="flex-1"
                 >
-                    {children}
+                    <SmoothScrollProvider>
+                        {children}
+                    </SmoothScrollProvider>
                 </motion.main>
             </AnimatePresence>
-            <Footer />
+            {pathname !== '/login' && <Footer />}
         </div>
     )
 }

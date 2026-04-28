@@ -18,6 +18,7 @@ const UserConfigurationContent = () => {
         setIsPermissionsOpen,
         activeUser,
         activeSubsystem,
+        searchTerm,
         fetchPage,
         handleToggleAccess,
         handleConfigure,
@@ -44,7 +45,8 @@ const UserConfigurationContent = () => {
                 currentPage={currentPage}
                 totalCount={totalCount}
                 pageSize={pageSize}
-                onPageChange={fetchPage}
+                searchTerm={searchTerm}
+                onPageChange={(page, quiet, search) => fetchPage(page, quiet, search)}
             />
 
             <PermissionsDialog

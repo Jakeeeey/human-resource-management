@@ -7,7 +7,7 @@ import { SubsystemRegistration, ModuleRegistration } from "@/modules/human-resou
 import { UserService } from "../services/UserService";
 import { extractAllSlugs, extractAllIds } from "../utils/permissionUtils";
 import { toast } from "sonner";
-import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
+import { APP_SIDEBAR_REFRESH_EVENT } from "@/components/shared/app-sidebar/app-sidebar-events";
 
 export function useUserConfiguration() {
     const { 
@@ -17,6 +17,7 @@ export function useUserConfiguration() {
         currentPage, 
         totalCount, 
         pageSize, 
+        searchTerm,
         fetchPage,
         updateUserPermissions,
     } = useUserConfigurationFetchContext();
@@ -33,11 +34,12 @@ export function useUserConfiguration() {
      * MANUAL-ADD Model: Turning ON only adds the subsystem.
      * AUTO-CLEANUP Model: Turning OFF removes the subsystem AND all its module permissions.
      */
-    const handleToggleAccess = useCallback(async (userId: string, subsystemId: string, authorized: boolean) => {
+    const handleToggleAccess = useCallback(async (userId: string, subsystemId: string | number, authorized: boolean) => {
         const user = users.find(u => u.user_id === userId);
-        const subRegistry = subsystems.find(s => s.slug === subsystemId);
+        const subRegistry = subsystems.find(s => Number(s.id) === Number(subsystemId));
         if (!user || !subRegistry) return;
 
+        const subSlug = subRegistry.slug;
         const slugsInSubsystem = extractAllSlugs(subRegistry);
         const subPk = Number(subRegistry.id);
 
@@ -48,7 +50,7 @@ export function useUserConfiguration() {
         });
 
         const newSlugs = authorized
-            ? Array.from(new Set([...user.authorized_subsystems, subsystemId]))
+            ? Array.from(new Set([...user.authorized_subsystems, subSlug]))
             : user.authorized_subsystems.filter((slug) => !slugsInSubsystem.includes(slug));
         
         const newSubIds = authorized
@@ -78,7 +80,7 @@ export function useUserConfiguration() {
             fetchPage(currentPage, true);
             
             // Trigger Sidebar Refresh
-            window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
+            window.dispatchEvent(new CustomEvent(APP_SIDEBAR_REFRESH_EVENT));
         } else {
             toast.error("Failed to persist permission changes.");
             fetchPage(currentPage, true);
@@ -150,7 +152,7 @@ export function useUserConfiguration() {
             fetchPage(currentPage, true);
             
             // Trigger Sidebar Refresh via Custom Event
-            window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
+            window.dispatchEvent(new CustomEvent(APP_SIDEBAR_REFRESH_EVENT));
         } else {
             toast.error("Failed to persist granular changes.");
             fetchPage(currentPage, true);
@@ -168,6 +170,7 @@ export function useUserConfiguration() {
         setIsPermissionsOpen,
         activeUser,
         activeSubsystem,
+        searchTerm,
         fetchPage,
         handleToggleAccess,
         handleConfigure,

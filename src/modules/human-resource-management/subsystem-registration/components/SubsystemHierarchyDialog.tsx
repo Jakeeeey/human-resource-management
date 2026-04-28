@@ -45,13 +45,14 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { IconPicker } from "./IconPicker";
-import { SIDEBAR_REFRESH_EVENT } from "@/app/(human-resource-management)/hrm/_components/sidebar-events";
+import { APP_SIDEBAR_REFRESH_EVENT } from "@/components/shared/app-sidebar/app-sidebar-events";
+import { toast } from "sonner";
 
 interface SubsystemHierarchyDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     subsystem: SubsystemRegistration | null;
-    onUpdate: (updatedSubsystem: SubsystemRegistration) => Promise<boolean>;
+    onUpdate: (updatedSubsystem: SubsystemRegistration) => Promise<{ success: boolean; message?: string }>;
 }
 
 export function SubsystemHierarchyDialog({
@@ -123,16 +124,36 @@ export function SubsystemHierarchyDialog({
     };
 
     const handleUpdateItem = (id: string | number, data: Partial<ModuleRegistration>, parentPath: string = "") => {
+        const generateSlug = (t: string) => t.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+        // Helper: Recursively updates base_path for all children when parent path changes
+        const updateChildrenPaths = (items: ModuleRegistration[], newParentPath: string): ModuleRegistration[] => {
+            return items.map(child => {
+                const childSlug = child.slug || generateSlug(child.title);
+                const newPath = `${newParentPath}/${childSlug}`;
+                return {
+                    ...child,
+                    base_path: newPath,
+                    subModules: child.subModules ? updateChildrenPaths(child.subModules, newPath) : []
+                };
+            });
+        };
+
         setModules(prev => updateInTree(prev, id, item => {
             const updated = { ...item, ...data };
-            // Helper: Slug from title
-            const generateSlug = (t: string) => t.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
+            // Logic: If title changed and no manual path provided, update slug and path
             if (data.title && !data.base_path) {
                 const slug = generateSlug(data.title);
                 updated.slug = slug;
                 updated.base_path = `${parentPath}/${slug}`;
             }
+
+            // Logic: If path or title (slug) changed, update all descendants
+            if (updated.base_path !== item.base_path && updated.subModules && updated.subModules.length > 0) {
+                updated.subModules = updateChildrenPaths(updated.subModules, updated.base_path);
+            }
+
             return updated;
         }));
     };
@@ -203,18 +224,55 @@ export function SubsystemHierarchyDialog({
 
     const handleCollapseAll = () => setExpandedIds(new Set());
 
+    const findDuplicateSlugs = (items: ModuleRegistration[]): { title: string; parentTitle: string; slug: string } | null => {
+        const slugs = new Set<string>();
+        let duplicateInfo: { title: string; parentTitle: string; slug: string } | null = null;
+
+        const traverse = (list: ModuleRegistration[], parentTitle: string = "Root") => {
+            for (const item of list) {
+                const s = item.slug || "";
+                if (s && slugs.has(s)) {
+                    duplicateInfo = { title: item.title, parentTitle, slug: s };
+                    return;
+                }
+                slugs.add(s);
+                if (item.subModules) traverse(item.subModules, item.title);
+                if (duplicateInfo) return;
+            }
+        };
+
+        traverse(items, "Root");
+        return duplicateInfo;
+    };
+
     const handleSave = async () => {
         if (!subsystem) return;
+
+        // 1. Validation: Check for duplicates within this subsystem hierarchy
+        const duplicate = findDuplicateSlugs(modules);
+        if (duplicate) {
+            toast.error("Duplicate Module Detected", {
+                description: `The module "${duplicate.title}" already exists in the "${duplicate.parentTitle}" folder. Each module in this subsystem must have a unique slug.`,
+                duration: 6000,
+            });
+            return;
+        }
+
         setIsSaving(true);
         try {
-            const success = await onUpdate({ ...subsystem, modules });
-            if (success) {
+            const result = await onUpdate({ ...subsystem, modules });
+            if (result.success) {
                 // Live Sync: Force refresh the sidebar navigation via Custom Event
-                window.dispatchEvent(new CustomEvent(SIDEBAR_REFRESH_EVENT));
+                window.dispatchEvent(new CustomEvent(APP_SIDEBAR_REFRESH_EVENT));
                 onOpenChange(false);
+                // Success message is handled by the hook
+            } else {
+                // Error message is handled by the hook, but we can add more context here if needed
+                console.error("Save failed:", result.message);
             }
         } catch (error) {
             console.error("Failed to save hierarchy:", error);
+            toast.error("An unexpected connection error occurred while saving.");
         } finally {
             setIsSaving(false);
         }
