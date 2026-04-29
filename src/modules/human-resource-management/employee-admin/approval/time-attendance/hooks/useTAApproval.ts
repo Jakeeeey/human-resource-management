@@ -30,7 +30,7 @@ export function useTAApproval() {
       const res = await fetch("/api/hrm/employee-admin/approval/time-attendance?action=departments");
       const result = await res.json();
       if (result.success) {
-        console.log("[useTAApproval] Departments loaded:", result.data?.length);
+
         setDepartments(result.data ?? []);
       } else {
         console.error("[useTAApproval] Failed to load departments:", result.error);
@@ -85,7 +85,14 @@ export function useTAApproval() {
   const fetchApprovalLogs = useCallback(async () => {
     setIsLogsLoading(true);
     try {
-      const res    = await fetch("/api/hrm/employee-admin/approval/time-attendance?action=logs&limit=100");
+      const query = new URLSearchParams();
+      query.append("action", "logs");
+      query.append("limit", "100");
+      if (filters.startDate) query.append("startDate", filters.startDate);
+      if (filters.endDate)   query.append("endDate",   filters.endDate);
+      if (filters.departmentId) query.append("departmentId", String(filters.departmentId));
+
+      const res    = await fetch(`/api/hrm/employee-admin/approval/time-attendance?${query.toString()}`);
       const result = await res.json();
       if (result.success) {
         setApprovalLogs(result.data);
@@ -95,7 +102,7 @@ export function useTAApproval() {
     } finally {
       setIsLogsLoading(false);
     }
-  }, []);
+  }, [filters.startDate, filters.endDate, filters.departmentId]);
 
   // ── Single-request audit trail ────────────────────────────────────────────
   const fetchHistory = useCallback(async (requestId: number, type: string) => {
@@ -167,7 +174,7 @@ export function useTAApproval() {
     // 2. PASSIVE REFRESH: Only hit the server when the user returns to the tab.
     // This eliminates background load entirely while keeping data fresh when needed.
     const handleFocus = () => {
-      console.log("[useTAApproval] Passive refresh triggered by window focus");
+
       smartRefresh();
     };
 

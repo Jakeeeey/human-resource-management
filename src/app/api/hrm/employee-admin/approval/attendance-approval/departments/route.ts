@@ -12,7 +12,7 @@ export async function GET() {
     const baseUrl = DIRECTUS_URL?.endsWith('/') ? DIRECTUS_URL.slice(0, -1) : DIRECTUS_URL;
     const url = `${baseUrl}/items/department?fields=department_id,department_name&sort=department_name&limit=1000`;
 
-    console.log(`[DEBUG] Fetching departments from: ${url} - route.ts:15`);
+
 
     const response = await fetch(url, {
       headers: {
@@ -28,7 +28,7 @@ export async function GET() {
     }
 
     const data = await response.json();
-    console.log(`[DEBUG] Departments fetched: ${data.data?.length || 0} items - route.ts:31`);
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Fetch departments error: - route.ts:34", error);
