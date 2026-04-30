@@ -1,16 +1,15 @@
 "use client";
 
 import type { Column, ColumnDef } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, Pencil } from "lucide-react";
+import { ArrowUpDown, Eye, ExternalLink, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Competitor } from "../types";
 import { formatCreatedBy, formatDateTime, toWebsiteHref } from "../utils/formatters";
 
 function renderSortIcon(direction: false | "asc" | "desc") {
-    if (direction === "asc") return <ArrowUp className="ml-2 h-3.5 w-3.5" />;
-    if (direction === "desc") return <ArrowDown className="ml-2 h-3.5 w-3.5" />;
-    return <ArrowUpDown className="ml-2 h-3.5 w-3.5" />;
+    const iconClass = direction ? "opacity-100" : "opacity-70";
+    return <ArrowUpDown className={`ml-2 h-3.5 w-3.5 ${iconClass}`} />;
 }
 
 function SortableHeader({
@@ -35,7 +34,8 @@ function SortableHeader({
 }
 
 export function createColumns(
-    onEdit: (competitor: Competitor) => void
+    onEdit: (competitor: Competitor) => void,
+    onView: (competitor: Competitor) => void
 ): ColumnDef<Competitor>[] {
     return [
         {
@@ -91,12 +91,6 @@ export function createColumns(
             cell: ({ row }) => row.original.barangay || "N/A",
         },
         {
-            id: "created_by",
-            accessorFn: (row) => formatCreatedBy(row.created_by ?? null),
-            header: ({ column }) => <SortableHeader column={column} label="Created by" />,
-            cell: ({ row }) => formatCreatedBy(row.original.created_by ?? null),
-        },
-        {
             accessorKey: "created_at",
             header: ({ column }) => <SortableHeader column={column} label="Created at" />,
             cell: ({ row }) => formatDateTime(row.original.created_at ?? null),
@@ -106,14 +100,24 @@ export function createColumns(
             header: "",
             enableSorting: false,
             cell: ({ row }) => (
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onEdit(row.original)}
-                    aria-label="Edit competitor"
-                >
-                    <Pencil className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onView(row.original)}
+                        aria-label="View competitor"
+                    >
+                        <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEdit(row.original)}
+                        aria-label="Edit competitor"
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </Button>
+                </div>
             ),
         },
     ];

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Loader2 } from "lucide-react";
+import { Building2, Globe, Loader2, MapPin, Save, X } from "lucide-react";
 
 import {
     Dialog,
@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollableSearchableSelect } from "./ScrollableSearchableSelect";
+import { Separator } from "@/components/ui/separator";
 
 import type { Competitor, CompetitorFormData, PsgcItem } from "../types";
 import { usePsgc } from "../hooks/usePsgc";
@@ -166,116 +167,167 @@ export function CompetitorDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>
-                        {isEdit ? "Edit Competitor" : "Add Competitor"}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {isEdit
-                            ? "Update the competitor details below."
-                            : "Fill in the information to add a new competitor."}
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className="sm:max-w-155 overflow-hidden p-0 rounded-2xl border-2 shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="bg-linear-to-r from-primary/10 via-background to-primary/5 p-6 pb-4">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="p-2.5 bg-primary/10 rounded-xl">
+                                <Building2 className="h-6 w-6 text-primary stroke-[2.5px]" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-2xl font-bold tracking-tight">
+                                    {isEdit ? "Edit Competitor Details" : "Add Competitor"}
+                                </DialogTitle>
+                                <DialogDescription className="text-sm font-medium opacity-70">
+                                    {isEdit
+                                        ? "Modify the competitor profile information."
+                                        : "Provide the details for a new competitor."}
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+                </div>
+
+                <Separator className="bg-primary/10" />
 
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            rules={{ required: "Name is required" }}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Name</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Competitor name" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                    <form onSubmit={form.handleSubmit(handleSubmit)} className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="name"
+                                rules={{ required: "Name is required" }}
+                                render={({ field }) => (
+                                    <FormItem className="space-y-2">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Building2 className="h-4 w-4 text-primary" />
+                                            <FormLabel className="font-bold text-sm">
+                                                Competitor Name <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                        </div>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="Competitor name"
+                                                className="h-11 rounded-xl border-2 bg-background/50 focus:bg-background transition-all"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage className="text-xs font-bold" />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <FormField
-                            control={form.control}
-                            name="website"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Website</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="https://example.com" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                            <FormField
+                                control={form.control}
+                                name="website"
+                                render={({ field }) => (
+                                    <FormItem className="space-y-2">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Globe className="h-4 w-4 text-primary" />
+                                            <FormLabel className="font-bold text-sm">Website</FormLabel>
+                                        </div>
+                                        <FormControl>
+                                            <Input
+                                                placeholder="https://example.com"
+                                                className="h-11 rounded-xl border-2 bg-background/50 focus:bg-background transition-all"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage className="text-xs font-bold" />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
-                        <FormField
-                            control={form.control}
-                            name="provinceCode"
-                            rules={{ required: "Province is required" }}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Province</FormLabel>
-                                    <FormControl>
-                                        <ScrollableSearchableSelect
-                                            options={provinceOptions}
-                                            value={field.value}
-                                            onValueChange={(value) => {
-                                                field.onChange(value);
-                                                form.setValue("cityCode", "");
-                                                form.setValue("barangayCode", "");
-                                            }}
-                                            placeholder={
-                                                isLoadingProvinces
-                                                    ? "Loading provinces..."
-                                                    : "Select province"
-                                            }
-                                            disabled={isLoadingProvinces}
-                                        />
-                                    </FormControl>
-                                    <FormDescription>Source: PSGC (GitLab)</FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField
+                                control={form.control}
+                                name="provinceCode"
+                                rules={{ required: "Province is required" }}
+                                render={({ field }) => (
+                                    <FormItem className="space-y-2">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <MapPin className="h-4 w-4 text-primary" />
+                                            <FormLabel className="font-bold text-sm">
+                                                Province <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                        </div>
+                                        <FormControl>
+                                            <ScrollableSearchableSelect
+                                                options={provinceOptions}
+                                                value={field.value}
+                                                onValueChange={(value) => {
+                                                    field.onChange(value);
+                                                    form.setValue("cityCode", "");
+                                                    form.setValue("barangayCode", "");
+                                                }}
+                                                placeholder={
+                                                    isLoadingProvinces
+                                                        ? "Loading provinces..."
+                                                        : "Select province"
+                                                }
+                                                disabled={isLoadingProvinces}
+                                                className="h-11 rounded-xl border-2 bg-background/50 focus:bg-background transition-all"
+                                            />
+                                        </FormControl>
+                                        <FormMessage className="text-xs font-bold" />
+                                    </FormItem>
+                                )}
+                            />
 
-                        <FormField
-                            control={form.control}
-                            name="cityCode"
-                            rules={{ required: "City is required" }}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>City</FormLabel>
-                                    <FormControl>
-                                        <ScrollableSearchableSelect
-                                            options={cityOptions}
-                                            value={field.value}
-                                            onValueChange={(value) => {
-                                                field.onChange(value);
-                                                form.setValue("barangayCode", "");
-                                            }}
-                                            placeholder={
-                                                isLoadingCities
-                                                    ? "Loading cities..."
-                                                    : provinceCode
-                                                        ? "Select city"
-                                                        : "Select province first"
-                                            }
-                                            disabled={!provinceCode || isLoadingCities}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                            <FormField
+                                control={form.control}
+                                name="cityCode"
+                                rules={{ required: "City is required" }}
+                                render={({ field }) => (
+                                    <FormItem className="space-y-2">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <MapPin className="h-4 w-4 text-primary" />
+                                            <FormLabel className="font-bold text-sm">
+                                                City <span className="text-destructive">*</span>
+                                            </FormLabel>
+                                        </div>
+                                        <FormControl>
+                                            <ScrollableSearchableSelect
+                                                options={cityOptions}
+                                                value={field.value}
+                                                onValueChange={(value) => {
+                                                    field.onChange(value);
+                                                    form.setValue("barangayCode", "");
+                                                }}
+                                                placeholder={
+                                                    isLoadingCities
+                                                        ? "Loading cities..."
+                                                        : provinceCode
+                                                            ? "Select city"
+                                                            : "Select province first"
+                                                }
+                                                disabled={!provinceCode || isLoadingCities}
+                                                className="h-11 rounded-xl border-2 bg-background/50 focus:bg-background transition-all"
+                                            />
+                                        </FormControl>
+                                        <FormMessage className="text-xs font-bold" />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        <FormDescription className="text-xs font-medium text-muted-foreground">
+                            Source: PSGC (GitLab)
+                        </FormDescription>
 
                         <FormField
                             control={form.control}
                             name="barangayCode"
                             rules={{ required: "Barangay is required" }}
                             render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Barangay</FormLabel>
+                                <FormItem className="space-y-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <MapPin className="h-4 w-4 text-primary" />
+                                        <FormLabel className="font-bold text-sm">
+                                            Barangay <span className="text-destructive">*</span>
+                                        </FormLabel>
+                                    </div>
                                     <FormControl>
                                         <ScrollableSearchableSelect
                                             options={barangayOptions}
@@ -289,26 +341,41 @@ export function CompetitorDialog({
                                                         : "Select city first"
                                             }
                                             disabled={!cityCode || isLoadingBarangays}
+                                            className="h-11 rounded-xl border-2 bg-background/50 focus:bg-background transition-all"
                                         />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage className="text-xs font-bold" />
                                 </FormItem>
                             )}
                         />
 
-                        <DialogFooter>
+                        <DialogFooter className="pt-2 gap-3 pb-2">
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="ghost"
                                 onClick={() => onOpenChange(false)}
+                                disabled={isSubmitting}
+                                className="font-bold text-muted-foreground hover:bg-muted rounded-xl px-6 h-11"
                             >
+                                <X className="mr-2 h-4 w-4" />
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 px-8 rounded-xl font-bold shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        {isEdit ? "Update Competitor" : "Create Competitor"}
+                                    </>
                                 )}
-                                {isEdit ? "Update" : "Create"} Competitor
                             </Button>
                         </DialogFooter>
                     </form>

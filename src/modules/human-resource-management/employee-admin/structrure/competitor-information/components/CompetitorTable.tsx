@@ -29,6 +29,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+    Calendar as CalendarIcon,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -39,7 +40,7 @@ import {
     X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { ScrollableSearchableSelect } from "./ScrollableSearchableSelect";
 import {
     Select,
     SelectContent,
@@ -47,10 +48,16 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 import type { Competitor, CompetitorFormData } from "../types";
 import { createColumns } from "./columns";
 import { CompetitorDialog } from "./CompetitorDialog";
+import { CompetitorViewDialog } from "./CompetitorViewDialog";
+import { parseLocalDate } from "../utils/formatters";
 
 interface CompetitorTableProps {
     data: Competitor[];
@@ -91,20 +98,32 @@ export function CompetitorTable({
 
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
     const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+    const [viewDialogOpen, setViewDialogOpen] = React.useState(false);
     const [selectedCompetitor, setSelectedCompetitor] = React.useState<Competitor | null>(null);
+    const [viewedCompetitor, setViewedCompetitor] = React.useState<Competitor | null>(null);
 
     const [search, setSearch] = React.useState("");
     const [nameFilter, setNameFilter] = React.useState("");
     const [provinceFilter, setProvinceFilter] = React.useState("");
     const [cityFilter, setCityFilter] = React.useState("");
     const [barangayFilter, setBarangayFilter] = React.useState("");
+    const [dateFrom, setDateFrom] = React.useState<Date | undefined>(undefined);
+    const [dateTo, setDateTo] = React.useState<Date | undefined>(undefined);
 
     const handleEdit = React.useCallback((competitor: Competitor) => {
         setSelectedCompetitor(competitor);
         setEditDialogOpen(true);
     }, []);
 
-    const columns = React.useMemo(() => createColumns(handleEdit), [handleEdit]);
+    const handleView = React.useCallback((competitor: Competitor) => {
+        setViewedCompetitor(competitor);
+        setViewDialogOpen(true);
+    }, []);
+
+    const columns = React.useMemo(
+        () => createColumns(handleEdit, handleView),
+        [handleEdit, handleView]
+    );
 
     const nameOptions = React.useMemo(
         () => buildOptions(data.map((item) => item.name), "All Names"),
@@ -149,11 +168,43 @@ export function CompetitorTable({
         if (cityFilter) result = result.filter((item) => item.city === cityFilter);
         if (barangayFilter) result = result.filter((item) => item.barangay === barangayFilter);
 
+        if (dateFrom || dateTo) {
+            const from = dateFrom ? new Date(dateFrom) : null;
+            const to = dateTo ? new Date(dateTo) : null;
+
+            if (from) from.setHours(0, 0, 0, 0);
+            if (to) to.setHours(23, 59, 59, 999);
+
+            result = result.filter((item) => {
+                if (!item.created_at) return false;
+                const created = parseLocalDate(item.created_at);
+                if (Number.isNaN(created.getTime())) return false;
+                if (from && created < from) return false;
+                if (to && created > to) return false;
+                return true;
+            });
+        }
+
         return result;
-    }, [data, search, nameFilter, provinceFilter, cityFilter, barangayFilter]);
+    }, [
+        data,
+        search,
+        nameFilter,
+        provinceFilter,
+        cityFilter,
+        barangayFilter,
+        dateFrom,
+        dateTo,
+    ]);
 
     const hasActiveFilters =
-        search || nameFilter || provinceFilter || cityFilter || barangayFilter;
+        search ||
+        nameFilter ||
+        provinceFilter ||
+        cityFilter ||
+        barangayFilter ||
+        dateFrom ||
+        dateTo;
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
@@ -208,7 +259,7 @@ export function CompetitorTable({
                             </div>
                         </div>
 
-                        <SearchableSelect
+                        <ScrollableSearchableSelect
                             options={nameOptions}
                             value={nameFilter}
                             onValueChange={(val) => setNameFilter(val)}
@@ -216,7 +267,7 @@ export function CompetitorTable({
                             className="h-10 w-56 justify-between"
                         />
 
-                        <SearchableSelect
+                        <ScrollableSearchableSelect
                             options={provinceOptions}
                             value={provinceFilter}
                             onValueChange={(val) => {
@@ -228,7 +279,7 @@ export function CompetitorTable({
                             className="h-10 w-56 justify-between"
                         />
 
-                        <SearchableSelect
+                        <ScrollableSearchableSelect
                             options={cityOptions}
                             value={cityFilter}
                             onValueChange={(val) => {
@@ -239,7 +290,7 @@ export function CompetitorTable({
                             className="h-10 w-56 justify-between"
                         />
 
-                        <SearchableSelect
+                        <ScrollableSearchableSelect
                             options={barangayOptions}
                             value={barangayFilter}
                             onValueChange={(val) => setBarangayFilter(val)}
@@ -256,6 +307,8 @@ export function CompetitorTable({
                                     setProvinceFilter("");
                                     setCityFilter("");
                                     setBarangayFilter("");
+                                    setDateFrom(undefined);
+                                    setDateTo(undefined);
                                 }}
                                 className="h-10 px-3"
                             >
@@ -263,35 +316,83 @@ export function CompetitorTable({
                                 <X className="ml-2 h-4 w-4" />
                             </Button>
                         )}
-
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="ml-auto">
-                                    Columns <ChevronDown className="ml-2 h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                {table
-                                    .getAllColumns()
-                                    .filter((column) => column.getCanHide())
-                                    .map((column) => (
-                                        <DropdownMenuCheckboxItem
-                                            key={column.id}
-                                            className="capitalize"
-                                            checked={column.getIsVisible()}
-                                            onCheckedChange={(value) =>
-                                                column.toggleVisibility(!!value)
-                                            }
-                                        >
-                                            {column.id}
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
                     </div>
                 </CardContent>
             </Card>
 
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                className={cn(
+                                    "h-10 w-40 justify-start text-left font-normal",
+                                    !dateFrom && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {dateFrom ? format(dateFrom, "MMM dd, yyyy") : "From date"}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={dateFrom}
+                                onSelect={(date) => setDateFrom(date ?? undefined)}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                className={cn(
+                                    "h-10 w-40 justify-start text-left font-normal",
+                                    !dateTo && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {dateTo ? format(dateTo, "MMM dd, yyyy") : "To date"}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={dateTo}
+                                onSelect={(date) => setDateTo(date ?? undefined)}
+                                initialFocus
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="ml-auto">
+                            Columns <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        {table
+                            .getAllColumns()
+                            .filter((column) => column.getCanHide())
+                            .map((column) => (
+                                <DropdownMenuCheckboxItem
+                                    key={column.id}
+                                    className="capitalize"
+                                    checked={column.getIsVisible()}
+                                    onCheckedChange={(value) =>
+                                        column.toggleVisibility(!!value)
+                                    }
+                                >
+                                    {column.id}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
             <div className="rounded-md border shadow-sm">
                 <Table>
                     <TableHeader>
@@ -423,6 +524,12 @@ export function CompetitorTable({
                         await onUpdateCompetitor(selectedCompetitor.id, data);
                     }
                 }}
+            />
+
+            <CompetitorViewDialog
+                open={viewDialogOpen}
+                onOpenChange={setViewDialogOpen}
+                competitor={viewedCompetitor}
             />
         </div>
     );

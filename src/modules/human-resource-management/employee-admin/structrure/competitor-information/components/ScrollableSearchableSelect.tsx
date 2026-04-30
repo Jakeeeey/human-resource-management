@@ -81,11 +81,13 @@ export function ScrollableSearchableSelect({
                                     >
                                         <Check
                                             className={cn(
-                                                "mr-2 h-4 w-4",
+                                                "mr-2 h-4 w-4 shrink-0",
                                                 value === opt.value ? "opacity-100" : "opacity-0"
                                             )}
                                         />
-                                        {opt.label}
+                                        <span className="min-w-0 flex-1 whitespace-normal wrap-break-word">
+                                            {opt.label}
+                                        </span>
                                     </CommandItem>
                                 ))}
                             </CommandGroup>
