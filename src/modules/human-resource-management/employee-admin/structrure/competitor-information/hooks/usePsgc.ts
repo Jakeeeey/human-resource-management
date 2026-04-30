@@ -21,15 +21,13 @@ export function usePsgc(provinceCode?: string, cityCode?: string): UsePsgcReturn
     const [provinces, setProvinces] = useState<PsgcItem[]>([]);
     const [cities, setCities] = useState<PsgcItem[]>([]);
     const [barangays, setBarangays] = useState<PsgcItem[]>([]);
+    const [citiesForProvince, setCitiesForProvince] = useState<string | null>(null);
+    const [barangaysForCity, setBarangaysForCity] = useState<string | null>(null);
 
     const [isLoadingProvinces, setIsLoadingProvinces] = useState(true);
-    const [isLoadingCities, setIsLoadingCities] = useState(false);
-    const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
 
     useEffect(() => {
         let active = true;
-        setIsLoadingProvinces(true);
-
         fetchPsgcProvinces()
             .then((data) => {
                 if (active) setProvinces(data);
@@ -46,21 +44,18 @@ export function usePsgc(provinceCode?: string, cityCode?: string): UsePsgcReturn
     useEffect(() => {
         let active = true;
         if (!provinceCode) {
-            setCities([]);
-            setBarangays([]);
             return;
         }
 
-        setIsLoadingCities(true);
-        setCities([]);
-        setBarangays([]);
-
         fetchPsgcCitiesByProvince(provinceCode)
             .then((data) => {
-                if (active) setCities(data);
+                if (active) {
+                    setCities(data);
+                    setCitiesForProvince(provinceCode);
+                }
             })
-            .finally(() => {
-                if (active) setIsLoadingCities(false);
+            .catch(() => {
+                if (active) setCitiesForProvince(provinceCode);
             });
 
         return () => {
@@ -71,19 +66,18 @@ export function usePsgc(provinceCode?: string, cityCode?: string): UsePsgcReturn
     useEffect(() => {
         let active = true;
         if (!cityCode) {
-            setBarangays([]);
             return;
         }
 
-        setIsLoadingBarangays(true);
-        setBarangays([]);
-
         fetchPsgcBarangaysByCity(cityCode)
             .then((data) => {
-                if (active) setBarangays(data);
+                if (active) {
+                    setBarangays(data);
+                    setBarangaysForCity(cityCode);
+                }
             })
-            .finally(() => {
-                if (active) setIsLoadingBarangays(false);
+            .catch(() => {
+                if (active) setBarangaysForCity(cityCode);
             });
 
         return () => {
@@ -91,12 +85,19 @@ export function usePsgc(provinceCode?: string, cityCode?: string): UsePsgcReturn
         };
     }, [cityCode]);
 
+    const visibleCities =
+        provinceCode && citiesForProvince === provinceCode ? cities : [];
+    const visibleBarangays =
+        cityCode && barangaysForCity === cityCode ? barangays : [];
+    const loadingCities = !!provinceCode && citiesForProvince !== provinceCode;
+    const loadingBarangays = !!cityCode && barangaysForCity !== cityCode;
+
     return {
         provinces,
-        cities,
-        barangays,
+        cities: visibleCities,
+        barangays: visibleBarangays,
         isLoadingProvinces,
-        isLoadingCities,
-        isLoadingBarangays,
+        isLoadingCities: provinceCode ? loadingCities : false,
+        isLoadingBarangays: cityCode ? loadingBarangays : false,
     };
 }

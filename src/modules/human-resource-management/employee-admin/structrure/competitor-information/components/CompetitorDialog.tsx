@@ -312,10 +312,6 @@ export function CompetitorDialog({
                             />
                         </div>
 
-                        <FormDescription className="text-xs font-medium text-muted-foreground">
-                            Source: PSGC (GitLab)
-                        </FormDescription>
-
                         <FormField
                             control={form.control}
                             name="barangayCode"

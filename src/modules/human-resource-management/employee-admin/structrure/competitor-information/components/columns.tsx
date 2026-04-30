@@ -5,7 +5,7 @@ import { ArrowUpDown, Eye, ExternalLink, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Competitor } from "../types";
-import { formatCreatedBy, formatDateTime, toWebsiteHref } from "../utils/formatters";
+import { formatDateTime, toWebsiteHref } from "../utils/formatters";
 
 function renderSortIcon(direction: false | "asc" | "desc") {
     const iconClass = direction ? "opacity-100" : "opacity-70";
