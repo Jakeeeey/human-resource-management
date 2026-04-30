@@ -1,11 +1,38 @@
 "use client";
 
-import type { ColumnDef } from "@tanstack/react-table";
-import { ExternalLink, Pencil } from "lucide-react";
+import type { Column, ColumnDef } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ArrowUpDown, ExternalLink, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { Competitor } from "../types";
 import { formatCreatedBy, formatDateTime, toWebsiteHref } from "../utils/formatters";
+
+function renderSortIcon(direction: false | "asc" | "desc") {
+    if (direction === "asc") return <ArrowUp className="ml-2 h-3.5 w-3.5" />;
+    if (direction === "desc") return <ArrowDown className="ml-2 h-3.5 w-3.5" />;
+    return <ArrowUpDown className="ml-2 h-3.5 w-3.5" />;
+}
+
+function SortableHeader({
+    column,
+    label,
+}: {
+    column: Column<Competitor, unknown>;
+    label: string;
+}) {
+    const direction = column.getIsSorted();
+    return (
+        <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2 h-8 px-2"
+            onClick={() => column.toggleSorting(direction === "asc")}
+        >
+            {label}
+            {renderSortIcon(direction)}
+        </Button>
+    );
+}
 
 export function createColumns(
     onEdit: (competitor: Competitor) => void
@@ -13,12 +40,13 @@ export function createColumns(
     return [
         {
             id: "no",
-            header: "No.",
+            accessorKey: "id",
+            header: ({ column }) => <SortableHeader column={column} label="No." />,
             cell: ({ row }) => row.index + 1,
         },
         {
             accessorKey: "name",
-            header: "Name",
+            header: ({ column }) => <SortableHeader column={column} label="Name" />,
             cell: ({ row }) => {
                 const name = row.original.name || "N/A";
                 if (name.length <= 25) return name;
@@ -49,27 +77,28 @@ export function createColumns(
         },
         {
             accessorKey: "province",
-            header: "Province",
+            header: ({ column }) => <SortableHeader column={column} label="Province" />,
             cell: ({ row }) => row.original.province || "N/A",
         },
         {
             accessorKey: "city",
-            header: "City",
+            header: ({ column }) => <SortableHeader column={column} label="City" />,
             cell: ({ row }) => row.original.city || "N/A",
         },
         {
             accessorKey: "barangay",
-            header: "Barangay",
+            header: ({ column }) => <SortableHeader column={column} label="Barangay" />,
             cell: ({ row }) => row.original.barangay || "N/A",
         },
         {
-            accessorKey: "created_by",
-            header: "Created by",
+            id: "created_by",
+            accessorFn: (row) => formatCreatedBy(row.created_by ?? null),
+            header: ({ column }) => <SortableHeader column={column} label="Created by" />,
             cell: ({ row }) => formatCreatedBy(row.original.created_by ?? null),
         },
         {
             accessorKey: "created_at",
-            header: "Created at",
+            header: ({ column }) => <SortableHeader column={column} label="Created at" />,
             cell: ({ row }) => formatDateTime(row.original.created_at ?? null),
         },
         {
