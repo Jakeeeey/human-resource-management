@@ -21,13 +21,16 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 import type { Competitor, CompetitorFormData } from "../types";
 import { createColumns } from "./columns";
@@ -38,6 +41,26 @@ interface CompetitorTableProps {
     isLoading?: boolean;
     onCreateCompetitor: (data: CompetitorFormData) => Promise<void>;
     onUpdateCompetitor: (id: number, data: CompetitorFormData) => Promise<void>;
+}
+
+function normalizeOption(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+}
+
+function buildOptions(values: Array<string | null | undefined>, allLabel: string) {
+    const unique = new Set<string>();
+    values.forEach((value) => {
+        const normalized = normalizeOption(value);
+        if (normalized) unique.add(normalized);
+    });
+    return [
+        { value: "", label: allLabel },
+        ...Array.from(unique)
+            .sort((a, b) => a.localeCompare(b))
+            .map((val) => ({ value: val, label: val })),
+    ];
 }
 
 export function CompetitorTable({
@@ -54,6 +77,12 @@ export function CompetitorTable({
     const [editDialogOpen, setEditDialogOpen] = React.useState(false);
     const [selectedCompetitor, setSelectedCompetitor] = React.useState<Competitor | null>(null);
 
+    const [search, setSearch] = React.useState("");
+    const [nameFilter, setNameFilter] = React.useState("");
+    const [provinceFilter, setProvinceFilter] = React.useState("");
+    const [cityFilter, setCityFilter] = React.useState("");
+    const [barangayFilter, setBarangayFilter] = React.useState("");
+
     const handleEdit = React.useCallback((competitor: Competitor) => {
         setSelectedCompetitor(competitor);
         setEditDialogOpen(true);
@@ -61,9 +90,58 @@ export function CompetitorTable({
 
     const columns = React.useMemo(() => createColumns(handleEdit), [handleEdit]);
 
+    const nameOptions = React.useMemo(
+        () => buildOptions(data.map((item) => item.name), "All Names"),
+        [data]
+    );
+
+    const provinceOptions = React.useMemo(
+        () => buildOptions(data.map((item) => item.province), "All Provinces"),
+        [data]
+    );
+
+    const cityOptions = React.useMemo(() => {
+        const base = provinceFilter
+            ? data.filter((item) => item.province === provinceFilter)
+            : data;
+        return buildOptions(base.map((item) => item.city), "All Cities");
+    }, [data, provinceFilter]);
+
+    const barangayOptions = React.useMemo(() => {
+        const base = data.filter(
+            (item) =>
+                (!provinceFilter || item.province === provinceFilter) &&
+                (!cityFilter || item.city === cityFilter)
+        );
+        return buildOptions(base.map((item) => item.barangay), "All Barangays");
+    }, [data, provinceFilter, cityFilter]);
+
+    const filteredData = React.useMemo(() => {
+        let result = data;
+
+        if (search) {
+            const s = search.toLowerCase();
+            result = result.filter((item) =>
+                [item.name, item.website, item.province, item.city, item.barangay]
+                    .filter(Boolean)
+                    .some((value) => String(value).toLowerCase().includes(s))
+            );
+        }
+
+        if (nameFilter) result = result.filter((item) => item.name === nameFilter);
+        if (provinceFilter) result = result.filter((item) => item.province === provinceFilter);
+        if (cityFilter) result = result.filter((item) => item.city === cityFilter);
+        if (barangayFilter) result = result.filter((item) => item.barangay === barangayFilter);
+
+        return result;
+    }, [data, search, nameFilter, provinceFilter, cityFilter, barangayFilter]);
+
+    const hasActiveFilters =
+        search || nameFilter || provinceFilter || cityFilter || barangayFilter;
+
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
-        data,
+        data: filteredData,
         columns,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
@@ -102,6 +180,80 @@ export function CompetitorTable({
                 </Button>
             </div>
 
+            <Card className="border shadow-sm">
+                <CardContent className="pt-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex-1 min-w-50">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search competitors..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8"
+                                />
+                            </div>
+                        </div>
+
+                        <SearchableSelect
+                            options={nameOptions}
+                            value={nameFilter}
+                            onValueChange={(val) => setNameFilter(val)}
+                            placeholder="Filter by name"
+                            className="h-10 w-56 justify-between"
+                        />
+
+                        <SearchableSelect
+                            options={provinceOptions}
+                            value={provinceFilter}
+                            onValueChange={(val) => {
+                                setProvinceFilter(val);
+                                setCityFilter("");
+                                setBarangayFilter("");
+                            }}
+                            placeholder="Filter by province"
+                            className="h-10 w-56 justify-between"
+                        />
+
+                        <SearchableSelect
+                            options={cityOptions}
+                            value={cityFilter}
+                            onValueChange={(val) => {
+                                setCityFilter(val);
+                                setBarangayFilter("");
+                            }}
+                            placeholder="Filter by city"
+                            className="h-10 w-56 justify-between"
+                        />
+
+                        <SearchableSelect
+                            options={barangayOptions}
+                            value={barangayFilter}
+                            onValueChange={(val) => setBarangayFilter(val)}
+                            placeholder="Filter by barangay"
+                            className="h-10 w-56 justify-between"
+                        />
+
+                        {hasActiveFilters && (
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    setSearch("");
+                                    setNameFilter("");
+                                    setProvinceFilter("");
+                                    setCityFilter("");
+                                    setBarangayFilter("");
+                                }}
+                                className="h-10 px-3"
+                            >
+                                Reset
+                                <X className="ml-2 h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
                     Showing {table.getRowModel().rows.length} record(s)
@@ -130,7 +282,7 @@ export function CompetitorTable({
                 </DropdownMenu>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-md border shadow-sm">
                 <Table>
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
