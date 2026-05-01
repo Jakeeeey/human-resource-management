@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { ApprovalLogEntry, LeaveRequest, OvertimeRequest, UndertimeRequest } from "../types";
+import { ApprovalLogEntry, LeaveRequest, OvertimeRequest, UndertimeRequest, UserDetails } from "../types";
 import {
   CheckCircle2,
   XCircle,
@@ -126,11 +126,26 @@ function LogRow({ entry }: { entry: ApprovalLogEntry }) {
           <span className={cn("text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 rounded", typeColor)}>
             {typeLabel}
           </span>
-          {entry.approver_id && (
-            <span className="text-[10px] font-medium text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded ml-1">
-              by {entry.approver_id.user_fname} {entry.approver_id.user_lname}
+          
+          {/* Explicit Approver Name */}
+          <span className="text-[10px] font-bold text-foreground/80 lowercase italic flex items-center gap-1 ml-1">
+            by{" "}
+            <span className="not-italic font-black text-foreground uppercase tracking-tight">
+              {entry.approver_id && typeof entry.approver_id === 'object' 
+                ? (
+                   ((entry.approver_id as UserDetails).user_fname || 
+                    (entry.approver_id as Record<string, string>).first_name || 
+                    (entry.approver_id as Record<string, string>).fname || 
+                    "Unknown") + " " + 
+                   ((entry.approver_id as UserDetails).user_lname || 
+                    (entry.approver_id as Record<string, string>).last_name || 
+                    (entry.approver_id as Record<string, string>).lname || 
+                    "")
+                  )
+                : (typeof entry.approver_id === 'number' ? `Approver #${entry.approver_id}` : "System")}
             </span>
-          )}
+          </span>
+
           <span className="text-[10px] text-muted-foreground ml-auto whitespace-nowrap hidden sm:block">
             {formatRelativeTime(entry.created_at)}
           </span>
@@ -141,7 +156,7 @@ function LogRow({ entry }: { entry: ApprovalLogEntry }) {
         </p>
 
         {entry.remarks && (
-          <p className="text-xs text-muted-foreground italic bg-muted/50 px-2 py-1.5 rounded-md border border-muted/20 line-clamp-2">
+          <p className="text-xs text-muted-foreground italic bg-muted/50 px-2 py-1.5 rounded-md border border-muted/20 line-clamp-2 break-words">
             &quot;{entry.remarks}&quot;
           </p>
         )}
@@ -161,10 +176,12 @@ function LogRow({ entry }: { entry: ApprovalLogEntry }) {
 function EmployeeGroupRow({
   name,
   position,
+  department,
   logs,
 }: {
   name: string;
   position: string;
+  department: string;
   logs: ApprovalLogEntry[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -181,7 +198,9 @@ function EmployeeGroupRow({
 
         <div className="flex-1 min-w-0">
           <div className="font-bold text-sm text-foreground truncate">{name}</div>
-          <div className="text-[11px] text-muted-foreground font-medium truncate uppercase tracking-wider mt-0.5">{position}</div>
+          <div className="text-[10px] text-muted-foreground font-semibold truncate uppercase tracking-tight mt-0.5">
+            {position} {department && <span className="opacity-40 ml-1.5 border-l border-muted-foreground/30 pl-1.5 font-medium lowercase tracking-normal">{department}</span>}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 shrink-0">
@@ -240,18 +259,20 @@ export function ApprovalHistoryLog({ logs, isLoading, onRefresh }: ApprovalHisto
 
   // Group by employee
   const employeeGroups = useMemo(() => {
-    const map = new Map<number | string, { name: string; position: string; logs: ApprovalLogEntry[] }>();
+    const map = new Map<number | string, { name: string; position: string; department: string; logs: ApprovalLogEntry[] }>();
 
     for (const log of filtered) {
       let uid: string | number = `req-${log.request_id}`;
       let name = `Unknown User (Req #${log.request_id})`;
       let position = "Employee";
+      let department = "";
 
       if (log.requester) {
         if (typeof log.requester === "object") {
           uid = log.requester.user_id;
           name = `${log.requester.user_fname} ${log.requester.user_lname}`.trim();
           position = log.requester.user_position ?? "Employee";
+          department = log.requester.user_department?.department_name ?? "";
         } else if (typeof log.requester === "number") {
           uid = log.requester;
           name = `Unknown User #${log.requester}`;
@@ -259,7 +280,7 @@ export function ApprovalHistoryLog({ logs, isLoading, onRefresh }: ApprovalHisto
       }
 
       if (!map.has(uid)) {
-        map.set(uid, { name, position, logs: [] });
+        map.set(uid, { name, position, department, logs: [] });
       }
       map.get(uid)!.logs.push(log);
     }
@@ -348,6 +369,7 @@ export function ApprovalHistoryLog({ logs, isLoading, onRefresh }: ApprovalHisto
               key={group.id}
               name={group.name}
               position={group.position}
+              department={group.department}
               logs={group.logs}
             />
           ))}

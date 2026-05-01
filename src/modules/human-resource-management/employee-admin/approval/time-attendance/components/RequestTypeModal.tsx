@@ -77,6 +77,12 @@ function getUserPosition(item: AnyTARequest): string {
   return (typeof u !== "number" && u?.user_position) ? u.user_position : "Employee";
 }
 
+function getUserDepartment(item: AnyTARequest): string {
+  if ("department_name" in item && item.department_name) return item.department_name as string;
+  const u = item.user_id;
+  return (typeof u !== "number" && u?.user_department?.department_name) ? u.user_department.department_name : "";
+}
+
 function getRequestId(item: AnyTARequest): number {
   if ("leave_id" in item) return item.leave_id;
   if ("overtime_id" in item) return item.overtime_id;
@@ -251,14 +257,16 @@ function ActionButtons({
         >
           <CheckCircle2 className="h-3.5 w-3.5" /> Approve
         </button>
-        <button
-          onClick={() => handleTrigger("return")}
-          disabled={isActing}
-          title="Return"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-40"
-        >
-          <RotateCcw className="h-3.5 w-3.5" /> Return
-        </button>
+        {currentLevel !== undefined && currentLevel > 1 && (
+          <button
+            onClick={() => handleTrigger("return")}
+            disabled={isActing}
+            title="Return"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors disabled:opacity-40"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Return
+          </button>
+        )}
         <button
           onClick={() => handleTrigger("reject")}
           disabled={isActing}
@@ -320,7 +328,7 @@ function EmployeeRequestsDrawer({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   type: RequestType;
-  employee: { name: string; position: string };
+  employee: { name: string; position: string; department?: string };
   requests: AnyTARequest[];
   onAction: (payload: TAActionPayload) => Promise<boolean | void>;
   isActing: boolean;
@@ -478,8 +486,11 @@ function EmployeeRequestsDrawer({
                 <SheetTitle className="text-xl font-black text-white tracking-tight">
                   {employee.name}
                 </SheetTitle>
-                <SheetDescription className="text-white/70 font-semibold text-xs uppercase tracking-widest">
-                  {employee.position} · {cfg.label}
+                <SheetDescription className="text-white/70 font-semibold text-xs uppercase tracking-widest flex flex-col gap-0.5">
+                  <span>{employee.position} · {cfg.label}</span>
+                  {employee.department && (
+                    <span className="text-white/40 text-[10px] font-bold">{employee.department}</span>
+                  )}
                 </SheetDescription>
               </div>
             </div>
@@ -602,14 +613,14 @@ function EmployeeRequestsDrawer({
                       <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Reason/Purpose</div>
                       <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1"><Clock className="h-3 w-3" /> Filed: {formatDate(req.filed_at)}</div>
                     </div>
-                    <p className="text-xs text-foreground font-medium leading-relaxed">
+                    <p className="text-xs text-foreground font-medium leading-relaxed break-words">
                       {("reason" in req && req.reason) || ("purpose" in req && req.purpose) || <span className="italic text-muted-foreground">No reason provided by employee.</span>}
                     </p>
                   </div>
 
                   {/* Remarks */}
                   {req.remarks && (
-                    <p className="text-xs text-muted-foreground italic bg-muted/40 px-3 py-2 rounded-xl mb-4 border border-muted-foreground/10">
+                    <p className="text-xs text-muted-foreground italic bg-muted/40 px-3 py-2 rounded-xl mb-4 border border-muted-foreground/10 break-words">
                       {req.remarks}
                     </p>
                   )}
@@ -759,16 +770,17 @@ export function RequestTypeModal({
 
   // Group requests by user_id
   const employeeGroups = useMemo(() => {
-    const map = new Map<number, { name: string; position: string; requests: AnyTARequest[] }>();
+    const map = new Map<number, { name: string; position: string; department: string; requests: AnyTARequest[] }>();
 
     for (const req of requests) {
       const u = req.user_id;
       const uid: number = typeof u === "number" ? u : u?.user_id ?? 0;
       const name = getUserName(req);
       const position = getUserPosition(req);
+      const department = getUserDepartment(req);
 
       if (!map.has(uid)) {
-        map.set(uid, { name, position, requests: [] });
+        map.set(uid, { name, position, department, requests: [] });
       }
       map.get(uid)!.requests.push(req);
     }
@@ -847,7 +859,9 @@ export function RequestTypeModal({
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-foreground truncate">{emp.name}</div>
-                        <div className="text-xs text-muted-foreground font-medium truncate">{emp.position}</div>
+                        <div className="text-[10px] text-muted-foreground font-semibold truncate uppercase tracking-tight">
+                          {emp.position} {emp.department && <span className="opacity-40 ml-1.5 border-l border-muted-foreground/30 pl-1.5 font-medium lowercase tracking-normal">{emp.department}</span>}
+                        </div>
                       </div>
 
                       {/* Stats */}
