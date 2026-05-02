@@ -1,6 +1,6 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from "next/server"
-import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils"
+import { decodeJwtPayload, COOKIE_NAME, LAST_VISITED_PATH_COOKIE } from "@/lib/auth-utils"
 
 const PUBLIC_FILE = /\.(.*)$/
 const BASELINE_PREFIXES = ["/main-dashboard"]
@@ -84,11 +84,32 @@ export async function middleware(req: NextRequest) {
     }
 
     if (
+        pathname === "/" ||
         pathname === "/login" ||
         pathname.startsWith("/api/auth/login") ||
         pathname.startsWith("/api/auth/logout") ||
-        pathname.startsWith("/error/service-down")
+        pathname.startsWith("/api/auth/forgot-password") ||
+        pathname.startsWith("/api/auth/verify-otp") ||
+        pathname.startsWith("/api/auth/resend-otp") ||
+        pathname.startsWith("/api/auth/reset-password") ||
+        pathname.startsWith("/error/service-down") ||
+        pathname.startsWith("/forgot-password") ||
+        pathname.startsWith("/reset-password")
     ) {
+        // If the user is already logged in and tries to go to root / or /login,
+        // take them back to their last visited route automatically (session resume).
+        if (pathname === "/" || pathname === "/login") {
+            const token = req.cookies.get(COOKIE_NAME)?.value;
+            if (token) {
+                const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
+                const target = lastVisited || "/main-dashboard";
+
+                // Avoid infinite redirect loop
+                if (target !== pathname) {
+                    return NextResponse.redirect(new URL(target, req.url));
+                }
+            }
+        }
         return NextResponse.next()
     }
 
@@ -240,7 +261,29 @@ export async function middleware(req: NextRequest) {
         }
     }
 
-    return NextResponse.next();
+    const response = NextResponse.next();
+
+    // --- Persist Last Visited Path ---
+    // Only save GET navigations that are not API, asset, or error routes.
+    // This cookie is used to restore the user's session automatically on re-entry.
+    const isNavigation = req.method === "GET" &&
+                        !pathname.startsWith("/api") &&
+                        !pathname.startsWith("/error") &&
+                        !pathname.startsWith("/_next") &&
+                        pathname !== "/favicon.ico";
+
+    if (token && isNavigation) {
+        response.cookies.set({
+            name: LAST_VISITED_PATH_COOKIE,
+            value: pathname,
+            maxAge: 60 * 60 * 24 * 7, // 7 days, matching the session lifetime
+            path: "/",
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production"
+        });
+    }
+
+    return response;
 }
 
 export const config = {
