@@ -1,15 +1,18 @@
 "use client";
 
 import React from "react";
+import { Briefcase, Clock, FileText, User } from "lucide-react";
 import type { EmploymentStatus } from "../types";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 function pickString(obj: Record<string, unknown>, keys: string[]): string {
     for (const k of keys) {
@@ -101,56 +104,97 @@ export function EmploymentStatusRegistrationViewDialog({
     onOpenChange,
     record,
 }: EmploymentStatusRegistrationViewDialogProps) {
+    const fields = [
+        {
+            label: "Status Name",
+            value: record?.name,
+            icon: Briefcase,
+        },
+        {
+            label: "Description",
+            value: record?.description,
+            icon: FileText,
+            className: "md:col-span-2",
+        },
+        {
+            label: "Created by",
+            value: formatUser(record?.created_by),
+            icon: User,
+        },
+        {
+            label: "Created at",
+            value: formatDateTime(record?.created_at || ""),
+            icon: Clock,
+        },
+        {
+            label: "Updated by",
+            value: formatUser(record?.updated_by),
+            icon: User,
+        },
+        {
+            label: "Updated at",
+            value: formatDateTime(record?.updated_at || ""),
+            icon: Clock,
+        },
+    ];
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-120">
-                <DialogHeader>
-                    <DialogTitle>Employment Status Details</DialogTitle>
-                </DialogHeader>
+            <DialogContent className="sm:max-w-155 overflow-hidden p-0 rounded-2xl border-2 shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="bg-linear-to-r from-primary/10 via-background to-primary/5 p-6 pb-4">
+                    <DialogHeader>
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="p-2.5 bg-primary/10 rounded-xl">
+                                <Briefcase className="h-6 w-6 text-primary stroke-[2.5px]" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-2xl font-bold tracking-tight">
+                                    Employment Status Information
+                                </DialogTitle>
+                                <DialogDescription className="text-sm font-medium opacity-70">
+                                    Full overview of the selected employment status.
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+                </div>
 
-                <div className="space-y-4">
-                    <div>
-                        <div className="text-sm text-muted-foreground">Name</div>
-                        <div className="font-medium">{record?.name || "-"}</div>
-                    </div>
+                <Separator className="bg-primary/10" />
 
-                    <div>
-                        <div className="text-sm text-muted-foreground">Description</div>
-                        <div className="whitespace-pre-wrap text-sm">
-                            {record?.description || "-"}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <div className="text-sm text-muted-foreground">Created By</div>
-                            <div className="text-sm">
-                                {formatUser(record?.created_by)}
-                            </div>
-                        </div>
-                        <div>
-                            <div className="text-sm text-muted-foreground">Created At</div>
-                            <div className="text-sm">
-                                {formatDateTime(record?.created_at || "")}
-                            </div>
-                        </div>
-                        <div>
-                            <div className="text-sm text-muted-foreground">Updated By</div>
-                            <div className="text-sm">
-                                {formatUser(record?.updated_by)}
-                            </div>
-                        </div>
-                        <div>
-                            <div className="text-sm text-muted-foreground">Updated At</div>
-                            <div className="text-sm">
-                                {formatDateTime(record?.updated_at || "")}
-                            </div>
-                        </div>
+                <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {fields.map((field) => {
+                            const Icon = field.icon;
+                            const hasValue =
+                                field.value !== null &&
+                                field.value !== undefined &&
+                                field.value !== "";
+                            return (
+                                <div
+                                    key={field.label}
+                                    className={`space-y-2 ${field.className ?? ""}`}
+                                >
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Icon className="h-4 w-4 text-primary" />
+                                        <p className="font-bold text-sm">{field.label}</p>
+                                    </div>
+                                    <div className="min-h-11 rounded-xl border-2 bg-muted/30 px-3 py-2 text-sm font-semibold">
+                                        <span className="min-w-0 wrap-break-word">
+                                            {hasValue ? field.value : "N/A"}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
-                <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                <DialogFooter className="px-6 pb-6">
+                    <Button
+                        type="button"
+                        onClick={() => onOpenChange(false)}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground h-11 px-8 rounded-xl font-bold shadow-lg shadow-primary/20 transition-all"
+                    >
                         Close
                     </Button>
                 </DialogFooter>
