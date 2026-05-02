@@ -493,34 +493,34 @@ function LoginForm() {
 
             {/* --- LOCKOUT HUD --- */}
             {isLocked && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-2xl">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-200/40 dark:bg-slate-950/60 backdrop-blur-2xl transition-colors duration-500">
                     <GlassCard 
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="w-full max-w-sm p-8 text-center !rounded-[2rem] border-white/20"
+                        className="w-full max-w-sm p-8 text-center !rounded-[2rem] border-slate-200 dark:border-white/20 bg-white/80 dark:bg-slate-900/60"
                         accent="rose"
                     >
                         <div className="mx-auto w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mb-6 border border-rose-500/20">
-                            <Clock className="w-8 h-8 text-rose-500 animate-pulse" />
+                            <Clock className="w-8 h-8 text-rose-600 dark:text-rose-500 animate-pulse" />
                         </div>
                         <h2 className="text-2xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none mb-2">
-                            Access <span className="text-rose-500">Locked</span>
+                            Access <span className="text-rose-600 dark:text-rose-500">Locked</span>
                         </h2>
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 dark:text-white/20 mb-8 leading-relaxed">
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 dark:text-white/20 mb-8 leading-relaxed">
                             Security protocol triggered
                         </p>
 
-                        <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-6 mb-8 border border-white/5 relative overflow-hidden group">
+                        <div className="bg-slate-100/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-2xl p-6 mb-8 border border-slate-200 dark:border-white/5 relative overflow-hidden group">
                             <ScanningOverlay />
-                            <div className="text-[9px] font-black uppercase tracking-[0.5em] text-rose-500/50 mb-2">Cool-down in progress</div>
-                            <div className="text-4xl font-mono font-black text-rose-500 tabular-nums drop-shadow-[0_0_10px_rgba(244,63,94,0.3)]">
+                            <div className="text-[9px] font-black uppercase tracking-[0.5em] text-rose-500/60 dark:text-rose-500/50 mb-2">Cool-down in progress</div>
+                            <div className="text-4xl font-mono font-black text-rose-600 dark:text-rose-500 tabular-nums drop-shadow-[0_0_10px_rgba(244,63,94,0.3)]">
                                 {formatTime(timeLeft)}
                             </div>
                         </div>
 
                         <Button
                             onClick={() => setIsLocked(false)}
-                            className="w-full h-12 rounded-xl bg-white/5 text-white/60 hover:bg-white/10 border border-white/10 font-black uppercase tracking-widest text-[10px] transition-all"
+                            className="w-full h-12 rounded-xl bg-slate-900/5 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-900/10 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] transition-all"
                         >
                             Deactivate Overlay
                         </Button>

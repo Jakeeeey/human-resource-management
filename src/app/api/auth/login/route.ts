@@ -32,8 +32,13 @@ interface LockoutInfo {
 }
 const lockoutMap = new Map<string, LockoutInfo>();
 
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+function getLockoutDuration(attempts: number): number {
+    if (attempts >= 7) return 30 * 60 * 1000; // 30 minutes
+    if (attempts === 6) return 10 * 60 * 1000; // 10 minutes
+    if (attempts === 5) return 5 * 60 * 1000;  // 5 minutes
+    return 0;
+}
 
 function normalizeLoginErrorMessage(status: number): string {
     if (status === 401) return "Credentials invalid.";
@@ -158,10 +163,11 @@ export async function POST(req: NextRequest) {
 
         // 2. Check for Locked status from backend (5-14 attempts)
         if (m.includes("locked") || m.includes("account_locked") || d.lockUntil || (backendAttempts !== null && backendAttempts >= 5)) {
+            const duration = getLockoutDuration(backendAttempts ?? 5);
             return NextResponse.json({
                 ok: false,
                 message: "ACCOUNT_LOCKED",
-                lockedUntil: d.lockUntil ? new Date(d.lockUntil as string).getTime() : Date.now() + 5 * 60 * 1000,
+                lockedUntil: d.lockUntil ? new Date(d.lockUntil as string).getTime() : Date.now() + duration,
                 attempts: backendAttempts
             }, { status: 423 }); // 423 Locked
         }
@@ -177,11 +183,11 @@ export async function POST(req: NextRequest) {
             // Fallback to local in-memory lockout tracking
             const current = lockoutMap.get(email) || { attempts: 0, lockedUntil: null };
             current.attempts += 1;
-            if (current.attempts >= MAX_ATTEMPTS) {
-                current.lockedUntil = Date.now() + LOCKOUT_DURATION_MS;
+            if (current.attempts >= 5) {
+                current.lockedUntil = Date.now() + getLockoutDuration(current.attempts);
             }
             lockoutMap.set(email, current);
-            remainingToLock = Math.max(0, MAX_ATTEMPTS - current.attempts);
+            remainingToLock = Math.max(0, 5 - current.attempts);
         }
 
         const msg = normalizeLoginErrorMessage(springRes.status);
