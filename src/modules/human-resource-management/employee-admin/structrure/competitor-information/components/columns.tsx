@@ -1,9 +1,17 @@
 "use client";
 
 import type { Column, ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, Eye, ExternalLink, Pencil } from "lucide-react";
+import { ArrowUpDown, Eye, ExternalLink, MoreHorizontal, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Competitor } from "../types";
 import { formatDateTime, toWebsiteHref } from "../utils/formatters";
 
@@ -97,27 +105,28 @@ export function createColumns(
         },
         {
             id: "actions",
-            header: "",
+            header: "Action",
             enableSorting: false,
             cell: ({ row }) => (
-                <div className="flex items-center gap-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onView(row.original)}
-                        aria-label="View competitor"
-                    >
-                        <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => onEdit(row.original)}
-                        aria-label="Edit competitor"
-                    >
-                        <Pencil className="h-4 w-4" />
-                    </Button>
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0" aria-label="Open actions">
+                            <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => onView(row.original)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onEdit(row.original)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                    </DropdownMenuContent>
+                </DropdownMenu>
             ),
         },
     ];
