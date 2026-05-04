@@ -93,10 +93,9 @@ export default function ForgotPasswordPage() {
 
     const handleVerifyOTP = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!otp.trim() || otp.length < 6 || otpAttempts >= 5) return
+        if (!otp.trim() || otp.length < 6) return
 
         setLoading(true)
-        let keepLoading = false
         try {
             const res = await fetch("/api/auth/verify-otp", {
                 method: "POST",
@@ -110,7 +109,6 @@ export default function ForgotPasswordPage() {
                 setOtpAttempts(newAttempts)
 
                 if (newAttempts >= 5) {
-                    keepLoading = true
                     toast.error("Maximum Attempts Reached", {
                         description: "You have exceeded the maximum number of attempts. Redirecting to login..."
                     })
@@ -127,12 +125,11 @@ export default function ForgotPasswordPage() {
             }
 
             toast.success("Success", { description: "OTP verified. Redirecting to reset password..." })
-            keepLoading = true
             router.push(`/reset-password/reset-password?token=${data.resetToken}`)
         } catch {
             toast.error("Network Error", { description: "Please check your connection." })
         } finally {
-            if (!keepLoading) setLoading(false)
+            setLoading(false)
         }
     }
 
@@ -156,7 +153,6 @@ export default function ForgotPasswordPage() {
             setSessionToken(data.sessionToken)
             setResendCooldown(60)
             setOtpExpiry(300)
-            setOtpAttempts(0)
             toast.success("OTP Resent", { description: "Check your email for a new code." })
         } catch {
             toast.error("Network Error", { description: "Please check your connection." })
@@ -372,8 +368,8 @@ export default function ForgotPasswordPage() {
                                                         Email Verification
                                                     </div>
                                                     <div className={`px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest transition-all ${otpAttempts >= 4
-                                                            ? "bg-rose-500/10 border-rose-500/20 text-rose-500"
-                                                            : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                                                        ? "bg-rose-500/10 border-rose-500/20 text-rose-500"
+                                                        : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
                                                         }`}>
                                                         {Math.max(0, 5 - otpAttempts)} Attempts Left
                                                     </div>
