@@ -25,11 +25,12 @@ export default function ForgotPasswordPage() {
     const [email, setEmail] = React.useState("")
     const [otp, setOtp] = React.useState("")
     const [sessionToken, setSessionToken] = React.useState("")
-    
+
     // Countdown timers
     const [otpExpiry, setOtpExpiry] = React.useState(300) // 5 minutes
     const [resendCooldown, setResendCooldown] = React.useState(0) // 1 minute cooldown after resend
-    
+    const [otpAttempts, setOtpAttempts] = React.useState(0) // Track failed attempts
+
     // Mouse Parallax (matching login page)
     const mouseX = useMotionValue(0)
     const mouseY = useMotionValue(0)
@@ -104,12 +105,26 @@ export default function ForgotPasswordPage() {
             const data = await res.json()
 
             if (!res.ok) {
-                toast.error("Verification Failed", { description: data.message || "Invalid OTP code." })
+                const newAttempts = otpAttempts + 1
+                setOtpAttempts(newAttempts)
+
+                if (newAttempts >= 5) {
+                    toast.error("Maximum Attempts Reached", {
+                        description: "You have exceeded the maximum number of attempts. Redirecting to login..."
+                    })
+                    setTimeout(() => {
+                        router.push("/login")
+                    }, 3000)
+                    return
+                }
+
+                toast.error("Verification Failed", {
+                    description: `Invalid OTP code. ${5 - newAttempts} attempts remaining.`
+                })
                 return
             }
 
             toast.success("Success", { description: "OTP verified. Redirecting to reset password..." })
-            // Redirect to reset password page with the resetToken
             router.push(`/reset-password/reset-password?token=${data.resetToken}`)
         } catch {
             toast.error("Network Error", { description: "Please check your connection." })
@@ -291,7 +306,7 @@ export default function ForgotPasswordPage() {
                                             <p className="text-xs text-slate-500 dark:text-white/40 leading-relaxed text-center font-medium">
                                                 Enter the email address associated with your account and we&apos;ll send you a 6-digit verification code.
                                             </p>
-                                            
+
                                             <form onSubmit={handleSendOTP} className="space-y-6">
                                                 <div className="space-y-2.5">
                                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 ml-1">Email Address</Label>
@@ -347,15 +362,23 @@ export default function ForgotPasswordPage() {
                                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                                             className="w-full space-y-6"
                                         >
-                                            <div className="flex flex-col items-center gap-2">
-                                                <div className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[9px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">
-                                                    Email Verification
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[9px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest">
+                                                        Email Verification
+                                                    </div>
+                                                    <div className={`px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest transition-all ${otpAttempts >= 4
+                                                        ? "bg-rose-500/10 border-rose-500/20 text-rose-500"
+                                                        : "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400"
+                                                        }`}>
+                                                        {Math.max(0, 5 - otpAttempts)} Attempts Left
+                                                    </div>
                                                 </div>
                                                 <p className="text-xs text-slate-500 dark:text-white/40 leading-relaxed text-center font-medium">
                                                     We sent a code to <span className="text-slate-900 dark:text-white font-bold">{email}</span>. Code expires in <span className="text-cyan-500 font-bold font-mono">{formatTime(otpExpiry)}</span>.
                                                 </p>
                                             </div>
-                                            
+
                                             <form onSubmit={handleVerifyOTP} className="space-y-6">
                                                 <div className="space-y-2.5">
                                                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 ml-1">6-Digit Verification Code</Label>
@@ -401,7 +424,7 @@ export default function ForgotPasswordPage() {
                                                         <RefreshCw className={`w-3 h-3 ${loading && "animate-spin"}`} />
                                                         {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend Code"}
                                                     </button>
-                                                    
+
                                                     <button
                                                         type="button"
                                                         onClick={() => setStep(1)}

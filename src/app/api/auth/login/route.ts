@@ -1,12 +1,12 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { 
-    decodeJwtPayload, 
-    pickTokenFromPayload, 
-    COOKIE_NAME, 
-    COOKIE_MAX_AGE_CAP, 
-    extractClientIp, 
-    resolveIpGeo 
+import {
+    decodeJwtPayload,
+    pickTokenFromPayload,
+    COOKIE_NAME,
+    COOKIE_MAX_AGE_CAP,
+    extractClientIp,
+    resolveIpGeo
 } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
         const m = String(d.message ?? "").toLowerCase();
         const backendAttempts =
             typeof d.attempts === "number" ? d.attempts :
-            typeof d.failedAttempts === "number" ? d.failedAttempts : null;
+                typeof d.failedAttempts === "number" ? d.failedAttempts : null;
 
         // 1. Check for Blocked status from backend (15+ attempts)
         if (m.includes("blocked") || m.includes("account_blocked") || (backendAttempts !== null && backendAttempts >= 15)) {
@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
         ? (data as Record<string, unknown>).data as Record<string, unknown> | string | null
         : data;
     const token = pickTokenFromPayload(dataObj);
-    
+
     if (!token) {
         return NextResponse.json(
             { ok: false, message: "Login succeeded but no token was returned." },
@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
     const decoded = decodeJwtPayload(token);
 
     const res = NextResponse.json(
-        { 
+        {
             ok: true,
             user: {
                 firstName: decoded?.FirstName || "",
@@ -249,7 +249,7 @@ export async function POST(req: NextRequest) {
         value: token,
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        secure: false,
         path: "/",
         ...(remember ? { maxAge: cookieMaxAge } : {}),
     });
@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
             value: String(latitude),
             httpOnly: true,
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
+            secure: false,
             path: "/",
             ...(remember ? { maxAge: cookieMaxAge } : {}),
         });
@@ -269,7 +269,7 @@ export async function POST(req: NextRequest) {
             value: String(longitude),
             httpOnly: true,
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
+            secure: false,
             path: "/",
             ...(remember ? { maxAge: cookieMaxAge } : {}),
         });
