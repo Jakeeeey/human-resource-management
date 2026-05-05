@@ -97,21 +97,16 @@ function LoginForm() {
     const [isLocked, setIsLocked] = React.useState(false)
     const [lockoutEndTime, setLockoutEndTime] = React.useState<number | string | null>(null)
     const [timeLeft, setTimeLeft] = React.useState(0)
-    const [_isVerifying, _setIsVerifying] = React.useState(false)
     const [isRedirecting, setIsRedirecting] = React.useState(false)
-    const [_isJumping, _setIsJumping] = React.useState(false)
     const [userName, setUserName] = React.useState("")
-    const [_pendingRedirect, _setPendingRedirect] = React.useState<string | null>(null)
 
     // Mouse Parallax for Background
     const mouseX = useMotionValue(0)
     const mouseY = useMotionValue(0)
     const springX = useSpring(mouseX, { stiffness: 50, damping: 20 })
     const springY = useSpring(mouseY, { stiffness: 50, damping: 20 })
-    const _gridX = useTransform(springX, [-500, 500], [30, -30])
-    const _gridY = useTransform(springY, [-500, 500], [30, -30])
 
-    const _handleMouseMove = (e: React.MouseEvent) => {
+    const handleMouseMove = (e: React.MouseEvent) => {
         const { clientX, clientY } = e
         mouseX.set(clientX - window.innerWidth / 2)
         mouseY.set(clientY - window.innerHeight / 2)
@@ -323,7 +318,10 @@ function LoginForm() {
     }
 
     return (
-        <div className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950">
+        <div
+            onMouseMove={handleMouseMove}
+            className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950"
+        >
             {/* --- IMMERSIVE BACKGROUND SYSTEM --- */}
 
             {/* Layer 1: Subtle radial gradient for light mode depth */}
