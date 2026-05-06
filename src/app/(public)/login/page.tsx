@@ -63,10 +63,11 @@ function normalizeLoginErrorMessage(rawMsg: string, httpStatus?: number) {
 
     if (
         httpStatus === 429 ||
-        m.includes("http 429") ||
-        m.includes("too many attempts")
+        httpStatus === 423 ||
+        m.includes("too many attempts") ||
+        m === "account_locked"
     ) {
-        return "The account has been blocked, please contact the administrator."
+        return "Your account has been temporarily locked due to too many failed attempts. Please wait for the countdown to expire."
     }
 
     return msg
@@ -94,7 +95,7 @@ function LoginForm() {
     const [remember, setRemember] = React.useState(false)
     const [isPasswordRemembered, setIsPasswordRemembered] = React.useState(false)
     const [isLocked, setIsLocked] = React.useState(false)
-    const [lockoutEndTime, setLockoutEndTime] = React.useState<number | null>(null)
+    const [lockoutEndTime, setLockoutEndTime] = React.useState<number | string | null>(null)
     const [timeLeft, setTimeLeft] = React.useState(0)
     const [isRedirecting, setIsRedirecting] = React.useState(false)
     const [userName, setUserName] = React.useState("")
@@ -104,6 +105,12 @@ function LoginForm() {
     const mouseY = useMotionValue(0)
     const springX = useSpring(mouseX, { stiffness: 50, damping: 20 })
     const springY = useSpring(mouseY, { stiffness: 50, damping: 20 })
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        const { clientX, clientY } = e
+        mouseX.set(clientX - window.innerWidth / 2)
+        mouseY.set(clientY - window.innerHeight / 2)
+    }
 
     // --- Remember Me: Load saved credentials from localStorage ---
     React.useEffect(() => {
@@ -120,19 +127,42 @@ function LoginForm() {
     }, [])
 
     // --- Countdown Timer Logic ---
+    // Synchronize the countdown timer
     React.useEffect(() => {
-        if (!isLocked || !lockoutEndTime) return
+        if (!isLocked || !lockoutEndTime) {
+            setTimeLeft(0)
+            return
+        }
 
-        const timer = setInterval(() => {
+        const calculateEndTs = () => {
+            if (typeof lockoutEndTime === 'string') {
+                const safeStr = lockoutEndTime.replace(' ', 'T') + (lockoutEndTime.endsWith('Z') ? '' : 'Z');
+                const ts = new Date(safeStr).getTime();
+                return isNaN(ts) ? (Date.now() + 300000) : ts;
+            }
+            return lockoutEndTime;
+        }
+
+        const endTs = calculateEndTs();
+
+        const updateTimer = () => {
             const now = Date.now()
-            const diff = Math.max(0, Math.ceil((lockoutEndTime - now) / 1000))
+            const diff = Math.max(0, Math.ceil((endTs - now) / 1000))
             setTimeLeft(diff)
 
             if (diff <= 0) {
                 setIsLocked(false)
                 setLockoutEndTime(null)
-                clearInterval(timer)
+                return true; // Finished
             }
+            return false;
+        }
+
+        // Run immediately
+        if (updateTimer()) return;
+
+        const timer = setInterval(() => {
+            if (updateTimer()) clearInterval(timer);
         }, 1000)
 
         return () => clearInterval(timer)
@@ -193,14 +223,21 @@ function LoginForm() {
             })
             const data = await res.json().catch(() => null)
 
-            if (res.status === 429 && data?.message === "TOO_MANY_ATTEMPTS") {
-                setLockoutEndTime(data.lockedUntil)
-                setIsLocked(true)
-                return
-            }
+            if ((res.status === 429 || res.status === 423) &&
+                (data?.message === "TOO_MANY_ATTEMPTS" || data?.message === "ACCOUNT_LOCKED")) {
 
-            if (res.status === 423 && data?.message === "ACCOUNT_LOCKED") {
-                setLockoutEndTime(data.lockedUntil)
+                // Priority for setting end time:
+                // 1. Raw DB string (best for parity)
+                // 2. Relative duration + local time (best for clock desync)
+                // 3. Server timestamp (fallback)
+                if (data.lockUntilRaw) {
+                    setLockoutEndTime(data.lockUntilRaw)
+                } else if (data.lockDurationMs) {
+                    setLockoutEndTime(Date.now() + data.lockDurationMs)
+                } else {
+                    setLockoutEndTime(data.lockedUntil)
+                }
+
                 setIsLocked(true)
                 return
             }
@@ -210,7 +247,7 @@ function LoginForm() {
                 const remaining = data?.remainingAttempts
 
                 if (raw === "ACCOUNT_BLOCKED" || (res.status === 403 && raw.includes("blocked"))) {
-                    toast.error("Account Blocked", { 
+                    toast.error("Account Blocked", {
                         description: "Your account has been permanently blocked due to too many failed login attempts. Please contact your system administrator.",
                         duration: 10000
                     })
@@ -230,7 +267,7 @@ function LoginForm() {
                 }
 
                 if (raw === "PASSWORD_RESET_REQUIRED" || res.status === 403) {
-                    toast.warning("Action Required", { 
+                    toast.warning("Action Required", {
                         description: description,
                         duration: 8000
                     })
@@ -281,7 +318,10 @@ function LoginForm() {
     }
 
     return (
-        <div className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950">
+        <div
+            onMouseMove={handleMouseMove}
+            className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950"
+        >
             {/* --- IMMERSIVE BACKGROUND SYSTEM --- */}
 
             {/* Layer 1: Subtle radial gradient for light mode depth */}
@@ -364,163 +404,163 @@ function LoginForm() {
                     <LoginSuccessLoader userName={userName} />
                 ) : (
                     <div className="w-full max-w-[440px] space-y-6">
-                    {/* Branding */}
-                    <motion.div variants={moduleVariants} className="flex flex-col items-center gap-3 mb-2">
-                        <div className="p-3 rounded-2xl bg-cyan-500/10 shadow-[0_0_30px_rgba(6,182,212,0.15)] border border-cyan-500/20">
-                            <LayoutDashboard className="w-7 h-7 text-cyan-600 dark:text-cyan-400" />
-                        </div>
-                        <div className="text-center">
-                            <h1 className="text-3xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none">VOS ERP</h1>
-                            <p className="text-[10px] font-bold text-slate-500 dark:text-white/30 uppercase tracking-[0.3em] mt-1">Management System</p>
-                        </div>
-                    </motion.div>
-
-                    {/* Form Card */}
-                    <GlassCard variants={moduleVariants} className="relative overflow-hidden p-0 shadow-2xl border-white/20 dark:border-white/10" accent="indigo">
-                        <div className="flex flex-col h-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl">
-                            <div className="p-8 border-b border-slate-200 dark:border-white/5 flex flex-col items-center gap-2">
-                                <h2 className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic text-center leading-none">
-                                    Account <span className="text-cyan-500 dark:text-cyan-400">Login</span>
-                                </h2>
-                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 dark:text-white/20 text-center">
-                                    Secure Authentication Portal
-                                </p>
+                        {/* Branding */}
+                        <motion.div variants={moduleVariants} className="flex flex-col items-center gap-3 mb-2">
+                            <div className="p-3 rounded-2xl bg-cyan-500/10 shadow-[0_0_30px_rgba(6,182,212,0.15)] border border-cyan-500/20">
+                                <LayoutDashboard className="w-7 h-7 text-cyan-600 dark:text-cyan-400" />
                             </div>
+                            <div className="text-center">
+                                <h1 className="text-3xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none">VOS ERP</h1>
+                                <p className="text-[10px] font-bold text-slate-500 dark:text-white/30 uppercase tracking-[0.3em] mt-1">Management System</p>
+                            </div>
+                        </motion.div>
 
-                            <div className="p-8 flex flex-col justify-center w-full">
-                                <form onSubmit={onSubmit} className="space-y-6">
-                                    {/* Email */}
-                                    <div className="space-y-2.5">
-                                        <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 ml-1">Email Address</Label>
-                                        <div className="relative group/field">
-                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-white/20 group-focus-within/field:text-cyan-500 transition-colors" />
-                                            <Input
-                                                id="login-email"
-                                                name="email"
-                                                type="email"
-                                                required
-                                                placeholder="your@email.com"
-                                                autoComplete="username"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                className="h-12 pl-12 rounded-xl bg-white/60 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-white/10 focus-visible:ring-1 focus-visible:ring-cyan-500/50 transition-all font-bold text-sm"
-                                            />
-                                        </div>
-                                    </div>
+                        {/* Form Card */}
+                        <GlassCard variants={moduleVariants} className="relative overflow-hidden p-0 shadow-2xl border-white/20 dark:border-white/10" accent="indigo">
+                            <div className="flex flex-col h-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl">
+                                <div className="p-8 border-b border-slate-200 dark:border-white/5 flex flex-col items-center gap-2">
+                                    <h2 className="text-2xl font-black tracking-tighter text-slate-900 dark:text-white uppercase italic text-center leading-none">
+                                        Account <span className="text-cyan-500 dark:text-cyan-400">Login</span>
+                                    </h2>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400 dark:text-white/20 text-center">
+                                        Secure Authentication Portal
+                                    </p>
+                                </div>
 
-                                    {/* Password */}
-                                    <div className="space-y-2.5">
-                                        <div className="flex items-center justify-between ml-1">
-                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40">Password</Label>
-                                            <button 
-                                                type="button" 
-                                                onClick={() => router.push("/forgot-password")}
-                                                className="text-[9px] font-bold text-slate-400 dark:text-white/20 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
-                                            >
-                                                Forgot?
-                                            </button>
+                                <div className="p-8 flex flex-col justify-center w-full">
+                                    <form onSubmit={onSubmit} className="space-y-6">
+                                        {/* Email */}
+                                        <div className="space-y-2.5">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 ml-1">Email Address</Label>
+                                            <div className="relative group/field">
+                                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-white/20 group-focus-within/field:text-cyan-500 transition-colors" />
+                                                <Input
+                                                    id="login-email"
+                                                    name="email"
+                                                    type="email"
+                                                    required
+                                                    placeholder="your@email.com"
+                                                    autoComplete="username"
+                                                    value={email}
+                                                    onChange={(e) => setEmail(e.target.value)}
+                                                    className="h-12 pl-12 rounded-xl bg-white/60 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-white/10 focus-visible:ring-1 focus-visible:ring-cyan-500/50 transition-all font-bold text-sm"
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="relative group/field">
-                                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-white/20 group-focus-within/field:text-cyan-500 transition-colors" />
-                                            <Input
-                                                id="login-password"
-                                                name="password"
-                                                type={showPw ? "text" : "password"}
-                                                required
-                                                placeholder="••••••••"
-                                                autoComplete="current-password"
-                                                value={hashPassword}
-                                                onChange={(e) => {
-                                                    setHashPassword(e.target.value)
-                                                    setIsPasswordRemembered(false)
-                                                }}
-                                                className="h-12 pl-12 pr-12 rounded-xl bg-white/60 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-white/10 focus-visible:ring-1 focus-visible:ring-cyan-500/50 transition-all font-bold text-sm"
-                                            />
-                                            {!isPasswordRemembered && (
+
+                                        {/* Password */}
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center justify-between ml-1">
+                                                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40">Password</Label>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setShowPw(!showPw)}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/20 hover:text-slate-600 dark:hover:text-white transition-colors"
+                                                    onClick={() => router.push("/forgot-password")}
+                                                    className="text-[9px] font-bold text-slate-400 dark:text-white/20 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
                                                 >
-                                                    {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                                    Forgot?
                                                 </button>
-                                            )}
+                                            </div>
+                                            <div className="relative group/field">
+                                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-white/20 group-focus-within/field:text-cyan-500 transition-colors" />
+                                                <Input
+                                                    id="login-password"
+                                                    name="password"
+                                                    type={showPw ? "text" : "password"}
+                                                    required
+                                                    placeholder="••••••••"
+                                                    autoComplete="current-password"
+                                                    value={hashPassword}
+                                                    onChange={(e) => {
+                                                        setHashPassword(e.target.value)
+                                                        setIsPasswordRemembered(false)
+                                                    }}
+                                                    className="h-12 pl-12 pr-12 rounded-xl bg-white/60 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-white/10 focus-visible:ring-1 focus-visible:ring-cyan-500/50 transition-all font-bold text-sm"
+                                                />
+                                                {!isPasswordRemembered && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPw(!showPw)}
+                                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/20 hover:text-slate-600 dark:hover:text-white transition-colors"
+                                                    >
+                                                        {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Remember me */}
-                                    <div className="flex items-center gap-2.5 ml-1">
-                                        <Checkbox
-                                            id="rememberMe"
-                                            checked={remember}
-                                            onCheckedChange={(v) => setRemember(Boolean(v))}
-                                            className="w-3.5 h-3.5 border-slate-300 dark:border-white/10 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
-                                        />
-                                        <label htmlFor="rememberMe" className="text-[10px] font-bold text-slate-500 dark:text-white/40 cursor-pointer">Stay signed in on this device</label>
-                                    </div>
+                                        {/* Remember me */}
+                                        <div className="flex items-center gap-2.5 ml-1">
+                                            <Checkbox
+                                                id="rememberMe"
+                                                checked={remember}
+                                                onCheckedChange={(v) => setRemember(Boolean(v))}
+                                                className="w-3.5 h-3.5 border-slate-300 dark:border-white/10 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
+                                            />
+                                            <label htmlFor="rememberMe" className="text-[10px] font-bold text-slate-500 dark:text-white/40 cursor-pointer">Stay signed in on this device</label>
+                                        </div>
 
-                                    {/* Submit */}
-                                    <Button
-                                        id="login-submit"
-                                        type="submit"
-                                        disabled={loading}
-                                        className="w-full h-14 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase tracking-[0.2em] text-xs transition-all hover:shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] active:scale-[0.98] group/btn"
-                                    >
-                                        {loading ? (
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
-                                                Signing In...
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <span>Sign In</span>
-                                                <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                                            </div>
-                                        )}
-                                    </Button>
-                                </form>
+                                        {/* Submit */}
+                                        <Button
+                                            id="login-submit"
+                                            type="submit"
+                                            disabled={loading}
+                                            className="w-full h-14 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase tracking-[0.2em] text-xs transition-all hover:shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] active:scale-[0.98] group/btn"
+                                        >
+                                            {loading ? (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-4 h-4 border-2 border-slate-950/30 border-t-slate-950 rounded-full animate-spin" />
+                                                    Signing In...
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <span>Sign In</span>
+                                                    <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                                                </div>
+                                            )}
+                                        </Button>
+                                    </form>
+                                </div>
+
+                                <div className="p-5 bg-slate-500/5 border-t border-slate-200 dark:border-white/5 flex items-center justify-center gap-2">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-500" />
+                                    <span className="text-[9px] font-black tracking-widest text-slate-400 dark:text-white/30 uppercase">Secure Encryption Active</span>
+                                </div>
                             </div>
-
-                            <div className="p-5 bg-slate-500/5 border-t border-slate-200 dark:border-white/5 flex items-center justify-center gap-2">
-                                <ShieldCheck className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-500" />
-                                <span className="text-[9px] font-black tracking-widest text-slate-400 dark:text-white/30 uppercase">Secure Encryption Active</span>
-                            </div>
-                        </div>
-                    </GlassCard>
-                </div>
-            )}
-        </motion.main>
+                        </GlassCard>
+                    </div>
+                )}
+            </motion.main>
 
             {/* --- LOCKOUT HUD --- */}
             {isLocked && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-200/40 dark:bg-slate-950/60 backdrop-blur-2xl transition-colors duration-500">
-                    <GlassCard 
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-background/80 backdrop-blur-2xl">
+                    <GlassCard
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="w-full max-w-sm p-8 text-center !rounded-[2rem] border-slate-200 dark:border-white/20 bg-white/80 dark:bg-slate-900/60"
+                        className="w-full max-w-sm p-8 text-center !rounded-[2rem] border-border"
                         accent="rose"
                     >
                         <div className="mx-auto w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mb-6 border border-rose-500/20">
-                            <Clock className="w-8 h-8 text-rose-600 dark:text-rose-500 animate-pulse" />
+                            <Clock className="w-8 h-8 text-rose-500 animate-pulse" />
                         </div>
-                        <h2 className="text-2xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none mb-2">
-                            Access <span className="text-rose-600 dark:text-rose-500">Locked</span>
+                        <h2 className="text-2xl font-black italic tracking-tighter text-foreground uppercase leading-none mb-2">
+                            Access <span className="text-rose-500">Locked</span>
                         </h2>
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 dark:text-white/20 mb-8 leading-relaxed">
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground mb-8 leading-relaxed">
                             Security protocol triggered
                         </p>
 
-                        <div className="bg-slate-100/60 dark:bg-slate-900/40 backdrop-blur-xl rounded-2xl p-6 mb-8 border border-slate-200 dark:border-white/5 relative overflow-hidden group">
+                        <div className="bg-card backdrop-blur-xl rounded-2xl p-6 mb-8 border border-border relative overflow-hidden group">
                             <ScanningOverlay />
-                            <div className="text-[9px] font-black uppercase tracking-[0.5em] text-rose-500/60 dark:text-rose-500/50 mb-2">Cool-down in progress</div>
-                            <div className="text-4xl font-mono font-black text-rose-600 dark:text-rose-500 tabular-nums drop-shadow-[0_0_10px_rgba(244,63,94,0.3)]">
+                            <div className="text-[9px] font-black uppercase tracking-[0.5em] text-rose-500/60 mb-2">Cool-down in progress</div>
+                            <div className="text-4xl font-mono font-black text-rose-500 tabular-nums drop-shadow-[0_0_10px_rgba(244,63,94,0.3)]">
                                 {formatTime(timeLeft)}
                             </div>
                         </div>
 
                         <Button
                             onClick={() => setIsLocked(false)}
-                            className="w-full h-12 rounded-xl bg-slate-900/5 dark:bg-white/5 text-slate-600 dark:text-white/60 hover:bg-slate-900/10 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 font-black uppercase tracking-widest text-[10px] transition-all"
+                            className="w-full h-12 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80 border border-border font-black uppercase tracking-widest text-[10px] transition-all"
                         >
                             Deactivate Overlay
                         </Button>
@@ -549,7 +589,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
     }, [])
 
     const isPackingUp = progress >= 100 // Bar is full, hide everything except the name
-    
+
     React.useEffect(() => {
         if (isPackingUp) {
             // Exactly 400ms after pack up starts, the name jumps (hitting absolute 3.0s mark)
@@ -562,16 +602,16 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
         <div className="relative w-full max-w-[440px] flex flex-col items-center">
             <div className="flex flex-col items-center justify-center gap-10 w-full relative z-10">
                 {/* [TOP] CORE HUD HUB */}
-                <motion.div 
+                <motion.div
                     animate={
-                        isPackingUp 
-                        ? { y: -30, scale: 0.8, opacity: 0 } 
-                        : { y: [-4, 4, -4], scale: 1, opacity: 1 }
+                        isPackingUp
+                            ? { y: -30, scale: 0.8, opacity: 0 }
+                            : { y: [-4, 4, -4], scale: 1, opacity: 1 }
                     }
                     transition={
-                        isPackingUp 
-                        ? { duration: 0.5, ease: [0.36, 0, 0.66, -0.56] } // Snappy back-in exit
-                        : { y: { duration: 5, repeat: Infinity, ease: "easeInOut" } }
+                        isPackingUp
+                            ? { duration: 0.5, ease: [0.36, 0, 0.66, -0.56] } // Snappy back-in exit
+                            : { y: { duration: 5, repeat: Infinity, ease: "easeInOut" } }
                     }
                     className="relative"
                 >
@@ -616,8 +656,8 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                     <motion.div
                         key={progress > 45 ? "welcome" : "init"}
                         initial={{ opacity: 0, y: 15 }}
-                        animate={{ 
-                            opacity: isJumping ? 0 : 1, 
+                        animate={{
+                            opacity: isJumping ? 0 : 1,
                             y: isJumping ? -20 : 0,
                             scale: isJumping ? 8 : 1
                         }}
@@ -632,7 +672,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                                 <h2 className="text-4xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none">
                                     Welcome Back, <span className="text-cyan-400 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">{userName}</span>
                                 </h2>
-                                <motion.p 
+                                <motion.p
                                     animate={{ opacity: isPackingUp ? 0 : 1 }}
                                     transition={{ duration: 0.3 }}
                                     className="text-[9px] font-black text-cyan-500/50 uppercase tracking-[0.6em] animate-pulse"
@@ -647,7 +687,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                         )}
                     </motion.div>
 
-                    <motion.div 
+                    <motion.div
                         animate={{ opacity: isPackingUp ? 0 : 1 }}
                         transition={{ duration: 0.3 }}
                         className="flex flex-col items-center gap-2"
@@ -660,7 +700,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                 </div>
 
                 {/* [BOTTOM] PROGRESS CALIBRATION */}
-                <motion.div 
+                <motion.div
                     animate={isPackingUp ? { y: 30, scale: 0.8, opacity: 0 } : { y: 0, scale: 1, opacity: 1 }}
                     transition={{ duration: 0.5, ease: [0.36, 0, 0.66, -0.56] }}
                     className="w-full space-y-4 px-10"
