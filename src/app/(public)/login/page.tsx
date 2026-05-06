@@ -463,10 +463,10 @@ function LoginForm() {
                                                 />
                                                 <button
                                                     type="button"
-                                                    onClick={() => setShowPw(!showPw)}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/20 hover:text-slate-600 dark:hover:text-white transition-colors"
+                                                    onClick={() => router.push("/forgot-password")}
+                                                    className="text-[9px] font-bold text-slate-400 dark:text-white/20 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
                                                 >
-                                                    {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                                    Forgot?
                                                 </button>
                                             </div>
                                         </div>
