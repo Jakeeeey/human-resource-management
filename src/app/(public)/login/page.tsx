@@ -88,9 +88,6 @@ function LoginForm() {
     const router = useRouter()
 
     const [showPw, setShowPw] = React.useState(false)
-    const togglePasswordVisibility = React.useCallback(() => {
-        setShowPw(prev => !prev)
-    }, [])
     const [loading, setLoading] = React.useState(false)
 
     const [email, setEmail] = React.useState("")
@@ -108,11 +105,6 @@ function LoginForm() {
     const springX = useSpring(mouseX, { stiffness: 50, damping: 20 })
     const springY = useSpring(mouseY, { stiffness: 50, damping: 20 })
 
-    const _handleMouseMove = (e: React.MouseEvent) => {
-        const { clientX, clientY } = e
-        mouseX.set(clientX - window.innerWidth / 2)
-        mouseY.set(clientY - window.innerHeight / 2)
-    }
 
     // --- Remember Me: Load saved email from localStorage ---
     React.useEffect(() => {
@@ -313,10 +305,7 @@ function LoginForm() {
     }
 
     return (
-        <div
-            onMouseMove={_handleMouseMove}
-            className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950"
-        >
+        <div className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950">
             {/* --- IMMERSIVE BACKGROUND SYSTEM --- */}
 
             {/* Layer 1: Subtle radial gradient for light mode depth */}
@@ -466,10 +455,10 @@ function LoginForm() {
                                                 />
                                                 <button
                                                     type="button"
-                                                    onClick={() => router.push("/forgot-password")}
-                                                    className="text-[9px] font-bold text-slate-400 dark:text-white/20 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+                                                    onClick={() => setShowPw(!showPw)}
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/20 hover:text-slate-600 dark:hover:text-white transition-colors"
                                                 >
-                                                    Forgot?
+                                                    {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                                                 </button>
                                             </div>
                                         </div>
@@ -743,4 +732,3 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
         </div>
     )
 }
-
