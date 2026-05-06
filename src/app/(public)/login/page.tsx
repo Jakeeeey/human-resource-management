@@ -88,6 +88,9 @@ function LoginForm() {
     const router = useRouter()
 
     const [showPw, setShowPw] = React.useState(false)
+    const togglePasswordVisibility = React.useCallback(() => {
+        setShowPw(prev => !prev)
+    }, [])
     const [loading, setLoading] = React.useState(false)
 
     const [email, setEmail] = React.useState("")
@@ -310,7 +313,7 @@ function LoginForm() {
     }
 
     return (
-        <div 
+        <div
             onMouseMove={_handleMouseMove}
             className="relative w-full min-h-svh flex flex-col overflow-hidden font-sans selection:bg-cyan-500/30 bg-slate-50 dark:bg-slate-950"
         >
