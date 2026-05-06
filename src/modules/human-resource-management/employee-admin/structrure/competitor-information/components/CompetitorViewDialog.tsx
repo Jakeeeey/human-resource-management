@@ -68,11 +68,6 @@ export function CompetitorViewDialog({
             icon: MapPin,
         },
         {
-            label: "Created by",
-            value: formatCreatedBy(competitor?.created_by ?? null),
-            icon: User,
-        },
-        {
             label: "Created at",
             value: formatDateTime(competitor?.created_at ?? null),
             icon: Clock,
