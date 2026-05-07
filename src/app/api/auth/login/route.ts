@@ -1,12 +1,12 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { 
-    decodeJwtPayload, 
-    pickTokenFromPayload, 
-    COOKIE_NAME, 
-    COOKIE_MAX_AGE_CAP, 
-    extractClientIp, 
-    resolveIpGeo 
+import {
+    decodeJwtPayload,
+    pickTokenFromPayload,
+    COOKIE_NAME,
+    COOKIE_MAX_AGE_CAP,
+    extractClientIp,
+    resolveIpGeo
 } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";
@@ -42,7 +42,7 @@ function getLockoutDuration(attempts: number): number {
 
 function normalizeLoginErrorMessage(status: number): string {
     if (status === 401) return "Credentials invalid.";
-    if (status === 429) return "The account has been blocked, please contact the administrator.";
+    if (status === 429 || status === 423) return "ACCOUNT_LOCKED";
     if (status >= 500) return "Server is down, please contact Administrator.";
     return `Login failed (HTTP ${status}).`;
 }
@@ -78,12 +78,62 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Check Lockout Status ---
-    const lockout = lockoutMap.get(email);
+    let lockout = lockoutMap.get(email);
+
+    // If not in memory (e.g. server restart), check the Database directly
+    if (!lockout || !lockout.lockedUntil || lockout.lockedUntil <= Date.now()) {
+        try {
+            const directusUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.DIRECTUS_API_URL || "";
+            const staticToken = process.env.DIRECTUS_STATIC_TOKEN || "";
+
+            if (directusUrl && staticToken) {
+                const filter = encodeURIComponent(JSON.stringify({ user_email: { _eq: email } }));
+                const dbRes = await fetch(`${directusUrl}/items/user?access_token=${staticToken}&filter=${filter}&limit=1`, {
+                    cache: 'no-store'
+                });
+
+                if (dbRes.ok) {
+                    const result = await dbRes.json();
+                    const dbUser = result.data?.[0];
+
+                    if (dbUser) {
+                        // Check if blocked
+                        const isBlockedRaw = dbUser.is_blocked;
+                        const isBlocked = typeof isBlockedRaw === 'boolean' ? isBlockedRaw : !!isBlockedRaw;
+
+                        if (isBlocked) {
+                            return NextResponse.json({ ok: false, message: "ACCOUNT_BLOCKED" }, { status: 403 });
+                        }
+
+                        // Check if locked
+                        if (dbUser.lock_until) {
+                            const safeStr = dbUser.lock_until.replace(' ', 'T') + (dbUser.lock_until.endsWith('Z') ? '' : 'Z');
+                            const lockUntilTs = new Date(safeStr).getTime();
+
+                            if (lockUntilTs > Date.now()) {
+                                lockout = {
+                                    attempts: dbUser.failed_attempts || 5,
+                                    lockedUntil: lockUntilTs
+                                };
+                                lockoutMap.set(email, lockout);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("[auth/login] Database lockout check failed:", error);
+            // Fallback: proceed to Spring API if DB check fails
+        }
+    }
+
     if (lockout?.lockedUntil && lockout.lockedUntil > Date.now()) {
+        const remaining = lockout.lockedUntil - Date.now();
         return NextResponse.json({
             ok: false,
             message: "TOO_MANY_ATTEMPTS",
-            lockedUntil: lockout.lockedUntil
+            lockedUntil: lockout.lockedUntil,
+            lockDurationMs: Math.max(0, remaining)
         }, { status: 429 });
     }
 
@@ -151,7 +201,8 @@ export async function POST(req: NextRequest) {
         const m = String(d.message ?? "").toLowerCase();
         const backendAttempts =
             typeof d.attempts === "number" ? d.attempts :
-            typeof d.failedAttempts === "number" ? d.failedAttempts : null;
+                typeof d.failedAttempts === "number" ? d.failedAttempts :
+                    typeof d.failed_attempts === "number" ? d.failed_attempts : null;
 
         // 1. Check for Blocked status from backend (15+ attempts)
         if (m.includes("blocked") || m.includes("account_blocked") || (backendAttempts !== null && backendAttempts >= 15)) {
@@ -162,12 +213,34 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Check for Locked status from backend (5-14 attempts)
-        if (m.includes("locked") || m.includes("account_locked") || d.lockUntil || (backendAttempts !== null && backendAttempts >= 5)) {
+        if (m.includes("locked") || m.includes("account_locked") || d.lockUntil || d.lock_until || (backendAttempts !== null && backendAttempts >= 5)) {
             const duration = getLockoutDuration(backendAttempts ?? 5);
+            const rawLockUntil = d.lockUntil || d.lock_until;
+
+            let lockedUntilTs: number;
+            if (rawLockUntil && typeof rawLockUntil === 'string') {
+                // Ensure SQL datetime format "YYYY-MM-DD HH:MM:SS" is parsed correctly as UTC
+                const safeDateString = rawLockUntil.replace(' ', 'T') + (rawLockUntil.endsWith('Z') ? '' : 'Z');
+                const parsed = new Date(safeDateString).getTime();
+                // If parsing failed (NaN), fallback to duration
+                lockedUntilTs = !isNaN(parsed) ? parsed : (Date.now() + duration);
+            } else {
+                lockedUntilTs = Date.now() + duration;
+            }
+
+            // CRITICAL SAFETY: If the timestamp is in the past or too close to 'now', 
+            // force a minimum duration so the client doesn't see "00:00"
+            const minBuffer = 5000; // 5 second grace
+            if (lockedUntilTs <= (Date.now() + minBuffer)) {
+                lockedUntilTs = Date.now() + Math.max(duration, 5 * 60 * 1000);
+            }
+
             return NextResponse.json({
                 ok: false,
                 message: "ACCOUNT_LOCKED",
-                lockedUntil: d.lockUntil ? new Date(d.lockUntil as string).getTime() : Date.now() + duration,
+                lockedUntil: lockedUntilTs,
+                lockUntilRaw: rawLockUntil,
+                lockDurationMs: duration, // Send relative duration to prevent clock desync
                 attempts: backendAttempts
             }, { status: 423 }); // 423 Locked
         }
@@ -175,10 +248,24 @@ export async function POST(req: NextRequest) {
         // 3. Handle standard failure with remaining attempts calculation
         let remainingToLock = null;
         let remainingToBlock = null;
+        let msg = normalizeLoginErrorMessage(springRes.status);
 
         if (backendAttempts !== null) {
-            remainingToLock = Math.max(0, 5 - backendAttempts);
             remainingToBlock = Math.max(0, 15 - backendAttempts);
+
+            if (backendAttempts < 5) {
+                remainingToLock = 5 - backendAttempts;
+            } else if (backendAttempts < 6) {
+                // Just came back from 5m lock, next fail is 10m
+                remainingToLock = 1;
+                msg = "Incorrect email or password. 1 attempt remaining before a 10 minute temporary lockout.";
+            } else if (backendAttempts < 7) {
+                // Just came back from 10m lock, next fail is 30m
+                remainingToLock = 1;
+                msg = "Incorrect email or password. 1 attempt remaining before a 30 minute temporary lockout.";
+            } else {
+                remainingToLock = 0;
+            }
         } else {
             // Fallback to local in-memory lockout tracking
             const current = lockoutMap.get(email) || { attempts: 0, lockedUntil: null };
@@ -189,8 +276,6 @@ export async function POST(req: NextRequest) {
             lockoutMap.set(email, current);
             remainingToLock = Math.max(0, 5 - current.attempts);
         }
-
-        const msg = normalizeLoginErrorMessage(springRes.status);
 
         await throttle();
         return NextResponse.json({
@@ -208,7 +293,7 @@ export async function POST(req: NextRequest) {
         ? (data as Record<string, unknown>).data as Record<string, unknown> | string | null
         : data;
     const token = pickTokenFromPayload(dataObj);
-    
+
     if (!token) {
         return NextResponse.json(
             { ok: false, message: "Login succeeded but no token was returned." },
@@ -232,7 +317,7 @@ export async function POST(req: NextRequest) {
     const decoded = decodeJwtPayload(token);
 
     const res = NextResponse.json(
-        { 
+        {
             ok: true,
             user: {
                 firstName: decoded?.FirstName || "",
@@ -249,7 +334,7 @@ export async function POST(req: NextRequest) {
         value: token,
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
+        secure: false,
         path: "/",
         ...(remember ? { maxAge: cookieMaxAge } : {}),
     });
@@ -260,7 +345,7 @@ export async function POST(req: NextRequest) {
             value: String(latitude),
             httpOnly: true,
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
+            secure: false,
             path: "/",
             ...(remember ? { maxAge: cookieMaxAge } : {}),
         });
@@ -269,7 +354,7 @@ export async function POST(req: NextRequest) {
             value: String(longitude),
             httpOnly: true,
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
+            secure: false,
             path: "/",
             ...(remember ? { maxAge: cookieMaxAge } : {}),
         });

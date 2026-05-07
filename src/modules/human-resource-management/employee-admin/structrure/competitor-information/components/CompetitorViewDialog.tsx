@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Building2, Clock, Globe, MapPin, User } from "lucide-react";
+import { Building2, Clock, Globe, MapPin } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 import type { Competitor } from "../types";
-import { formatCreatedBy, formatDateTime, toWebsiteHref } from "../utils/formatters";
+import { formatDateTime, toWebsiteHref } from "../utils/formatters";
 
 interface CompetitorViewDialogProps {
     open: boolean;
@@ -66,11 +66,6 @@ export function CompetitorViewDialog({
             label: "Barangay",
             value: competitor?.barangay,
             icon: MapPin,
-        },
-        {
-            label: "Created by",
-            value: formatCreatedBy(competitor?.created_by ?? null),
-            icon: User,
         },
         {
             label: "Created at",
