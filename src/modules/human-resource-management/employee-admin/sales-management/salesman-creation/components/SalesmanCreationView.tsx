@@ -19,6 +19,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePsgc } from "../hooks/usePsgc";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+
 
 import { createSalesman, getLookups } from "../../providers/fetchProvider";
 
@@ -34,6 +37,7 @@ export function SalesmanCreationView() {
   const [lookups, setLookups] = React.useState<Lookups | null>(null);
 
   const [saving, setSaving] = React.useState(false);
+  const { provinces, getCities, getBarangays, findProvinceCode, findCityCode } = usePsgc();
 
   const [employeeId, setEmployeeId] = React.useState<number | null>(null);
   const [salesmanName, setSalesmanName] = React.useState("");
@@ -53,6 +57,11 @@ export function SalesmanCreationView() {
   const [isActive, setIsActive] = React.useState(true);
   const [isInventory, setIsInventory] = React.useState(false);
   const [canCollect, setCanCollect] = React.useState(false);
+
+  const [userProvince, setUserProvince] = React.useState("");
+  const [userCity, setUserCity] = React.useState("");
+  const [userBrgy, setUserBrgy] = React.useState("");
+
 
   React.useEffect(() => {
     async function load() {
@@ -77,6 +86,24 @@ export function SalesmanCreationView() {
     return employees.find((e) => e.user_id === Number(employeeId ?? -1)) ?? null;
   }, [employees, employeeId]);
 
+  React.useEffect(() => {
+    if (employee) {
+      setUserProvince(employee.user_province ?? "");
+      setUserCity(employee.user_city ?? "");
+      setUserBrgy(employee.user_brgy ?? "");
+    } else {
+      setUserProvince("");
+      setUserCity("");
+      setUserBrgy("");
+    }
+  }, [employee]);
+
+  const provinceCode = React.useMemo(() => findProvinceCode(userProvince), [userProvince, findProvinceCode]);
+  const cityCode = React.useMemo(() => findCityCode(provinceCode, userCity), [provinceCode, userCity, findCityCode]);
+
+  const selectableCities = React.useMemo(() => getCities(provinceCode), [provinceCode, getCities]);
+  const selectableBarangays = React.useMemo(() => getBarangays(cityCode), [cityCode, getBarangays]);
+
   const handleSave = async () => {
     const name = salesmanName.trim();
     const code = salesmanCode.trim();
@@ -86,6 +113,10 @@ export function SalesmanCreationView() {
     if (!name) return toast.error("Salesman Name is required.");
     if (!code) return toast.error("Salesman Code is required.");
     if (!plate) return toast.error("Truck Plate is required.");
+    if (!divisionId) return toast.error("Division is required.");
+    if (!operationId) return toast.error("Operation is required.");
+    if (!branchId) return toast.error("Branch is required.");
+    if (!badBranchId) return toast.error("Bad Branch is required.");
 
     const draft: SalesmanDraft = {
       employee_id: employeeId,
@@ -107,6 +138,10 @@ export function SalesmanCreationView() {
       isInventory: to01(isInventory),
       canCollect: to01(canCollect),
       inventory_day: null,
+
+      user_province: userProvince,
+      user_city: userCity,
+      user_brgy: userBrgy,
     };
 
     setSaving(true);
@@ -148,7 +183,7 @@ export function SalesmanCreationView() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-12 px-1 overflow-x-hidden">
             {/* Row 1: Employee Link (12) */}
             <div className="md:col-span-12 min-w-0 overflow-hidden">
-              <Label>Employee Link</Label>
+              <Label>Employee Link <span className="text-destructive">*</span></Label>
               <Select
                 value={employeeId ? String(employeeId) : ""}
                 onValueChange={(v) => setEmployeeId(v ? Number(v) : null)}
@@ -172,7 +207,7 @@ export function SalesmanCreationView() {
 
             {/* Row 2: Salesman Info (6, 3, 3) */}
             <div className="md:col-span-6 min-w-0 overflow-hidden">
-              <Label>Salesman Name</Label>
+              <Label>Salesman Name <span className="text-destructive">*</span></Label>
               <Input
                 value={salesmanName}
                 onChange={(e) => setSalesmanName(e.target.value)}
@@ -182,7 +217,7 @@ export function SalesmanCreationView() {
             </div>
 
             <div className="md:col-span-3 min-w-0 overflow-hidden">
-              <Label>Salesman Code</Label>
+              <Label>Salesman Code <span className="text-destructive">*</span></Label>
               <Input
                 value={salesmanCode}
                 onChange={(e) => setSalesmanCode(e.target.value)}
@@ -192,7 +227,7 @@ export function SalesmanCreationView() {
             </div>
 
             <div className="md:col-span-3 min-w-0 overflow-hidden">
-              <Label>Truck Plate</Label>
+              <Label>Truck Plate <span className="text-destructive">*</span></Label>
               <Input
                 value={truckPlate}
                 onChange={(e) => setTruckPlate(e.target.value)}
@@ -203,7 +238,7 @@ export function SalesmanCreationView() {
 
             {/* Row 3: Price Type & E-mail (4, 8) */}
             <div className="md:col-span-4 min-w-0 overflow-hidden">
-              <Label>Price Type</Label>
+              <Label>Price Type <span className="text-destructive">*</span></Label>
               <Select value={priceType} onValueChange={(v) => setPriceType(v as PriceType)}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select price type" className="truncate" />
@@ -239,18 +274,51 @@ export function SalesmanCreationView() {
 
             <div className="md:col-span-6 min-w-0 overflow-hidden">
               <Label>Province</Label>
-              <Input value={(employee?.user_province ?? "").toString()} disabled className="bg-muted/30 w-full" />
+              <SearchableSelect
+                placeholder="Select province"
+                value={userProvince}
+                onValueChange={(val) => {
+                  setUserProvince(val);
+                  setUserCity("");
+                  setUserBrgy("");
+                }}
+                options={provinces.map((p) => ({
+                  value: p.name,
+                  label: p.name,
+                }))}
+              />
             </div>
 
             {/* Row 5: Details (4, 4, 4) */}
             <div className="md:col-span-4 min-w-0 overflow-hidden">
               <Label>City</Label>
-              <Input value={(employee?.user_city ?? "").toString()} disabled className="bg-muted/30 w-full" />
+              <SearchableSelect
+                placeholder="Select city"
+                value={userCity}
+                onValueChange={(val) => {
+                  setUserCity(val);
+                  setUserBrgy("");
+                }}
+                options={selectableCities.map((c) => ({
+                  value: c.name,
+                  label: c.name,
+                }))}
+                disabled={!userProvince}
+              />
             </div>
 
             <div className="md:col-span-4 min-w-0 overflow-hidden">
               <Label>Barangay</Label>
-              <Input value={(employee?.user_brgy ?? "").toString()} disabled className="bg-muted/30 w-full" />
+              <SearchableSelect
+                placeholder="Select barangay"
+                value={userBrgy}
+                onValueChange={setUserBrgy}
+                options={selectableBarangays.map((b) => ({
+                  value: b.name,
+                  label: b.name,
+                }))}
+                disabled={!userCity}
+              />
             </div>
 
             <div className="md:col-span-4 min-w-0 overflow-hidden">
@@ -312,7 +380,7 @@ export function SalesmanCreationView() {
 
             {/* Row 7: Org (6, 6) */}
             <div className="md:col-span-6 min-w-0 overflow-hidden">
-              <Label>Division</Label>
+              <Label>Division <span className="text-destructive">*</span></Label>
               <Select
                 value={divisionId ? String(divisionId) : ""}
                 onValueChange={(v) => setDivisionId(v ? Number(v) : null)}
@@ -331,7 +399,7 @@ export function SalesmanCreationView() {
             </div>
 
             <div className="md:col-span-6 min-w-0 overflow-hidden">
-              <Label>Operation</Label>
+              <Label>Operation <span className="text-destructive">*</span></Label>
               <Select
                 value={operationId ? String(operationId) : ""}
                 onValueChange={(v) => setOperationId(v ? Number(v) : null)}
@@ -359,7 +427,7 @@ export function SalesmanCreationView() {
 
             {/* Row 8: Branching (6, 6) */}
             <div className="md:col-span-6 min-w-0 overflow-hidden">
-              <Label>Branch</Label>
+              <Label>Branch <span className="text-destructive">*</span></Label>
               <Select
                 value={branchId ? String(branchId) : ""}
                 onValueChange={(v) => setBranchId(v ? Number(v) : null)}
@@ -378,7 +446,7 @@ export function SalesmanCreationView() {
             </div>
 
             <div className="md:col-span-6 min-w-0 overflow-hidden">
-              <Label>Bad Branch</Label>
+              <Label>Bad Branch <span className="text-destructive">*</span></Label>
               <Select
                 value={badBranchId ? String(badBranchId) : ""}
                 onValueChange={(v) => setBadBranchId(v ? Number(v) : null)}
