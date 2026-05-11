@@ -138,4 +138,8 @@ export type SalesmanDraft = {
 
   // must be null per your instruction
   inventory_day: null;
+
+  user_province?: string;
+  user_city?: string;
+  user_brgy?: string;
 };
