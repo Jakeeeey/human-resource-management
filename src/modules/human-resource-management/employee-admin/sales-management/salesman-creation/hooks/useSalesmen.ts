@@ -19,7 +19,6 @@ import type {
 
 interface UseSalesmenReturn {
     salesmen: SalesmanWithRelations[];
-    allSalesmen: SalesmanWithRelations[];
     users: User[];
     divisions: Division[];
     branches: Branch[];
@@ -139,7 +138,6 @@ export function useSalesmen(): UseSalesmenReturn {
 
     return {
         salesmen: filteredSalesmen,
-        allSalesmen,
         users,
         divisions,
         branches,

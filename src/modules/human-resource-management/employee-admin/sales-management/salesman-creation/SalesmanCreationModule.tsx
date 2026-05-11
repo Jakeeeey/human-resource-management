@@ -25,7 +25,6 @@ function SalesmanCreationContent() {
     const { filters, updateSearch, updatePriceType, updateIsActive, resetFilters } = useSalesmanFilterContext();
     const {
         salesmen,
-        allSalesmen,
         users,
         divisions,
         branches,
@@ -185,7 +184,6 @@ function SalesmanCreationContent() {
                 open={dialogOpen}
                 onOpenChange={setDialogOpen}
                 salesman={selectedSalesman}
-                registeredSalesmen={allSalesmen}
                 users={users}
                 divisions={divisions}
                 branches={branches}

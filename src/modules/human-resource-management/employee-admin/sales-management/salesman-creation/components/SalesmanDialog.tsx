@@ -32,6 +32,8 @@ import type {
     Operation,
     PriceType,
 } from "../types";
+import { usePsgc } from "../hooks/usePsgc";
+
 
 interface SalesmanFormData {
     employee_id: string;
@@ -68,7 +70,6 @@ interface SalesmanDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     salesman?: SalesmanWithRelations | null;
-    registeredSalesmen?: SalesmanWithRelations[];
     users: User[];
     divisions: Division[];
     branches: Branch[];
@@ -82,7 +83,6 @@ export function SalesmanDialog({
     open,
     onOpenChange,
     salesman,
-    registeredSalesmen = [],
     users,
     divisions,
     branches,
@@ -93,6 +93,7 @@ export function SalesmanDialog({
 }: SalesmanDialogProps) {
     const isEdit = !!salesman;
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { provinces, getCities, getBarangays, findProvinceCode, findCityCode } = usePsgc();
 
     const form = useForm<SalesmanFormData>({
         defaultValues: {
@@ -118,26 +119,20 @@ export function SalesmanDialog({
     });
 
     const selectedEmployeeId = form.watch("employee_id");
+    const watchProvince = form.watch("user_province");
+    const watchCity = form.watch("user_city");
+
+    const provinceCode = useMemo(() => findProvinceCode(watchProvince), [watchProvince, findProvinceCode]);
+    const cityCode = useMemo(() => findCityCode(provinceCode, watchCity), [provinceCode, watchCity, findCityCode]);
+
+    const selectableCities = useMemo(() => getCities(provinceCode), [provinceCode, getCities]);
+    const selectableBarangays = useMemo(() => getBarangays(cityCode), [cityCode, getBarangays]);
     const hasInventory = form.watch("isInventory");
     const selectedEmployee = users.find((u) => u.user_id.toString() === selectedEmployeeId);
 
     const selectableUsers = useMemo(() => {
-        if (!registeredSalesmen.length) return users;
-
-        const usedEmployeeIds = new Set(
-            registeredSalesmen
-                .map((s) => s.employee_id)
-                .filter((id): id is number => typeof id === "number")
-        );
-
-        // Allow the currently-linked employee when editing.
-        const currentEmployeeId = salesman?.employee_id;
-        if (typeof currentEmployeeId === "number") {
-            usedEmployeeIds.delete(currentEmployeeId);
-        }
-
-        return users.filter((u) => !usedEmployeeIds.has(u.user_id));
-    }, [registeredSalesmen, salesman?.employee_id, users]);
+        return users;
+    }, [users]);
 
     useEffect(() => {
         if (selectedEmployee) {
@@ -269,7 +264,7 @@ export function SalesmanDialog({
                     <DialogDescription>
                         {isEdit
                             ? "Update the salesman information below."
-                            : "Fill in the information to create a new salesman."}
+                            : "Fill in the information to create a new salesman. Fields marked with * are required."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -282,7 +277,7 @@ export function SalesmanDialog({
                                 rules={{ required: "Employee is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Employee Link</FormLabel>
+                                        <FormLabel>Employee Link <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <SearchableSelect
                                                 placeholder="Select employee"
@@ -305,7 +300,7 @@ export function SalesmanDialog({
                                 rules={{ required: "Salesman name is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Salesman Name</FormLabel>
+                                        <FormLabel>Salesman Name <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <Input {...field} placeholder="Salesman name" />
                                         </FormControl>
@@ -322,7 +317,7 @@ export function SalesmanDialog({
                                 rules={{ required: "Salesman code is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Salesman Code</FormLabel>
+                                        <FormLabel>Salesman Code <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <Input {...field} placeholder="e.g., SLS-001" />
                                         </FormControl>
@@ -387,7 +382,19 @@ export function SalesmanDialog({
                                         <FormItem>
                                             <FormLabel>Province</FormLabel>
                                             <FormControl>
-                                                <Input {...field} placeholder="Province" />
+                                                <SearchableSelect
+                                                    placeholder="Select province"
+                                                    value={field.value}
+                                                    onValueChange={(val) => {
+                                                        field.onChange(val);
+                                                        form.setValue("user_city", "");
+                                                        form.setValue("user_brgy", "");
+                                                    }}
+                                                    options={provinces.map((p) => ({
+                                                        value: p.name,
+                                                        label: p.name,
+                                                    }))}
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -401,7 +408,19 @@ export function SalesmanDialog({
                                         <FormItem>
                                             <FormLabel>City</FormLabel>
                                             <FormControl>
-                                                <Input {...field} placeholder="City" />
+                                                <SearchableSelect
+                                                    placeholder="Select city"
+                                                    value={field.value}
+                                                    onValueChange={(val) => {
+                                                        field.onChange(val);
+                                                        form.setValue("user_brgy", "");
+                                                    }}
+                                                    options={selectableCities.map((c) => ({
+                                                        value: c.name,
+                                                        label: c.name,
+                                                    }))}
+                                                    disabled={!watchProvince}
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -415,7 +434,16 @@ export function SalesmanDialog({
                                         <FormItem>
                                             <FormLabel>Barangay</FormLabel>
                                             <FormControl>
-                                                <Input {...field} placeholder="Barangay" />
+                                                <SearchableSelect
+                                                    placeholder="Select barangay"
+                                                    value={field.value}
+                                                    onValueChange={field.onChange}
+                                                    options={selectableBarangays.map((b) => ({
+                                                        value: b.name,
+                                                        label: b.name,
+                                                    }))}
+                                                    disabled={!watchCity}
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -428,9 +456,10 @@ export function SalesmanDialog({
                             <FormField
                                 control={form.control}
                                 name="division_id"
+                                rules={{ required: "Division is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Division</FormLabel>
+                                        <FormLabel>Division <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <SearchableSelect
                                                 placeholder="Select division"
@@ -450,9 +479,10 @@ export function SalesmanDialog({
                             <FormField
                                 control={form.control}
                                 name="operation"
+                                rules={{ required: "Operation is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Operation</FormLabel>
+                                        <FormLabel>Operation <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <SearchableSelect
                                                 placeholder="Select operation"
@@ -518,9 +548,10 @@ export function SalesmanDialog({
                             <FormField
                                 control={form.control}
                                 name="branch_code"
+                                rules={{ required: "Branch is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Branch</FormLabel>
+                                        <FormLabel>Branch <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <SearchableSelect
                                                 placeholder="Select branch"
@@ -540,9 +571,10 @@ export function SalesmanDialog({
                             <FormField
                                 control={form.control}
                                 name="bad_branch_code"
+                                rules={{ required: "Bad branch is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Bad Branch</FormLabel>
+                                        <FormLabel>Bad Branch <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <SearchableSelect
                                                 placeholder="Select bad branch"
@@ -566,7 +598,7 @@ export function SalesmanDialog({
                             rules={{ required: "Price type is required" }}
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Price Type</FormLabel>
+                                    <FormLabel>Price Type <span className="text-destructive">*</span></FormLabel>
                                     <FormControl>
                                         <SearchableSelect
                                             placeholder="Select price type"
