@@ -18,7 +18,8 @@ async function proxy(req: NextRequest) {
   const search = searchParams.get("search");
 
   // Strictly use items/user with fields matched to the provided DDL
-  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user?limit=${limit}&offset=${offset}&fields=user_id,user_email,user_fname,user_mname,user_lname&meta=filter_count&filter[role][_neq]=ADMIN`;
+  // Added restriction to filter out deleted users (is_deleted == 1)
+  let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/user?limit=${limit}&offset=${offset}&fields=user_id,user_email,user_fname,user_mname,user_lname&meta=filter_count&filter[role][_neq]=ADMIN&filter[_or][0][is_deleted][_eq]=0&filter[_or][1][is_deleted][_null]=true`;
   
   if (search) {
     upstreamUrl += `&search=${encodeURIComponent(search)}`;

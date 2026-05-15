@@ -1,6 +1,6 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from "next/server"
-import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, LAST_VISITED_PATH_COOKIE, pickTokenFromPayload } from "@/lib/auth-utils"
+import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, LAST_VISITED_PATH_COOKIE, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
 
 const PUBLIC_FILE = /\.(.*)$/
 const BASELINE_PREFIXES = ["/main-dashboard"]
@@ -103,7 +103,6 @@ export async function middleware(req: NextRequest) {
             if (token) {
                 const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
                 const target = lastVisited || "/main-dashboard";
-                
                 // Avoid infinite redirect loop if target is the current page
                 if (target !== pathname) {
                     return NextResponse.redirect(new URL(target, req.url));
@@ -129,7 +128,6 @@ export async function middleware(req: NextRequest) {
     }
 
     let token = req.cookies.get(COOKIE_NAME)?.value
-    
     // --- Automatic Session Refresh ---
     if (!token) {
         const refreshToken = req.cookies.get(REFRESH_COOKIE_NAME)?.value;
@@ -139,7 +137,6 @@ export async function middleware(req: NextRequest) {
             try {
                 console.log("[Middleware] Access token missing, attempting refresh...");
                 const refreshUrl = `${springBase.replace(/\/$/, "")}/auth/refresh`;
-                
                 const refreshRes = await fetch(refreshUrl, {
                     method: "POST",
                     headers: {
@@ -156,7 +153,6 @@ export async function middleware(req: NextRequest) {
                     if (newToken) {
                         console.log("[Middleware] Refresh successful.");
                         token = newToken;
-                        
                         // We will set the new token in the response cookies at the end
                         // But we also need to make it available for the rest of this middleware run
                     }
@@ -302,7 +298,7 @@ export async function middleware(req: NextRequest) {
             value: token,
             httpOnly: true,
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
+            secure: IS_SECURE_COOKIE,
             path: "/",
             maxAge: 60 * 60 * 24 * 7, // 7 days (since it's a persistent session)
         });
@@ -310,11 +306,11 @@ export async function middleware(req: NextRequest) {
 
     // --- 4. Persist Last Visited Path ---
     // We only save GET requests that aren't for APIs, assets, or error pages.
-    const isNavigation = req.method === "GET" && 
-                        !pathname.startsWith("/api") && 
-                        !pathname.startsWith("/error") &&
-                        !pathname.startsWith("/_next") &&
-                        pathname !== "/favicon.ico";
+    const isNavigation = req.method === "GET" &&
+        !pathname.startsWith("/api") &&
+        !pathname.startsWith("/error") &&
+        !pathname.startsWith("/_next") &&
+        pathname !== "/favicon.ico";
 
     if (token && isNavigation) {
         response.cookies.set({
@@ -323,7 +319,7 @@ export async function middleware(req: NextRequest) {
             maxAge: 60 * 60 * 24 * 7, // 7 days
             path: "/",
             sameSite: "lax",
-            secure: process.env.NODE_ENV === "production"
+            secure: IS_SECURE_COOKIE
         });
     }
 

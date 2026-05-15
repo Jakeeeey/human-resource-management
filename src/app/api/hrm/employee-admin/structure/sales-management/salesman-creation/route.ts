@@ -83,11 +83,11 @@ type EmployeePatch = {
 function extractEmployeePatch(body: Record<string, unknown>): EmployeePatch {
     const patch: EmployeePatch = {};
 
-    if ("user_email" in body) patch.user_email = (body.user_email as string) || null;
-    if ("user_contact" in body) patch.user_contact = (body.user_contact as string) || null;
-    if ("user_province" in body) patch.user_province = (body.user_province as string) || null;
-    if ("user_city" in body) patch.user_city = (body.user_city as string) || null;
-    if ("user_brgy" in body) patch.user_brgy = (body.user_brgy as string) || null;
+    if ("user_email" in body && body.user_email !== undefined) patch.user_email = (body.user_email as string) || "";
+    if ("user_contact" in body && body.user_contact !== undefined) patch.user_contact = (body.user_contact as string) || "";
+    if ("user_province" in body && body.user_province !== undefined) patch.user_province = (body.user_province as string) || "";
+    if ("user_city" in body && body.user_city !== undefined) patch.user_city = (body.user_city as string) || "";
+    if ("user_brgy" in body && body.user_brgy !== undefined) patch.user_brgy = (body.user_brgy as string) || "";
 
     return patch;
 }
@@ -144,6 +144,46 @@ async function fetchAll<T>(collection: string, filter?: string): Promise<T[]> {
     return json.data || [];
 }
 
+async function getCurrentTimeInTimeZone() {
+    try {
+        const search = new URLSearchParams();
+        search.set("filter[setting_key][_eq]", "time_zone");
+        const url = `${DIRECTUS_URL}/items/general_setting?${search.toString()}`;
+        
+        const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` },
+            cache: "no-store",
+        });
+        
+        if (!res.ok) throw new Error("Failed to fetch timezone setting");
+        
+        const json = await res.json();
+        const timeZone = json.data?.[0]?.setting_value || "Asia/Manila";
+        
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat("sv-SE", {
+            timeZone,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+        });
+        
+        const parts = formatter.formatToParts(now);
+        const map: Record<string, string> = {};
+        parts.forEach(p => map[p.type] = p.value);
+        
+        return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}`;
+    } catch (e) {
+        console.error("Error fetching timezone:", e);
+        const now = new Date();
+        return now.toLocaleString("sv-SE", { timeZone: "Asia/Manila" }).replace("T", " ");
+    }
+}
+
 async function findSalesmanConflict(params: {
     employeeId?: number;
     salesmanCode?: string;
@@ -158,16 +198,8 @@ async function findSalesmanConflict(params: {
     search.set("limit", "1");
 
     let orIndex = 0;
-    if (employeeId) {
-        search.set(`filter[_or][${orIndex}][employee_id][_eq]`, String(employeeId));
-        orIndex += 1;
-    }
     if (salesmanCode) {
         search.set(`filter[_or][${orIndex}][salesman_code][_eq]`, salesmanCode);
-        orIndex += 1;
-    }
-    if (salesmanName) {
-        search.set(`filter[_or][${orIndex}][salesman_name][_eq]`, salesmanName);
         orIndex += 1;
     }
 
@@ -202,7 +234,7 @@ async function findSalesmanConflict(params: {
 
 async function buildSalesmanRelations() {
     try {
-        const [salesmenRaw, users, divisions, branches, operations, priceTypes] = await Promise.all([
+        const [salesmen, users, divisions, branches, operations, priceTypes] = await Promise.all([
             fetchAll<Salesman>("salesman").catch(() => []),
             fetchAll<User>("user").catch(() => []),
             fetchAll<Division>("division").catch(() => []),
@@ -210,19 +242,6 @@ async function buildSalesmanRelations() {
             fetchAll<Operation>("operation").catch(() => []),
             fetchAll<PriceType>("price_types").catch(() => []),
         ]);
-
-        // Guard against duplicates in upstream data.
-        // Business expectation: 1 salesman per employee_id.
-        const salesmenSorted = [...salesmenRaw].sort((a, b) => {
-            const aTime = a.modified_date ? Date.parse(a.modified_date) : 0;
-            const bTime = b.modified_date ? Date.parse(b.modified_date) : 0;
-            if (bTime !== aTime) return bTime - aTime;
-            return (b.id || 0) - (a.id || 0);
-        });
-
-        const salesmen = Array.from(
-            new Map(salesmenSorted.map((s) => [s.employee_id, s])).values()
-        );
 
         const regularBranches = branches.filter((b) => b.isReturn === 0 || b.isReturn === null);
         const badBranches = branches.filter((b) => b.isReturn === 1);
@@ -319,7 +338,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 {
                     error: "Duplicate salesman",
-                    message: "A salesman with this employee, name, code, or truck plate already exists.",
+                    message: "A salesman with this code or truck plate already exists.",
                     conflictId: conflict.id,
                 },
                 { status: 409 }
@@ -328,6 +347,8 @@ export async function POST(req: NextRequest) {
 
         // Update linked employee info first (email/contact/address)
         await patchEmployee(employeeId, employeePatch);
+
+        salesmanBody["modified_date"] = await getCurrentTimeInTimeZone();
 
         const res = await fetch(`${DIRECTUS_URL}/items/salesman`, {
             method: "POST",
@@ -413,7 +434,7 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json(
                 {
                     error: "Duplicate salesman",
-                    message: "A salesman with this employee, name, code, or truck plate already exists.",
+                    message: "A salesman with this code or truck plate already exists.",
                     conflictId: conflict.id,
                 },
                 { status: 409 }
@@ -422,6 +443,8 @@ export async function PATCH(req: NextRequest) {
 
         // Update linked employee info first (email/contact/address)
         await patchEmployee(employeeId, employeePatch);
+
+        updateData["modified_date"] = await getCurrentTimeInTimeZone();
 
         const res = await fetch(`${DIRECTUS_URL}/items/salesman/${salesmanId}`, {
             method: "PATCH",
