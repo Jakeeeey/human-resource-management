@@ -4,9 +4,22 @@
  */
 
 export const COOKIE_NAME = "vos_access_token";
+export const REFRESH_COOKIE_NAME = "refreshToken"; // Matches Spring Boot backend
 export const SPRING_COOKIE_NAME = "springboot_token";
+export const LAST_VISITED_PATH_COOKIE = "vos_last_visited_path";
 export const COOKIE_MAX_AGE_CAP = 60 * 60 * 24 * 7; // 7 days cap
-export const LAST_VISITED_PATH_COOKIE = "hrm_last_visited_path";
+export const REFRESH_PATH = "/api/auth/refresh";
+
+/**
+ * Shared cookie options for consistency.
+ */
+export const getCookieOptions = (remember: boolean, path: string = "/") => ({
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path,
+    ...(remember ? { maxAge: COOKIE_MAX_AGE_CAP } : {}),
+});
 
 export interface JwtPayload {
     sub: string;
@@ -61,33 +74,34 @@ export function pickTokenFromPayload(payload: Record<string, unknown> | string |
 }
 
 /**
- * Extract the real client IP from Next.js request headers.
+ * Extracts the real client IP from standard proxy headers.
  */
 export function extractClientIp(headers: Headers): string | null {
-    const forwarded = headers.get("x-forwarded-for");
-    if (forwarded) return forwarded.split(",")[0].trim();
-    return headers.get("x-real-ip") ?? null;
+    const xff = headers.get("x-forwarded-for");
+    if (xff) {
+        const first = xff.split(",")[0].trim();
+        if (first) return first;
+    }
+    const realIp = headers.get("x-real-ip");
+    if (realIp) return realIp.trim();
+    return null;
 }
 
 /**
- * Resolve approximate lat/lng from an IP address using ip-api.com.
+ * Resolves an IP address to approximate lat/lon.
  */
 export async function resolveIpGeo(ip: string): Promise<{ latitude: number; longitude: number } | null> {
-    if (!ip || ip === "127.0.0.1" || ip === "::1" || ip.startsWith("192.168.") || ip.startsWith("10.")) {
-        return null;
-    }
+    if (!ip || ip === "127.0.0.1" || ip === "::1") return null;
     try {
         const res = await fetch(`http://ip-api.com/json/${ip}?fields=status,lat,lon`, {
-            signal: AbortSignal.timeout(4_000),
             cache: "no-store",
+            signal: AbortSignal.timeout(3000),
         });
-        if (!res.ok) return null;
         const data = await res.json();
-        if (data?.status === "success" && Number.isFinite(data.lat) && Number.isFinite(data.lon)) {
-            return { latitude: data.lat, longitude: data.lon };
-        }
+        if (data.status !== "success") return null;
+        return { latitude: data.lat, longitude: data.lon };
     } catch {
-        // Geo lookup failure is non-fatal
+        return null;
     }
-    return null;
 }
+

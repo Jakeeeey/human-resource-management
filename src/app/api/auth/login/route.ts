@@ -4,9 +4,12 @@ import {
     decodeJwtPayload,
     pickTokenFromPayload,
     COOKIE_NAME,
+    REFRESH_COOKIE_NAME,
+    REFRESH_PATH,
     COOKIE_MAX_AGE_CAP,
     extractClientIp,
-    resolveIpGeo
+    resolveIpGeo,
+    getCookieOptions
 } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";
@@ -79,13 +82,13 @@ export async function POST(req: NextRequest) {
 
     // --- Check Lockout Status ---
     let lockout = lockoutMap.get(email);
-
+    
     // If not in memory (e.g. server restart), check the Database directly
     if (!lockout || !lockout.lockedUntil || lockout.lockedUntil <= Date.now()) {
         try {
             const directusUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.DIRECTUS_API_URL || "";
             const staticToken = process.env.DIRECTUS_STATIC_TOKEN || "";
-
+            
             if (directusUrl && staticToken) {
                 const filter = encodeURIComponent(JSON.stringify({ user_email: { _eq: email } }));
                 const dbRes = await fetch(`${directusUrl}/items/user?access_token=${staticToken}&filter=${filter}&limit=1`, {
@@ -95,12 +98,12 @@ export async function POST(req: NextRequest) {
                 if (dbRes.ok) {
                     const result = await dbRes.json();
                     const dbUser = result.data?.[0];
-
+                    
                     if (dbUser) {
                         // Check if blocked
                         const isBlockedRaw = dbUser.is_blocked;
                         const isBlocked = typeof isBlockedRaw === 'boolean' ? isBlockedRaw : !!isBlockedRaw;
-
+                        
                         if (isBlocked) {
                             return NextResponse.json({ ok: false, message: "ACCOUNT_BLOCKED" }, { status: 403 });
                         }
@@ -109,11 +112,11 @@ export async function POST(req: NextRequest) {
                         if (dbUser.lock_until) {
                             const safeStr = dbUser.lock_until.replace(' ', 'T') + (dbUser.lock_until.endsWith('Z') ? '' : 'Z');
                             const lockUntilTs = new Date(safeStr).getTime();
-
+                            
                             if (lockUntilTs > Date.now()) {
-                                lockout = {
-                                    attempts: dbUser.failed_attempts || 5,
-                                    lockedUntil: lockUntilTs
+                                lockout = { 
+                                    attempts: dbUser.failed_attempts || 5, 
+                                    lockedUntil: lockUntilTs 
                                 };
                                 lockoutMap.set(email, lockout);
                             }
@@ -133,8 +136,8 @@ export async function POST(req: NextRequest) {
             ok: false,
             message: "TOO_MANY_ATTEMPTS",
             lockedUntil: lockout.lockedUntil,
-            lockDurationMs: Math.max(0, remaining)
-        }, { status: 429 });
+            lockDurationMs: Math.max(0, remaining) 
+		}, { status: 429 });
     }
 
     // IP Geolocation fallback
@@ -216,7 +219,7 @@ export async function POST(req: NextRequest) {
         if (m.includes("locked") || m.includes("account_locked") || d.lockUntil || d.lock_until || (backendAttempts !== null && backendAttempts >= 5)) {
             const duration = getLockoutDuration(backendAttempts ?? 5);
             const rawLockUntil = d.lockUntil || d.lock_until;
-
+            
             let lockedUntilTs: number;
             if (rawLockUntil && typeof rawLockUntil === 'string') {
                 // Ensure SQL datetime format "YYYY-MM-DD HH:MM:SS" is parsed correctly as UTC
@@ -252,7 +255,7 @@ export async function POST(req: NextRequest) {
 
         if (backendAttempts !== null) {
             remainingToBlock = Math.max(0, 15 - backendAttempts);
-
+            
             if (backendAttempts < 5) {
                 remainingToLock = 5 - backendAttempts;
             } else if (backendAttempts < 6) {
@@ -332,12 +335,23 @@ export async function POST(req: NextRequest) {
     res.cookies.set({
         name: COOKIE_NAME,
         value: token,
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-        path: "/",
-        ...(remember ? { maxAge: cookieMaxAge } : {}),
+        ...getCookieOptions(remember, "/")
     });
+
+    // --- Handle Refresh Token from Backend ---
+    const setCookies = springRes.headers.getSetCookie();
+    const refreshCookieStr = setCookies.find(c => c.startsWith(`${REFRESH_COOKIE_NAME}=`));
+    
+    if (refreshCookieStr) {
+        const value = refreshCookieStr.split(';')[0].split('=')[1];
+        if (value) {
+            res.cookies.set({
+                name: REFRESH_COOKIE_NAME,
+                value: value,
+                ...getCookieOptions(remember, REFRESH_PATH)
+            });
+        }
+    }
 
     if (latitude !== null && longitude !== null) {
         res.cookies.set({
@@ -362,3 +376,4 @@ export async function POST(req: NextRequest) {
 
     return res;
 }
+
