@@ -2,7 +2,7 @@
 "use client"
 
 import * as React from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
     Eye,
     EyeOff,
@@ -10,7 +10,8 @@ import {
     Mail,
     ArrowRight,
     ShieldCheck,
-    LayoutDashboard
+    LayoutDashboard,
+    Clock,
 } from "lucide-react"
 import { motion, useMotionValue, useSpring, useTransform, type Variants } from "framer-motion"
 import { toast } from "sonner"
@@ -45,9 +46,32 @@ function normalizeLoginErrorMessage(rawMsg: string, httpStatus?: number) {
         return "We're having trouble connecting to the server. Please try again."
     }
 
+    if (
+        httpStatus === 403 ||
+        m === "password_reset_required"
+    ) {
+        return "Password reset required. An administrator has forced a password update for your account."
+    }
+
+    if (m === "account_blocked") {
+        return "Your account has been permanently blocked due to security concerns. Please contact support."
+    }
+
+    if (m === "account_locked") {
+        return "Your account has been temporarily locked due to too many failed attempts."
+    }
+
+    if (
+        httpStatus === 429 ||
+        httpStatus === 423 ||
+        m.includes("too many attempts") ||
+        m === "account_locked"
+    ) {
+        return "Your account has been temporarily locked due to too many failed attempts. Please wait for the countdown to expire."
+    }
+
     return msg
 }
-
 
 export default function LoginPage() {
     return (
@@ -57,36 +81,87 @@ export default function LoginPage() {
     )
 }
 
+// ─── Login Form ───────────────────────────────────────────────────────────────
+
 function LoginForm() {
     const searchParams = useSearchParams()
+    const router = useRouter()
 
     const [showPw, setShowPw] = React.useState(false)
     const [loading, setLoading] = React.useState(false)
-    const [isRedirecting, setIsRedirecting] = React.useState(false)
-    const [userName, setUserName] = React.useState("")
 
     const [email, setEmail] = React.useState("")
     const [hashPassword, setHashPassword] = React.useState("")
     const [remember, setRemember] = React.useState(false)
+    const [isLocked, setIsLocked] = React.useState(false)
+    const [lockoutEndTime, setLockoutEndTime] = React.useState<number | string | null>(null)
+    const [timeLeft, setTimeLeft] = React.useState(0)
+    const [isRedirecting, setIsRedirecting] = React.useState(false)
+    const [userName, setUserName] = React.useState("")
 
-    // Mouse Parallax for Background - Optimized with window listener
+    // Mouse Parallax for Background
     const mouseX = useMotionValue(0)
     const mouseY = useMotionValue(0)
-    // Spring config for smooth parallax
-    const springConfig = { damping: 25, stiffness: 150, mass: 0.5 };
-    const springX = useSpring(mouseX, springConfig);
-    const springY = useSpring(mouseY, springConfig);
+    const springX = useSpring(mouseX, { stiffness: 50, damping: 20 })
+    const springY = useSpring(mouseY, { stiffness: 50, damping: 20 })
 
+
+    // --- Remember Me: Load saved email from localStorage ---
     React.useEffect(() => {
-        const handleMove = (e: MouseEvent) => {
-            const centerX = window.innerWidth / 2
-            const centerY = window.innerHeight / 2
-            mouseX.set(e.clientX - centerX)
-            mouseY.set(e.clientY - centerY)
+        const savedEmail = localStorage.getItem("remembered_email")
+        if (savedEmail) {
+            setEmail(savedEmail)
+            setRemember(true)
         }
-        window.addEventListener("mousemove", handleMove, { passive: true })
-        return () => window.removeEventListener("mousemove", handleMove)
-    }, [mouseX, mouseY])
+    }, [])
+
+    // --- Countdown Timer Logic ---
+    // Synchronize the countdown timer
+    React.useEffect(() => {
+        if (!isLocked || !lockoutEndTime) {
+            setTimeLeft(0)
+            return
+        }
+
+        const calculateEndTs = () => {
+            if (typeof lockoutEndTime === 'string') {
+                const safeStr = lockoutEndTime.replace(' ', 'T') + (lockoutEndTime.endsWith('Z') ? '' : 'Z');
+                const ts = new Date(safeStr).getTime();
+                return isNaN(ts) ? (Date.now() + 300000) : ts;
+            }
+            return lockoutEndTime;
+        }
+
+        const endTs = calculateEndTs();
+
+        const updateTimer = () => {
+            const now = Date.now()
+            const diff = Math.max(0, Math.ceil((endTs - now) / 1000))
+            setTimeLeft(diff)
+
+            if (diff <= 0) {
+                setIsLocked(false)
+                setLockoutEndTime(null)
+                return true; // Finished
+            }
+            return false;
+        }
+
+        // Run immediately
+        if (updateTimer()) return;
+
+        const timer = setInterval(() => {
+            if (updateTimer()) clearInterval(timer);
+        }, 1000)
+
+        return () => clearInterval(timer)
+    }, [isLocked, lockoutEndTime])
+
+    const formatTime = (seconds: number) => {
+        const m = Math.floor(seconds / 60)
+        const s = seconds % 60
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    }
 
     const validate = React.useCallback((): boolean => {
         if (!String(email).trim()) return false
@@ -94,29 +169,114 @@ function LoginForm() {
         return true
     }, [email, hashPassword])
 
+    /**
+     * Silently request the browser's geolocation.
+     * Returns coords if the user allows, or null if they deny/skip.
+     * This NEVER blocks or forces — it's best-effort only.
+     */
+    const getLocationSilently = (): Promise<{ latitude: number; longitude: number } | null> => {
+        return new Promise((resolve) => {
+            if (!navigator?.geolocation) {
+                resolve(null)
+                return
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                () => resolve(null),   // User denied — silently continue without coords
+                { enableHighAccuracy: true, timeout: 8_000, maximumAge: 0 }
+            )
+        })
+    }
+
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!validate()) return
-        setLoading(true)
-        let res_local: Response | null = null
 
+        setLoading(true)
         try {
+            // Request location silently in the background.
+            // If the user allows → precise coords go to the API.
+            // If the user denies → API falls back to IP geolocation on the server.
+            const coords = await getLocationSilently()
+
+            const payload: Record<string, unknown> = { email, hashPassword, remember }
+            if (coords) {
+                payload.latitude = coords.latitude
+                payload.longitude = coords.longitude
+            }
+
             const res = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, hashPassword, remember }),
+                body: JSON.stringify(payload),
             })
-            res_local = res
             const data = await res.json().catch(() => null)
-            if (!res.ok || !data?.ok) {
-                const raw = String(data?.message ?? `Sign in failed.`)
-                const msg = normalizeLoginErrorMessage(raw, res.status)
-                toast.error("Sign in failed", { description: msg })
+
+            if ((res.status === 429 || res.status === 423) &&
+                (data?.message === "TOO_MANY_ATTEMPTS" || data?.message === "ACCOUNT_LOCKED")) {
+
+                // Priority for setting end time:
+                // 1. Raw DB string (best for parity)
+                // 2. Relative duration + local time (best for clock desync)
+                // 3. Server timestamp (fallback)
+                if (data.lockUntilRaw) {
+                    setLockoutEndTime(data.lockUntilRaw)
+                } else if (data.lockDurationMs) {
+                    setLockoutEndTime(Date.now() + data.lockDurationMs)
+                } else {
+                    setLockoutEndTime(data.lockedUntil)
+                }
+
+                setIsLocked(true)
                 return
             }
 
-            setUserName(data?.firstName || "User")
+            if (!res.ok || !data?.ok) {
+                const raw = String(data?.message ?? "Sign in failed.")
+                const remaining = data?.remainingAttempts
+
+                if (raw === "ACCOUNT_BLOCKED" || (res.status === 403 && raw.includes("blocked"))) {
+                    toast.error("Account Blocked", {
+                        description: "Your account has been permanently blocked due to too many failed login attempts. Please contact your system administrator.",
+                        duration: 10000
+                    })
+                    return
+                }
+
+                let description = normalizeLoginErrorMessage(raw, res.status)
+                const remainingToBlock = data?.remainingUntilBlock
+                const totalAttempts = data?.attempts
+
+                if (typeof totalAttempts === "number" && totalAttempts >= 5) {
+                    if (typeof remainingToBlock === "number") {
+                        description = `${description} You have ${remainingToBlock} ${remainingToBlock === 1 ? 'attempt' : 'attempts'} remaining until your account is permanently blocked.`
+                    }
+                } else if (typeof remaining === "number" && remaining > 0 && res.status === 401) {
+                    description = `${description} You have ${remaining} ${remaining === 1 ? 'attempt' : 'attempts'} remaining before temporary lockout.`
+                }
+
+                if (raw === "PASSWORD_RESET_REQUIRED" || res.status === 403) {
+                    toast.warning("Action Required", {
+                        description: description,
+                        duration: 8000
+                    })
+                    return
+                }
+
+                toast.error("Sign in failed", { description })
+                return
+            }
+
             toast.success("Welcome back!", { description: "Signing you in..." })
+
+            // --- Remember Me: Persist or clear email in localStorage ---
+            if (remember) {
+                localStorage.setItem("remembered_email", email)
+            } else {
+                localStorage.removeItem("remembered_email")
+            }
+
+            setUserName(data.user?.firstName || "User")
             setIsRedirecting(true)
 
             // Extended delay to allow the 1.5s zoom-fade to finish perfectly (4.5 seconds)
@@ -126,31 +286,22 @@ function LoginForm() {
             if (!next.startsWith("/")) next = "/main-dashboard"
             window.location.href = next
         } catch (err: unknown) {
-            const errorInfo = err as { message?: string };
+            const errorInfo = err as { message?: string }
             const raw = errorInfo?.message ? String(errorInfo.message) : "Network error."
             toast.error("Error", { description: normalizeLoginErrorMessage(raw) })
         } finally {
-            if (!res_local?.ok) setLoading(false)
+            setLoading(false)
         }
     }
 
-    // Animation Variants
     const containerVariants: Variants = {
         hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1, delayChildren: 0.2 }
-        }
+        visible: { opacity: 1, transition: { staggerChildren: 0.15, delayChildren: 0.3 } }
     }
 
     const moduleVariants: Variants = {
-        hidden: { opacity: 0, y: 15, scale: 0.99 },
-        visible: {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] }
-        }
+        hidden: { opacity: 0, y: 20, scale: 0.98 },
+        visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } }
     }
 
     return (
@@ -163,7 +314,7 @@ function LoginForm() {
             {/* --- DIRECTUS-INSPIRED FLUID GRADIENT SYSTEM --- */}
 
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none bg-slate-50 dark:bg-[#020617]">
-                {/* Layer 1: The Moving Fluid Core (Increased Visibility) */}
+                {/* Layer 1: The Moving Fluid Core */}
                 <div className="absolute inset-0 z-0 opacity-40 dark:opacity-60">
                     <motion.div
                         animate={{
@@ -221,13 +372,12 @@ function LoginForm() {
 
                 <div className="absolute inset-0 z-30 opacity-[0.1] dark:opacity-[0.15] pointer-events-none mix-blend-overlay"
                     style={{
-                        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3C%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
                     }}
                 />
             </div>
 
             {/* --- LOGIN HUD --- */}
-
             <motion.main
                 variants={containerVariants}
                 initial="hidden"
@@ -238,7 +388,7 @@ function LoginForm() {
                     <LoginSuccessLoader userName={userName} />
                 ) : (
                     <div className="w-full max-w-[440px] space-y-6">
-                        {/* [TOP] SYSTEM BRANDING ACCENT */}
+                        {/* Branding */}
                         <motion.div variants={moduleVariants} className="flex flex-col items-center gap-3 mb-2">
                             <div className="p-3 rounded-2xl bg-cyan-500/10 shadow-[0_0_30px_rgba(6,182,212,0.15)] border border-cyan-500/20">
                                 <LayoutDashboard className="w-7 h-7 text-cyan-600 dark:text-cyan-400" />
@@ -249,7 +399,7 @@ function LoginForm() {
                             </div>
                         </motion.div>
 
-                        {/* [CENTER] LOGIN FORM */}
+                        {/* Form Card */}
                         <GlassCard variants={moduleVariants} className="relative overflow-hidden p-0 shadow-2xl border-white/20 dark:border-white/10" accent="indigo">
                             <div className="flex flex-col h-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl">
                                 <div className="p-8 border-b border-slate-200 dark:border-white/5 flex flex-col items-center gap-2">
@@ -263,14 +413,18 @@ function LoginForm() {
 
                                 <div className="p-8 flex flex-col justify-center w-full">
                                     <form onSubmit={onSubmit} className="space-y-6">
+                                        {/* Email */}
                                         <div className="space-y-2.5">
                                             <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40 ml-1">Email Address</Label>
                                             <div className="relative group/field">
                                                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-white/20 group-focus-within/field:text-cyan-500 transition-colors" />
                                                 <Input
+                                                    id="login-email"
+                                                    name="email"
                                                     type="email"
                                                     required
                                                     placeholder="your@email.com"
+                                                    autoComplete="username"
                                                     value={email}
                                                     onChange={(e) => setEmail(e.target.value)}
                                                     className="h-12 pl-12 rounded-xl bg-white/60 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-white/10 focus-visible:ring-1 focus-visible:ring-cyan-500/50 transition-all font-bold text-sm"
@@ -278,19 +432,25 @@ function LoginForm() {
                                             </div>
                                         </div>
 
+                                        {/* Password */}
                                         <div className="space-y-2.5">
                                             <div className="flex items-center justify-between ml-1">
                                                 <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-white/40">Password</Label>
-                                                <button type="button" className="text-[9px] font-bold text-slate-400 dark:text-white/20 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" disabled>Forgot?</button>
+
                                             </div>
                                             <div className="relative group/field">
                                                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-white/20 group-focus-within/field:text-cyan-500 transition-colors" />
                                                 <Input
+                                                    id="login-password"
+                                                    name="password"
                                                     type={showPw ? "text" : "password"}
                                                     required
                                                     placeholder="••••••••"
+                                                    autoComplete="current-password"
                                                     value={hashPassword}
-                                                    onChange={(e) => setHashPassword(e.target.value)}
+                                                    onChange={(e) => {
+                                                        setHashPassword(e.target.value)
+                                                    }}
                                                     className="h-12 pl-12 pr-12 rounded-xl bg-white/60 dark:bg-black/20 border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-300 dark:placeholder:text-white/10 focus-visible:ring-1 focus-visible:ring-cyan-500/50 transition-all font-bold text-sm"
                                                 />
                                                 <button
@@ -303,17 +463,29 @@ function LoginForm() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2.5 ml-1">
-                                            <Checkbox
-                                                id="persists"
-                                                checked={remember}
-                                                onCheckedChange={(v) => setRemember(Boolean(v))}
-                                                className="w-3.5 h-3.5 border-slate-300 dark:border-white/10 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
-                                            />
-                                            <label htmlFor="persists" className="text-[10px] font-bold text-slate-500 dark:text-white/40 cursor-pointer">Stay signed in on this device</label>
+                                        {/* Remember me & Forgot Password */}
+                                        <div className="flex items-center justify-between ml-1">
+                                            <div className="flex items-center gap-2.5">
+                                                <Checkbox
+                                                    id="rememberMe"
+                                                    checked={remember}
+                                                    onCheckedChange={(v) => setRemember(Boolean(v))}
+                                                    className="w-3.5 h-3.5 border-slate-300 dark:border-white/10 data-[state=checked]:bg-cyan-500 data-[state=checked]:border-cyan-500"
+                                                />
+                                                <label htmlFor="rememberMe" className="text-[10px] font-bold text-slate-500 dark:text-white/40 cursor-pointer">Stay signed in on this device</label>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => router.push("/forgot-password")}
+                                                className="text-[10px] font-bold text-slate-400 dark:text-white/20 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+                                            >
+                                                Forgot Password?
+                                            </button>
                                         </div>
 
+                                        {/* Submit */}
                                         <Button
+                                            id="login-submit"
                                             type="submit"
                                             disabled={loading}
                                             className="w-full h-14 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black uppercase tracking-[0.2em] text-xs transition-all hover:shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] active:scale-[0.98] group/btn"
@@ -339,13 +511,50 @@ function LoginForm() {
                                 </div>
                             </div>
                         </GlassCard>
-
                     </div>
                 )}
             </motion.main>
+
+            {/* --- LOCKOUT HUD --- */}
+            {isLocked && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-background/80 backdrop-blur-2xl">
+                    <GlassCard
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="w-full max-w-sm p-8 text-center !rounded-[2rem] border-border"
+                        accent="rose"
+                    >
+                        <div className="mx-auto w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mb-6 border border-rose-500/20">
+                            <Clock className="w-8 h-8 text-rose-500 animate-pulse" />
+                        </div>
+                        <h2 className="text-2xl font-black italic tracking-tighter text-foreground uppercase leading-none mb-2">
+                            Access <span className="text-rose-500">Locked</span>
+                        </h2>
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground mb-8 leading-relaxed">
+                            Security protocol triggered
+                        </p>
+
+                        <div className="bg-card backdrop-blur-xl rounded-2xl p-6 mb-8 border border-border relative overflow-hidden group">
+                            <ScanningOverlay />
+                            <div className="text-[9px] font-black uppercase tracking-[0.5em] text-rose-500/60 mb-2">Cool-down in progress</div>
+                            <div className="text-4xl font-mono font-black text-rose-500 tabular-nums drop-shadow-[0_0_10px_rgba(244,63,94,0.3)]">
+                                {formatTime(timeLeft)}
+                            </div>
+                        </div>
+
+                        <Button
+                            onClick={() => setIsLocked(false)}
+                            className="w-full h-12 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80 border border-border font-black uppercase tracking-widest text-[10px] transition-all"
+                        >
+                            Deactivate Overlay
+                        </Button>
+                    </GlassCard>
+                </div>
+            )}
         </div>
     )
 }
+
 function LoginSuccessLoader({ userName }: { userName: string }) {
     const [progress, setProgress] = React.useState(0)
     const [isJumping, setIsJumping] = React.useState(false)
@@ -364,7 +573,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
     }, [])
 
     const isPackingUp = progress >= 100 // Bar is full, hide everything except the name
-    
+
     React.useEffect(() => {
         if (isPackingUp) {
             // Exactly 400ms after pack up starts, the name jumps (hitting absolute 3.0s mark)
@@ -377,16 +586,16 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
         <div className="relative w-full max-w-[440px] flex flex-col items-center">
             <div className="flex flex-col items-center justify-center gap-10 w-full relative z-10">
                 {/* [TOP] CORE HUD HUB */}
-                <motion.div 
+                <motion.div
                     animate={
-                        isPackingUp 
-                        ? { y: -30, scale: 0.8, opacity: 0 } 
-                        : { y: [-4, 4, -4], scale: 1, opacity: 1 }
+                        isPackingUp
+                            ? { y: -30, scale: 0.8, opacity: 0 }
+                            : { y: [-4, 4, -4], scale: 1, opacity: 1 }
                     }
                     transition={
-                        isPackingUp 
-                        ? { duration: 0.5, ease: [0.36, 0, 0.66, -0.56] } // Snappy back-in exit
-                        : { y: { duration: 5, repeat: Infinity, ease: "easeInOut" } }
+                        isPackingUp
+                            ? { duration: 0.5, ease: [0.36, 0, 0.66, -0.56] } // Snappy back-in exit
+                            : { y: { duration: 5, repeat: Infinity, ease: "easeInOut" } }
                     }
                     className="relative"
                 >
@@ -431,8 +640,8 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                     <motion.div
                         key={progress > 45 ? "welcome" : "init"}
                         initial={{ opacity: 0, y: 15 }}
-                        animate={{ 
-                            opacity: isJumping ? 0 : 1, 
+                        animate={{
+                            opacity: isJumping ? 0 : 1,
                             y: isJumping ? -20 : 0,
                             scale: isJumping ? 8 : 1
                         }}
@@ -447,7 +656,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                                 <h2 className="text-4xl font-black italic tracking-tighter text-slate-900 dark:text-white uppercase leading-none">
                                     Welcome Back, <span className="text-cyan-400 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)]">{userName}</span>
                                 </h2>
-                                <motion.p 
+                                <motion.p
                                     animate={{ opacity: isPackingUp ? 0 : 1 }}
                                     transition={{ duration: 0.3 }}
                                     className="text-[9px] font-black text-cyan-500/50 uppercase tracking-[0.6em] animate-pulse"
@@ -462,7 +671,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                         )}
                     </motion.div>
 
-                    <motion.div 
+                    <motion.div
                         animate={{ opacity: isPackingUp ? 0 : 1 }}
                         transition={{ duration: 0.3 }}
                         className="flex flex-col items-center gap-2"
@@ -475,7 +684,7 @@ function LoginSuccessLoader({ userName }: { userName: string }) {
                 </div>
 
                 {/* [BOTTOM] PROGRESS CALIBRATION */}
-                <motion.div 
+                <motion.div
                     animate={isPackingUp ? { y: 30, scale: 0.8, opacity: 0 } : { y: 0, scale: 1, opacity: 1 }}
                     transition={{ duration: 0.5, ease: [0.36, 0, 0.66, -0.56] }}
                     className="w-full space-y-4 px-10"
