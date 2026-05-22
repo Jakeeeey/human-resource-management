@@ -9,5 +9,9 @@ export interface NavItem {
     status?: string | SubsystemStatus;
     icon?: React.ComponentType<{ className?: string }>;
     iconName?: string | null;
+    // Subscription ID that a module belongs to (nullable)
+    subscription?: number | null;
+    // Indicates the module is locked for the current company (leaf items only)
+    isLocked?: boolean;
     items?: NavItem[];
 }

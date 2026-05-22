@@ -9,7 +9,19 @@ export interface ModuleRegistration {
     icon_name?: string;
     sort?: number;
     parent_module_id?: string | number | null;
+    subscription?: number | null;
     subModules?: ModuleRegistration[];
+}
+
+export interface Subscription {
+    id: number;
+    name: string;
+    description?: string | null;
+    tier: number;
+    created_by?: string | null;
+    created_at?: string;
+    updated_by?: string | null;
+    updated_at?: string;
 }
 
 export interface NavItem {
