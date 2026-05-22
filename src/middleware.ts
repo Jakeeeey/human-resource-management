@@ -329,7 +329,25 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
-    let token = req.cookies.get(COOKIE_NAME)?.value
+    const requestHeaders = new Headers(req.headers);
+    const currentToken = req.cookies.get(COOKIE_NAME)?.value;
+    let token = currentToken;
+
+    // --- Validate Token Expiration ---
+    if (token) {
+        const payload = decodeJwtPayload(token);
+        if (payload && payload.exp) {
+            const now = Math.floor(Date.now() / 1000);
+            // If expired or expiring within 10 seconds, treat as expired to trigger refresh
+            if (payload.exp <= now + 10) {
+                console.log("[Middleware] Access token is expired or expiring soon. Forcing refresh...");
+                token = undefined;
+            }
+        } else {
+            console.log("[Middleware] Access token payload is invalid. Forcing refresh...");
+            token = undefined;
+        }
+    }
 
     // --- Automatic Session Refresh ---
     if (!token) {
@@ -338,7 +356,7 @@ export async function middleware(req: NextRequest) {
 
         if (refreshToken && springBase) {
             try {
-                console.log("[Middleware] Access token missing, attempting refresh...");
+                console.log("[Middleware] Access token missing or expired, attempting refresh...");
                 const refreshUrl = `${springBase.replace(/\/$/, "")}/auth/refresh`;
 
                 const refreshRes = await fetch(refreshUrl, {
@@ -358,12 +376,34 @@ export async function middleware(req: NextRequest) {
                         console.log("[Middleware] Refresh successful.");
                         token = newToken;
 
-                        // We will set the new token in the response cookies at the end
-                        // But we also need to make it available for the rest of this middleware run
+                        // Propagate new token to downstream request headers
+                        requestHeaders.set("Authorization", `Bearer ${newToken}`);
+                        const cookieHeader = req.headers.get("cookie") || "";
+                        let updatedCookieHeader = cookieHeader;
+                        const cookiePattern = new RegExp(`(${COOKIE_NAME}=)[^;]*`);
+
+                        if (cookiePattern.test(cookieHeader)) {
+                            updatedCookieHeader = cookieHeader.replace(cookiePattern, `$1${newToken}`);
+                        } else {
+                            updatedCookieHeader = cookieHeader 
+                                ? `${cookieHeader}; ${COOKIE_NAME}=${newToken}` 
+                                : `${COOKIE_NAME}=${newToken}`;
+                        }
+                        requestHeaders.set("cookie", updatedCookieHeader);
                     }
+                } else if (refreshRes.status >= 500) {
+                    console.error(`[Middleware] Spring Boot returned ${refreshRes.status} during refresh.`);
+                    const url = req.nextUrl.clone();
+                    url.pathname = "/error/service-down";
+                    url.searchParams.set("service", `Spring Boot (Refresh Status ${refreshRes.status})`);
+                    return NextResponse.redirect(url);
                 }
             } catch (err) {
-                console.error("[Middleware] Refresh failed:", err);
+                console.error("[Middleware] Refresh failed (Server Outage):", err);
+                const url = req.nextUrl.clone();
+                url.pathname = "/error/service-down";
+                url.searchParams.set("service", "Spring Boot (Session Refresh)");
+                return NextResponse.redirect(url);
             }
         }
     }
@@ -385,7 +425,6 @@ export async function middleware(req: NextRequest) {
 
         // Dashboard is always allowed if logged in
         if (subsystemId === "main-dashboard") {
-            const requestHeaders = new Headers(req.headers);
             requestHeaders.delete("x-locked-module");
             const response = NextResponse.next({
                 request: {
@@ -506,7 +545,6 @@ export async function middleware(req: NextRequest) {
     // Authorization must run first. If the authorized path is subscription-locked,
     // let the request proceed and mark it so the layout can show the paywall.
     const isLocked = await isSubscriptionLocked(pathname);
-    const requestHeaders = new Headers(req.headers);
     if (isLocked) {
         const lockMode = normalizeLockedModuleMode(process.env.NEXT_PUBLIC_LOCKED_MODULE_MODE);
 
