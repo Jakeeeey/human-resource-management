@@ -342,7 +342,6 @@ export async function POST(req: NextRequest) {
     // --- Handle Refresh Token from Backend ---
     const setCookies = springRes.headers.getSetCookie();
     const refreshCookieStr = setCookies.find(c => c.startsWith(`${REFRESH_COOKIE_NAME}=`));
-
     if (refreshCookieStr) {
         const value = refreshCookieStr.split(';')[0].split('=')[1];
         if (value) {
