@@ -11,7 +11,6 @@ import {
     Folder,
     SearchX,
     Sparkles,
-    Lock,
 } from "lucide-react";
 import {
     Tooltip,
@@ -62,15 +61,6 @@ type VOSThemeSettingsV1 = {
     radiusRem?: number;
     density?: "compact" | "comfortable";
 };
-
-type LockedModuleMode = "enable" | "disabled" | "hide";
-
-function normalizeLockedModuleMode(value?: string): LockedModuleMode {
-    const mode = value?.trim().toLowerCase();
-    if (mode === "enable" || mode === "enabled") return "enable";
-    if (mode === "hide") return "hide";
-    return "disabled";
-}
 
 const ACCENT_HSL: Record<string, { pill: string; fg: string }> = {
     amber: { pill: "45 93% 47%", fg: "0 0% 10%" },
@@ -282,15 +272,6 @@ function RecursiveNavItem({
     const isOpen = hasChildren ? !!openMap[key] : false;
     const isClickable = node.url !== "#";
 
-    const lockMode = normalizeLockedModuleMode(process.env.NEXT_PUBLIC_LOCKED_MODULE_MODE);
-    // If hide mode and this is a locked leaf, skip rendering
-    if (lockMode === "hide" && node.isLocked && !hasChildren) {
-        return <></>;
-    }
-    // If disabled mode and locked leaf, make it non-clickable and style disabled
-    const isClickableEffective = isClickable && !(lockMode === "disabled" && node.isLocked && !hasChildren);
-    const disabledClass = lockMode === "disabled" && node.isLocked && !hasChildren ? "opacity-60 cursor-not-allowed" : "";
-
     // Indentation logic: Level 1 (0), Level 2 (7), Level 3 (12), Level 4 (17)...
     const getPaddingClass = (d: number) => {
         if (d === 0) return "";
@@ -314,8 +295,6 @@ function RecursiveNavItem({
             })()}
             <TruncatedLabel text={node.title} term={searchTerm} className={LABEL} />
             {node.status === "comingSoon" && <SoonBadge />}
-            {/* Lock icon for locked leaf items */}
-            {node.isLocked && !hasChildren && <Lock className={ICON_L2_CLASS} />}
 
             {hasChildren && (
                 isOpen ? (
@@ -376,19 +355,25 @@ function RecursiveNavItem({
                     <SidebarMenuButton
                         asChild
                         tooltip={node.title}
-                        className={cn(OUTER_ROW_NO_GREY, disabledClass, "cursor-pointer min-w-0 overflow-hidden")}
+                        className={cn(OUTER_ROW_NO_GREY, "cursor-pointer min-w-0 overflow-hidden")}
                         data-active={isExact}
                     >
-                        {isClickableEffective ? (
-                            <Link href={node.url}>
+                        {isClickable && node.status !== "comingSoon" ? (
+                            <Link href={node.url} className={ROW}>
                                 {renderButtonContent}
                             </Link>
                         ) : (
-                            <div className={ROW} onClick={() => {
-                                if (node.isLocked && lockMode === "disabled") {
-                                    toast.error("Locked Module", { description: "This module is restricted." });
-                                }
-                            }}>
+                            <div
+                                className={cn(ROW, node.status === "comingSoon" && "opacity-60 cursor-not-allowed")}
+                                onClick={() => {
+                                    if (node.status === "comingSoon") {
+                                        toast.info("Stay Tuned!", {
+                                            description: `The "${node.title}" module is currently under development.`,
+                                            icon: <Sparkles className="size-4 text-amber-500" />,
+                                        });
+                                    }
+                                }}
+                            >
                                 {renderButtonContent}
                             </div>
                         )}
@@ -409,21 +394,24 @@ function RecursiveNavItem({
                         </div>
                     </CollapsibleTrigger>
                 ) : (
-                    isClickableEffective ? (
-                        <Link href={node.url} className={nestedClass} style={dynamicStyle} data-active={isExact}>
+                    isClickable && node.status !== "comingSoon" ? (
+                        <Link
+                            href={node.url}
+                            className={nestedClass}
+                            style={dynamicStyle}
+                            data-active={isExact}
+                        >
                             <div className={ROW}>
                                 {renderButtonContent}
                             </div>
                         </Link>
                     ) : (
                         <div
-                            className={cn(nestedClass, disabledClass, ROW)}
+                            className={nestedClass}
                             style={dynamicStyle}
                             data-active={isExact}
                             onClick={() => {
-                                if (node.isLocked && lockMode === "disabled") {
-                                    toast.error("Locked Module", { description: "This module is restricted." });
-                                } else if (node.status === "comingSoon") {
+                                if (node.status === "comingSoon") {
                                     toast.info("Stay Tuned!", {
                                         description: `The "${node.title}" module is currently under development.`,
                                         icon: <Sparkles className="size-4 text-amber-500" />,
@@ -431,7 +419,9 @@ function RecursiveNavItem({
                                 }
                             }}
                         >
-                            {renderButtonContent}
+                            <div className={ROW}>
+                                {renderButtonContent}
+                            </div>
                         </div>
                     )
                 )

@@ -25,7 +25,7 @@ import {
     Plus, 
     Trash2, 
     ChevronRight, 
-    ChevronDown,
+    ChevronDown, 
     Package, 
     Layers,
     Link as LinkIcon,
@@ -39,16 +39,7 @@ import {
 import { 
     SubsystemRegistration, 
     ModuleRegistration, 
-    Subscription,
 } from "../types";
-import { SubsystemService } from "../services/SubsystemService";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -74,13 +65,6 @@ export function SubsystemHierarchyDialog({
     const [searchQuery, setSearchQuery] = React.useState("");
     const [expandedIds, setExpandedIds] = React.useState<Set<string | number>>(new Set());
     const [isSaving, setIsSaving] = React.useState(false);
-    const [subscriptions, setSubscriptions] = React.useState<Subscription[]>([]);
-
-    React.useEffect(() => {
-        if (open) {
-            SubsystemService.getSubscriptions().then(setSubscriptions);
-        }
-    }, [open]);
 
     React.useEffect(() => {
         if (subsystem && open) {
@@ -180,26 +164,21 @@ export function SubsystemHierarchyDialog({
 
     const handleAddChild = (parentId: string | number, parentPath: string) => {
         const newId = Math.random().toString(36).substr(2, 9);
-        setModules(prev => updateInTree(prev, parentId, item => {
-            const parentSubId = item.subscription;
-            return {
-                ...item,
-                subscription: null,
-                subModules: [
-                    ...(item.subModules || []),
-                    {
-                        id: newId,
-                        slug: "new-sub-module",
-                        title: "New Sub-module",
-                        base_path: `${parentPath}/new-sub-module`,
-                        status: "active",
-                        icon_name: "Folder",
-                        subscription: parentSubId || null,
-                        subModules: [],
-                    }
-                ]
-            };
-        }));
+        setModules(prev => updateInTree(prev, parentId, item => ({
+            ...item,
+            subModules: [
+                ...(item.subModules || []),
+                {
+                    id: newId,
+                    slug: "new-sub-module",
+                    title: "New Sub-module",
+                    base_path: `${parentPath}/new-sub-module`,
+                    status: "active",
+                    icon_name: "Folder",
+                    subModules: [],
+                }
+            ]
+        })));
         setExpandedIds(prev => new Set(prev).add(parentId));
     };
 
@@ -266,24 +245,11 @@ export function SubsystemHierarchyDialog({
         return duplicateInfo;
     };
 
-    const cleanParentSubscriptions = (items: ModuleRegistration[]): ModuleRegistration[] => {
-        return items.map(item => {
-            const hasChildren = item.subModules && item.subModules.length > 0;
-            return {
-                ...item,
-                subscription: hasChildren ? null : item.subscription,
-                subModules: item.subModules ? cleanParentSubscriptions(item.subModules) : []
-            };
-        });
-    };
-
     const handleSave = async () => {
         if (!subsystem) return;
 
-        const cleanedModules = cleanParentSubscriptions(modules);
-
         // 1. Validation: Check for duplicates within this subsystem hierarchy
-        const duplicate = findDuplicateSlugs(cleanedModules);
+        const duplicate = findDuplicateSlugs(modules);
         if (duplicate) {
             toast.error("Duplicate Module Detected", {
                 description: `The module "${duplicate.title}" already exists in the "${duplicate.parentTitle}" folder. Each module in this subsystem must have a unique slug.`,
@@ -294,7 +260,7 @@ export function SubsystemHierarchyDialog({
 
         setIsSaving(true);
         try {
-            const result = await onUpdate({ ...subsystem, modules: cleanedModules });
+            const result = await onUpdate({ ...subsystem, modules });
             if (result.success) {
                 // Live Sync: Force refresh the sidebar navigation via Custom Event
                 window.dispatchEvent(new CustomEvent(APP_SIDEBAR_REFRESH_EVENT));
@@ -354,7 +320,7 @@ export function SubsystemHierarchyDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[1200px] h-[95vh] sm:h-[90vh] max-h-[95vh] flex flex-col p-0 overflow-hidden bg-background border shadow-2xl rounded-2xl">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[1000px] h-[95vh] sm:h-[90vh] max-h-[95vh] flex flex-col p-0 overflow-hidden bg-background border shadow-2xl rounded-2xl">
                 <DialogHeader className="p-5 sm:p-6 pb-3 bg-muted/20 border-b">
                     <div className="flex items-center justify-between gap-6">
                         <div className="space-y-0.5">
@@ -474,7 +440,6 @@ export function SubsystemHierarchyDialog({
                                         onMove={handleMoveItem}
                                         isFirst={index === 0}
                                         isLast={index === displayedModules.length - 1}
-                                        subscriptions={subscriptions}
                                     />
                                 ))}
                             </div>
@@ -525,7 +490,6 @@ interface RecursiveModuleItemProps {
     onMove: (id: string | number, direction: 'up' | 'down') => void;
     isFirst: boolean;
     isLast: boolean;
-    subscriptions: Subscription[];
 }
 
 function RecursiveModuleItem({ 
@@ -539,8 +503,7 @@ function RecursiveModuleItem({
     onAddChild,
     onMove,
     isFirst,
-    isLast,
-    subscriptions,
+    isLast
 }: RecursiveModuleItemProps) {
     const isExpanded = expandedIds.has(item.id);
     const hasChildren = item.subModules && item.subModules.length > 0;
@@ -617,52 +580,7 @@ function RecursiveModuleItem({
                         </div>
                     </div>
 
-                    {/* Subscription Dropdown */}
-                    <div className="shrink-0 w-full sm:w-[148px]">
-                        {hasChildren ? (
-                            <div className="flex items-center justify-center h-8">
-                                <span className="text-[10px] font-bold text-muted-foreground/40 italic uppercase tracking-wider select-none">
-                                    Dynamic Tier
-                                </span>
-                            </div>
-                        ) : (
-                            <Select
-                                value={item.subscription ? String(item.subscription) : "none"}
-                                onValueChange={(val) => {
-                                    onUpdate(item.id, { subscription: val === "none" ? null : Number(val) });
-                                }}
-                            >
-                                <SelectTrigger
-                                    className="h-8 w-full rounded-full border border-primary/60 bg-background px-3.5 text-[11px] font-bold text-foreground shadow-sm hover:border-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
-                                >
-                                    <SelectValue placeholder="No Subscription" />
-                                </SelectTrigger>
-                                <SelectContent
-                                    className="rounded-2xl border shadow-xl overflow-hidden p-1 min-w-[160px]"
-                                    position="popper"
-                                    sideOffset={6}
-                                >
-                                    <SelectItem
-                                        value="none"
-                                        className="rounded-xl text-[11px] font-semibold cursor-pointer"
-                                    >
-                                        No Subscription
-                                    </SelectItem>
-                                    {subscriptions.map((sub) => (
-                                        <SelectItem
-                                            key={sub.id}
-                                            value={String(sub.id)}
-                                            className="rounded-xl text-[11px] font-semibold cursor-pointer"
-                                        >
-                                            {sub.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                    </div>
-
-                    <div className="group/path w-full sm:w-[320px] flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-transparent hover:border-primary/20 hover:bg-card transition-all overflow-hidden">
+                    <div className="group/path w-full sm:w-[260px] flex items-center gap-1.5 bg-muted/40 p-1 rounded-xl border border-transparent hover:border-primary/20 hover:bg-card transition-all overflow-hidden">
                         <LinkIcon className="h-3 w-3 text-primary/40 ml-1 shrink-0" />
                         <Input 
                             value={item.base_path}
@@ -761,7 +679,6 @@ function RecursiveModuleItem({
                             onMove={onMove}
                             isFirst={idx === 0}
                             isLast={idx === (item.subModules?.length || 0) - 1}
-                            subscriptions={subscriptions}
                         />
                     ))}
                 </div>
