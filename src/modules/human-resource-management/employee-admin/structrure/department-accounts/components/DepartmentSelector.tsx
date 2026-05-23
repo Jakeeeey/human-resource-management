@@ -6,15 +6,9 @@
 "use client";
 
 import React from "react";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DepartmentPerDivision } from "../types";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface DepartmentSelectorProps {
     departments: DepartmentPerDivision[];
@@ -29,40 +23,33 @@ export function DepartmentSelector({
     onSelectDepartment,
     disabled = false,
 }: DepartmentSelectorProps) {
+    const options = React.useMemo(() => {
+        return departments.map((deptPerDiv) => ({
+            value: deptPerDiv.id.toString(),
+            label: deptPerDiv.department?.department_name || `Department ${deptPerDiv.department_id}`,
+        }));
+    }, [departments]);
+
     return (
         <div className="space-y-2">
             <Label htmlFor="department-select">Department</Label>
-            <Select
+            <SearchableSelect
+                options={options}
                 value={selectedDeptDivId?.toString() || ""}
                 onValueChange={(value) => {
-                    if (value === "") {
+                    if (!value) {
                         onSelectDepartment(null);
                     } else {
                         onSelectDepartment(parseInt(value));
                     }
                 }}
+                placeholder={
+                    departments.length === 0
+                        ? "No departments available"
+                        : "Select a department"
+                }
                 disabled={disabled || departments.length === 0}
-            >
-                <SelectTrigger id="department-select" className="w-full">
-                    <SelectValue
-                        placeholder={
-                            departments.length === 0
-                                ? "No departments available"
-                                : "Select a department"
-                        }
-                    />
-                </SelectTrigger>
-                <SelectContent>
-                    {departments.map((deptPerDiv) => (
-                        <SelectItem
-                            key={deptPerDiv.id}
-                            value={deptPerDiv.id.toString()}
-                        >
-                            {deptPerDiv.department?.department_name || `Department ${deptPerDiv.department_id}`}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            />
         </div>
     );
 }
