@@ -1,14 +1,42 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from "next/server"
-import { decodeJwtPayload, COOKIE_NAME, LAST_VISITED_PATH_COOKIE } from "@/lib/auth-utils"
+import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, LAST_VISITED_PATH_COOKIE, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
 
 const PUBLIC_FILE = /\.(.*)$/
 const BASELINE_PREFIXES = ["/main-dashboard"]
 
-// Edge Memory Cache
+// Edge Memory Cache — Subsystem Prefixes
 let CACHED_PREFIXES: string[] = [...BASELINE_PREFIXES]
 let LAST_FETCH_TIME = 0
-const CACHE_TTL = 300000 // 5 minutes
+const CACHE_TTL = process.env.NODE_ENV === "development" ? 0 : 300000 // 5 minutes in production
+
+// Edge Memory Cache — Subscription Lock
+let CACHED_COMPANY_TIER: number | null = null
+let COMPANY_TIER_FETCH_TIME = 0
+
+interface ModuleSubscriptionInfo {
+    base_path: string;
+    subscription: number | null;
+}
+
+interface DirectusModuleSubscriptionRow {
+    base_path?: string | null;
+    subscription?: number | null;
+}
+
+let CACHED_MODULES_INFO: ModuleSubscriptionInfo[] = []
+let MODULES_INFO_FETCH_TIME = 0
+
+const SUBSCRIPTION_TIER_CACHE: Record<number, number | null> = {}
+let SUBSCRIPTION_TIER_CACHE_TIME = 0
+
+function normalizeLockedModuleMode(value?: string | null) {
+    const mode = value?.trim().toLowerCase()
+    if (mode === "enable" || mode === "enabled") return "enable"
+    if (mode === "hide") return "hide"
+    if (mode === "disabled") return "disabled"
+    return "disabled"
+}
 
 async function getDynamicProtectedPrefixes() {
     const now = Date.now()
@@ -65,6 +93,179 @@ function isProtectedPath(pathname: string, prefixes: string[]) {
     return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
+/**
+ * Fetches the company's subscription tier (company_id = 1, always).
+ * Results are cached in edge memory for CACHE_TTL ms.
+ */
+async function getCompanyTier(): Promise<number | null> {
+    const now = Date.now()
+    if (CACHED_COMPANY_TIER !== null && (now - COMPANY_TIER_FETCH_TIME) < CACHE_TTL) {
+        return CACHED_COMPANY_TIER
+    }
+    const directusBase = process.env.NEXT_PUBLIC_API_BASE_URL
+    const directusToken = process.env.DIRECTUS_STATIC_TOKEN
+    if (!directusBase || !directusToken) return null
+    try {
+        const compFilter = encodeURIComponent(JSON.stringify({ company_id: { _eq: 1 } }))
+        const compRes = await fetch(
+            `${directusBase.replace(/\/+$/, "")}/items/company?filter=${compFilter}&fields=company_subscription&limit=1`,
+            { headers: { Authorization: `Bearer ${directusToken}` }, cache: "no-store" }
+        )
+        if (!compRes.ok) return null
+        const compJson = await compRes.json()
+        const subscriptionId: number | null = compJson.data?.[0]?.company_subscription ?? null
+        if (!subscriptionId) return null
+
+        const subFilter = encodeURIComponent(JSON.stringify({ id: { _eq: subscriptionId } }))
+        const subRes = await fetch(
+            `${directusBase.replace(/\/+$/, "")}/items/subscription?filter=${subFilter}&fields=tier&limit=1`,
+            { headers: { Authorization: `Bearer ${directusToken}` }, cache: "no-store" }
+        )
+        if (!subRes.ok) return null
+        const subJson = await subRes.json()
+        const tier: number | null = subJson.data?.[0]?.tier ?? null
+
+        CACHED_COMPANY_TIER = tier
+        COMPANY_TIER_FETCH_TIME = now
+        return tier
+    } catch {
+        return null
+    }
+}
+
+async function getAllModulesInfo(): Promise<ModuleSubscriptionInfo[]> {
+    const now = Date.now()
+    if (CACHED_MODULES_INFO.length > 0 && (now - MODULES_INFO_FETCH_TIME) < CACHE_TTL) {
+        return CACHED_MODULES_INFO
+    }
+
+    const directusBase = process.env.NEXT_PUBLIC_API_BASE_URL
+    const directusToken = process.env.DIRECTUS_STATIC_TOKEN
+    if (!directusBase || !directusToken) return []
+
+    try {
+        const url = `${directusBase.replace(/\/+$/, "")}/items/modules?fields=base_path,subscription&limit=-1`
+        const res = await fetch(url, {
+            headers: { "Authorization": `Bearer ${directusToken}` },
+            cache: 'no-store'
+        })
+        if (!res.ok) return []
+        const { data } = await res.json()
+        const mapped = ((data || []) as DirectusModuleSubscriptionRow[]).map((m) => ({
+            base_path: m.base_path?.trim() || "",
+            subscription: m.subscription ?? null
+        })).filter((m) => m.base_path)
+
+        CACHED_MODULES_INFO = mapped
+        MODULES_INFO_FETCH_TIME = now
+        return CACHED_MODULES_INFO
+    } catch (err) {
+        console.error("[Middleware] Fetch modules info failed:", err)
+        return CACHED_MODULES_INFO
+    }
+}
+
+async function getSubscriptionTier(subscriptionId: number): Promise<number | null> {
+    const now = Date.now()
+    if ((now - SUBSCRIPTION_TIER_CACHE_TIME) < CACHE_TTL && subscriptionId in SUBSCRIPTION_TIER_CACHE) {
+        return SUBSCRIPTION_TIER_CACHE[subscriptionId]
+    }
+
+    const directusBase = process.env.NEXT_PUBLIC_API_BASE_URL
+    const directusToken = process.env.DIRECTUS_STATIC_TOKEN
+    if (!directusBase || !directusToken) return null
+
+    try {
+        const subFilter = encodeURIComponent(JSON.stringify({ id: { _eq: subscriptionId } }))
+        const subRes = await fetch(
+            `${directusBase.replace(/\/+$/, "")}/items/subscription?filter=${subFilter}&fields=tier&limit=1`,
+            { headers: { Authorization: `Bearer ${directusToken}` }, cache: "no-store" }
+        )
+        if (!subRes.ok) return null
+        const subJson = await subRes.json()
+        const tier: number | null = subJson.data?.[0]?.tier ?? null
+
+        SUBSCRIPTION_TIER_CACHE[subscriptionId] = tier
+        SUBSCRIPTION_TIER_CACHE_TIME = now
+        return tier
+    } catch {
+        return null
+    }
+}
+
+async function getModuleTierForPath(pathname: string): Promise<number | null> {
+    const modulesInfo = await getAllModulesInfo()
+    const cleanPath = pathname.replace(/\/$/, "")
+
+    const sortedModules = [...modulesInfo].sort((a, b) => b.base_path.length - a.base_path.length)
+    const matchedModule = sortedModules.find(m => {
+        const base = m.base_path.replace(/\/$/, "")
+        return cleanPath === base || cleanPath.startsWith(base + "/")
+    })
+
+    if (!matchedModule || !matchedModule.subscription) {
+        return null
+    }
+
+    return getSubscriptionTier(matchedModule.subscription)
+}
+
+async function isSubscriptionLocked(pathname: string): Promise<boolean> {
+    const lockMode = normalizeLockedModuleMode(process.env.NEXT_PUBLIC_LOCKED_MODULE_MODE)
+
+    try {
+        const cleanPathname = pathname.replace(/\/$/, "")
+        const [companyTier, moduleTier] = await Promise.all([
+            getCompanyTier(),
+            getModuleTierForPath(cleanPathname),
+        ])
+
+        console.log(`[SubscriptionLock] Path: ${cleanPathname} | Company Tier: ${companyTier} | Module Tier: ${moduleTier} | Lock Mode: ${lockMode}`)
+
+        if (
+            companyTier !== null &&
+            moduleTier !== null &&
+            moduleTier > companyTier
+        ) {
+            return true
+        }
+    } catch (err) {
+        console.error("[Middleware] Subscription lock check failed:", err)
+    }
+    return false
+}
+
+function applyCommonCookies(response: NextResponse, req: NextRequest, token: string, pathname: string) {
+    const currentToken = req.cookies.get(COOKIE_NAME)?.value;
+    if (token && token !== currentToken) {
+        response.cookies.set({
+            name: COOKIE_NAME,
+            value: token,
+            httpOnly: true,
+            sameSite: "lax",
+            secure: IS_SECURE_COOKIE,
+            path: "/",
+            maxAge: 60 * 60 * 24 * 7,
+        });
+    }
+
+    const isNavigation = req.method === "GET" &&
+        !pathname.startsWith("/api") &&
+        !pathname.startsWith("/error") &&
+        !pathname.startsWith("/_next") &&
+        pathname !== "/favicon.ico";
+
+    if (token && isNavigation) {
+        response.cookies.set({
+            name: LAST_VISITED_PATH_COOKIE,
+            value: pathname,
+            maxAge: 60 * 60 * 24 * 7,
+            path: "/",
+            sameSite: "lax",
+            secure: IS_SECURE_COOKIE
+        });
+    }
+}
 
 export async function middleware(req: NextRequest) {
     if (process.env.NEXT_PUBLIC_AUTH_DISABLED === "true") {
@@ -92,19 +293,19 @@ export async function middleware(req: NextRequest) {
         pathname.startsWith("/api/auth/verify-otp") ||
         pathname.startsWith("/api/auth/resend-otp") ||
         pathname.startsWith("/api/auth/reset-password") ||
+        pathname.startsWith("/api/activity-logs") ||
         pathname.startsWith("/error/service-down") ||
         pathname.startsWith("/forgot-password") ||
         pathname.startsWith("/reset-password")
     ) {
-        // If the user is already logged in and tries to go to root / or /login,
-        // take them back to their last visited route automatically (session resume).
+        // If the user is already logged in and tries to go to root / or /login, take them to their last visited subsystem
         if (pathname === "/" || pathname === "/login") {
             const token = req.cookies.get(COOKIE_NAME)?.value;
             if (token) {
                 const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
                 const target = lastVisited || "/main-dashboard";
 
-                // Avoid infinite redirect loop
+                // Avoid infinite redirect loop if target is the current page
                 if (target !== pathname) {
                     return NextResponse.redirect(new URL(target, req.url));
                 }
@@ -128,7 +329,85 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
-    const token = req.cookies.get(COOKIE_NAME)?.value
+    const requestHeaders = new Headers(req.headers);
+    const currentToken = req.cookies.get(COOKIE_NAME)?.value;
+    let token = currentToken;
+
+    // --- Validate Token Expiration ---
+    if (token) {
+        const payload = decodeJwtPayload(token);
+        if (payload && payload.exp) {
+            const now = Math.floor(Date.now() / 1000);
+            // If expired or expiring within 10 seconds, treat as expired to trigger refresh
+            if (payload.exp <= now + 10) {
+                console.log("[Middleware] Access token is expired or expiring soon. Forcing refresh...");
+                token = undefined;
+            }
+        } else {
+            console.log("[Middleware] Access token payload is invalid. Forcing refresh...");
+            token = undefined;
+        }
+    }
+
+    // --- Automatic Session Refresh ---
+    if (!token) {
+        const refreshToken = req.cookies.get(REFRESH_COOKIE_NAME)?.value;
+        const springBase = process.env.SPRING_API_BASE_URL;
+
+        if (refreshToken && springBase) {
+            try {
+                console.log("[Middleware] Access token missing or expired, attempting refresh...");
+                const refreshUrl = `${springBase.replace(/\/$/, "")}/auth/refresh`;
+
+                const refreshRes = await fetch(refreshUrl, {
+                    method: "POST",
+                    headers: {
+                        "Cookie": `${REFRESH_COOKIE_NAME}=${refreshToken}`,
+                        "Accept": "application/json",
+                    },
+                    cache: "no-store",
+                });
+
+                if (refreshRes.ok) {
+                    const data = await refreshRes.json();
+                    const newToken = pickTokenFromPayload(data);
+
+                    if (newToken) {
+                        console.log("[Middleware] Refresh successful.");
+                        token = newToken;
+
+                        // Propagate new token to downstream request headers
+                        requestHeaders.set("Authorization", `Bearer ${newToken}`);
+                        const cookieHeader = req.headers.get("cookie") || "";
+                        let updatedCookieHeader = cookieHeader;
+                        const cookiePattern = new RegExp(`(${COOKIE_NAME}=)[^;]*`);
+
+                        if (cookiePattern.test(cookieHeader)) {
+                            updatedCookieHeader = cookieHeader.replace(cookiePattern, `$1${newToken}`);
+                        } else {
+                            updatedCookieHeader = cookieHeader 
+                                ? `${cookieHeader}; ${COOKIE_NAME}=${newToken}` 
+                                : `${COOKIE_NAME}=${newToken}`;
+                        }
+                        requestHeaders.set("cookie", updatedCookieHeader);
+                    }
+                } else if (refreshRes.status >= 500) {
+                    console.error(`[Middleware] Spring Boot returned ${refreshRes.status} during refresh.`);
+                    const url = req.nextUrl.clone();
+                    url.pathname = "/error/service-down";
+                    url.searchParams.set("service", `Spring Boot (Refresh Status ${refreshRes.status})`);
+                    return NextResponse.redirect(url);
+                }
+            } catch (err) {
+                console.error("[Middleware] Refresh failed (Server Outage):", err);
+                const url = req.nextUrl.clone();
+                url.pathname = "/error/service-down";
+                url.searchParams.set("service", "Spring Boot (Session Refresh)");
+                return NextResponse.redirect(url);
+            }
+        }
+    }
+
     if (!token) {
         const url = req.nextUrl.clone()
         url.pathname = "/login"
@@ -142,10 +421,19 @@ export async function middleware(req: NextRequest) {
 
     if (subsystemMatch) {
         const subsystemId = subsystemMatch.replace("/", "");
+        let bypassModuleAuthorization = false;
 
         // Dashboard is always allowed if logged in
         if (subsystemId === "main-dashboard") {
-            return NextResponse.next();
+            requestHeaders.delete("x-locked-module");
+            const response = NextResponse.next({
+                request: {
+                    headers: requestHeaders,
+                }
+            });
+            response.cookies.delete("x-locked-module");
+            applyCommonCookies(response, req, token, pathname);
+            return response;
         }
 
         // --- 1. Subsystem Level Check (Short-Circuit via JWT) ---
@@ -200,12 +488,12 @@ export async function middleware(req: NextRequest) {
                     const u = userData?.data || {};
                     const isAdmin = u.role === "ADMIN" || u.isAdmin === 1 || u.isAdmin === true;
                     if (isAdmin) {
-                        return NextResponse.next(); // SILENT BYPASS for Admins
+                        bypassModuleAuthorization = true;
+                    } else {
+                        authorizedSubsystemPaths = (subData.data || []).map((row: { subsystem_id?: { base_path?: string } }) => row.subsystem_id?.base_path?.trim()).filter(Boolean) as string[];
+                        authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
+                        allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
                     }
-
-                    authorizedSubsystemPaths = (subData.data || []).map((row: { subsystem_id?: { base_path?: string } }) => row.subsystem_id?.base_path?.trim()).filter(Boolean) as string[];
-                    authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
-                    allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
                 } else {
                     // Fail-fast on server errors
                     const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus" : "Spring Boot";
@@ -223,7 +511,7 @@ export async function middleware(req: NextRequest) {
 
         // --- Stricter URL Matching Logic ---
         const cleanPathname = pathname.replace(/\/$/, "");
-        let isAuthorized = false;
+        let isAuthorized = bypassModuleAuthorization;
 
         // 1. Root Subsystem Match (e.g. exactly /hrm)
         if (authorizedSubsystemPaths.includes(cleanPathname)) {
@@ -243,14 +531,6 @@ export async function middleware(req: NextRequest) {
             }
         }
 
-        console.log("=== MIDDLEWARE DEBUG ===");
-        console.log("cleanPathname:", cleanPathname);
-        console.log("authorizedSubsystemPaths:", authorizedSubsystemPaths);
-        console.log("authorizedModulePaths:", authorizedModulePaths);
-        console.log("allModulePaths.includes(cleanPathname):", allModulePaths.includes(cleanPathname));
-        console.log("isAuthorized:", isAuthorized);
-        console.log("========================");
-
         if (!isAuthorized) {
             console.warn(`[Middleware] Unauthorized access attempt: User ${payload?.email} -> ${pathname}`);
             const url = req.nextUrl.clone();
@@ -261,31 +541,44 @@ export async function middleware(req: NextRequest) {
         }
     }
 
-    const response = NextResponse.next();
+    // --- Subscription Lock Check ---
+    // Authorization must run first. If the authorized path is subscription-locked,
+    // let the request proceed and mark it so the layout can show the paywall.
+    const isLocked = await isSubscriptionLocked(pathname);
+    if (isLocked) {
+        const lockMode = normalizeLockedModuleMode(process.env.NEXT_PUBLIC_LOCKED_MODULE_MODE);
 
-    // --- Persist Last Visited Path ---
-    // Only save GET navigations that are not API, asset, or error routes.
-    // This cookie is used to restore the user's session automatically on re-entry.
-    const isNavigation = req.method === "GET" &&
-                        !pathname.startsWith("/api") &&
-                        !pathname.startsWith("/error") &&
-                        !pathname.startsWith("/_next") &&
-                        pathname !== "/favicon.ico";
+        if (lockMode === "hide" || lockMode === "disabled") {
+            const url = req.nextUrl.clone();
+            url.pathname = "/main-dashboard";
+            url.searchParams.set("error", "locked_module");
+            return NextResponse.redirect(url);
+        }
 
-    if (token && isNavigation) {
-        response.cookies.set({
-            name: LAST_VISITED_PATH_COOKIE,
-            value: pathname,
-            maxAge: 60 * 60 * 24 * 7, // 7 days, matching the session lifetime
-            path: "/",
-            sameSite: "lax",
-            secure: process.env.NODE_ENV === "production"
+        requestHeaders.set("x-locked-module", "true");
+        const response = NextResponse.next({
+            request: {
+                headers: requestHeaders,
+            }
         });
+        response.cookies.set("x-locked-module", "true", { path: "/" });
+        applyCommonCookies(response, req, token, pathname);
+        return response;
     }
 
+    requestHeaders.delete("x-locked-module");
+    const response = NextResponse.next({
+        request: {
+            headers: requestHeaders,
+        }
+    });
+    response.cookies.delete("x-locked-module");
+
+    applyCommonCookies(response, req, token, pathname);
     return response;
 }
 
 export const config = {
     matcher: ["/:path*"],
 }
+
