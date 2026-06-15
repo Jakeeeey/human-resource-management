@@ -20,7 +20,7 @@ const DirectusModuleSchema = z.object({
     sort: z.number().nullable(),
     parent_module_id: z.number().nullable(),
     subsystem_id: z.number().nullish(),
-    subscription: z.number().nullable()
+    subscription: z.number().nullable().optional()
 });
 
 const SpringModuleSchema = z.object({
