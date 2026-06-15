@@ -7,11 +7,19 @@
 
 import React, { useState, useMemo } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import {
     useDepartmentAccountsMasterData,
     useAssignedAccounts,
@@ -26,6 +34,7 @@ import { getDepartmentsForDivision } from "./types";
 export default function DepartmentAccountsModule() {
     const [selectedDivisionId, setSelectedDivisionId] = useState<number | null>(null);
     const [selectedDeptDivId, setSelectedDeptDivId] = useState<number | null>(null);
+    const [accountTypeFilter, setAccountTypeFilter] = useState<string>("all");
 
     // Fetch master data
     const {
@@ -65,14 +74,28 @@ export default function DepartmentAccountsModule() {
         return getDepartmentsForDivision(selectedDivision);
     }, [selectedDivision]);
 
+    // Dynamically discover all unique budgeting account types in the current department datasets
+    const uniqueAccountTypes = useMemo(() => {
+        if (!accountsData) return [];
+        const typesMap = new Map<number, string>();
+        [...(accountsData.assigned || []), ...(accountsData.available || [])].forEach((acc) => {
+            if (acc.account_type && acc.account_type_info) {
+                typesMap.set(acc.account_type, acc.account_type_info.account_name);
+            }
+        });
+        return Array.from(typesMap.entries()).map(([id, name]) => ({ id, name }));
+    }, [accountsData]);
+
     // Handlers
     const handleDivisionChange = (divisionId: number | null) => {
         setSelectedDivisionId(divisionId);
         setSelectedDeptDivId(null); // Reset department selection
+        setAccountTypeFilter("all"); // Reset filter
     };
 
     const handleDepartmentChange = (deptDivId: number | null) => {
         setSelectedDeptDivId(deptDivId);
+        setAccountTypeFilter("all"); // Reset filter
     };
 
     const handleAssignAccount = async (coaId: number) => {
@@ -146,7 +169,8 @@ export default function DepartmentAccountsModule() {
                         <Skeleton className="h-4 w-96" />
                     </div>
                 </div>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    <Skeleton className="h-20" />
                     <Skeleton className="h-20" />
                     <Skeleton className="h-20" />
                 </div>
@@ -159,13 +183,18 @@ export default function DepartmentAccountsModule() {
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">
-                        Department Accounts
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Assign chart of accounts to departments within divisions
-                    </p>
+                <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl border border-primary/20 bg-primary/5 transition-all duration-200">
+                        <Users className="h-7 w-7 text-primary transition-colors duration-200" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">
+                            Department Accounts
+                        </h1>
+                        <p className="text-muted-foreground">
+                            Assign chart of accounts to departments within divisions
+                        </p>
+                    </div>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleRefresh}>
                     <RefreshCw className="mr-2 h-4 w-4" />
@@ -173,10 +202,10 @@ export default function DepartmentAccountsModule() {
                 </Button>
             </div>
 
-            {/* Selectors */}
+            {/* Selectors and Filter */}
             <Card>
                 <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                         <DivisionSelector
                             divisions={masterData?.divisions || []}
                             selectedDivisionId={selectedDivisionId}
@@ -188,6 +217,26 @@ export default function DepartmentAccountsModule() {
                             onSelectDepartment={handleDepartmentChange}
                             disabled={!selectedDivisionId}
                         />
+                        <div className="space-y-2">
+                            <Label htmlFor="account-type-filter">Account Type Filter</Label>
+                            <Select
+                                value={accountTypeFilter}
+                                onValueChange={setAccountTypeFilter}
+                                disabled={!selectedDeptDivId}
+                            >
+                                <SelectTrigger id="account-type-filter" className="w-full">
+                                    <SelectValue placeholder="All Account Types" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Budgeting Categories</SelectItem>
+                                    {uniqueAccountTypes.map((type) => (
+                                        <SelectItem key={type.id} value={type.id.toString()}>
+                                            {type.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -207,6 +256,7 @@ export default function DepartmentAccountsModule() {
                         onUnassignAccount={handleUnassignAccount}
                         isAssigning={assignMutation.isPending}
                         isUnassigning={unassignMutation.isPending}
+                        accountTypeFilter={accountTypeFilter}
                     />
                 ) : null
             ) : (

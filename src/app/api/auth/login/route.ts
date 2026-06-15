@@ -4,9 +4,13 @@ import {
     decodeJwtPayload,
     pickTokenFromPayload,
     COOKIE_NAME,
+    REFRESH_COOKIE_NAME,
+    REFRESH_PATH,
     COOKIE_MAX_AGE_CAP,
     extractClientIp,
-    resolveIpGeo
+    resolveIpGeo,
+    getCookieOptions,
+    IS_SECURE_COOKIE
 } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";
@@ -228,7 +232,7 @@ export async function POST(req: NextRequest) {
                 lockedUntilTs = Date.now() + duration;
             }
 
-            // CRITICAL SAFETY: If the timestamp is in the past or too close to 'now', 
+            // CRITICAL SAFETY: If the timestamp is in the past or too close to 'now',
             // force a minimum duration so the client doesn't see "00:00"
             const minBuffer = 5000; // 5 second grace
             if (lockedUntilTs <= (Date.now() + minBuffer)) {
@@ -332,12 +336,22 @@ export async function POST(req: NextRequest) {
     res.cookies.set({
         name: COOKIE_NAME,
         value: token,
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-        path: "/",
-        ...(remember ? { maxAge: cookieMaxAge } : {}),
+        ...getCookieOptions(remember, "/")
     });
+
+    // --- Handle Refresh Token from Backend ---
+    const setCookies = springRes.headers.getSetCookie();
+    const refreshCookieStr = setCookies.find(c => c.startsWith(`${REFRESH_COOKIE_NAME}=`));
+    if (refreshCookieStr) {
+        const value = refreshCookieStr.split(';')[0].split('=')[1];
+        if (value) {
+            res.cookies.set({
+                name: REFRESH_COOKIE_NAME,
+                value: value,
+                ...getCookieOptions(remember, REFRESH_PATH)
+            });
+        }
+    }
 
     if (latitude !== null && longitude !== null) {
         res.cookies.set({
@@ -345,7 +359,7 @@ export async function POST(req: NextRequest) {
             value: String(latitude),
             httpOnly: true,
             sameSite: "lax",
-            secure: false,
+            secure: IS_SECURE_COOKIE,
             path: "/",
             ...(remember ? { maxAge: cookieMaxAge } : {}),
         });
@@ -354,7 +368,7 @@ export async function POST(req: NextRequest) {
             value: String(longitude),
             httpOnly: true,
             sameSite: "lax",
-            secure: false,
+            secure: IS_SECURE_COOKIE,
             path: "/",
             ...(remember ? { maxAge: cookieMaxAge } : {}),
         });
@@ -362,3 +376,4 @@ export async function POST(req: NextRequest) {
 
     return res;
 }
+

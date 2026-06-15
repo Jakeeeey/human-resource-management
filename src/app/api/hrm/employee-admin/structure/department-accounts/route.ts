@@ -79,8 +79,9 @@ interface DirectusResponse<T> {
 // HELPERS
 // ============================================================================
 
-async function fetchAll<T>(collection: string, offset = 0, acc: T[] = []): Promise<T[]> {
-    const url = `${DIRECTUS_URL}/items/${collection}?limit=${LIMIT}&offset=${offset}`;
+async function fetchAll<T>(collection: string, offset = 0, queryParams = "", acc: T[] = []): Promise<T[]> {
+    const separator = queryParams ? `&${queryParams}` : "";
+    const url = `${DIRECTUS_URL}/items/${collection}?limit=${LIMIT}&offset=${offset}${separator}`;
     const res = await fetch(url, {
         cache: "no-store",
         headers: {
@@ -98,7 +99,7 @@ async function fetchAll<T>(collection: string, offset = 0, acc: T[] = []): Promi
     const all = [...acc, ...items];
 
     if (items.length === LIMIT) {
-        return fetchAll(collection, offset + LIMIT, all);
+        return fetchAll(collection, offset + LIMIT, queryParams, all);
     }
 
     return all;
@@ -112,6 +113,9 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
         const deptDivId = searchParams.get("dept_div_id");
+        
+        // Allowed budgeting account types filter: OpEx (9), COGS (7, 8), CapEx (10)
+        const budgetFilter = "filter=" + encodeURIComponent(JSON.stringify({ account_type: { _in: [7, 8, 9, 10] } }));
 
         // If dept_div_id is provided, return assigned accounts for that department
         if (deptDivId) {
@@ -120,7 +124,7 @@ export async function GET(req: NextRequest) {
             const possibleAssignCollections = ["department_division_coa", "dept_div_coa", "assigned_accounts"];
 
             const [allAccounts, accountTypes] = await Promise.all([
-                fetchAll<ChartOfAccount>(COLLECTIONS.CHART_OF_ACCOUNTS),
+                fetchAll<ChartOfAccount>(COLLECTIONS.CHART_OF_ACCOUNTS, 0, budgetFilter),
                 fetchAll<AccountType>(COLLECTIONS.ACCOUNT_TYPES),
             ]);
 
@@ -166,7 +170,7 @@ export async function GET(req: NextRequest) {
         const [divisions, departments, accounts, accountTypes] = await Promise.all([
             fetchAll<Division>(COLLECTIONS.DIVISION),
             fetchAll<Department>(COLLECTIONS.DEPARTMENT),
-            fetchAll<ChartOfAccount>(COLLECTIONS.CHART_OF_ACCOUNTS),
+            fetchAll<ChartOfAccount>(COLLECTIONS.CHART_OF_ACCOUNTS, 0, budgetFilter),
             fetchAll<AccountType>(COLLECTIONS.ACCOUNT_TYPES),
         ]);
 
