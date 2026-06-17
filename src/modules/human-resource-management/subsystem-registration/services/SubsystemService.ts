@@ -1,4 +1,4 @@
-import { SubsystemRegistration, ModuleRegistration, Subscription } from "../types";
+import { SubsystemRegistration, ModuleRegistration } from "../types";
 
 interface RawModule extends ModuleRegistration {
     subsystem_id?: number;
@@ -92,8 +92,7 @@ export class SubsystemService {
                 icon_name: itemModule.icon_name || "Folder",
                 sort: index,
                 subsystem_id: subsystemId,
-                parent_module_id: parentId,
-                subscription: itemModule.subscription || null
+                parent_module_id: parentId
             };
 
             let savedModuleId: string | number = itemModule.id;
@@ -324,17 +323,5 @@ export class SubsystemService {
     /** @deprecated */
     static async saveSubsystems(): Promise<void> {
         console.warn("saveSubsystems is slow and deprecated.");
-    }
-
-    static async getSubscriptions(): Promise<Subscription[]> {
-        try {
-            const res = await fetch(`/api/hrm/subsystem-registration/subscriptions?limit=-1`);
-            if (!res.ok) return [];
-            const { data } = await res.json();
-            return data || [];
-        } catch (error) {
-            console.error("Error fetching subscriptions:", error);
-            return [];
-        }
     }
 }
