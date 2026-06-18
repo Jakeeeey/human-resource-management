@@ -30,22 +30,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { Eye, MoreHorizontal, Pencil, Users } from "lucide-react";
-import type { SalesmanWithRelations } from "../types";
+import { CheckCircle2, MoreHorizontal, XCircle } from "lucide-react";
+import type { SalesmanDraftWithRelations } from "../types";
 
-interface SalesmanTableProps {
-    salesmen: SalesmanWithRelations[];
-    onViewDetails: (salesman: SalesmanWithRelations) => void;
-    onEdit: (salesman: SalesmanWithRelations) => void;
-    onManageCustomers: (salesman: SalesmanWithRelations) => void;
+interface SalesmanApprovalTableProps {
+    drafts: SalesmanDraftWithRelations[];
+    onApprove: (draft: SalesmanDraftWithRelations) => void;
+    onReject: (draft: SalesmanDraftWithRelations) => void;
 }
 
-export function SalesmanTable({
-    salesmen,
-    onViewDetails,
-    onEdit,
-    onManageCustomers,
-}: SalesmanTableProps) {
+export function SalesmanApprovalTable({
+    drafts,
+    onApprove,
+    onReject,
+}: SalesmanApprovalTableProps) {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [pagination, setPagination] = useState<PaginationState>({
         pageIndex: 0,
@@ -53,11 +51,10 @@ export function SalesmanTable({
     });
 
     useEffect(() => {
-        // When the dataset changes (filters/search/refetch), return to page 1.
         setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-    }, [salesmen]);
+    }, [drafts]);
 
-    const columns: ColumnDef<SalesmanWithRelations>[] = [
+    const columns: ColumnDef<SalesmanDraftWithRelations>[] = [
         {
             accessorKey: "employee_id",
             header: "Employee Name",
@@ -104,7 +101,7 @@ export function SalesmanTable({
             id: "actions",
             header: "Actions",
             cell: ({ row }) => {
-                const salesman = row.original;
+                const draft = row.original;
 
                 return (
                     <DropdownMenu>
@@ -117,17 +114,13 @@ export function SalesmanTable({
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => onViewDetails(salesman)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
+                            <DropdownMenuItem onClick={() => onApprove(draft)} className="text-green-600">
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Approve
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onEdit(salesman)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onManageCustomers(salesman)}>
-                                <Users className="mr-2 h-4 w-4" />
-                                Manage Customers
+                            <DropdownMenuItem onClick={() => onReject(draft)} className="text-destructive">
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Reject
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -136,11 +129,9 @@ export function SalesmanTable({
         },
     ];
 
-    // TanStack Table returns functions that React Compiler can't safely memoize.
-    // This is expected; suppress the lint warning at this call site.
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
-        data: salesmen,
+        data: drafts,
         columns,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -195,8 +186,8 @@ export function SalesmanTable({
                                 colSpan={columns.length}
                                 className="h-24 text-center"
                             >
-                                {salesmen.length === 0
-                                    ? "No salesmen found."
+                                {drafts.length === 0
+                                    ? "No drafts pending approval."
                                     : "No results on this page."}
                             </TableCell>
                         </TableRow>
@@ -204,12 +195,12 @@ export function SalesmanTable({
                 </TableBody>
             </Table>
 
-            {salesmen.length > 0 ? (
+            {drafts.length > 0 ? (
                 <div className="border-t py-2">
                     <DataTablePagination
                         pageIndex={table.getState().pagination.pageIndex + 1}
                         pageSize={table.getState().pagination.pageSize}
-                        rowCount={salesmen.length}
+                        rowCount={drafts.length}
                         onPageChange={(page) => table.setPageIndex(page - 1)}
                         onPageSizeChange={(pageSize) => table.setPageSize(pageSize)}
                     />
