@@ -85,7 +85,15 @@ export function DepartmentDialog({
                 department_description: department.department_description || "",
                 department_head: department.department_head_id?.toString() || "",
                 date_added: department.date_added
-                    ? new Date(department.date_added)
+                    ? (() => {
+                        // Parse as local date (not UTC) to avoid day-shift in UTC+8.
+                        // "2023-01-03" parsed by new Date() becomes UTC midnight,
+                        // which in UTC+8 still stays Jan 3 — but toISOString on
+                        // a locally-created Date at midnight shifts back. Setting
+                        // noon avoids any DST or boundary issues on both read & write.
+                        const [y, m, d] = department.date_added.split("T")[0].split("-").map(Number);
+                        return new Date(y, m - 1, d, 12, 0, 0);
+                    })()
                     : new Date(),
                 positions: department.positions?.map(p => p.position) || [],
             });
@@ -108,7 +116,10 @@ export function DepartmentDialog({
                 department_name: data.department_name,
                 department_description: data.department_description,
                 department_head: parseInt(data.department_head, 10),
-                date_added: data.date_added?.toISOString(),
+                // Format as YYYY-MM-DD to avoid UTC conversion shifting the day.
+                date_added: data.date_added
+                    ? `${data.date_added.getFullYear()}-${String(data.date_added.getMonth() + 1).padStart(2, "0")}-${String(data.date_added.getDate()).padStart(2, "0")}`
+                    : null,
                 positions: data.positions.filter(p => p.trim() !== ""),
             });
             onOpenChange(false);
