@@ -147,6 +147,32 @@ export function SalesmanFormDialog(props: Props) {
     }
   }, [employee]);
 
+  React.useEffect(() => {
+    if (!open) return;
+
+    const handleScrollEvent = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (
+        target && (
+          target.closest("[data-radix-select-viewport]") ||
+          target.closest("[data-slot='command-list']") ||
+          target.closest("[cmdk-list]") ||
+          target.closest("[data-radix-popper-content-wrapper]")
+        )
+      ) {
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener("wheel", handleScrollEvent, { capture: true });
+    document.addEventListener("touchmove", handleScrollEvent, { capture: true });
+
+    return () => {
+      document.removeEventListener("wheel", handleScrollEvent, { capture: true });
+      document.removeEventListener("touchmove", handleScrollEvent, { capture: true });
+    };
+  }, [open]);
+
   const provinceCode = React.useMemo(() => findProvinceCode(userProvince), [userProvince, findProvinceCode]);
   const cityCode = React.useMemo(() => findCityCode(provinceCode, userCity), [provinceCode, userCity, findCityCode]);
 

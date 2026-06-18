@@ -65,6 +65,10 @@ export async function getSalesmanCreationData() {
 	return http<SalesmanCreationDataResponse>(API_BASE);
 }
 
+export async function getQrCodeLookups() {
+	return http<{ data: { companies: any[]; suppliers: any[] } }>("/api/hrm/employee-admin/structure/sales-management/salesman-qr-code/lookups");
+}
+
 export async function createSalesman(data: Record<string, unknown>) {
 	return http<unknown>(API_BASE, {
 		method: "POST",

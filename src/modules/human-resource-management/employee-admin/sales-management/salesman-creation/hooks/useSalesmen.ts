@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSalesmanFilterContext } from "../Provider/SalesmanFilterProvider";
 import {
@@ -15,6 +13,8 @@ import type {
     Branch,
     Operation,
     PriceType,
+    Company,
+    Supplier,
 } from "../types";
 
 interface UseSalesmenReturn {
@@ -25,6 +25,8 @@ interface UseSalesmenReturn {
     badBranches: Branch[];
     operations: Operation[];
     priceTypes: PriceType[];
+    companies: Company[];
+    suppliers: Supplier[];
     isLoading: boolean;
     isError: boolean;
     error: Error | null;
@@ -44,6 +46,8 @@ export function useSalesmen(): UseSalesmenReturn {
     const [badBranches, setBadBranches] = useState<Branch[]>([]);
     const [operations, setOperations] = useState<Operation[]>([]);
     const [priceTypes, setPriceTypes] = useState<PriceType[]>([]);
+    const [companies, setCompanies] = useState<Company[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
@@ -56,6 +60,7 @@ export function useSalesmen(): UseSalesmenReturn {
             }
 
             const data = await getSalesmanCreationData();
+
             setAllSalesmen(data.salesmen || []);
             setUsers(data.users || []);
             setDivisions(data.divisions || []);
@@ -63,6 +68,9 @@ export function useSalesmen(): UseSalesmenReturn {
             setBadBranches(data.badBranches || []);
             setOperations(data.operations || []);
             setPriceTypes(data.priceTypes || []);
+            setCompanies((data as any).companies || []);
+            setSuppliers((data as any).suppliers || []);
+            
             hasLoadedRef.current = true;
 
         } catch (err) {
@@ -144,6 +152,8 @@ export function useSalesmen(): UseSalesmenReturn {
         badBranches,
         operations,
         priceTypes,
+        companies,
+        suppliers,
         isLoading,
         isError,
         error,

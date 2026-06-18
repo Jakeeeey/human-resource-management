@@ -1,4 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+const COOKIE_NAME = "vos_access_token";
+
+function decodeJwt(token: string): Record<string, unknown> | null {
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
+        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        while (s.length % 4) s += "=";
+        const json = Buffer.from(s, "base64").toString("utf8");
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -263,13 +279,15 @@ async function findSalesmanConflict(params: {
 
 async function buildSalesmanRelations() {
     try {
-        const [salesmen, users, divisions, branches, operations, priceTypes] = await Promise.all([
+        const [salesmen, users, divisions, branches, operations, priceTypes, companies, suppliers] = await Promise.all([
             fetchAll<Salesman>("salesman").catch(() => []),
             fetchAll<User>("user").catch(() => []),
             fetchAll<Division>("division").catch(() => []),
             fetchAll<Branch>("branches").catch(() => []),
             fetchAll<Operation>("operation").catch(() => []),
             fetchAll<PriceType>("price_types").catch(() => []),
+            fetchAll<any>("company").catch(() => []),
+            fetchAll<any>("suppliers").catch(() => []),
         ]);
 
         const regularBranches = branches.filter((b) => b.isReturn === 0 || b.isReturn === null);
@@ -300,6 +318,8 @@ async function buildSalesmanRelations() {
             badBranches,
             operations,
             priceTypes,
+            companies,
+            suppliers,
         };
     } catch (error) {
         console.error("Error building salesman relations:", error);
@@ -376,6 +396,17 @@ export async function POST(req: NextRequest) {
 
         // Update linked employee info first (email/contact/address)
         await patchEmployee(employeeId, employeePatch);
+
+        // Resolve encoder_id from cookie session
+        const cookieStore = await cookies();
+        const token = cookieStore.get(COOKIE_NAME)?.value;
+        if (token) {
+            const payload = decodeJwt(token);
+            const userId = payload?.id || payload?.user_id || payload?.sub;
+            if (userId) {
+                salesmanBody["encoder_id"] = Number(userId);
+            }
+        }
 
         salesmanBody["modified_date"] = await getCurrentTimeInTimeZone();
 
@@ -475,6 +506,17 @@ export async function PATCH(req: NextRequest) {
 
         // Update linked employee info first (email/contact/address)
         await patchEmployee(employeeId, employeePatch);
+
+        // Resolve encoder_id from cookie session
+        const cookieStore = await cookies();
+        const token = cookieStore.get(COOKIE_NAME)?.value;
+        if (token) {
+            const payload = decodeJwt(token);
+            const userId = payload?.id || payload?.user_id || payload?.sub;
+            if (userId) {
+                updateData["encoder_id"] = Number(userId);
+            }
+        }
 
         updateData["modified_date"] = await getCurrentTimeInTimeZone();
 
