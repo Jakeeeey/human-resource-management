@@ -12,6 +12,8 @@ import type {
 	PriceType,
 	SalesmanWithRelations,
 	User,
+	Company,
+	Supplier,
 } from "../types";
 
 const API_BASE =
@@ -25,6 +27,8 @@ export interface SalesmanCreationDataResponse {
 	badBranches: Branch[];
 	operations: Operation[];
 	priceTypes: PriceType[];
+	companies: Company[];
+	suppliers: Supplier[];
 }
 
 async function http<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
