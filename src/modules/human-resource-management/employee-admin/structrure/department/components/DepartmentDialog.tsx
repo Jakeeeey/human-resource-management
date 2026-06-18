@@ -24,13 +24,7 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -167,23 +161,17 @@ export function DepartmentDialog({
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Department Head</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a user" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {users.map((user) => (
-                                                <SelectItem
-                                                    key={user.user_id}
-                                                    value={user.user_id.toString()}
-                                                >
-                                                    {user.user_fname} {user.user_lname}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <FormControl>
+                                        <SearchableSelect
+                                            options={users.map((user) => ({
+                                                value: user.user_id.toString(),
+                                                label: `${user.user_fname} ${user.user_lname}`,
+                                            }))}
+                                            value={field.value}
+                                            onValueChange={field.onChange}
+                                            placeholder="Select a user"
+                                        />
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
