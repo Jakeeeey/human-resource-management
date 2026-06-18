@@ -277,6 +277,18 @@ async function findSalesmanConflict(params: {
     return await checkCollection("salesman_draft");
 }
 
+interface Company {
+    company_id: number;
+    company_name: string;
+    company_code?: string | null;
+}
+
+interface Supplier {
+    id: number;
+    supplier_name: string;
+    supplier_code?: string | null;
+}
+
 async function buildSalesmanRelations() {
     try {
         const [salesmen, users, divisions, branches, operations, priceTypes, companies, suppliers] = await Promise.all([
@@ -286,8 +298,8 @@ async function buildSalesmanRelations() {
             fetchAll<Branch>("branches").catch(() => []),
             fetchAll<Operation>("operation").catch(() => []),
             fetchAll<PriceType>("price_types").catch(() => []),
-            fetchAll<any>("company").catch(() => []),
-            fetchAll<any>("suppliers").catch(() => []),
+            fetchAll<Company>("company").catch(() => []),
+            fetchAll<Supplier>("suppliers").catch(() => []),
         ]);
 
         const regularBranches = branches.filter((b) => b.isReturn === 0 || b.isReturn === null);

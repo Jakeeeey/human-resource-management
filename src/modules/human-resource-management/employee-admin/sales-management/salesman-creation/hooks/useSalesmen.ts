@@ -68,8 +68,8 @@ export function useSalesmen(): UseSalesmenReturn {
             setBadBranches(data.badBranches || []);
             setOperations(data.operations || []);
             setPriceTypes(data.priceTypes || []);
-            setCompanies((data as any).companies || []);
-            setSuppliers((data as any).suppliers || []);
+            setCompanies(data.companies || []);
+            setSuppliers(data.suppliers || []);
             
             hasLoadedRef.current = true;
 

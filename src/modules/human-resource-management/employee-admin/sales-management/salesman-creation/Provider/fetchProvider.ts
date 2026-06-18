@@ -12,6 +12,8 @@ import type {
 	PriceType,
 	SalesmanWithRelations,
 	User,
+	Company,
+	Supplier,
 } from "../types";
 
 const API_BASE =
@@ -25,6 +27,8 @@ export interface SalesmanCreationDataResponse {
 	badBranches: Branch[];
 	operations: Operation[];
 	priceTypes: PriceType[];
+	companies: Company[];
+	suppliers: Supplier[];
 }
 
 async function http<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
@@ -63,10 +67,6 @@ async function http<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T>
 
 export async function getSalesmanCreationData() {
 	return http<SalesmanCreationDataResponse>(API_BASE);
-}
-
-export async function getQrCodeLookups() {
-	return http<{ data: { companies: any[]; suppliers: any[] } }>("/api/hrm/employee-admin/structure/sales-management/salesman-qr-code/lookups");
 }
 
 export async function createSalesman(data: Record<string, unknown>) {
