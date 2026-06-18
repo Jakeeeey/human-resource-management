@@ -59,8 +59,15 @@ async function proxy(req: NextRequest) {
 
   const upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}${upstreamPath}${search ? (upstreamPath.includes('?') ? `&${search.slice(1)}` : search) : ""}`;
 
+  const authHeader = process.env.DIRECTUS_STATIC_TOKEN 
+    ? `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` 
+    : req.headers.get("Authorization") || "";
+
   const headers = new Headers();
   headers.set("content-type", "application/json");
+  if (authHeader) {
+    headers.set("Authorization", authHeader);
+  }
 
   try {
     const res = await fetch(upstreamUrl, {
