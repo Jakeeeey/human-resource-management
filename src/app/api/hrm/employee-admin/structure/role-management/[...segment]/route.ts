@@ -104,10 +104,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
   if (req.method === "DELETE" && segments[0] === "supervisors" && segments[1]) {
     try {
       const supervisorId = segments[1];
+      const authHeader = process.env.DIRECTUS_STATIC_TOKEN 
+        ? `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` 
+        : req.headers.get("Authorization") || "";
 
       // 1. Find all active salesman assignments for this supervisor assignment
       const assignmentsRes = await fetch(`${UPSTREAM_BASE}/items/salesman_per_supervisor?filter[supervisor_per_division_id][_eq]=${supervisorId}&filter[is_deleted][_eq]=0&fields=id`, {
-        headers: { "Authorization": req.headers.get("Authorization") || "" }
+        headers: { "Authorization": authHeader }
       });
       const assignmentsData = await assignmentsRes.json();
 
@@ -117,7 +120,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ s
           fetch(`${UPSTREAM_BASE}/items/salesman_per_supervisor/${a.id}`, {
             method: "PATCH",
             headers: {
-              "Authorization": req.headers.get("Authorization") || "",
+              "Authorization": authHeader,
               "Content-Type": "application/json"
             },
             body: JSON.stringify({ is_deleted: 1 })
@@ -216,10 +219,14 @@ async function handleMutation(req: NextRequest, segments: string[], method: stri
       };
     }
 
+    const authHeader = process.env.DIRECTUS_STATIC_TOKEN 
+      ? `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}` 
+      : req.headers.get("Authorization") || "";
+
     const res = await fetch(`${UPSTREAM_BASE}${upstreamPath}`, {
       method: finalMethod,
       headers: {
-        "Authorization": req.headers.get("Authorization") || "",
+        "Authorization": authHeader,
         "Content-Type": "application/json"
       },
       body: JSON.stringify(finalBody)
