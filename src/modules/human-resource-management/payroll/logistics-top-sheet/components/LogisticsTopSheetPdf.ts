@@ -17,12 +17,6 @@ export const generateLogisticsTopSheetPdf = async (
     };
     const periodStr = `${formatDate(cutoffStart)} — ${formatDate(cutoffEnd)}`;
 
-    // Calculate totals
-    const totalGross = data.reduce((sum, item) => sum + item.grossPay, 0);
-    const totalAdditions = data.reduce((sum, item) => sum + item.additions, 0);
-    const totalDeductions = data.reduce((sum, item) => sum + item.deductions, 0);
-    const totalNet = data.reduce((sum, item) => sum + item.netPay, 0);
-
     // Format Currency
     const formatCurrency = (val: number) => {
         if (val === 0) return "PHP 0.00";
@@ -55,6 +49,7 @@ export const generateLogisticsTopSheetPdf = async (
         currentY += 5;
 
         // Draw the AutoTable
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tableBody: any[] = [];
         data.forEach(item => {
             // Main Employee Row

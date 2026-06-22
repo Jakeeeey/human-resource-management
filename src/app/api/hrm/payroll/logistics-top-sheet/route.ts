@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Missing cutoff dates" }, { status: 400 });
         }
 
-        const fetchWithRetry = async (url: string, options: any, retries = 3): Promise<Response> => {
+        const fetchWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
             for (let i = 0; i < retries; i++) {
                 try {
                     const res = await fetch(url, { ...options, keepalive: true });
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         const userAdditions = new Map<number, number>();
         const userAdditionsList = new Map<number, {description: string, amount: number}[]>();
         
-        additionsData.forEach((a: any) => {
+        additionsData.forEach((a: { description?: string; user_id?: string | number; amount?: string | number }) => {
             const desc = a.description || "";
             const isLogisticsRecord = desc.startsWith("Dispatch -") || desc.includes("Helper") || desc.includes("Driver") || /^\d{2}[/-]\d{2}/.test(desc);
             
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
             );
         };
 
-        const userData: any[] = [];
+        const userData: { user_id?: number; user_fname?: string; user_lname?: string; user_mname?: string; external_id?: string | number }[] = [];
         const chunks = chunkArray(userIds, 150);
         for (const chunk of chunks) {
             const joined = chunk.join(",");

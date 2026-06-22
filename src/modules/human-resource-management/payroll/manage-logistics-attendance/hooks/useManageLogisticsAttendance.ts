@@ -6,7 +6,6 @@ import {
   LogisticsReportMeta,
   LogisticsReportResponse,
   DispatchAttendance,
-  UpdateDispatchStaffPayload,
 } from "../type";
 
 function getDefaultDateRange() {

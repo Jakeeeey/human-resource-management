@@ -7,7 +7,7 @@ import { generateLogisticsTopSheetPdf } from "./components/LogisticsTopSheetPdf"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Printer, RefreshCw, Download, FileText } from "lucide-react";
+import { Printer, RefreshCw, FileText } from "lucide-react";
 
 export const LogisticsTopSheetModule = () => {
     const [cutoffStart, setCutoffStart] = useState("");

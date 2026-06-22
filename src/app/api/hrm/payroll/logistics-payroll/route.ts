@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 import { StaffPayrollSummary, DispatchDetail } from "@/modules/human-resource-management/payroll/logistics-payroll/types/logistics-payroll.schema";
 
