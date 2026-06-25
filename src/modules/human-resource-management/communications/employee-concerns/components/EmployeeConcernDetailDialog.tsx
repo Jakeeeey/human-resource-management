@@ -55,7 +55,11 @@ export function EmployeeConcernDetailDialog({
         if (!concern.id) return;
         try {
             setPendingStatus(next);
-            await onStatusUpdate(concern.id, next);
+            const ok = await onStatusUpdate(concern.id, next);
+            if (ok) {
+                onOpenChange(false);
+                return;
+            }
         } finally {
             setPendingStatus(null);
         }
@@ -65,7 +69,7 @@ export function EmployeeConcernDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] overflow-hidden p-0 rounded-2xl border-2 shadow-2xl animate-in fade-in zoom-in-95">
+            <DialogContent showCloseButton={false} className="sm:max-w-[600px] overflow-hidden p-0 rounded-2xl border-2 shadow-2xl animate-in fade-in zoom-in-95">
                 <div className="bg-gradient-to-r from-primary/10 via-background to-primary/5 p-6 pb-4">
                     <DialogHeader>
                         <div className="flex items-center gap-3 mb-2">
@@ -133,93 +137,85 @@ export function EmployeeConcernDetailDialog({
                         </div>
                     </div>
 
-                    {/* Workflow Actions */}
-                    <div className="space-y-3 rounded-xl border-2 border-primary/15 p-5 bg-primary/[0.03]">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold uppercase tracking-wider text-primary/80">
-                                Workflow Actions
-                            </span>
-                            <StatusBadge status={concern.status} />
-                        </div>
-
-                        {concern.status === "PENDING" && (
-                            <Button
-                                onClick={() => handleWorkflowAction("IN_REVIEW")}
-                                disabled={isBusy("IN_REVIEW")}
-                                className={cn(
-                                    "h-11 w-full rounded-xl font-bold shadow-lg shadow-primary/20 transition-all",
-                                    "bg-blue-600 hover:bg-blue-700 text-white"
-                                )}
-                            >
-                                {isBusy("IN_REVIEW") ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Starting review...
-                                    </>
-                                ) : (
-                                    <>
-                                        <PlayCircle className="mr-2 h-4 w-4" />
-                                        Start Review
-                                    </>
-                                )}
-                            </Button>
-                        )}
-
-                        {concern.status === "IN_REVIEW" && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <Button
-                                    onClick={() => handleWorkflowAction("RESOLVED")}
-                                    disabled={isBusy("RESOLVED")}
-                                    className={cn(
-                                        "h-11 rounded-xl font-bold shadow-lg transition-all",
-                                        "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
-                                    )}
-                                >
-                                    {isBusy("RESOLVED") ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Resolving...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Resolve Concern
-                                        </>
-                                    )}
-                                </Button>
-                                <Button
-                                    onClick={() => handleWorkflowAction("DISMISSED")}
-                                    disabled={isBusy("DISMISSED")}
-                                    className={cn(
-                                        "h-11 rounded-xl font-bold shadow-lg transition-all",
-                                        "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20"
-                                    )}
-                                >
-                                    {isBusy("DISMISSED") ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Dismissing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <XCircle className="mr-2 h-4 w-4" />
-                                            Dismiss Concern
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
-                        )}
-
-                        {(concern.status === "RESOLVED" || concern.status === "DISMISSED") && (
-                            <div className="flex items-center justify-center py-2 text-center">
-                                <span className="text-sm font-medium text-muted-foreground">
-                                    {concern.status === "RESOLVED"
-                                        ? "This concern is resolved. No further action needed."
-                                        : "This concern has been dismissed. No further action needed."}
+                    {/* Workflow Actions — hidden for terminal states (status is in header badge) */}
+                    {concern.status !== "RESOLVED" && concern.status !== "DISMISSED" && (
+                        <div className="space-y-3 rounded-xl border-2 border-primary/15 p-5 bg-primary/[0.03]">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase tracking-wider text-primary/80">
+                                    Workflow Actions
                                 </span>
+                                <StatusBadge status={concern.status} />
                             </div>
-                        )}
-                    </div>
+
+                            {concern.status === "PENDING" && (
+                                <Button
+                                    onClick={() => handleWorkflowAction("IN_REVIEW")}
+                                    disabled={isBusy("IN_REVIEW")}
+                                    className={cn(
+                                        "h-11 w-full rounded-xl font-bold shadow-lg shadow-primary/20 transition-all",
+                                        "bg-blue-600 hover:bg-blue-700 text-white"
+                                    )}
+                                >
+                                    {isBusy("IN_REVIEW") ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Starting review...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <PlayCircle className="mr-2 h-4 w-4" />
+                                            Start Review
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+
+                            {concern.status === "IN_REVIEW" && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <Button
+                                        onClick={() => handleWorkflowAction("RESOLVED")}
+                                        disabled={isBusy("RESOLVED")}
+                                        className={cn(
+                                            "h-11 rounded-xl font-bold shadow-lg transition-all",
+                                            "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                                        )}
+                                    >
+                                        {isBusy("RESOLVED") ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Resolving...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                                Resolve Concern
+                                            </>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        onClick={() => handleWorkflowAction("DISMISSED")}
+                                        disabled={isBusy("DISMISSED")}
+                                        className={cn(
+                                            "h-11 rounded-xl font-bold shadow-lg transition-all",
+                                            "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20"
+                                        )}
+                                    >
+                                        {isBusy("DISMISSED") ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Dismissing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <XCircle className="mr-2 h-4 w-4" />
+                                                Dismiss Concern
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="px-6 pb-6 pt-0">
