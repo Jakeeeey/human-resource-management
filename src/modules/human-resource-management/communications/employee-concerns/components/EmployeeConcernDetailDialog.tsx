@@ -1,31 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Loader2, Save, X, MessageSquareWarning, CalendarClock, UserCircle2, EyeOff } from "lucide-react";
+    Loader2,
+    X,
+    MessageSquareWarning,
+    CalendarClock,
+    UserCircle2,
+    EyeOff,
+    PlayCircle,
+    CheckCircle2,
+    XCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPHT } from "../lib/format-pht";
 import {
     EnrichedEmployeeConcern,
     ConcernStatus,
-    CONCERN_STATUSES,
-    CONCERN_STATUS_LABELS,
 } from "../types/employee-concern.schema";
 import { StatusBadge } from "./columns";
 
@@ -42,14 +42,7 @@ export function EmployeeConcernDetailDialog({
     concern,
     onStatusUpdate,
 }: EmployeeConcernDetailDialogProps) {
-    const [nextStatus, setNextStatus] = useState<ConcernStatus>("PENDING");
-    const [isSaving, setIsSaving] = useState(false);
-
-    useEffect(() => {
-        if (concern) {
-            setNextStatus(concern.status);
-        }
-    }, [concern]);
+    const [pendingStatus, setPendingStatus] = useState<ConcernStatus | null>(null);
 
     if (!concern) return null;
 
@@ -57,17 +50,18 @@ export function EmployeeConcernDetailDialog({
         ? "Anonymous"
         : concern.user_name || concern.created_by_name || "—";
     const submittedDate = formatPHT(concern.created_at);
-    const statusChanged = nextStatus !== concern.status;
 
-    const handleSaveStatus = async () => {
-        if (!statusChanged || !concern.id) return;
+    const handleWorkflowAction = async (next: ConcernStatus) => {
+        if (!concern.id) return;
         try {
-            setIsSaving(true);
-            await onStatusUpdate(concern.id, nextStatus);
+            setPendingStatus(next);
+            await onStatusUpdate(concern.id, next);
         } finally {
-            setIsSaving(false);
+            setPendingStatus(null);
         }
     };
+
+    const isBusy = (s: ConcernStatus) => pendingStatus === s;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -83,7 +77,7 @@ export function EmployeeConcernDetailDialog({
                                     {concern.subject_of_concern}
                                 </DialogTitle>
                                 <DialogDescription className="text-xs font-medium opacity-70">
-                                    Concern detail &mdash; review and update the lifecycle status.
+                                    Concern detail &mdash; advance the concern through its workflow.
                                 </DialogDescription>
                             </div>
                         </div>
@@ -139,62 +133,106 @@ export function EmployeeConcernDetailDialog({
                         </div>
                     </div>
 
-                    {/* Admin status control */}
-                    <div className="space-y-2 rounded-xl border-2 border-primary/10 p-4 bg-primary/[0.02]">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-primary/80">
-                            Update Status
-                        </span>
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                            <Select
-                                value={nextStatus}
-                                onValueChange={(v) => setNextStatus(v as ConcernStatus)}
-                            >
-                                <SelectTrigger className="h-11 flex-1 rounded-xl">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {CONCERN_STATUSES.map((s) => (
-                                        <SelectItem key={s} value={s}>
-                                            {CONCERN_STATUS_LABELS[s]}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                    {/* Workflow Actions */}
+                    <div className="space-y-3 rounded-xl border-2 border-primary/15 p-5 bg-primary/[0.03]">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-primary/80">
+                                Workflow Actions
+                            </span>
+                            <StatusBadge status={concern.status} />
+                        </div>
+
+                        {concern.status === "PENDING" && (
                             <Button
-                                onClick={handleSaveStatus}
-                                disabled={isSaving || !statusChanged}
+                                onClick={() => handleWorkflowAction("IN_REVIEW")}
+                                disabled={isBusy("IN_REVIEW")}
                                 className={cn(
-                                    "h-11 sm:w-[160px] rounded-xl font-bold shadow-lg shadow-primary/20 transition-all",
-                                    !statusChanged && "opacity-50"
+                                    "h-11 w-full rounded-xl font-bold shadow-lg shadow-primary/20 transition-all",
+                                    "bg-blue-600 hover:bg-blue-700 text-white"
                                 )}
                             >
-                                {isSaving ? (
+                                {isBusy("IN_REVIEW") ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Saving...
+                                        Starting review...
                                     </>
                                 ) : (
                                     <>
-                                        <Save className="mr-2 h-4 w-4" />
-                                        Save Status
+                                        <PlayCircle className="mr-2 h-4 w-4" />
+                                        Start Review
                                     </>
                                 )}
                             </Button>
-                        </div>
+                        )}
+
+                        {concern.status === "IN_REVIEW" && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <Button
+                                    onClick={() => handleWorkflowAction("RESOLVED")}
+                                    disabled={isBusy("RESOLVED")}
+                                    className={cn(
+                                        "h-11 rounded-xl font-bold shadow-lg transition-all",
+                                        "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                                    )}
+                                >
+                                    {isBusy("RESOLVED") ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Resolving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            Resolve Concern
+                                        </>
+                                    )}
+                                </Button>
+                                <Button
+                                    onClick={() => handleWorkflowAction("DISMISSED")}
+                                    disabled={isBusy("DISMISSED")}
+                                    className={cn(
+                                        "h-11 rounded-xl font-bold shadow-lg transition-all",
+                                        "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20"
+                                    )}
+                                >
+                                    {isBusy("DISMISSED") ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Dismissing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <XCircle className="mr-2 h-4 w-4" />
+                                            Dismiss Concern
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        )}
+
+                        {(concern.status === "RESOLVED" || concern.status === "DISMISSED") && (
+                            <div className="flex items-center justify-center py-2 text-center">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                    {concern.status === "RESOLVED"
+                                        ? "This concern is resolved. No further action needed."
+                                        : "This concern has been dismissed. No further action needed."}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                <DialogFooter className="px-6 pb-6 pt-0">
+                <div className="px-6 pb-6 pt-0">
                     <Button
                         type="button"
                         variant="ghost"
                         onClick={() => onOpenChange(false)}
-                        className="font-bold text-muted-foreground hover:bg-muted rounded-xl px-6 h-11"
+                        className="font-bold text-muted-foreground hover:bg-muted rounded-xl px-6 h-11 w-full"
                     >
                         <X className="mr-2 h-4 w-4" />
                         Close
                     </Button>
-                </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
     );

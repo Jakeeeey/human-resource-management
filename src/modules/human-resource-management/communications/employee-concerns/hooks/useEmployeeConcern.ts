@@ -45,6 +45,9 @@ export function useEmployeeConcern() {
         if (submittedByFilter.trim()) {
             result = result.filter((c) => {
                 if (submittedByFilter === "__anonymous__") return c.is_anonymous;
+                // Anonymous concerns must never match a named-user filter —
+                // their submitter identity is intentionally hidden.
+                if (c.is_anonymous) return false;
                 const id = c.user_id ?? c.created_by;
                 return id != null && String(id) === submittedByFilter;
             });
