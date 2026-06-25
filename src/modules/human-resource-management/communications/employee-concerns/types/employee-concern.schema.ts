@@ -97,3 +97,40 @@ export interface EnrichedEmployeeConcern extends EmployeeConcern {
     user_email?: string;
     created_by_name?: string;
 }
+
+/**
+ * Employee Concern Attachment Schema
+ *
+ * Maps 1:1 to the `employee_concern_attachments` table (vos_database).
+ *
+ * DB DDL (summary):
+ *   id              int AUTO_INCREMENT PK
+ *   concern_id      int NOT NULL -> employee_concerns.id  (ON DELETE CASCADE)
+ *   file_path       varchar(500) NOT NULL
+ *   file_name       varchar(255) NOT NULL
+ *   file_type       varchar(100) NULL
+ *   created_at      datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
+ *   created_by      int NULL -> user.user_id
+ *   updated_at      datetime NULL ON UPDATE CURRENT_TIMESTAMP
+ *   updated_by      int NULL -> user.user_id
+ */
+export const EmployeeConcernAttachmentSchema = z.object({
+    id: z.number(),
+    concern_id: z.number(),
+    file_path: z.string().min(1),
+    file_name: z.string().min(1),
+    file_type: z.string().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+    created_by: z.number().nullable().optional(),
+    updated_at: z.string().nullable().optional(),
+    updated_by: z.number().nullable().optional(),
+});
+
+export type EmployeeConcernAttachment = z.infer<typeof EmployeeConcernAttachmentSchema>;
+
+/** Enriched attachment — includes joined creator name for UI display. */
+export interface EnrichedEmployeeConcernAttachment extends EmployeeConcernAttachment {
+    created_by_name?: string;
+    /** Client-safe URL for viewing the file (routed through the API proxy). */
+    view_url?: string;
+}

@@ -3,6 +3,7 @@ import {
     EmployeeConcern,
     ConcernStatus,
     parseBit,
+    EnrichedEmployeeConcernAttachment,
 } from "../types/employee-concern.schema";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -166,6 +167,84 @@ export const employeeConcernService = {
             throw new Error("INTERNAL_FAIL: Failed to delete concern");
         }
     },
+
+    /**
+     * Fetches all attachments for a given concern, newest first.
+     * `created_by` is an M2O relation to the `user` collection.
+     * @param {number} concernId - The parent concern id.
+     * @returns {Promise<EnrichedEmployeeConcernAttachment[]>}
+     */
+    async fetchAttachmentsByConcernId(
+        concernId: number,
+    ): Promise<EnrichedEmployeeConcernAttachment[]> {
+        try {
+            const url =
+                `${API_BASE_URL}/items/employee_concern_attachments` +
+                `?fields=*,created_by.user_id,created_by.user_fname,created_by.user_lname` +
+                `&filter[concern_id][_eq]=${concernId}` +
+                `&sort=-created_at`;
+
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`DIRECTUS ERROR [fetchAttachments:${concernId}]:`, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            const rows: Record<string, unknown>[] = result.data;
+            return rows.map((row) => normalizeAttachment(row, concernId));
+        } catch (e) {
+            const error = e as Error;
+            console.error("Error fetching attachments:", error);
+            throw new Error("INTERNAL_FAIL: Failed to fetch attachments");
+        }
+    },
+
+    /**
+     * Fetches a single attachment by id (with creator relation).
+     * Used by the file-streaming proxy endpoint.
+     * @param {number} concernId - The parent concern id (scoped for safety).
+     * @param {number} attachmentId - The attachment id.
+     * @returns {Promise<EnrichedEmployeeConcernAttachment | null>}
+     */
+    async fetchAttachmentById(
+        concernId: number,
+        attachmentId: number,
+    ): Promise<EnrichedEmployeeConcernAttachment | null> {
+        try {
+            const url =
+                `${API_BASE_URL}/items/employee_concern_attachments/${attachmentId}` +
+                `?fields=*,created_by.user_id,created_by.user_fname,created_by.user_lname` +
+                `&filter[concern_id][_eq]=${concernId}`;
+
+            const response = await fetch(url, { headers });
+            if (response.status === 404) return null;
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`DIRECTUS ERROR [fetchAttachment:${attachmentId}]:`, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            return normalizeAttachment(result.data, concernId);
+        } catch (e) {
+            const error = e as Error;
+            console.error("Error fetching attachment:", error);
+            throw new Error("INTERNAL_FAIL: Failed to fetch attachment");
+        }
+    },
+
+    /**
+     * Resolves a stored `file_path` to a fully-qualified URL that the server
+     * can fetch with the Directus static token. Handles absolute URLs,
+     * Directus `/assets/...` paths, and bare relative paths.
+     * @param {string} filePath - The raw file_path from the DB.
+     * @returns {string}
+     */
+    resolveFileUrl(filePath: string): string {
+        if (/^https?:\/\//i.test(filePath)) return filePath;
+        if (filePath.startsWith("/")) return `${API_BASE_URL}${filePath}`;
+        return `${API_BASE_URL}/${filePath}`;
+    },
 };
 
 /**
@@ -193,6 +272,36 @@ function normalizeConcern(row: Record<string, unknown>): EnrichedEmployeeConcern
             ? `${userObj.user_fname ?? ""} ${userObj.user_lname ?? ""}`.trim() || undefined
             : undefined,
         user_email: userIsObj ? (userObj.user_email as string) ?? undefined : undefined,
+        created_by_name: creatorIsObj
+            ? `${creatorObj.user_fname ?? ""} ${creatorObj.user_lname ?? ""}`.trim() || undefined
+            : undefined,
+    };
+}
+
+/**
+ * Normalizes a raw Directus attachment row into an EnrichedEmployeeConcernAttachment.
+ * Unpacks the M2O `created_by` relation object. `view_url` is left unset here —
+ * the API route populates it with the client-safe proxy URL.
+ */
+function normalizeAttachment(
+    row: Record<string, unknown>,
+    concernId: number,
+): EnrichedEmployeeConcernAttachment {
+    const creatorObj = row.created_by as Record<string, unknown> | number | null;
+    const creatorIsObj = creatorObj && typeof creatorObj === "object";
+
+    return {
+        id: row.id as number,
+        concern_id: (row.concern_id as number) ?? concernId,
+        file_path: row.file_path as string,
+        file_name: row.file_name as string,
+        file_type: (row.file_type as string) ?? null,
+        created_at: (row.created_at as string) ?? null,
+        created_by: creatorIsObj
+            ? (creatorObj.user_id as number)
+            : (creatorObj as number | null) ?? null,
+        updated_at: (row.updated_at as string) ?? null,
+        updated_by: (row.updated_by as number) ?? null,
         created_by_name: creatorIsObj
             ? `${creatorObj.user_fname ?? ""} ${creatorObj.user_lname ?? ""}`.trim() || undefined
             : undefined,

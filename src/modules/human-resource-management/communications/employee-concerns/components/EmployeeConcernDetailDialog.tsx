@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -20,12 +20,20 @@ import {
     PlayCircle,
     CheckCircle2,
     XCircle,
+    Paperclip,
+    FileText,
+    Image as ImageIcon,
+    FileSpreadsheet,
+    FileVideo,
+    FileAudio,
+    ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPHT } from "../lib/format-pht";
 import {
     EnrichedEmployeeConcern,
     ConcernStatus,
+    EnrichedEmployeeConcernAttachment,
 } from "../types/employee-concern.schema";
 import { StatusBadge } from "./columns";
 
@@ -36,6 +44,34 @@ interface EmployeeConcernDetailDialogProps {
     onStatusUpdate: (id: number, status: ConcernStatus) => Promise<boolean>;
 }
 
+/** Picks an icon + tint colour based on the attachment's MIME type or extension. */
+function getAttachmentIcon(fileType?: string | null, fileName?: string) {
+    const type = (fileType ?? "").toLowerCase();
+    const ext = (fileName ?? "").split(".").pop()?.toLowerCase() ?? "";
+
+    if (type.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) {
+        return { Icon: ImageIcon, tint: "text-violet-600 bg-violet-500/10" };
+    }
+    if (type.startsWith("video/") || ["mp4", "webm", "mov", "avi", "mkv"].includes(ext)) {
+        return { Icon: FileVideo, tint: "text-pink-600 bg-pink-500/10" };
+    }
+    if (type.startsWith("audio/") || ["mp3", "wav", "ogg", "m4a", "flac"].includes(ext)) {
+        return { Icon: FileAudio, tint: "text-amber-600 bg-amber-500/10" };
+    }
+    if (
+        type.includes("spreadsheet") || type.includes("excel") ||
+        ["xlsx", "xls", "csv", "ods"].includes(ext)
+    ) {
+        return { Icon: FileSpreadsheet, tint: "text-emerald-600 bg-emerald-500/10" };
+    }
+    if (
+        type === "application/pdf" || ext === "pdf"
+    ) {
+        return { Icon: FileText, tint: "text-red-600 bg-red-500/10" };
+    }
+    return { Icon: Paperclip, tint: "text-sky-600 bg-sky-500/10" };
+}
+
 export function EmployeeConcernDetailDialog({
     open,
     onOpenChange,
@@ -43,6 +79,38 @@ export function EmployeeConcernDetailDialog({
     onStatusUpdate,
 }: EmployeeConcernDetailDialogProps) {
     const [pendingStatus, setPendingStatus] = useState<ConcernStatus | null>(null);
+    const [attachments, setAttachments] = useState<EnrichedEmployeeConcernAttachment[]>([]);
+    const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+    const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
+    const concernId = concern?.id;
+
+    // Fetch attachments whenever the dialog opens for a specific concern.
+    useEffect(() => {
+        if (!open || !concernId) {
+            setAttachments([]);
+            setAttachmentError(null);
+            return;
+        }
+        let cancelled = false;
+        setIsLoadingAttachments(true);
+        setAttachmentError(null);
+        fetch(`/api/hrm/communications/employee-concerns/${concernId}/attachments`)
+            .then(async (res) => {
+                if (!res.ok) throw new Error("Failed to load attachments");
+                const json = await res.json();
+                if (!cancelled) setAttachments(json.data ?? []);
+            })
+            .catch((err: Error) => {
+                if (!cancelled) setAttachmentError(err.message);
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingAttachments(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [open, concernId]);
 
     if (!concern) return null;
 
@@ -135,6 +203,75 @@ export function EmployeeConcernDetailDialog({
                         <div className="rounded-xl border bg-muted/20 p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 max-h-64 overflow-y-auto text-justify">
                             {concern.concern}
                         </div>
+                    </div>
+
+                    {/* Attachments */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                Attachments
+                            </span>
+                            {attachments.length > 0 && (
+                                <span className="text-[10px] font-semibold text-muted-foreground/60">
+                                    {attachments.length} {attachments.length === 1 ? "file" : "files"}
+                                </span>
+                            )}
+                        </div>
+
+                        {isLoadingAttachments ? (
+                            <div className="flex items-center justify-center gap-2 rounded-xl border bg-muted/20 py-6 text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading attachments...
+                            </div>
+                        ) : attachmentError ? (
+                            <div className="rounded-xl border border-red-500/20 bg-red-500/5 py-4 px-4 text-sm text-red-600">
+                                {attachmentError}
+                            </div>
+                        ) : attachments.length === 0 ? (
+                            <div className="flex items-center gap-2 rounded-xl border border-dashed bg-muted/10 py-4 px-4 text-sm text-muted-foreground/60">
+                                <Paperclip className="h-4 w-4" />
+                                No attachments for this concern.
+                            </div>
+                        ) : (
+                            <ul className="space-y-2">
+                                {attachments.map((att) => {
+                                    const { Icon, tint } = getAttachmentIcon(att.file_type, att.file_name);
+                                    return (
+                                        <li
+                                            key={att.id}
+                                            className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/30"
+                                        >
+                                            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", tint)}>
+                                                <Icon className="h-5 w-5" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-semibold text-foreground">
+                                                    {att.file_name}
+                                                </p>
+                                                <p className="truncate text-[11px] text-muted-foreground/70">
+                                                    {att.file_type || "Unknown type"}
+                                                    {att.created_at && <> · {formatPHT(att.created_at, false)}</>}
+                                                </p>
+                                            </div>
+                                            {att.view_url && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    asChild
+                                                    className="shrink-0 rounded-lg h-8 px-3"
+                                                >
+                                                    <a href={att.view_url} target="_blank" rel="noopener noreferrer">
+                                                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                                                        View
+                                                    </a>
+                                                </Button>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
                     </div>
 
                     {/* Workflow Actions — hidden for terminal states (status is in header badge) */}
