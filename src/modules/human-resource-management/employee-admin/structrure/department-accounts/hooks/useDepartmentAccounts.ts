@@ -11,6 +11,7 @@ import {
     AssignedAccountsResponse,
     AssignAccountsPayload,
     UnassignAccountPayload,
+    ChartOfAccount,
 } from "../types";
 import { toastServerDown } from "@/modules/human-resource-management/employee-admin/administrator/utils/utils";
 
@@ -103,15 +104,25 @@ export function useAssignedAccounts(
     const [isLoading, setIsLoading] = useState(false);
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
+    const lastDeptDivIdRef = useRef<number | null>(null);
+    const dataRef = useRef<AssignedAccountsResponse | null>(null);
 
-    const fetchData = useCallback(async () => {
+    // Keep dataRef in sync with data to avoid triggering reactivity loops
+    useEffect(() => {
+        dataRef.current = data;
+    }, [data]);
+
+    const fetchData = useCallback(async (showLoading = false) => {
         if (!deptDivId) {
             setData(null);
+            lastDeptDivIdRef.current = null;
             return;
         }
 
         try {
-            setIsLoading(true);
+            if (showLoading || lastDeptDivIdRef.current !== deptDivId || !dataRef.current) {
+                setIsLoading(true);
+            }
             setIsError(false);
             setError(null);
 
@@ -124,7 +135,19 @@ export function useAssignedAccounts(
             }
 
             const responseData = await res.json();
-            setData(responseData);
+            
+            // Exclude current asset, liability, and equity accounts
+            // Only Operational Expenses (OpEx: 9), COGS (7, 8), and Capital Expenses (CapEx: 10)
+            const allowedTypeIds = [7, 8, 9, 10];
+            const filterBudgeting = (acc: ChartOfAccount) => acc.account_type !== null && allowedTypeIds.includes(acc.account_type);
+
+            const filteredData: AssignedAccountsResponse = {
+                assigned: (responseData.assigned || []).filter(filterBudgeting),
+                available: (responseData.available || []).filter(filterBudgeting),
+            };
+
+            setData(filteredData);
+            lastDeptDivIdRef.current = deptDivId;
         } catch (err) {
             setIsError(true);
             setError(err instanceof Error ? err : new Error("Unknown error"));
@@ -137,15 +160,18 @@ export function useAssignedAccounts(
 
     // Fetch when deptDivId changes
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        if (deptDivId !== lastDeptDivIdRef.current) {
+            setData(null);
+        }
+        fetchData(true);
+    }, [deptDivId, fetchData]);
 
     return {
         data,
         isLoading,
         isError,
         error,
-        refetch: fetchData,
+        refetch: () => fetchData(false),
     };
 }
 

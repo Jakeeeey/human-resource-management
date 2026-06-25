@@ -14,10 +14,7 @@ import {
     FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
 
-import {
-    Select, SelectContent, SelectItem,
-    SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 import {
     Command,
@@ -281,20 +278,17 @@ export function DivisionDialog({
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Division Head *</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                <FormControl>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select user" />
-                                                    </SelectTrigger>
-                                                </FormControl>
-                                                <SelectContent>
-                                                    {users.map(user => (
-                                                        <SelectItem key={user.user_id} value={user.user_id.toString()}>
-                                                            {getUserFullName(user)}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            <FormControl>
+                                                <SearchableSelect
+                                                    options={users.map(user => ({
+                                                        value: user.user_id.toString(),
+                                                        label: getUserFullName(user),
+                                                    }))}
+                                                    value={field.value}
+                                                    onValueChange={field.onChange}
+                                                    placeholder="Select user"
+                                                />
+                                            </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -410,24 +404,19 @@ export function DivisionDialog({
 
                                                     <div className="flex items-center gap-2 mt-2">
                                                         <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <Select
+                                                        <SearchableSelect
+                                                            options={[
+                                                                { value: "none", label: "No Bank Account" },
+                                                                ...bankAccounts.filter(b => b.is_active).map(bank => ({
+                                                                    value: bank.bank_id.toString(),
+                                                                    label: `${bank.bank_name} - ${bank.account_number}`,
+                                                                }))
+                                                            ]}
                                                             value={assignment.bank_id?.toString() || "none"}
                                                             onValueChange={(val) => updateBankAssignment(assignment.department_id, val)}
-                                                        >
-                                                            <SelectTrigger className="h-8 text-xs w-full max-w-[250px]">
-                                                                <SelectValue placeholder="Select Bank Account" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">
-                                                                    <span className="text-muted-foreground italic">No Bank Account</span>
-                                                                </SelectItem>
-                                                                {bankAccounts.filter(b => b.is_active).map(bank => (
-                                                                    <SelectItem key={bank.bank_id} value={bank.bank_id.toString()}>
-                                                                        {bank.bank_name} - {bank.account_number}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
+                                                            placeholder="Select Bank Account"
+                                                            className="h-8 text-xs w-full max-w-[250px]"
+                                                        />
                                                     </div>
                                                 </div>
                                             </CardContent>
