@@ -14,7 +14,7 @@ export const runtime = "nodejs";
  * fall back to a download for unknown types.
  */
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ id: string; attachmentId: string }> },
 ) {
     try {
@@ -48,6 +48,11 @@ export async function GET(
             upstream.headers.get("content-type") ||
             "application/octet-stream";
 
+        // ?download=1 forces attachment disposition (Save As).
+        const url = new URL(request.url);
+        const forceDownload = url.searchParams.get("download") === "1";
+        const disposition = forceDownload ? "attachment" : "inline";
+
         // Encode filename safely for the Content-Disposition header (RFC 5987).
         const safeName = attachment.file_name.replace(/[^\x20-\x7E]/g, "").replace(/"/g, "") || "file";
         const encodedName = encodeURIComponent(attachment.file_name);
@@ -56,7 +61,7 @@ export async function GET(
             status: 200,
             headers: {
                 "Content-Type": contentType,
-                "Content-Disposition": `inline; filename="${safeName}"; filename*=UTF-8''${encodedName}`,
+                "Content-Disposition": `${disposition}; filename="${safeName}"; filename*=UTF-8''${encodedName}`,
                 "Cache-Control": "private, no-store",
             },
         });

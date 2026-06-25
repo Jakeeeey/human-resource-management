@@ -16,7 +16,7 @@ import {
     MessageSquareWarning,
     CalendarClock,
     UserCircle2,
-    EyeOff,
+    Eye,
     PlayCircle,
     CheckCircle2,
     XCircle,
@@ -26,7 +26,6 @@ import {
     FileSpreadsheet,
     FileVideo,
     FileAudio,
-    ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPHT } from "../lib/format-pht";
@@ -36,6 +35,7 @@ import {
     EnrichedEmployeeConcernAttachment,
 } from "../types/employee-concern.schema";
 import { StatusBadge } from "./columns";
+import { AttachmentPreviewDialog } from "./AttachmentPreviewDialog";
 
 interface EmployeeConcernDetailDialogProps {
     open: boolean;
@@ -82,6 +82,7 @@ export function EmployeeConcernDetailDialog({
     const [attachments, setAttachments] = useState<EnrichedEmployeeConcernAttachment[]>([]);
     const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
     const [attachmentError, setAttachmentError] = useState<string | null>(null);
+    const [previewAttachment, setPreviewAttachment] = useState<EnrichedEmployeeConcernAttachment | null>(null);
 
     const concernId = concern?.id;
 
@@ -155,12 +156,6 @@ export function EmployeeConcernDetailDialog({
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-2">
                             <StatusBadge status={concern.status} />
-                            {concern.is_anonymous && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full border bg-zinc-500/10 text-zinc-500 border-zinc-500/20">
-                                    <EyeOff className="h-3 w-3" />
-                                    Anonymous
-                                </span>
-                            )}
                         </div>
                     </DialogHeader>
                 </div>
@@ -233,7 +228,7 @@ export function EmployeeConcernDetailDialog({
                                 No attachments for this concern.
                             </div>
                         ) : (
-                            <ul className="space-y-2">
+                            <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
                                 {attachments.map((att) => {
                                     const { Icon, tint } = getAttachmentIcon(att.file_type, att.file_name);
                                     return (
@@ -258,13 +253,11 @@ export function EmployeeConcernDetailDialog({
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
-                                                    asChild
+                                                    onClick={() => setPreviewAttachment(att)}
                                                     className="shrink-0 rounded-lg h-8 px-3"
                                                 >
-                                                    <a href={att.view_url} target="_blank" rel="noopener noreferrer">
-                                                        <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                                                        View
-                                                    </a>
+                                                    <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                                    Preview
                                                 </Button>
                                             )}
                                         </li>
@@ -277,12 +270,9 @@ export function EmployeeConcernDetailDialog({
                     {/* Workflow Actions — hidden for terminal states (status is in header badge) */}
                     {concern.status !== "RESOLVED" && concern.status !== "DISMISSED" && (
                         <div className="space-y-3 rounded-xl border-2 border-primary/15 p-5 bg-primary/[0.03]">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold uppercase tracking-wider text-primary/80">
-                                    Workflow Actions
-                                </span>
-                                <StatusBadge status={concern.status} />
-                            </div>
+                            <span className="block text-xs font-bold uppercase tracking-wider text-primary/80">
+                                Workflow Actions
+                            </span>
 
                             {concern.status === "PENDING" && (
                                 <Button
@@ -355,7 +345,7 @@ export function EmployeeConcernDetailDialog({
                     )}
                 </div>
 
-                <div className="px-6 pb-6 pt-0">
+                <div className="px-6 pb-4 -mt-2">
                     <Button
                         type="button"
                         variant="ghost"
@@ -367,6 +357,13 @@ export function EmployeeConcernDetailDialog({
                     </Button>
                 </div>
             </DialogContent>
+
+            {/* In-system attachment preview */}
+            <AttachmentPreviewDialog
+                open={previewAttachment !== null}
+                onOpenChange={(o) => { if (!o) setPreviewAttachment(null); }}
+                attachment={previewAttachment}
+            />
         </Dialog>
     );
 }
