@@ -1,41 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import type { DateRange } from "react-day-picker";
 import { useEmployeeConcernContext } from "../providers/EmployeeConcernProvider";
-import { EnrichedEmployeeConcern, EmployeeConcernForm, ConcernStatus } from "../types/employee-concern.schema";
-import { toast } from "sonner";
+import { EnrichedEmployeeConcern, ConcernStatus } from "../types/employee-concern.schema";
 
-/**
- * useEmployeeConcern
- * Consumer of EmployeeConcernContext that adds UI orchestration state:
- * dialog open flags, the currently selected concern, and action handlers.
- */
 export function useEmployeeConcern() {
-    const { concerns, isLoading, error, refresh, submitConcern, updateStatus, deleteConcern } =
+    const { concerns, isLoading, error, refresh, updateStatus } =
         useEmployeeConcernContext();
 
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [selectedConcern, setSelectedConcern] = useState<EnrichedEmployeeConcern | null>(null);
     const [statusFilter, setStatusFilter] = useState<ConcernStatus | "ALL">("ALL");
+    const [dateRange, setDateRange] = useState<DateRange | undefined>();
+    const [submittedByFilter, setSubmittedByFilter] = useState("");
 
-    const handleAdd = () => {
-        setSelectedConcern(null);
-        setIsDialogOpen(true);
-    };
+    const filteredConcerns = useMemo(() => {
+        let result = concerns;
+
+        if (statusFilter !== "ALL") {
+            result = result.filter((c) => c.status === statusFilter);
+        }
+
+        if (dateRange?.from) {
+            const from = new Date(dateRange.from);
+            from.setHours(0, 0, 0, 0);
+            result = result.filter((c) => {
+                if (!c.created_at) return false;
+                const d = new Date(c.created_at);
+                return d >= from;
+            });
+        }
+
+        if (dateRange?.to) {
+            const to = new Date(dateRange.to);
+            to.setHours(23, 59, 59, 999);
+            result = result.filter((c) => {
+                if (!c.created_at) return false;
+                const d = new Date(c.created_at);
+                return d <= to;
+            });
+        }
+
+        if (submittedByFilter.trim()) {
+            result = result.filter((c) => {
+                if (submittedByFilter === "__anonymous__") return c.is_anonymous;
+                const id = c.user_id ?? c.created_by;
+                return id != null && String(id) === submittedByFilter;
+            });
+        }
+
+        return result;
+    }, [concerns, statusFilter, dateRange, submittedByFilter]);
 
     const handleView = (concern: EnrichedEmployeeConcern) => {
         setSelectedConcern(concern);
         setIsDetailOpen(true);
-    };
-
-    const handleSubmit = async (form: EmployeeConcernForm): Promise<boolean> => {
-        const ok = await submitConcern(form);
-        if (ok) {
-            setIsDialogOpen(false);
-            toast.success("Concern submitted");
-        }
-        return ok;
     };
 
     const handleStatusUpdate = async (id: number, status: ConcernStatus): Promise<boolean> => {
@@ -46,33 +66,22 @@ export function useEmployeeConcern() {
         return ok;
     };
 
-    const handleDelete = async (concern: EnrichedEmployeeConcern): Promise<void> => {
-        if (!concern.id) return;
-        if (confirm(`Delete this concern "${concern.subject_of_concern}"? This cannot be undone.`)) {
-            const ok = await deleteConcern(concern.id);
-            if (ok && selectedConcern?.id === concern.id) {
-                setIsDetailOpen(false);
-                setSelectedConcern(null);
-            }
-        }
-    };
-
     return {
-        concerns,
+        concerns: filteredConcerns,
+        allConcerns: concerns,
         isLoading,
         error,
         refresh,
-        isDialogOpen,
-        setIsDialogOpen,
         isDetailOpen,
         setIsDetailOpen,
         selectedConcern,
         statusFilter,
         setStatusFilter,
-        handleAdd,
+        dateRange,
+        setDateRange,
+        submittedByFilter,
+        setSubmittedByFilter,
         handleView,
-        handleSubmit,
         handleStatusUpdate,
-        handleDelete,
     };
 }

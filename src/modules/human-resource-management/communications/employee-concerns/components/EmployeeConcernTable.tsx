@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import type { DateRange } from "react-day-picker";
 import {
     flexRender,
     getCoreRowModel,
@@ -29,9 +30,32 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+    Combobox,
+    ComboboxContent,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxEmpty,
+} from "@/components/ui/combobox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Search, AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
-import { EnrichedEmployeeConcern, ConcernStatus, CONCERN_STATUSES, CONCERN_STATUS_LABELS } from "../types/employee-concern.schema";
+import {
+    Search,
+    AlertCircle,
+    RefreshCw,
+    ChevronLeft,
+    ChevronRight,
+    CalendarIcon,
+    X,
+} from "lucide-react";
+import { cn, formatDateLong } from "@/lib/utils";
+import { EnrichedEmployeeConcern, type ConcernStatus, CONCERN_STATUSES, CONCERN_STATUS_LABELS } from "../types/employee-concern.schema";
 import { createColumns } from "./columns";
 
 interface EmployeeConcernTableProps {
@@ -40,8 +64,11 @@ interface EmployeeConcernTableProps {
     error: string | null;
     statusFilter: ConcernStatus | "ALL";
     onStatusFilterChange: (value: ConcernStatus | "ALL") => void;
+    dateRange: DateRange | undefined;
+    onDateRangeChange: (range: DateRange | undefined) => void;
+    submittedByFilter: string;
+    onSubmittedByFilterChange: (value: string) => void;
     onView: (concern: EnrichedEmployeeConcern) => void;
-    onDelete: (concern: EnrichedEmployeeConcern) => void;
     onRefresh: () => void;
 }
 
@@ -51,25 +78,43 @@ export function EmployeeConcernTable({
     error,
     statusFilter,
     onStatusFilterChange,
+    dateRange,
+    onDateRangeChange,
+    submittedByFilter,
+    onSubmittedByFilterChange,
     onView,
-    onDelete,
     onRefresh,
 }: EmployeeConcernTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
-    const columns = React.useMemo(() => createColumns(onView, onDelete), [onView, onDelete]);
+    const columns = React.useMemo(() => createColumns(onView), [onView]);
 
-    // Apply the external status filter in-memory before handing data to TanStack.
-    // The subject search still runs through columnFilters below.
-    const filteredData = React.useMemo(
-        () => (statusFilter === "ALL" ? concerns : concerns.filter((c) => c.status === statusFilter)),
-        [concerns, statusFilter]
-    );
+    const submitterOptions = React.useMemo(() => {
+        const seen = new Set<number | "anonymous">();
+        const options: { value: string; label: string }[] = [];
+        for (const c of concerns) {
+            if (c.is_anonymous) {
+                if (!seen.has("anonymous")) {
+                    seen.add("anonymous");
+                    options.push({ value: "__anonymous__", label: "Anonymous" });
+                }
+            } else {
+                const id = c.user_id ?? c.created_by;
+                if (id != null && !seen.has(id)) {
+                    seen.add(id);
+                    const name = c.user_name || c.created_by_name || `User #${id}`;
+                    options.push({ value: String(id), label: name });
+                }
+            }
+        }
+        return options.sort((a, b) => a.label.localeCompare(b.label));
+    }, [concerns]);
+    const hasActiveFilters = statusFilter !== "ALL" || !!dateRange || submittedByFilter.length > 0;
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
-        data: filteredData,
+        data: concerns,
         columns,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
@@ -81,12 +126,19 @@ export function EmployeeConcernTable({
         state: { sorting, columnFilters },
     });
 
+    const clearAllFilters = () => {
+        onStatusFilterChange("ALL");
+        onDateRangeChange(undefined);
+        onSubmittedByFilterChange("");
+    };
+
     if (isLoading) {
         return (
             <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Skeleton className="h-10 flex-1 max-w-sm rounded-xl" />
                     <Skeleton className="h-10 w-[180px] rounded-xl" />
+                    <Skeleton className="h-10 w-[240px] rounded-xl" />
                 </div>
                 <div className="rounded-2xl border overflow-hidden">
                     <Skeleton className="h-11 w-full rounded-none" />
@@ -114,31 +166,116 @@ export function EmployeeConcernTable({
         );
     }
 
+    const dateRangeLabel = dateRange?.from
+        ? dateRange.to
+            ? `${formatDateLong(dateRange.from)} – ${formatDateLong(dateRange.to)}`
+            : `From ${formatDateLong(dateRange.from)}`
+        : "Date range";
+
     return (
         <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Filter bar */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Subject search — left */}
                 <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
                     <Input
-                        placeholder="Search subject or submitter..."
+                        placeholder="Search subject..."
                         value={(table.getColumn("subject_of_concern")?.getFilterValue() as string) ?? ""}
                         onChange={(e) => table.getColumn("subject_of_concern")?.setFilterValue(e.target.value)}
                         className="pl-9 h-10 rounded-xl bg-muted/20 text-sm"
                     />
                 </div>
-                <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange(v as ConcernStatus | "ALL")}>
-                    <SelectTrigger className="h-10 w-full sm:w-[180px] rounded-xl">
-                        <SelectValue placeholder="Filter by status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ALL">All statuses</SelectItem>
-                        {CONCERN_STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                                {CONCERN_STATUS_LABELS[s]}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+
+                {/* Right-aligned filter controls */}
+                <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+                    {/* Status filter */}
+                    <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange(v as ConcernStatus | "ALL")}>
+                        <SelectTrigger className="h-10 w-full sm:w-[160px] rounded-xl">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">All statuses</SelectItem>
+                            {CONCERN_STATUSES.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                    {CONCERN_STATUS_LABELS[s]}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    {/* Submitted by filter — search + dropdown */}
+                    <Combobox
+                        items={submitterOptions}
+                        value={submitterOptions.find((o) => o.value === submittedByFilter) ?? null}
+                        onValueChange={(item: { value: string; label: string } | null) =>
+                            onSubmittedByFilterChange(item?.value ?? "")
+                        }
+                    >
+                        <ComboboxInput
+                            className="h-10 w-full sm:w-[220px] rounded-xl text-sm"
+                            placeholder="Submitted by..."
+                            showClear={!!submittedByFilter}
+                        />
+                        <ComboboxContent>
+                            <ComboboxEmpty>No matches.</ComboboxEmpty>
+                            <ComboboxList>
+                                {(item: { value: string; label: string }) => (
+                                    <ComboboxItem key={item.value} value={item}>
+                                        {item.label}
+                                    </ComboboxItem>
+                                )}
+                            </ComboboxList>
+                        </ComboboxContent>
+                    </Combobox>
+
+                    {/* Date range picker */}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                className={cn(
+                                    "h-10 w-full sm:w-[240px] rounded-xl justify-start text-left font-normal",
+                                    !dateRange && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                                <span className="truncate">{dateRangeLabel}</span>
+                                {dateRange && (
+                                    <X
+                                        className="ml-auto h-4 w-4 shrink-0 opacity-60 hover:opacity-100"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onDateRangeChange(undefined);
+                                        }}
+                                    />
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                            <Calendar
+                                mode="range"
+                                selected={dateRange}
+                                onSelect={onDateRangeChange}
+                                initialFocus
+                                numberOfMonths={2}
+                            />
+                        </PopoverContent>
+                    </Popover>
+
+                    {/* Clear filters */}
+                    {hasActiveFilters && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearAllFilters}
+                            className="h-10 shrink-0 gap-1"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                            Clear
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">

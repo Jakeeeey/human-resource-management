@@ -2,8 +2,9 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Eye, Trash2, MessageSquareWarning, UserCircle2, CalendarClock, EyeOff } from "lucide-react";
-import { cn, formatDateTime, isValidDate } from "@/lib/utils";
+import { Eye, MessageSquareWarning, CalendarClock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { formatPHT } from "../lib/format-pht";
 import {
     EnrichedEmployeeConcern,
     ConcernStatus,
@@ -42,7 +43,6 @@ export function StatusBadge({ status }: { status: ConcernStatus }) {
 
 export const createColumns = (
     onView: (concern: EnrichedEmployeeConcern) => void,
-    onDelete: (concern: EnrichedEmployeeConcern) => void
 ): ColumnDef<EnrichedEmployeeConcern>[] => [
     {
         accessorKey: "subject_of_concern",
@@ -57,31 +57,6 @@ export const createColumns = (
                 </span>
             </div>
         ),
-    },
-    {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => <StatusBadge status={row.original.status} />,
-        filterFn: (row, columnId, filterValue) => {
-            if (filterValue === "ALL") return true;
-            return row.getValue(columnId) === filterValue;
-        },
-    },
-    {
-        id: "anonymous",
-        header: "Anonymity",
-        cell: ({ row }) =>
-            row.original.is_anonymous ? (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-                    <EyeOff className="h-3.5 w-3.5" />
-                    Anonymous
-                </span>
-            ) : (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/70">
-                    <UserCircle2 className="h-3.5 w-3.5" />
-                    Identified
-                </span>
-            ),
     },
     {
         id: "submitted_by",
@@ -103,17 +78,23 @@ export const createColumns = (
         accessorKey: "created_at",
         header: "Submitted On",
         cell: ({ row }) => {
-            const raw = row.original.created_at;
-            if (!raw) return <span className="text-sm text-muted-foreground">—</span>;
-            const d = new Date(raw);
             return (
                 <div className="flex items-center gap-2">
                     <CalendarClock className="h-3.5 w-3.5 text-muted-foreground/60" />
                     <span className="text-sm text-muted-foreground">
-                        {formatDateTime(isValidDate(d) ? d : new Date())}
+                        {formatPHT(row.original.created_at)}
                     </span>
                 </div>
             );
+        },
+    },
+    {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        filterFn: (row, columnId, filterValue) => {
+            if (filterValue === "ALL") return true;
+            return row.getValue(columnId) === filterValue;
         },
     },
     {
@@ -129,15 +110,6 @@ export const createColumns = (
                     className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-muted active:scale-90 transition-all"
                 >
                     <Eye className="h-4 w-4" />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Delete concern"
-                    onClick={() => onDelete(row.original)}
-                    className="h-8 w-8 rounded-xl text-destructive hover:bg-destructive/10 active:scale-90 transition-all"
-                >
-                    <Trash2 className="h-3.5 w-3.5" />
                 </Button>
             </div>
         ),

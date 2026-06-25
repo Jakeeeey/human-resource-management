@@ -13,6 +13,7 @@ import {
     EnrichedEmployeeConcern,
     EmployeeConcernForm,
     ConcernStatus,
+    type UserRole,
 } from "../types/employee-concern.schema";
 
 const API_PATH = "/api/hrm/communications/employee-concerns";
@@ -21,6 +22,9 @@ interface EmployeeConcernContextType {
     concerns: EnrichedEmployeeConcern[];
     isLoading: boolean;
     error: string | null;
+    currentUserRole: UserRole;
+    canSubmit: boolean;
+    canDelete: boolean;
     refresh: () => Promise<void>;
     submitConcern: (form: EmployeeConcernForm) => Promise<boolean>;
     updateStatus: (id: number, status: ConcernStatus) => Promise<boolean>;
@@ -33,6 +37,10 @@ export function EmployeeConcernProvider({ children }: { children: React.ReactNod
     const [concerns, setConcerns] = useState<EnrichedEmployeeConcern[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentUserRole, setCurrentUserRole] = useState<UserRole>("USER");
+
+    const canSubmit = currentUserRole !== "HR";
+    const canDelete = currentUserRole !== "HR";
 
     const refresh = useCallback(async () => {
         setIsLoading(true);
@@ -45,6 +53,9 @@ export function EmployeeConcernProvider({ children }: { children: React.ReactNod
             }
             const result = await response.json();
             setConcerns(result.data as EnrichedEmployeeConcern[]);
+            if (result._currentUserRole) {
+                setCurrentUserRole(result._currentUserRole as UserRole);
+            }
         } catch (err) {
             const e = err as Error;
             setError(e.message);
@@ -128,12 +139,15 @@ export function EmployeeConcernProvider({ children }: { children: React.ReactNod
             concerns,
             isLoading,
             error,
+            currentUserRole,
+            canSubmit,
+            canDelete,
             refresh,
             submitConcern,
             updateStatus,
             deleteConcern,
         }),
-        [concerns, isLoading, error, refresh, submitConcern, updateStatus, deleteConcern]
+        [concerns, isLoading, error, currentUserRole, canSubmit, canDelete, refresh, submitConcern, updateStatus, deleteConcern]
     );
 
     return (

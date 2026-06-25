@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** System role for authorization. Mirrors the `role` column in the `user` table. */
+export type UserRole = "ADMIN" | "HR" | "USER";
+
 /**
  * Employee Concern Schema
  *

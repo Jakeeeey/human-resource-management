@@ -19,7 +19,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Save, X, MessageSquareWarning, CalendarClock, UserCircle2, EyeOff } from "lucide-react";
-import { formatDateTime, isValidDate, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatPHT } from "../lib/format-pht";
 import {
     EnrichedEmployeeConcern,
     ConcernStatus,
@@ -55,9 +56,7 @@ export function EmployeeConcernDetailDialog({
     const submittedName = concern.is_anonymous
         ? "Anonymous"
         : concern.user_name || concern.created_by_name || "—";
-    const submittedDate = concern.created_at
-        ? formatDateTime(isValidDate(new Date(concern.created_at)) ? new Date(concern.created_at) : new Date())
-        : "—";
+    const submittedDate = formatPHT(concern.created_at);
     const statusChanged = nextStatus !== concern.status;
 
     const handleSaveStatus = async () => {
