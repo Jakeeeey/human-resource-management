@@ -10,7 +10,7 @@ interface CompanyProfileContextType {
     isLoading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
-    updateProfile: (profile: Partial<CompanyProfile>) => Promise<boolean>;
+    updateProfile: (profile: Partial<CompanyProfile>, silent?: boolean) => Promise<boolean>;
     uploadLogo: (file: File) => Promise<string | null>;
 }
 
@@ -45,7 +45,7 @@ export function CompanyProfileProvider({ children }: { children: React.ReactNode
         refresh();
     }, [refresh]);
 
-    const updateProfile = async (profile: Partial<CompanyProfile>) => {
+    const updateProfile = async (profile: Partial<CompanyProfile>, silent = false) => {
         try {
             const response = await fetch("/api/hrm/employee-admin/structure/company-profile", {
                 method: "PATCH",
@@ -56,7 +56,9 @@ export function CompanyProfileProvider({ children }: { children: React.ReactNode
                 const errData = await response.json();
                 throw new Error(errData.error || "Failed to update profile");
             }
-            toast.success("Company profile updated successfully");
+            if (!silent) {
+                toast.success("Company profile updated successfully");
+            }
             refresh();
             return true;
         } catch (err) {
