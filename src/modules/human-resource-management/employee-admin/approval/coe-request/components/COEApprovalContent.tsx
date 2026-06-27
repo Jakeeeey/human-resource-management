@@ -23,6 +23,7 @@ export default function COEApprovalContent() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [nameFilter, setNameFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const loadData = async () => {
     try {
@@ -65,26 +66,6 @@ export default function COEApprovalContent() {
     }
   };
 
-  const handleAttachEcopy = async (coeId: number, fileUrl: string) => {
-    try {
-      const response = await fetch(
-        `/api/hrm/employee-admin/approval/coe-request/${coeId}/ecopy`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ecopy_file_url: fileUrl }),
-        },
-      );
-      if (!response.ok) throw new Error("Failed to attach e-copy");
-      toast.success("E-Copy attached successfully");
-      await loadData();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to attach e-copy";
-      toast.error(errorMessage);
-    }
-  };
-
   const handleReject = async (coeId: number, remarks: string) => {
     try {
       await approveOrRejectCOERequest({
@@ -113,6 +94,7 @@ export default function COEApprovalContent() {
     setDateFrom(undefined);
     setDateTo(undefined);
     setNameFilter(null);
+    setStatusFilter("all");
   };
 
   const employeeNames = useMemo(() => {
@@ -168,8 +150,12 @@ export default function COEApprovalContent() {
       });
     }
 
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((req) => req.status === statusFilter);
+    }
+
     return filtered;
-  }, [requests, searchQuery, dateFrom, dateTo, nameFilter]);
+  }, [requests, searchQuery, dateFrom, dateTo, nameFilter, statusFilter]);
 
   if (isLoading) {
     return (
@@ -217,10 +203,12 @@ export default function COEApprovalContent() {
             dateTo={dateTo}
             nameFilter={nameFilter}
             employeeNames={employeeNames}
+            statusFilter={statusFilter}
             onSearchChange={setSearchQuery}
             onDateFromChange={setDateFrom}
             onDateToChange={setDateTo}
             onNameFilterChange={setNameFilter}
+            onStatusFilterChange={setStatusFilter}
             onResetFilters={resetFilters}
           />
         </CardContent>
@@ -238,7 +226,6 @@ export default function COEApprovalContent() {
         data={filteredRequests}
         onApprove={handleApprove}
         onReject={handleReject}
-        onAttachEcopy={handleAttachEcopy}
         isLoading={isLoading}
       />
     </div>

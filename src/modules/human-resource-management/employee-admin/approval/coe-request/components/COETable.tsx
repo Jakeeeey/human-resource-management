@@ -20,11 +20,10 @@ interface COETableProps {
   data: COERequestWithUser[];
   onApprove: (coeId: number, remarks: string) => Promise<void>;
   onReject: (coeId: number, remarks: string) => Promise<void>;
-  onAttachEcopy?: (coeId: number, fileUrl: string) => Promise<void>;
   isLoading?: boolean;
 }
 
-export function COETable({ data, onApprove, onReject, onAttachEcopy, isLoading = false }: COETableProps) {
+export function COETable({ data, onApprove, onReject, isLoading = false }: COETableProps) {
   const [viewModalState, setViewModalState] = useState<{
     isOpen: boolean;
     data: COERequestWithUser | null;
@@ -193,7 +192,6 @@ export function COETable({ data, onApprove, onReject, onAttachEcopy, isLoading =
         data={viewModalState.data}
         onApprove={onApprove}
         onReject={onReject}
-        onAttachEcopy={onAttachEcopy}
       />
     </>
   );

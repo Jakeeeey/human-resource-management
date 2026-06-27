@@ -25,7 +25,6 @@ interface ViewDetailsModalProps {
   data: COERequestWithUser | null;
   onApprove: (coeId: number, remarks: string, status?: string, ecopyFileUrl?: string) => Promise<void>;
   onReject: (coeId: number, remarks: string) => Promise<void>;
-  onAttachEcopy?: (coeId: number, fileUrl: string) => Promise<void>;
 }
 
 export function ViewDetailsModal({
@@ -34,7 +33,6 @@ export function ViewDetailsModal({
   data,
   onApprove,
   onReject,
-  onAttachEcopy,
 }: ViewDetailsModalProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [remarks, setRemarks] = useState("");
@@ -86,23 +84,6 @@ export function ViewDetailsModal({
         await onReject(data.id, remarks);
       }
       setRemarks("");
-      setSelectedFile(null);
-      onClose();
-    } catch {
-      // error handled upstream
-    } finally {
-      setIsProcessing(false);
-      setUploading(false);
-    }
-  };
-
-  const handleAttachEcopy = async () => {
-    if (!selectedFile || !onAttachEcopy || isProcessing) return;
-    try {
-      setIsProcessing(true);
-      setUploading(true);
-      const result = await uploadCOEFile(selectedFile);
-      await onAttachEcopy(data.id, result.file_url);
       setSelectedFile(null);
       onClose();
     } catch {

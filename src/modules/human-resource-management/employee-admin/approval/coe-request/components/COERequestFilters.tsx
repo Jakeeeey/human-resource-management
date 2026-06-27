@@ -16,6 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { CalendarIcon, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -26,10 +34,12 @@ interface COERequestFiltersProps {
   dateTo: Date | undefined;
   nameFilter: string | null;
   employeeNames: string[];
+  statusFilter: string;
   onSearchChange: (query: string) => void;
   onDateFromChange: (date: Date | undefined) => void;
   onDateToChange: (date: Date | undefined) => void;
   onNameFilterChange: (name: string | null) => void;
+  onStatusFilterChange: (status: string) => void;
   onResetFilters: () => void;
 }
 
@@ -39,17 +49,20 @@ export function COERequestFilters({
   dateTo,
   nameFilter,
   employeeNames,
+  statusFilter,
   onSearchChange,
   onDateFromChange,
   onDateToChange,
   onNameFilterChange,
+  onStatusFilterChange,
   onResetFilters,
 }: COERequestFiltersProps) {
   const hasActiveFilters =
     searchQuery ||
     dateFrom ||
     dateTo ||
-    nameFilter !== null;
+    nameFilter !== null ||
+    statusFilter !== "all";
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -117,22 +130,37 @@ export function COERequestFilters({
         </PopoverContent>
       </Popover>
 
-      <Select
-        value={nameFilter !== null ? nameFilter : "all"}
-        onValueChange={(value) =>
-          onNameFilterChange(value === "all" ? null : value)
-        }
+      <Combobox
+        items={employeeNames}
+        value={nameFilter}
+        onValueChange={(value) => onNameFilterChange(value ?? null)}
       >
-        <SelectTrigger className="w-42.5">
-          <SelectValue placeholder="All Employees" />
+        <ComboboxInput placeholder="All Employees" showClear />
+        <ComboboxContent>
+          <ComboboxEmpty>No employees found.</ComboboxEmpty>
+          <ComboboxList>
+            {(item) => (
+              <ComboboxItem key={item} value={item}>
+                {item}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+
+      <Select
+        value={statusFilter}
+        onValueChange={onStatusFilterChange}
+      >
+        <SelectTrigger className="w-38">
+          <SelectValue placeholder="All Status" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Employees</SelectItem>
-          {employeeNames.map((name) => (
-            <SelectItem key={name} value={name}>
-              {name}
-            </SelectItem>
-          ))}
+          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="PENDING">Pending</SelectItem>
+          <SelectItem value="APPROVED">Approved</SelectItem>
+          <SelectItem value="REJECTED">Rejected</SelectItem>
+          <SelectItem value="RELEASED">Released</SelectItem>
         </SelectContent>
       </Select>
 
