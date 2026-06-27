@@ -100,39 +100,41 @@ export async function GET() {
     const userDepartment = currentUser.user_department;
 
     // Fetch all departments
-    const deptResponse = await directusFetch(`/items/department?limit=1000`);
+    const deptResponse = await directusFetch(`/items/department?limit=-1`);
     const departments = deptResponse.data || [];
 
-    // Fetch overtime requests based on department
-    // If user is from HR (department_id = 2), fetch all requests
-    // Otherwise, fetch only their department's requests
-    let overtimeUrl = `/items/overtime_request?limit=1000&sort=-filed_at&fields=*`;
+    // Check if user is HR (department_id = 2) or an Admin
+    const isHRAdmin = userDepartment === 2 || currentUser.isAdmin === 1 || currentUser.isAdmin === true;
 
-    if (userDepartment !== 2) {
+    // Fetch overtime requests based on department
+    // If user is from HR or Admin, fetch all requests
+    // Otherwise, fetch only their department's requests
+    let overtimeUrl = `/items/overtime_request?limit=-1&sort=-filed_at&fields=*`;
+
+    if (!isHRAdmin) {
       overtimeUrl += `&filter[department_id][_eq]=${userDepartment}`;
     }
 
     const overtimeResponse = await directusFetch(overtimeUrl);
     const requests = overtimeResponse.data || [];
 
-    // Fetch all unique users
-    const userIds = [...new Set(requests.map((r: OvertimeRequest) => r.user_id))].filter(
-      (id): id is number => typeof id === "number"
-    );
+    // Fetch all users
+    let userUrl = `/items/user?limit=-1&fields=*`;
+    if (!isHRAdmin) {
+      userUrl += `&filter[user_department][_eq]=${userDepartment}`;
+    }
+    
+    const allUsersRes = await directusFetch(userUrl);
+    const allUsers = allUsersRes.data || [];
+    
     const usersMap = new Map();
-
-    await Promise.all(
-      userIds.map(async (id: number) => {
-        try {
-          const userRes = await directusFetch(`/items/user/${id}?fields=*`);
-          if (userRes.data) {
-            usersMap.set(id, userRes.data);
-          }
-        } catch (err) {
-          console.error(`Failed to fetch user ${id}:`, err);
-        }
-      })
-    );
+    allUsers.forEach((user: { user_id?: number, id?: number, [key: string]: unknown }) => {
+      // Use user.user_id or user.id depending on your schema
+      const id = user.user_id || user.id;
+      if (id) {
+        usersMap.set(id, user);
+      }
+    });
 
     // Enrich overtime requests with user details
     const enrichedRequests = requests.map((req: OvertimeRequest) => {
@@ -157,6 +159,7 @@ export async function GET() {
       currentUser,
       departments,
       overtimeRequests: enrichedRequests,
+      users: allUsers,
     });
   } catch (error) {
     console.error("GET overtime report error:", error);

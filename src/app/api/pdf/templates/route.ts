@@ -9,20 +9,31 @@ const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
  */
 export async function GET() {
     try {
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (STATIC_TOKEN) {
+            headers['Authorization'] = `Bearer ${STATIC_TOKEN}`;
+        }
+
         const response = await fetch(`${API_BASE_URL}/items/pdf_templates`, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${STATIC_TOKEN}`,
-                'Content-Type': 'application/json',
-            },
+            headers,
         });
 
-        if (!response.ok) throw new Error(`Directus error: ${response.status}`);
+        if (!response.ok) {
+            if (response.status === 403 || response.status === 401) {
+                // If token is missing or invalid, gracefully return empty templates
+                return NextResponse.json({ data: [] });
+            }
+            const errorText = await response.text();
+            throw new Error(`Directus error: ${response.status} - ${errorText}`);
+        }
         const data = await response.json();
         return NextResponse.json(data);
     } catch (error) {
         console.error('API Error (GET pdf_templates):', error);
-        return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 });
+        return NextResponse.json({ data: [] }, { status: 200 }); // Graceful fallback
     }
 }
 

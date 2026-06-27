@@ -24,7 +24,10 @@ export const pdfTemplateService = {
                 method: "GET"
             });
 
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                console.warn(`PdfTemplateService HTTP error! status: ${response.status}`);
+                return [];
+            }
             const result = await response.json();
             return result.data || [];
         } catch (e) {
