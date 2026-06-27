@@ -34,19 +34,6 @@ export async function POST(req: NextRequest) {
     const directusForm = new FormData();
     directusForm.append("file", file, file.name);
 
-    const folderRes = await fetch(`${DIRECTUS_URL}/folders?filter[name][_eq]=coe_requests`, {
-      headers: { Authorization: `Bearer ${TOKEN}` },
-    });
-    const folderData = await folderRes.json();
-    const folderId =
-      folderData.data && folderData.data.length > 0
-        ? folderData.data[0].id
-        : undefined;
-
-    if (folderId) {
-      directusForm.append("folder", folderId);
-    }
-
     const uploadRes = await fetch(`${DIRECTUS_URL}/files`, {
       method: "POST",
       headers: {
@@ -62,6 +49,27 @@ export async function POST(req: NextRequest) {
 
     const uploadData = await uploadRes.json();
     const fileId = uploadData.data?.id;
+
+    // Assign to folder via PATCH (Directus ignores folder during upload)
+    const folderRes = await fetch(`${DIRECTUS_URL}/folders?filter[name][_eq]=coe_requests`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    const folderData = await folderRes.json();
+    const folderId =
+      folderData.data && folderData.data.length > 0
+        ? folderData.data[0].id
+        : undefined;
+
+    if (folderId && fileId) {
+      await fetch(`${DIRECTUS_URL}/files/${fileId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${TOKEN}`,
+        },
+        body: JSON.stringify({ folder: folderId }),
+      });
+    }
 
     return NextResponse.json({
       success: true,
