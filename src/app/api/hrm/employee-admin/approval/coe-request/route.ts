@@ -77,14 +77,40 @@ export async function GET() {
         .map((u) => [u.data.user_id, u.data])
     );
 
-    const enrichedRequests = requests.map((req: { employee_id: number }) => {
+    // Resolve file metadata from Directus files for requests with attachments
+    const fileUuids = requests
+      .map((r: { ecopy_file_url: string | null }) => {
+        if (!r.ecopy_file_url) return null;
+        const match = r.ecopy_file_url.match(/\/?assets\/([a-f0-9-]+)/);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean) as string[];
+
+    const filePromises = fileUuids.map((uuid) =>
+      directusFetch(`/files/${uuid}?fields=id,filename_download,type`)
+        .then((r) => r.data)
+        .catch(() => null)
+    );
+    const filesData = await Promise.all(filePromises);
+    const filesMap = new Map(
+      filesData.filter((f) => f?.id).map((f) => [f.id, f])
+    );
+
+    const enrichedRequests = requests.map((req: { employee_id: number; id: number; ecopy_file_url: string | null }) => {
       const user = usersMap.get(req.employee_id);
+      const fileUuid = req.ecopy_file_url?.match(/\/?assets\/([a-f0-9-]+)/)?.[1] || null;
+      const fileMeta = fileUuid ? filesMap.get(fileUuid) : null;
 
       return {
         ...req,
         user_fname: user?.user_fname || "Unknown",
         user_lname: user?.user_lname || "",
         user_mname: user?.user_mname || null,
+        view_file_url: req.ecopy_file_url
+          ? `/api/hrm/employee-admin/approval/coe-request/${req.id}/file`
+          : null,
+        ecopy_file_name: fileMeta?.filename_download || null,
+        ecopy_file_type: fileMeta?.type || null,
       };
     });
 
@@ -115,11 +141,11 @@ export async function PATCH(req: NextRequest) {
 
     const userId = payload?.id || payload?.user_id || payload?.sub;
     const body = await req.json();
-    const { coe_id, status, remarks } = body;
+    const { coe_id, status, remarks, ecopy_file_url } = body;
 
-    if (!coe_id || !status || !["APPROVED", "REJECTED"].includes(status)) {
+    if (!coe_id || !status || !["APPROVED", "REJECTED", "RELEASED"].includes(status)) {
       return NextResponse.json(
-        { error: "Invalid request: coe_id and status (APPROVED/REJECTED) are required" },
+        { error: "Invalid request: coe_id and status (APPROVED/REJECTED/RELEASED) are required" },
         { status: 400 }
       );
     }
@@ -129,6 +155,7 @@ export async function PATCH(req: NextRequest) {
       hr_remarks: remarks || null,
       approved_by: userId,
       approval_date: new Date().toISOString(),
+      ...(ecopy_file_url ? { ecopy_file_url } : {}),
     };
 
     await directusFetch(`/items/coe_requests/${coe_id}`, {

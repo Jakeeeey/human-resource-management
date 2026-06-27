@@ -37,3 +37,40 @@ export async function approveOrRejectCOERequest(
 
   return response.json();
 }
+
+export async function uploadCOEFile(file: File): Promise<{
+  file_id: string;
+  file_url: string;
+  filename_download: string;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE}/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Failed to upload file");
+  }
+
+  return response.json();
+}
+
+export async function attachCOEecopy(
+  coeId: number,
+  fileUrl: string
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/${coeId}/ecopy`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ecopy_file_url: fileUrl }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Failed to attach e-copy to request");
+  }
+}

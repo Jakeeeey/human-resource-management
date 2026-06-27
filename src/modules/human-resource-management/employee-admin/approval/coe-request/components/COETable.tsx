@@ -12,30 +12,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+
 import type { COERequestWithUser } from "../type";
-import { ApprovalModal } from "./ApprovalModal";
 import { ViewDetailsModal } from "./ViewDetailsModal";
 
 interface COETableProps {
   data: COERequestWithUser[];
   onApprove: (coeId: number, remarks: string) => Promise<void>;
   onReject: (coeId: number, remarks: string) => Promise<void>;
-  onRefresh: () => Promise<void>;
+  onAttachEcopy?: (coeId: number, fileUrl: string) => Promise<void>;
   isLoading?: boolean;
 }
 
-export function COETable({ data, onApprove, onReject, isLoading = false }: COETableProps) {
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean;
-    action: "approve" | "reject" | null;
-    coeId: number | null;
-    employeeName: string;
-  }>({
-    isOpen: false,
-    action: null,
-    coeId: null,
-    employeeName: "",
-  });
+export function COETable({ data, onApprove, onReject, onAttachEcopy, isLoading = false }: COETableProps) {
   const [viewModalState, setViewModalState] = useState<{
     isOpen: boolean;
     data: COERequestWithUser | null;
@@ -43,7 +32,6 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
     isOpen: false,
     data: null,
   });
-  const [processingId, setProcessingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -62,28 +50,6 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
     });
   };
 
-  const handleOpenModal = (
-    action: "approve" | "reject",
-    coeId: number,
-    employeeName: string
-  ) => {
-    setModalState({
-      isOpen: true,
-      action,
-      coeId,
-      employeeName,
-    });
-  };
-
-  const handleCloseModal = () => {
-    setModalState({
-      isOpen: false,
-      action: null,
-      coeId: null,
-      employeeName: "",
-    });
-  };
-
   const handleOpenViewModal = (request: COERequestWithUser) => {
     setViewModalState({
       isOpen: true,
@@ -96,26 +62,6 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
       isOpen: false,
       data: null,
     });
-  };
-
-  const handleConfirm = async (remarks: string) => {
-    if (!modalState.coeId || !modalState.action) return;
-
-    try {
-      setProcessingId(modalState.coeId);
-
-      if (modalState.action === "approve") {
-        await onApprove(modalState.coeId, remarks);
-      } else {
-        await onReject(modalState.coeId, remarks);
-      }
-
-      handleCloseModal();
-    } catch (error) {
-      console.error("Error processing request:", error);
-    } finally {
-      setProcessingId(null);
-    }
   };
 
   if (isLoading) {
@@ -147,7 +93,6 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
                 <TableHead>Request Date</TableHead>
                 <TableHead>Purpose</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>E-Copy</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -161,18 +106,6 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
                   .filter(Boolean)
                   .join(" ");
 
-                const isProcessing = processingId === request.id;
-
-                const badgeVariant =
-                  request.status === "APPROVED" ? "outline"
-                  : request.status === "REJECTED" ? "destructive"
-                  : "secondary";
-
-                const badgeClass =
-                  request.status === "APPROVED"
-                    ? "text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700"
-                    : "capitalize";
-
                 return (
                   <TableRow key={request.id}>
                     <TableCell className="font-medium">{fullName}</TableCell>
@@ -181,18 +114,23 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
                       {request.purpose}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={badgeVariant as "secondary" | "destructive" | "outline"} className={badgeClass}>
+                      <Badge
+                        variant={
+                          request.status === "REJECTED" ? "destructive"
+                          : "secondary"
+                        }
+                        className={
+                          request.status === "PENDING"
+                            ? "bg-amber-500 dark:bg-amber-600 text-white hover:bg-amber-500/80 dark:hover:bg-amber-600/80"
+                            : request.status === "APPROVED"
+                            ? "bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-600/80 dark:hover:bg-blue-500/80"
+                            : request.status === "RELEASED"
+                            ? "bg-emerald-600 dark:bg-emerald-500 text-white hover:bg-emerald-600/80 dark:hover:bg-emerald-500/80"
+                            : "capitalize"
+                        }
+                      >
                         {request.status.toLowerCase()}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {request.ecopy_file_url ? (
-                        <Badge variant="outline" className="text-xs">
-                          Attached
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -200,35 +138,11 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
                           size="sm"
                           variant="secondary"
                           onClick={() => handleOpenViewModal(request)}
-                          disabled={isLoading || isProcessing}
+                          disabled={isLoading}
                           className="border dark:border-gray-600"
                         >
                           View
                         </Button>
-                        {request.status === "PENDING" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() =>
-                                handleOpenModal("approve", request.id, fullName)
-                              }
-                              disabled={isLoading || isProcessing}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() =>
-                                handleOpenModal("reject", request.id, fullName)
-                              }
-                              disabled={isLoading || isProcessing}
-                            >
-                              Reject
-                            </Button>
-                          </>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -277,15 +191,9 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
         isOpen={viewModalState.isOpen}
         onClose={handleCloseViewModal}
         data={viewModalState.data}
-      />
-
-      <ApprovalModal
-        isOpen={modalState.isOpen}
-        onClose={handleCloseModal}
-        onConfirm={handleConfirm}
-        action={modalState.action}
-        employeeName={modalState.employeeName}
-        isLoading={processingId !== null}
+        onApprove={onApprove}
+        onReject={onReject}
+        onAttachEcopy={onAttachEcopy}
       />
     </>
   );

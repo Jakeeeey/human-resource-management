@@ -44,22 +44,44 @@ export default function COEApprovalContent() {
     loadData();
   }, []);
 
-  const handleApprove = async (coeId: number, remarks: string) => {
+  const handleApprove = async (coeId: number, remarks: string, status?: string, ecopyFileUrl?: string) => {
     try {
+      const targetStatus = status === "RELEASED" ? "RELEASED" : "APPROVED";
       await approveOrRejectCOERequest({
         coe_id: coeId,
-        status: "APPROVED",
+        status: targetStatus,
         remarks,
         approver_id: 0,
+        ...(ecopyFileUrl ? { ecopy_file_url: ecopyFileUrl } : {}),
       });
 
-      toast.success("COE request approved successfully");
+      toast.success(targetStatus === "RELEASED" ? "COE request approved & released" : "COE request approved successfully");
       await loadData();
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to approve COE request";
       toast.error(errorMessage);
       throw err;
+    }
+  };
+
+  const handleAttachEcopy = async (coeId: number, fileUrl: string) => {
+    try {
+      const response = await fetch(
+        `/api/hrm/employee-admin/approval/coe-request/${coeId}/ecopy`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ecopy_file_url: fileUrl }),
+        },
+      );
+      if (!response.ok) throw new Error("Failed to attach e-copy");
+      toast.success("E-Copy attached successfully");
+      await loadData();
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to attach e-copy";
+      toast.error(errorMessage);
     }
   };
 
@@ -216,7 +238,7 @@ export default function COEApprovalContent() {
         data={filteredRequests}
         onApprove={handleApprove}
         onReject={handleReject}
-        onRefresh={handleRefresh}
+        onAttachEcopy={handleAttachEcopy}
         isLoading={isLoading}
       />
     </div>

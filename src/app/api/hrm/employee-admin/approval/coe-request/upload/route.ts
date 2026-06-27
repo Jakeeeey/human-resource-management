@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const directusForm = new FormData();
     directusForm.append("file", file, file.name);
 
-    const folderRes = await fetch(`${DIRECTUS_URL}/folders?filter[name][_eq]=coe_ecopies`, {
+    const folderRes = await fetch(`${DIRECTUS_URL}/folders?filter[name][_eq]=coe_requests`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
     });
     const folderData = await folderRes.json();
