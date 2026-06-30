@@ -26,7 +26,7 @@ export interface OvertimeRequestWithUser extends OvertimeRequest {
 }
 
 export interface ApprovalAction {
-  overtime_id: number;
+  overtime_ids: number[];
   status: 'approved' | 'rejected';
   remarks: string;
   approver_id: number;

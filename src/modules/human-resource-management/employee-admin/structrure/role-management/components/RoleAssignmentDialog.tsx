@@ -124,22 +124,22 @@ export function RoleAssignmentDialog({
     }
   };
 
-  const userOptions = users.map(u => ({
+  const userOptions = (Array.isArray(users) ? users : []).map(u => ({
     value: u.user_id.toString(),
     label: `${u.user_fname} ${u.user_lname} (${u.user_position})`
   }));
 
-  const divisionOptions = divisions.map(d => ({
+  const divisionOptions = (Array.isArray(divisions) ? divisions : []).map(d => ({
     value: d.division_id.toString(),
     label: d.division_name
   }));
 
-  const supervisorAsmtOptions = supervisors.map(s => ({
+  const supervisorAsmtOptions = (Array.isArray(supervisors) ? supervisors : []).map(s => ({
     value: s.id.toString(),
     label: `${getUser(s.supervisor_id)?.user_fname} ${getUser(s.supervisor_id)?.user_lname} (${getDivision(s.division_id)?.division_name})`
   }));
 
-  const salesmanOptions = salesmen.map(s => ({
+  const salesmanOptions = (Array.isArray(salesmen) ? salesmen : []).map(s => ({
     value: s.id.toString(),
     label: `${s.salesman_name} (${s.salesman_code})`
   }));

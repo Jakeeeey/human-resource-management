@@ -23,6 +23,7 @@ export async function fetchOvertimeReportData() {
     return {
       currentUser: data.currentUser as User,
       departments: (data.departments || []) as Department[],
+      users: (data.users || []) as User[],
       overtimeRequests: (data.overtimeRequests || []) as OvertimeRequestWithDetails[],
     };
   } catch (err) {

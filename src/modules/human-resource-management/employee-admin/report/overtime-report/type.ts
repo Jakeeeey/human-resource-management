@@ -67,6 +67,7 @@ export interface PaginationState {
 export interface OvertimeReportFetchContextType {
   overtimeRequests: OvertimeRequestWithDetails[];
   departments: Department[];
+  users: User[];
   currentUser: User | null;
   isLoading: boolean;
   isError: boolean;
