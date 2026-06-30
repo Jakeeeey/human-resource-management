@@ -143,6 +143,17 @@ export function ViewDetailsModal({
               </div>
             </div>
 
+            {data.remarks && (
+              <div>
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employee&apos;s Remarks</h3>
+                <div className="bg-muted/20 border rounded-lg p-4">
+                  <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
+                    {data.remarks}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {data.status === "PENDING" && (
               <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-4">
                 <div className="flex items-center gap-2">
