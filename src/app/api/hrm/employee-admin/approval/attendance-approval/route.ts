@@ -129,7 +129,9 @@ export async function GET(req: NextRequest) {
     const selectedDepartmentId = searchParams.get("departmentId");
     const filterParts = [];
 
-    if (approvalStatus && approvalStatus !== "all") {
+    if (approvalStatus === "pending") {
+      filterParts.push(`filter[_or][0][approve_status][_eq]=pending&filter[_or][1][approve_status][_null]=true`);
+    } else if (approvalStatus && approvalStatus !== "all") {
       filterParts.push(`filter[approve_status][_eq]=${approvalStatus}`);
     }
 
@@ -442,9 +444,11 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      const derivedStatus = manualAdjustments?.status || log.approve_status || "pending";
+
       return {
         ...log,
-        approval_status: log.approve_status,
+        approval_status: derivedStatus.toLowerCase(),
         user_fname: user?.user_fname || "Unknown",
         user_lname: user?.user_lname || "",
         user_mname: user?.user_mname || null,
@@ -459,9 +463,14 @@ export async function GET(req: NextRequest) {
       };
     });
 
+    let finalLogs = enrichedLogs;
+    if (approvalStatus && approvalStatus !== "all") {
+      finalLogs = enrichedLogs.filter((log: { approval_status?: string; [key: string]: unknown }) => log.approval_status === approvalStatus.toLowerCase());
+    }
+
     return NextResponse.json({
-      data: enrichedLogs,
-      total: enrichedLogs.length,
+      data: finalLogs,
+      total: finalLogs.length,
     });
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";

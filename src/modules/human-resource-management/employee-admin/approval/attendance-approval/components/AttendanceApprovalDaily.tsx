@@ -8,7 +8,9 @@ import {
   Search, 
   Save, 
   Calendar as CalendarIcon,
-  Filter
+  Filter,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +36,7 @@ import {
 import type { AttendanceLogWithUser } from "../type";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function AttendanceApprovalDaily() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -43,6 +46,7 @@ export function AttendanceApprovalDaily() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [departments, setDepartments] = useState<{ department_id: number, department_name: string }[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState("all");
+  const [showApproved, setShowApproved] = useState(false);
 
   const loadLogs = React.useCallback(async () => {
     try {
@@ -51,7 +55,8 @@ export function AttendanceApprovalDaily() {
       const response = await fetchAttendanceRequests({ 
         startDate: dateStr, 
         endDate: dateStr,
-        departmentId: selectedDeptId
+        departmentId: selectedDeptId,
+        approvalStatus: showApproved ? "all" : "pending"
       });
       setLogs(response.data || []);
     } catch {
@@ -59,7 +64,7 @@ export function AttendanceApprovalDaily() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedDate, selectedDeptId]);
+  }, [selectedDate, selectedDeptId, showApproved]);
 
   useEffect(() => {
     const getDepts = async () => {
@@ -112,7 +117,8 @@ export function AttendanceApprovalDaily() {
       const response = await fetchAttendanceRequests({ 
         startDate: dateStr, 
         endDate: dateStr,
-        departmentId: selectedDeptId
+        departmentId: selectedDeptId,
+        approvalStatus: showApproved ? "all" : "pending"
       });
       setLogs(response.data || []);
     } catch {
@@ -224,6 +230,22 @@ export function AttendanceApprovalDaily() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 rounded-xl border-muted-foreground/20 bg-background/50 focus-visible:ring-primary/20 h-10"
             />
+          </div>
+
+          <div className="flex items-center gap-2 bg-background/50 border border-muted-foreground/20 px-3 py-2 rounded-xl h-10 ml-2">
+            <Checkbox 
+              id="show-approved" 
+              checked={showApproved} 
+              onCheckedChange={(checked) => setShowApproved(checked === true)}
+              className="border-primary/50 data-[state=checked]:bg-primary"
+            />
+            <label
+              htmlFor="show-approved"
+              className="text-sm font-bold text-muted-foreground cursor-pointer select-none whitespace-nowrap flex items-center gap-1.5"
+            >
+              {showApproved ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              Show Approved
+            </label>
           </div>
         </div>
 
