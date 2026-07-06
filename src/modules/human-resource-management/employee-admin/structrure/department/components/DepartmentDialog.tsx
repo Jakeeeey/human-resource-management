@@ -24,13 +24,7 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -91,7 +85,15 @@ export function DepartmentDialog({
                 department_description: department.department_description || "",
                 department_head: department.department_head_id?.toString() || "",
                 date_added: department.date_added
-                    ? new Date(department.date_added)
+                    ? (() => {
+                        // Parse as local date (not UTC) to avoid day-shift in UTC+8.
+                        // "2023-01-03" parsed by new Date() becomes UTC midnight,
+                        // which in UTC+8 still stays Jan 3 — but toISOString on
+                        // a locally-created Date at midnight shifts back. Setting
+                        // noon avoids any DST or boundary issues on both read & write.
+                        const [y, m, d] = department.date_added.split("T")[0].split("-").map(Number);
+                        return new Date(y, m - 1, d, 12, 0, 0);
+                    })()
                     : new Date(),
                 positions: department.positions?.map(p => p.position) || [],
             });
@@ -114,7 +116,10 @@ export function DepartmentDialog({
                 department_name: data.department_name,
                 department_description: data.department_description,
                 department_head: parseInt(data.department_head, 10),
-                date_added: data.date_added?.toISOString(),
+                // Format as YYYY-MM-DD to avoid UTC conversion shifting the day.
+                date_added: data.date_added
+                    ? `${data.date_added.getFullYear()}-${String(data.date_added.getMonth() + 1).padStart(2, "0")}-${String(data.date_added.getDate()).padStart(2, "0")}`
+                    : null,
                 positions: data.positions.filter(p => p.trim() !== ""),
             });
             onOpenChange(false);
@@ -167,23 +172,17 @@ export function DepartmentDialog({
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Department Head</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a user" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {users.map((user) => (
-                                                <SelectItem
-                                                    key={user.user_id}
-                                                    value={user.user_id.toString()}
-                                                >
-                                                    {user.user_fname} {user.user_lname}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <FormControl>
+                                        <SearchableSelect
+                                            options={users.map((user) => ({
+                                                value: user.user_id.toString(),
+                                                label: `${user.user_fname} ${user.user_lname}`,
+                                            }))}
+                                            value={field.value}
+                                            onValueChange={field.onChange}
+                                            placeholder="Select a user"
+                                        />
+                                    </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}

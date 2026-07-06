@@ -30,6 +30,7 @@ export function OvertimeReportFetchProvider({
     OvertimeRequestWithDetails[]
   >([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
@@ -45,6 +46,7 @@ export function OvertimeReportFetchProvider({
 
       setCurrentUser(data.currentUser);
       setDepartments(data.departments);
+      setUsers(data.users);
       setOvertimeRequests(data.overtimeRequests);
     } catch (err) {
       setIsError(true);
@@ -67,6 +69,7 @@ export function OvertimeReportFetchProvider({
   const value: OvertimeReportFetchContextType = {
     overtimeRequests,
     departments,
+    users,
     currentUser,
     isLoading,
     isError,

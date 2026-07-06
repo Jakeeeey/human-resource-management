@@ -45,43 +45,43 @@ export default function OvertimeApprovalContent() {
     loadData();
   }, []);
 
-  const handleApprove = async (overtimeId: number, remarks: string) => {
+  const handleApprove = async (overtimeIds: number[], remarks: string) => {
     try {
       await approveOrRejectOvertimeRequest({
-        overtime_id: overtimeId,
+        overtime_ids: overtimeIds,
         status: "approved",
         remarks,
         approver_id: 0, // Will be set by API from token
       });
 
-      toast.success("Overtime request approved successfully");
+      toast.success("Overtime request(s) approved successfully");
 
-      // Reload data
-      await loadData();
+      // Optimistically remove from state instead of full reload
+      setRequests((prev) => prev.filter((r) => !overtimeIds.includes(r.overtime_id)));
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to approve overtime request";
+        err instanceof Error ? err.message : "Failed to approve overtime request(s)";
       toast.error(errorMessage);
       throw err;
     }
   };
 
-  const handleReject = async (overtimeId: number, remarks: string) => {
+  const handleReject = async (overtimeIds: number[], remarks: string) => {
     try {
       await approveOrRejectOvertimeRequest({
-        overtime_id: overtimeId,
+        overtime_ids: overtimeIds,
         status: "rejected",
         remarks,
         approver_id: 0, // Will be set by API from token
       });
 
-      toast.success("Overtime request rejected successfully");
+      toast.success("Overtime request(s) rejected successfully");
 
-      // Reload data
-      await loadData();
+      // Optimistically remove from state instead of full reload
+      setRequests((prev) => prev.filter((r) => !overtimeIds.includes(r.overtime_id)));
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to reject overtime request";
+        err instanceof Error ? err.message : "Failed to reject overtime request(s)";
       toast.error(errorMessage);
       throw err;
     }

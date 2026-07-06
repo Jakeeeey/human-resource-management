@@ -37,6 +37,7 @@ export function useOvertimeReport() {
   const {
     overtimeRequests,
     departments,
+    users,
     currentUser,
     isLoading,
     isError,
@@ -72,24 +73,25 @@ export function useOvertimeReport() {
     return paginateRequests(filteredRequests);
   }, [filteredRequests, paginateRequests]);
 
-  // Check if user is HR admin
-  const isHRAdmin = currentUser?.user_department === 2;
+  // Check if user is HR admin or System admin
+  const isHRAdmin = currentUser?.user_department === 2 || currentUser?.isAdmin === true;
 
-  // Get unique employee names for filter dropdown
-  // If HR admin and department is selected, show only names from that department
+  // Get unique employee names for filter dropdown from the complete users list
   const employeeNames = useMemo(() => {
-    let requestsToFilter = overtimeRequests;
+    let usersToFilter = users;
     
     // If HR admin selected a department, filter names by that department
     if (isHRAdmin && filters.departmentId !== null) {
-      requestsToFilter = overtimeRequests.filter(
-        (req) => req.department_id === filters.departmentId
+      usersToFilter = users.filter(
+        (user) => user.user_department === filters.departmentId
       );
     }
     
-    const names = requestsToFilter.map((req) => req.employee_name);
+    const names = usersToFilter.map(
+      (user) => `${user.user_fname} ${user.user_mname ? user.user_mname + " " : ""}${user.user_lname}`
+    );
     return Array.from(new Set(names)).sort();
-  }, [overtimeRequests, isHRAdmin, filters.departmentId]);
+  }, [users, isHRAdmin, filters.departmentId]);
 
   return {
     // Data

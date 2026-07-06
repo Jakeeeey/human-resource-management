@@ -10,10 +10,12 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, UserCircle2, UserCircle, Hash } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Trash2, Plus, UserCircle2, UserCircle, Hash, Search, Filter } from "lucide-react";
 import { SalesmanPerSupervisor, Salesman, SupervisorPerDivision, SystemUser, Division } from "../types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RoleAssignmentDialog } from "./RoleAssignmentDialog";
+import { SearchableSelect } from "./SearchableSelect";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { TablePagination, usePagination } from "./TablePagination";
@@ -38,7 +40,66 @@ interface SalesmanTabProps {
 export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, supervisors, users }: SalesmanTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
-  const pagination = usePagination(data, 5);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [supervisorFilter, setSupervisorFilter] = React.useState<string>("");
+
+  const supervisorFilterOptions = React.useMemo(() => {
+    const optionsMap = new Map<string, { value: string, label: string }>();
+    
+    data.forEach(d => {
+      const supAsmt = getSupervisorAsmt(d.supervisor_per_division_id);
+      if (!supAsmt) return;
+      
+      const idStr = supAsmt.id.toString();
+      if (!optionsMap.has(idStr)) {
+        const supUser = getUser(supAsmt.supervisor_id);
+        const div = getDivision(supAsmt.division_id);
+        const supName = `${supUser?.user_fname || ''} ${supUser?.user_lname || ''}`.trim();
+        optionsMap.set(idStr, {
+          value: idStr,
+          label: `${supName} (${div?.division_name || 'No Division'})`
+        });
+      }
+    });
+    return Array.from(optionsMap.values());
+  }, [data]);
+
+  const filteredData = React.useMemo(() => {
+    let result = data;
+    
+    if (supervisorFilter) {
+      result = result.filter(item => {
+        const supAsmt = getSupervisorAsmt(item.supervisor_per_division_id);
+        return supAsmt?.id.toString() === supervisorFilter;
+      });
+    }
+    
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase().replace(/\s+/g, ' ').trim();
+      const queryParts = lowerQuery.split(' ');
+      
+      result = result.filter(item => {
+        const salesman = getSalesman(item.salesman_id);
+        const supAsmt = getSupervisorAsmt(item.supervisor_per_division_id);
+        const supUser = getUser(supAsmt?.supervisor_id);
+        const division = getDivision(supAsmt?.division_id);
+        
+        const salesmanName = (salesman?.salesman_name || '').toLowerCase();
+        const salesmanCode = (salesman?.salesman_code || '').toLowerCase();
+        const supName = `${supUser?.user_fname || ''} ${supUser?.user_lname || ''}`.toLowerCase().replace(/\s+/g, ' ');
+        const divName = (division?.division_name || '').toLowerCase();
+        
+        const fullText = `${salesmanName} ${salesmanCode} ${supName} ${divName}`;
+        
+        // Match all parts of the query (e.g. "Richard M" matches if both "richard" and "m" are in fullText)
+        return queryParts.every(part => fullText.includes(part));
+      });
+    }
+    
+    return result;
+  }, [data, searchQuery, supervisorFilter]);
+
+  const pagination = usePagination(filteredData, 5);
 
   if (isLoading) {
     return <div className="space-y-4">
@@ -49,17 +110,41 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm gap-4">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Sales Force</h3>
           <p className="text-sm text-muted-foreground font-medium">Frontline personnel assigned to supervisors.</p>
         </div>
-        <Button
-          onClick={() => setIsDialogOpen(true)}
-          className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
-        >
-          <Plus className="mr-2 h-4 w-4" /> Assign Salesman
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-48">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground z-10" />
+              <SearchableSelect
+                options={[{ value: "", label: "All Supervisors" }, ...supervisorFilterOptions]}
+                value={supervisorFilter}
+                onValueChange={setSupervisorFilter}
+                placeholder="Filter by supervisor..."
+                className="h-10 pl-9 pr-3 rounded-full bg-muted/50 border-muted-foreground/10 text-sm"
+              />
+            </div>
+            <div className="relative w-full sm:w-56">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+              <Input
+                type="text"
+                placeholder="Search..."
+                className="w-full pl-9 rounded-full bg-muted/50 border-muted-foreground/10 focus-visible:ring-primary/20 h-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          <Button
+            onClick={() => setIsDialogOpen(true)}
+            className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 w-full sm:w-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" /> Assign Salesman
+          </Button>
+        </div>
       </div>
 
       <RoleAssignmentDialog
@@ -96,7 +181,7 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.length === 0 ? (
+            {filteredData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="h-64 text-center pointer-events-none">
                   <div className="flex flex-col items-center justify-center space-y-3 opacity-40">
