@@ -109,8 +109,8 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
                   <TableRow key={request.id}>
                     <TableCell className="font-medium">{fullName}</TableCell>
                     <TableCell>{formatDate(request.request_date)}</TableCell>
-                    <TableCell className="max-w-xs truncate" title={request.purpose}>
-                      {request.purpose}
+                    <TableCell className="max-w-[200px] truncate" title={request.purpose}>
+                      {request.purpose?.length > 50 ? `${request.purpose.slice(0, 50)}...` : request.purpose}
                     </TableCell>
                     <TableCell>
                       <Badge

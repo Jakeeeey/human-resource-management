@@ -104,7 +104,7 @@ export function ViewDetailsModal({
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-          <div className="sticky top-0 z-10 bg-gradient-to-r from-primary/5 via-background to-background border-b px-6 py-4">
+          <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
             <DialogHeader className="p-0">
               <div className="flex items-center justify-between">
                 <div>
@@ -136,7 +136,7 @@ export function ViewDetailsModal({
 
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Purpose</h3>
-              <div className="bg-muted/20 border rounded-lg p-4">
+              <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
                 <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
                   {data.purpose || "N/A"}
                 </p>
@@ -146,7 +146,7 @@ export function ViewDetailsModal({
             {data.remarks && (
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employee&apos;s Remarks</h3>
-                <div className="bg-muted/20 border rounded-lg p-4">
+                <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
                   <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
                     {data.remarks}
                   </p>
@@ -347,7 +347,7 @@ export function ViewDetailsModal({
             {data.hr_remarks && data.status !== "PENDING" && (
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">HR Remarks</h3>
-                <div className="bg-muted/20 border rounded-lg p-4">
+                <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
                   <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
                     {data.hr_remarks}
                   </p>
