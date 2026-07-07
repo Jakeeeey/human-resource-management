@@ -141,7 +141,7 @@ export function ViewDetailsModal({
             <div>
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Purpose</h3>
               <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
-                <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
+                <p className="text-sm whitespace-pre-wrap break-all leading-relaxed" style={{ overflowWrap: "anywhere" }}>
                   {data.purpose || "N/A"}
                 </p>
               </div>
@@ -151,7 +151,7 @@ export function ViewDetailsModal({
               <div>
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Employee&apos;s Remarks</h3>
                 <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
-                  <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
+                  <p className="text-sm whitespace-pre-wrap break-all leading-relaxed" style={{ overflowWrap: "anywhere" }}>
                     {data.remarks}
                   </p>
                 </div>
@@ -176,7 +176,7 @@ export function ViewDetailsModal({
                   )}
                 </div>
                 <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
-                  <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
+                  <p className="text-sm whitespace-pre-wrap break-all leading-relaxed" style={{ overflowWrap: "anywhere" }}>
                     {data.hr_remarks}
                   </p>
                 </div>
@@ -198,7 +198,7 @@ export function ViewDetailsModal({
                   value={editedHrRemarks}
                   onChange={(e) => setEditedHrRemarks(e.target.value)}
                   rows={4}
-                  className="bg-background max-h-48 overflow-y-auto break-all"
+                  className="bg-background max-h-48 overflow-y-auto break-all" style={{ overflowWrap: "anywhere" }}
                 />
                 <div className="flex justify-end gap-2">
                   <Button
@@ -276,20 +276,6 @@ export function ViewDetailsModal({
                       onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="remarks" className="text-xs font-medium">
-                      Remarks <span className="text-muted-foreground font-normal">(optional)</span>
-                    </Label>
-                    <Textarea
-                      id="remarks"
-                      placeholder="Enter your remarks here..."
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      rows={3}
-                      disabled={isProcessing}
-                      className="bg-background max-h-36 overflow-y-auto break-all"
-                    />
-                  </div>
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
@@ -316,6 +302,21 @@ export function ViewDetailsModal({
                         "Approve"
                       )}
                     </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="remarks" className="text-xs font-medium">
+                      HR Remarks <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Textarea
+                      id="remarks"
+                      placeholder="Enter your remarks here..."
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      rows={2}
+                      disabled={isProcessing}
+                      className="bg-background max-h-36 overflow-y-auto break-all"
+                      style={{ overflowWrap: "anywhere" }}
+                    />
                   </div>
                 </div>
               </div>
@@ -402,6 +403,7 @@ export function ViewDetailsModal({
                         rows={3}
                         disabled={isProcessing}
                         className="bg-background max-h-36 overflow-y-auto break-all"
+                        style={{ overflowWrap: "anywhere" }}
                       />
                     </div>
                     )}

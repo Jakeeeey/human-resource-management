@@ -196,7 +196,7 @@ export function EmployeeConcernDetailDialog({
                             Concern
                         </span>
                             <div className="rounded-xl border bg-muted/20 p-4 text-sm leading-relaxed min-h-0 max-h-36 overflow-y-auto">
-                              <p className="whitespace-pre-wrap break-all text-foreground/90">
+                              <p className="whitespace-pre-wrap break-all text-foreground/90" style={{ overflowWrap: "anywhere" }}>
                             {concern.concern}
                           </p>
                         </div>
