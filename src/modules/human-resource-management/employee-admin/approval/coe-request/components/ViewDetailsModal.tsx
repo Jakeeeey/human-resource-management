@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { Eye, Upload, FileText, ShieldCheck, UserCircle, Paperclip, X } from "lucide-react";
+import { Pencil, Upload, FileText, ShieldCheck, UserCircle, Paperclip, X } from "lucide-react";
 import type { COERequestWithUser } from "../type";
 import { COEFilePreviewDialog } from "./COEFilePreviewDialog";
 import { uploadCOEFile } from "../providers/fetchProvider";
@@ -25,6 +25,7 @@ interface ViewDetailsModalProps {
   data: COERequestWithUser | null;
   onApprove: (coeId: number, remarks: string, status?: string, ecopyFileUrl?: string) => Promise<void>;
   onReject: (coeId: number, remarks: string) => Promise<void>;
+  onEditRemarks: (coeId: number, hr_remarks: string) => Promise<void>;
 }
 
 export function ViewDetailsModal({
@@ -33,12 +34,15 @@ export function ViewDetailsModal({
   data,
   onApprove,
   onReject,
+  onEditRemarks,
 }: ViewDetailsModalProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [remarks, setRemarks] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [editingHrRemarks, setEditingHrRemarks] = useState(false);
+  const [editedHrRemarks, setEditedHrRemarks] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!data) return null;
@@ -154,6 +158,76 @@ export function ViewDetailsModal({
               </div>
             )}
 
+            {data.hr_remarks && data.status !== "PENDING" && !editingHrRemarks && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">HR Remarks</h3>
+                  {data.status === "APPROVED" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditedHrRemarks(data.hr_remarks || "");
+                        setEditingHrRemarks(true);
+                      }}
+                      className="p-1 rounded-md hover:bg-muted transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+                <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
+                  <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
+                    {data.hr_remarks}
+                  </p>
+                </div>
+              </div>
+            )}
+            {editingHrRemarks && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Edit HR Remarks</h3>
+                  <button
+                    type="button"
+                    onClick={() => setEditingHrRemarks(false)}
+                    className="p-1 rounded-md hover:bg-muted transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+                <Textarea
+                  value={editedHrRemarks}
+                  onChange={(e) => setEditedHrRemarks(e.target.value)}
+                  rows={4}
+                  className="bg-background max-h-48 overflow-y-auto break-all"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingHrRemarks(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={async () => {
+                      if (!data) return;
+                      try {
+                        await onEditRemarks(data.id, editedHrRemarks);
+                        setEditingHrRemarks(false);
+                      } catch {
+                        // error handled by parent toast
+                      }
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {data.status === "PENDING" && (
               <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-4">
                 <div className="flex items-center gap-2">
@@ -213,7 +287,7 @@ export function ViewDetailsModal({
                       onChange={(e) => setRemarks(e.target.value)}
                       rows={3}
                       disabled={isProcessing}
-                      className="bg-background"
+                      className="bg-background max-h-36 overflow-y-auto break-all"
                     />
                   </div>
                   <div className="flex justify-end gap-2">
@@ -315,21 +389,23 @@ export function ViewDetailsModal({
                       />
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <Label htmlFor="remarks-approved" className="text-xs font-medium">
-                      Remarks <span className="text-muted-foreground font-normal">(optional)</span>
-                    </Label>
-                    <Textarea
-                      id="remarks-approved"
-                      placeholder="Enter your remarks here..."
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      rows={3}
-                      disabled={isProcessing}
-                      className="bg-background"
-                    />
-                  </div>
-                  <div className="flex justify-end">
+                    {!data.hr_remarks && (
+                    <div className="space-y-2">
+                      <Label htmlFor="remarks-approved" className="text-xs font-medium">
+                        Remarks <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <Textarea
+                        id="remarks-approved"
+                        placeholder="Enter your remarks here..."
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        rows={3}
+                        disabled={isProcessing}
+                        className="bg-background max-h-36 overflow-y-auto break-all"
+                      />
+                    </div>
+                    )}
+                    <div className="flex justify-end">
                     <Button
                       type="button"
                       onClick={() => handleConfirm("RELEASED")}
@@ -340,17 +416,6 @@ export function ViewDetailsModal({
                       {isProcessing ? (uploading ? "Uploading..." : "Processing...") : "Release"}
                     </Button>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {data.hr_remarks && data.status !== "PENDING" && (
-              <div>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">HR Remarks</h3>
-                <div className="bg-muted/20 border rounded-lg p-4 max-h-48 overflow-y-auto">
-                  <p className="text-sm whitespace-pre-wrap break-all leading-relaxed">
-                    {data.hr_remarks}
-                  </p>
                 </div>
               </div>
             )}
