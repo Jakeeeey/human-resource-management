@@ -113,6 +113,14 @@ export function EmployeeConcernDetailDialog({
         };
     }, [open, concernId]);
 
+    const [limit, setLimit] = useState(40);
+    useEffect(() => {
+        setLimit(window.innerWidth < 640 ? 20 : 40);
+        const handler = () => setLimit(window.innerWidth < 640 ? 20 : 40);
+        window.addEventListener("resize", handler);
+        return () => window.removeEventListener("resize", handler);
+    }, []);
+
     if (!concern) return null;
 
     const submittedName = concern.is_anonymous
@@ -138,18 +146,18 @@ export function EmployeeConcernDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent showCloseButton={false} className="sm:max-w-[600px] overflow-hidden p-0 rounded-2xl border-2 shadow-2xl animate-in fade-in zoom-in-95">
-                <div className="bg-gradient-to-r from-primary/10 via-background to-primary/5 p-6 pb-4">
+            <DialogContent showCloseButton={false} className="sm:max-w-[600px] w-[95vw] overflow-hidden p-0 rounded-2xl border-2 shadow-2xl animate-in fade-in zoom-in-95">
+                <div className="bg-gradient-to-r from-primary/10 via-background to-primary/5 p-4 sm:p-6 sm:pb-4">
                     <DialogHeader>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2.5 bg-primary/10 rounded-xl">
-                                <MessageSquareWarning className="h-6 w-6 text-primary stroke-[2.5px]" />
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                            <div className="p-2 sm:p-2.5 bg-primary/10 rounded-xl">
+                                <MessageSquareWarning className="h-5 w-5 sm:h-6 sm:w-6 text-primary stroke-[2.5px]" />
                             </div>
                             <div className="min-w-0 flex-1 overflow-hidden">
-                                <DialogTitle className="text-xl font-bold tracking-tight truncate max-w-full">
+                                <DialogTitle className="text-base sm:text-xl font-bold tracking-tight truncate max-w-full">
                                     {String(concern.subject_of_concern).slice(0, 30)}{String(concern.subject_of_concern).length > 30 ? "..." : ""}
                                 </DialogTitle>
-                                <DialogDescription className="text-xs font-medium opacity-70">
+                                <DialogDescription className="text-[10px] sm:text-xs font-medium opacity-70">
                                     Concern detail &mdash; advance the concern through its workflow.
                                 </DialogDescription>
                             </div>
@@ -162,9 +170,9 @@ export function EmployeeConcernDetailDialog({
 
                 <Separator className="bg-primary/10" />
 
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                     {/* Meta row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-1">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                                 Submitted By
@@ -195,7 +203,7 @@ export function EmployeeConcernDetailDialog({
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                             Concern
                         </span>
-                            <div className="rounded-xl border bg-muted/20 p-4 text-sm leading-relaxed min-h-0 max-h-36 overflow-y-auto">
+                            <div className="rounded-xl border bg-muted/20 p-3 sm:p-4 text-xs sm:text-sm leading-relaxed min-h-0 max-h-36 overflow-y-auto">
                               <p className="whitespace-pre-wrap break-all text-foreground/90" style={{ overflowWrap: "anywhere" }}>
                             {concern.concern}
                           </p>
@@ -236,14 +244,14 @@ export function EmployeeConcernDetailDialog({
                                     return (
                                         <li
                                             key={att.id}
-                                            className="flex items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/30"
+                                            className="flex items-center gap-3 rounded-xl border bg-card p-2 sm:p-3 transition-colors hover:bg-muted/30"
                                         >
-                                            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", tint)}>
-                                                <Icon className="h-5 w-5" />
+                                            <div className={cn("flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg", tint)}>
+                                                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-semibold text-foreground">
-                                                    {att.file_name.length > 40 ? att.file_name.slice(0, 40) + "..." : att.file_name}
+                                                <p className="truncate text-xs sm:text-sm font-semibold text-foreground">
+                                                    {att.file_name.length > limit ? att.file_name.slice(0, limit) + "..." : att.file_name}
                                                 </p>
                                                 <p className="truncate text-[11px] text-muted-foreground/70">
                                                     {att.file_type || "Unknown type"}
@@ -256,9 +264,9 @@ export function EmployeeConcernDetailDialog({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() => setPreviewAttachment(att)}
-                                                    className="shrink-0 rounded-lg h-8 px-3"
+                                                    className="shrink-0 rounded-lg h-7 sm:h-8 px-2 sm:px-3"
                                                 >
-                                                    <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                                    <Eye className="mr-1 h-3 w-3 sm:mr-1.5 sm:h-3.5 sm:w-3.5" />
                                                     Preview
                                                 </Button>
                                             )}
@@ -271,7 +279,7 @@ export function EmployeeConcernDetailDialog({
 
                     {/* Workflow Actions — hidden for terminal states (status is in header badge) */}
                     {concern.status !== "RESOLVED" && concern.status !== "DISMISSED" && (
-                        <div className="space-y-3 rounded-xl border-2 border-primary/15 p-5 bg-primary/[0.03]">
+                        <div className="space-y-3 rounded-xl border-2 border-primary/15 p-4 sm:p-5 bg-primary/[0.03]">
                             <span className="block text-xs font-bold uppercase tracking-wider text-primary/80">
                                 Workflow Actions
                             </span>
@@ -281,7 +289,7 @@ export function EmployeeConcernDetailDialog({
                                     onClick={() => handleWorkflowAction("IN_REVIEW")}
                                     disabled={isBusy("IN_REVIEW")}
                                     className={cn(
-                                        "h-11 w-full rounded-xl font-bold shadow-lg shadow-primary/20 transition-all",
+                                        "h-10 sm:h-11 w-full rounded-xl font-bold shadow-lg shadow-primary/20 transition-all text-sm sm:text-base",
                                         "bg-blue-600 hover:bg-blue-700 text-white"
                                     )}
                                 >
@@ -305,7 +313,7 @@ export function EmployeeConcernDetailDialog({
                                         onClick={() => handleWorkflowAction("RESOLVED")}
                                         disabled={isBusy("RESOLVED")}
                                         className={cn(
-                                            "h-11 rounded-xl font-bold shadow-lg transition-all",
+                                            "h-10 sm:h-11 rounded-xl font-bold shadow-lg transition-all text-sm sm:text-base",
                                             "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
                                         )}
                                     >
@@ -325,7 +333,7 @@ export function EmployeeConcernDetailDialog({
                                         onClick={() => handleWorkflowAction("DISMISSED")}
                                         disabled={isBusy("DISMISSED")}
                                         className={cn(
-                                            "h-11 rounded-xl font-bold shadow-lg transition-all",
+                                            "h-10 sm:h-11 rounded-xl font-bold shadow-lg transition-all text-sm sm:text-base",
                                             "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20"
                                         )}
                                     >
@@ -347,7 +355,7 @@ export function EmployeeConcernDetailDialog({
                     )}
                 </div>
 
-                <div className="px-6 pb-4 -mt-2">
+                <div className="px-4 sm:px-6 pb-4 sm:pb-4 -mt-1 sm:-mt-2">
                     <Button
                         type="button"
                         variant="ghost"
