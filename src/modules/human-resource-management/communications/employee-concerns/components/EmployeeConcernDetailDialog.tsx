@@ -228,7 +228,7 @@ export function EmployeeConcernDetailDialog({
                                 No attachments for this concern.
                             </div>
                         ) : (
-                            <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                            <ul className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                                 {attachments.map((att) => {
                                     const { Icon, tint } = getAttachmentIcon(att.file_type, att.file_name);
                                     return (
