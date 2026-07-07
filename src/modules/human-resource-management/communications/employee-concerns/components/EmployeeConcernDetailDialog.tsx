@@ -243,7 +243,7 @@ export function EmployeeConcernDetailDialog({
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-semibold text-foreground">
-                                                    {att.file_name}
+                                                    {att.file_name.length > 40 ? att.file_name.slice(0, 40) + "..." : att.file_name}
                                                 </p>
                                                 <p className="truncate text-[11px] text-muted-foreground/70">
                                                     {att.file_type || "Unknown type"}
