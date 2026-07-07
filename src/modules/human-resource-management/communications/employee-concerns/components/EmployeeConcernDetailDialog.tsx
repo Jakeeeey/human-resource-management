@@ -145,9 +145,9 @@ export function EmployeeConcernDetailDialog({
                             <div className="p-2.5 bg-primary/10 rounded-xl">
                                 <MessageSquareWarning className="h-6 w-6 text-primary stroke-[2.5px]" />
                             </div>
-                            <div className="min-w-0">
-                                <DialogTitle className="text-xl font-bold tracking-tight line-clamp-1">
-                                    {concern.subject_of_concern}
+                            <div className="min-w-0 flex-1 overflow-hidden">
+                                <DialogTitle className="text-xl font-bold tracking-tight truncate max-w-full">
+                                    {String(concern.subject_of_concern).slice(0, 30)}{String(concern.subject_of_concern).length > 30 ? "..." : ""}
                                 </DialogTitle>
                                 <DialogDescription className="text-xs font-medium opacity-70">
                                     Concern detail &mdash; advance the concern through its workflow.
@@ -195,8 +195,10 @@ export function EmployeeConcernDetailDialog({
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                             Concern
                         </span>
-                        <div className="rounded-xl border bg-muted/20 p-4 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 max-h-64 overflow-y-auto text-justify">
+                            <div className="rounded-xl border bg-muted/20 p-4 text-sm leading-relaxed min-h-0 max-h-36 overflow-y-auto">
+                              <p className="whitespace-pre-wrap break-all text-foreground/90">
                             {concern.concern}
+                          </p>
                         </div>
                     </div>
 
@@ -228,7 +230,7 @@ export function EmployeeConcernDetailDialog({
                                 No attachments for this concern.
                             </div>
                         ) : (
-                            <ul className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                            <ul className="space-y-2 max-h-[136px] overflow-y-auto pr-1">
                                 {attachments.map((att) => {
                                     const { Icon, tint } = getAttachmentIcon(att.file_type, att.file_name);
                                     return (
