@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { Pencil, Upload, FileText, ShieldCheck, UserCircle, Paperclip, X } from "lucide-react";
+import { Pencil, Upload, FileText, ShieldCheck, UserCircle, Paperclip, X, Eye } from "lucide-react";
 import type { COERequestWithUser } from "../type";
 import { COEFilePreviewDialog } from "./COEFilePreviewDialog";
 import { uploadCOEFile } from "../providers/fetchProvider";
