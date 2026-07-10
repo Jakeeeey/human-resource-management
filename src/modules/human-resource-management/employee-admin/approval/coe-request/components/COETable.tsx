@@ -20,10 +20,11 @@ interface COETableProps {
   data: COERequestWithUser[];
   onApprove: (coeId: number, remarks: string) => Promise<void>;
   onReject: (coeId: number, remarks: string) => Promise<void>;
+  onEditRemarks: (coeId: number, hr_remarks: string) => Promise<void>;
   isLoading?: boolean;
 }
 
-export function COETable({ data, onApprove, onReject, isLoading = false }: COETableProps) {
+export function COETable({ data, onApprove, onReject, onEditRemarks, isLoading = false }: COETableProps) {
   const [viewModalState, setViewModalState] = useState<{
     isOpen: boolean;
     data: COERequestWithUser | null;
@@ -109,8 +110,8 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
                   <TableRow key={request.id}>
                     <TableCell className="font-medium">{fullName}</TableCell>
                     <TableCell>{formatDate(request.request_date)}</TableCell>
-                    <TableCell className="max-w-xs truncate" title={request.purpose}>
-                      {request.purpose}
+                    <TableCell className="max-w-[200px] truncate" title={request.purpose}>
+                      {request.purpose?.length > 50 ? `${request.purpose.slice(0, 50)}...` : request.purpose}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -192,6 +193,7 @@ export function COETable({ data, onApprove, onReject, isLoading = false }: COETa
         data={viewModalState.data}
         onApprove={onApprove}
         onReject={onReject}
+        onEditRemarks={onEditRemarks}
       />
     </>
   );
