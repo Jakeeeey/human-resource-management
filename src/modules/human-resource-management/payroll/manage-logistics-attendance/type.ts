@@ -8,6 +8,7 @@ export interface StaffAttendance {
 
 export interface DispatchAttendance {
 	dispatchPlanId: number | null;
+	isExtra?: boolean;
 	dispatchDocNo: string;
 	dispatchStatus: string;
 	deliveryStatus: string;
@@ -28,6 +29,8 @@ export interface DispatchAttendance {
 	city: string;
 	province: string;
 	areaName: string;
+	clusterId: number | null;
+	clusterName: string;
 	staff: StaffAttendance[];
 }
 
@@ -55,6 +58,7 @@ export interface LogisticsReportDateRange {
 // Edit payload types
 export interface UpdateDispatchStaffPayload {
 	dispatchPlanId: number;
+	isExtra?: boolean;
 	driverId: number | null;
 	helperIds: number[];
 	timeOfDispatch?: string | null;

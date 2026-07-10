@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { DispatchAttendance } from "../type";
 import {
     Dialog,
     DialogContent,
@@ -17,11 +16,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Trash2 } from "lucide-react";
 
-interface EditDispatchStaffDialogProps {
+interface AddManualDispatchDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    dispatchRecord: DispatchAttendance | null;
-    onSave: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; }) => Promise<{ success: boolean; } | void>;
+    onSave: (payload: { docNo: string; timeOfDispatch: string; driverId: number | null; vehicleId: number | null; helperIds: number[]; }) => Promise<{ success: boolean; } | void>;
 }
 
 interface UserOption {
@@ -30,76 +28,72 @@ interface UserOption {
     position: string;
 }
 
-export function EditDispatchStaffDialog({
+export function AddManualDispatchDialog({
     isOpen,
     onOpenChange,
-    dispatchRecord,
     onSave,
-}: EditDispatchStaffDialogProps) {
+}: AddManualDispatchDialogProps) {
     const [users, setUsers] = useState<UserOption[]>([]);
     const [vehicles, setVehicles] = useState<{id: number, plate: string, type: string}[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState(false);
     const [isLoadingVehicles, setIsLoadingVehicles] = useState(false);
 
+    const [docNo, setDocNo] = useState("");
     const [driverId, setDriverId] = useState<string>("none");
     const [helperIds, setHelperIds] = useState<string[]>([]);
     const [timeOfDispatch, setTimeOfDispatch] = useState<string>("");
     const [vehicleId, setVehicleId] = useState<string>("none");
     const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (isOpen && users.length === 0) {
-            setIsLoadingUsers(true);
-            fetch('/api/hrm/manage-logistics-attendance/users')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.data) {
-                        setUsers(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name)));
-                    }
-                })
-                .finally(() => setIsLoadingUsers(false));
-        }
-        
-        if (isOpen && vehicles.length === 0) {
-            setIsLoadingVehicles(true);
-            fetch('/api/hrm/manage-logistics-attendance/vehicles')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.data) {
-                        setVehicles(data.data);
-                    }
-                })
-                .finally(() => setIsLoadingVehicles(false));
+        if (isOpen) {
+            // Reset form
+            setDocNo("");
+            setDriverId("none");
+            setHelperIds([]);
+            setTimeOfDispatch("");
+            setVehicleId("none");
+            setError(null);
+
+            if (users.length === 0) {
+                setIsLoadingUsers(true);
+                fetch('/api/hrm/manage-logistics-attendance/users')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.data) {
+                            setUsers(data.data.sort((a: any, b: any) => a.name.localeCompare(b.name)));
+                        }
+                    })
+                    .finally(() => setIsLoadingUsers(false));
+            }
+            
+            if (vehicles.length === 0) {
+                setIsLoadingVehicles(true);
+                fetch('/api/hrm/manage-logistics-attendance/vehicles')
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.data) {
+                            setVehicles(data.data);
+                        }
+                    })
+                    .finally(() => setIsLoadingVehicles(false));
+            }
         }
     }, [isOpen, users.length, vehicles.length]);
 
-    useEffect(() => {
-        if (isOpen && dispatchRecord) {
-            setDriverId(dispatchRecord.driverId ? String(dispatchRecord.driverId) : "none");
-            setVehicleId(dispatchRecord.vehicleId ? String(dispatchRecord.vehicleId) : "none");
-            const currentHelperIds = dispatchRecord.staff
-                .map(s => s.staffUserId)
-                .filter((id): id is number => id !== null);
-            setHelperIds(currentHelperIds.map(id => String(id)));
-            
-            if (dispatchRecord.timeOfDispatch) {
-                // Convert UTC to local datetime-local format YYYY-MM-DDTHH:mm
-                const dateObj = new Date(dispatchRecord.timeOfDispatch);
-                const tzOffset = (new Date()).getTimezoneOffset() * 60000; 
-                const localISOTime = (new Date(dateObj.getTime() - tzOffset)).toISOString().slice(0, 16);
-                setTimeOfDispatch(localISOTime);
-            } else {
-                setTimeOfDispatch("");
-            }
-        }
-    }, [isOpen, dispatchRecord]);
-
-    if (!dispatchRecord) return null;
-
     const handleSave = async () => {
-        if (!dispatchRecord.dispatchPlanId) return;
+        if (!docNo) {
+            setError("PDP Document Number is required.");
+            return;
+        }
+        if (!timeOfDispatch) {
+            setError("Time of Dispatch is required.");
+            return;
+        }
 
         setIsSaving(true);
+        setError(null);
         try {
             const parsedDriverId = driverId !== "none" ? parseInt(driverId, 10) : null;
             const parsedVehicleId = vehicleId !== "none" ? parseInt(vehicleId, 10) : null;
@@ -108,23 +102,20 @@ export function EditDispatchStaffDialog({
                 .map(id => parseInt(id, 10));
 
             // Convert local time back to UTC ISO for saving
-            let finalTime = null;
-            if (timeOfDispatch) {
-                const dateObj = new Date(timeOfDispatch);
-                finalTime = dateObj.toISOString();
-            }
+            const dateObj = new Date(timeOfDispatch);
+            const finalTime = dateObj.toISOString();
 
             await onSave({
-                dispatchPlanId: dispatchRecord.dispatchPlanId,
-                isExtra: dispatchRecord.isExtra,
+                docNo,
+                timeOfDispatch: finalTime,
                 driverId: parsedDriverId,
                 helperIds: parsedHelperIds,
-                timeOfDispatch: finalTime,
                 vehicleId: parsedVehicleId,
             });
             onOpenChange(false);
         } catch (error) {
-            console.error("Failed to save", error);
+            setError(error instanceof Error ? error.message : "Failed to save record.");
+            console.error("Failed to save manual PDP", error);
         } finally {
             setIsSaving(false);
         }
@@ -148,16 +139,33 @@ export function EditDispatchStaffDialog({
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Edit PDP Staff & Info</DialogTitle>
+                    <DialogTitle>Add Manual PDP</DialogTitle>
                     <DialogDescription>
-                        Update the Driver, Helpers, Time, and Vehicle for {dispatchRecord.dispatchDocNo || `PDP-${dispatchRecord.dispatchPlanId}`}.
+                        Create a manual entry that will be stored in the extra dispatch records table.
                     </DialogDescription>
                 </DialogHeader>
                 
                 <div className="grid gap-6 py-4">
+                    {error && (
+                        <div className="p-3 bg-red-50 text-red-600 rounded-md border border-red-200 shadow-sm text-sm font-medium">
+                            {error}
+                        </div>
+                    )}
+
+                    {/* PDP Document No */}
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="docNo" className="font-semibold text-slate-700">PDP No <span className="text-red-500">*</span></Label>
+                        <Input
+                            id="docNo"
+                            placeholder="e.g. PDP-2026-0001"
+                            value={docNo}
+                            onChange={(e) => setDocNo(e.target.value)}
+                        />
+                    </div>
+
                     {/* Time of Dispatch */}
                     <div className="flex flex-col gap-2">
-                        <Label htmlFor="timeOfDispatch" className="font-semibold text-slate-700">Time of Dispatch</Label>
+                        <Label htmlFor="timeOfDispatch" className="font-semibold text-slate-700">Time of Dispatch <span className="text-red-500">*</span></Label>
                         <Input
                             id="timeOfDispatch"
                             type="datetime-local"
@@ -245,7 +253,7 @@ export function EditDispatchStaffDialog({
                         Cancel
                     </Button>
                     <Button onClick={handleSave} disabled={isSaving || isLoadingUsers}>
-                        {isSaving ? "Saving..." : "Save changes"}
+                        {isSaving ? "Saving..." : "Create PDP"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

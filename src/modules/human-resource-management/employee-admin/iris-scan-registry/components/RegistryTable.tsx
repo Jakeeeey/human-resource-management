@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import React from "react";
@@ -10,7 +11,6 @@ import {
     useReactTable,
     type ColumnFiltersState,
     type SortingState,
-    type VisibilityState,
 } from "@tanstack/react-table";
 import {
     Table,
@@ -21,13 +21,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ScanFace } from "lucide-react";
 import {
     Select,
     SelectContent,
@@ -36,42 +30,24 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import type { User, Department } from "../types";
+import type { User, Department } from "../../employee-masterlist/types";
 import { createColumns } from "./columns";
 
-interface EmployeeTableProps {
+interface RegistryTableProps {
     data: User[];
     departments?: Department[];
     isLoading?: boolean;
-    onViewDetails?: (employee: User) => void;
-    onDeleteEmployee?: (id: number) => Promise<void>;
     onScanIris?: (employee: User) => void;
 }
 
-export function EmployeeTable({ 
+export function RegistryTable({ 
     data, 
     departments = [],
     isLoading = false,
-    onViewDetails,
-    onDeleteEmployee,
     onScanIris
-}: EmployeeTableProps) {
+}: RegistryTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-    const [rowSelection, setRowSelection] = React.useState({});
-
-    const handleViewDetails = React.useCallback((user: User) => {
-        if (onViewDetails) {
-            onViewDetails(user);
-        }
-    }, [onViewDetails]);
-
-    const handleDelete = React.useCallback(async (user: User) => {
-        if (onDeleteEmployee) {
-            await onDeleteEmployee(user.id);
-        }
-    }, [onDeleteEmployee]);
 
     const handleScanIris = React.useCallback((user: User) => {
         if (onScanIris) {
@@ -79,9 +55,8 @@ export function EmployeeTable({
         }
     }, [onScanIris]);
 
-    const columns = React.useMemo(() => createColumns(handleViewDetails, handleDelete, handleScanIris, departments), [handleViewDetails, handleDelete, handleScanIris, departments]);
+    const columns = React.useMemo(() => createColumns(handleScanIris, departments), [handleScanIris, departments]);
 
-    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
@@ -91,13 +66,9 @@ export function EmployeeTable({
         getPaginationRowModel: getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
-        onColumnVisibilityChange: setColumnVisibility,
-        onRowSelectionChange: setRowSelection,
         state: {
             sorting,
             columnFilters,
-            columnVisibility,
-            rowSelection,
         },
     });
 
@@ -147,41 +118,26 @@ export function EmployeeTable({
                             ))}
                         </SelectContent>
                     </Select>
-                </div>
 
-                <div className="flex items-center gap-3 w-full lg:w-auto">
-                    <Button variant="outline" size="sm" className="h-11 gap-2 rounded-xl border-dashed px-4 hover:border-primary/50 hover:bg-primary/5 ml-auto sm:ml-0">
-                        <SlidersHorizontal className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Advanced</span>
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 ml-auto gap-2 rounded-xl px-4 hover:bg-muted/80">
-                                Columns <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-[180px] rounded-xl shadow-xl border-muted/20">
-                            {table
-                                .getAllColumns()
-                                .filter((column) => column.getCanHide())
-                                .map((column) => {
-                                    return (
-                                        <DropdownMenuCheckboxItem
-                                            key={column.id}
-                                            className="capitalize py-2 rounded-lg m-1"
-                                            checked={column.getIsVisible()}
-                                            onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                                        >
-                                            {column.id.replace("user_", "").replace("_", " ")}
-                                        </DropdownMenuCheckboxItem>
-                                    );
-                                })}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Select
+                        value={(table.getColumn("status")?.getFilterValue() as string) ?? "all"}
+                        onValueChange={(value) => 
+                            table.getColumn("status")?.setFilterValue(value === "all" ? "" : value)
+                        }
+                    >
+                        <SelectTrigger className="h-11 w-full sm:w-[200px] rounded-xl bg-muted/40 border-transparent focus:bg-background transition-all focus:ring-2 focus:ring-primary/20">
+                            <SelectValue placeholder="All Status" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl shadow-xl border-muted/20">
+                            <SelectItem value="all">All Status</SelectItem>
+                            <SelectItem value="registered">Registered</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
             </div>
 
-            <div className="rounded-2xl border bg-background overflow-hidden ring-1 ring-muted/10">
+            <div className="rounded-2xl border bg-background overflow-hidden ring-1 ring-muted/10 shadow-sm">
                 <Table>
                     <TableHeader className="bg-muted/30">
                         {table.getHeaderGroups().map((headerGroup) => (
@@ -206,7 +162,6 @@ export function EmployeeTable({
                             table.getRowModel().rows.map((row) => (
                                 <TableRow
                                     key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
                                     className="hover:bg-primary/5 transition-colors border-b-muted/10 group h-16"
                                 >
                                     {row.getVisibleCells().map((cell) => (
@@ -226,8 +181,8 @@ export function EmployeeTable({
                                     className="h-40 text-center"
                                 >
                                     <div className="flex flex-col items-center gap-2 opacity-60">
-                                        <Users className="h-10 w-10 text-muted-foreground" />
-                                        <p className="text-sm font-medium">No employee records found matching your criteria</p>
+                                        <ScanFace className="h-10 w-10 text-muted-foreground" />
+                                        <p className="text-sm font-medium">No records found matching your criteria</p>
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -238,7 +193,7 @@ export function EmployeeTable({
 
             <div className="flex flex-col sm:flex-row items-center justify-between px-2 gap-4 pt-2">
                 <div className="text-sm text-muted-foreground font-medium order-2 sm:order-1">
-                    Showing <span className="text-foreground">{table.getFilteredRowModel().rows.length}</span> verified personnel
+                    Showing <span className="text-foreground">{table.getFilteredRowModel().rows.length}</span> personnel
                 </div>
                 <div className="flex items-center space-x-3 order-1 sm:order-2 bg-muted/20 p-1.5 rounded-2xl border border-muted/10">
                     <Button

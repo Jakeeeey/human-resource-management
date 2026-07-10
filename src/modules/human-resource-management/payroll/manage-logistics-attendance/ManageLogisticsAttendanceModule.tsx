@@ -2,9 +2,11 @@
 
 import { ManageLogisticsHeader } from "./components/ManageLogisticsHeader";
 import { ManageLogisticsDispatchList } from "./components/ManageLogisticsDispatchList";
+import { AddManualDispatchDialog } from "./components/AddManualDispatchDialog";
 import { useManageLogisticsAttendance } from "./hooks/useManageLogisticsAttendance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState } from "react";
 
 export function ManageLogisticsAttendanceModule() {
   const {
@@ -14,6 +16,10 @@ export function ManageLogisticsAttendanceModule() {
     setEndDate,
     searchQuery,
     setSearchQuery,
+    driverFilter,
+    setDriverFilter,
+    helperFilter,
+    setHelperFilter,
     paginatedDispatches,
     isLoading,
     error,
@@ -21,7 +27,10 @@ export function ManageLogisticsAttendanceModule() {
     totalPages,
     setCurrentPage,
     updateDispatchStaff,
+    addManualDispatch,
   } = useManageLogisticsAttendance();
+
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-6 mx-auto max-w-screen-2xl">
@@ -45,6 +54,11 @@ export function ManageLogisticsAttendanceModule() {
         setEndDate={setEndDate}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        driverFilter={driverFilter}
+        setDriverFilter={setDriverFilter}
+        helperFilter={helperFilter}
+        setHelperFilter={setHelperFilter}
+        onAddManualDispatch={() => setIsAddDialogOpen(true)}
       />
 
       <Card className="border-slate-200 shadow-sm">
@@ -86,6 +100,12 @@ export function ManageLogisticsAttendanceModule() {
             </div>
         </CardContent>
       </Card>
+
+      <AddManualDispatchDialog 
+        isOpen={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSave={addManualDispatch}
+      />
     </div>
   );
 }

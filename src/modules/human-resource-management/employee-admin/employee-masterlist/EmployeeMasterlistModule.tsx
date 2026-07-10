@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Employee Masterlist Module
  * Connected to Database
@@ -14,7 +15,8 @@ import {
   FileText,
   AlertCircle,
   RefreshCw,
-  BarChart3
+  BarChart3,
+  ScanFace
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +25,7 @@ import { AddEmployeeModal, type NewEmployeeFormData } from "./components/AddEmpl
 import { EmployeeDetailsModal } from "./components/EmployeeDetailsModal";
 import { MasterlistPreviewModal } from "./components/MasterlistPreviewModal";
 import { EmployeeInfographics } from "./components/EmployeeInfographics";
+import { IrishRegistrationModal } from "./components/IrishRegistrationModal";
 import type { User } from "./types";
 import { useEmployeeMasterlist } from "./hooks/useEmployeeMasterlist";
 import { createEmployeeSpring } from "./providers/springProvider";
@@ -44,6 +47,8 @@ export default function EmployeeMasterlistModule() {
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState("list");
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [selectedScanUser, setSelectedScanUser] = useState<User | null>(null);
 
   const handleAddEmployee = async (data: NewEmployeeFormData & { _userImageId?: string; _signatureId?: string }) => {
     try {
@@ -220,6 +225,10 @@ export default function EmployeeMasterlistModule() {
                 setIsDetailsModalOpen(true);
               }}
               onDeleteEmployee={removeEmployee}
+              onScanIris={(user) => {
+                setSelectedScanUser(user);
+                setIsScanModalOpen(true);
+              }}
             />
           </div>
         </TabsContent>
@@ -229,6 +238,7 @@ export default function EmployeeMasterlistModule() {
             <EmployeeInfographics employees={employees} departments={departments} />
           </div>
         </TabsContent>
+
       </Tabs>
 
       <AddEmployeeModal
@@ -251,6 +261,12 @@ export default function EmployeeMasterlistModule() {
         onOpenChange={setIsPreviewModalOpen}
         employees={employees}
         departments={departments}
+      />
+
+      <IrishRegistrationModal 
+        isOpen={isScanModalOpen}
+        onOpenChange={setIsScanModalOpen}
+        user={selectedScanUser}
       />
     </div>
   );
