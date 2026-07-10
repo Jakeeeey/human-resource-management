@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LogisticsReportDateRange,
   LogisticsReportMeta,
@@ -41,6 +41,7 @@ export function useManageLogisticsAttendance() {
   const [searchQuery, setSearchQuery] = useState("");
   const [driverFilter, setDriverFilter] = useState("");
   const [helperFilter, setHelperFilter] = useState("");
+  const [dispatchDateFilter, setDispatchDateFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
@@ -141,7 +142,19 @@ export function useManageLogisticsAttendance() {
             (s.staffName && s.staffName.toLowerCase().includes(helperFilter.toLowerCase())) ||
             (s.staffUserId && s.staffUserId.toString().includes(helperFilter))
           ));
-        return matchSearch && matchDriver && matchHelper;
+        let matchDate = true;
+        if (dispatchDateFilter) {
+          // dispatchDateFilter is YYYY-MM-DD. dispatch.timeOfDispatch is an ISO string.
+          if (!dispatch.timeOfDispatch) {
+            matchDate = false;
+          } else {
+            const dDate = new Date(dispatch.timeOfDispatch);
+            const dDateStr = `${dDate.getFullYear()}-${String(dDate.getMonth() + 1).padStart(2, '0')}-${String(dDate.getDate()).padStart(2, '0')}`;
+            matchDate = dDateStr === dispatchDateFilter;
+          }
+        }
+        
+        return matchSearch && matchDriver && matchHelper && matchDate;
       }
     )
     .sort((a, b) => {
@@ -165,6 +178,24 @@ export function useManageLogisticsAttendance() {
   const endIndex = startIndex + pageSize;
   const paginatedDispatches = filteredDispatches.slice(startIndex, endIndex);
 
+  const uniqueDrivers = useMemo(() => {
+    const drivers = new Set<string>();
+    dispatches.forEach(d => {
+      if (d.driverName) drivers.add(d.driverName);
+    });
+    return Array.from(drivers).sort();
+  }, [dispatches]);
+
+  const uniqueHelpers = useMemo(() => {
+    const helpers = new Set<string>();
+    dispatches.forEach(d => {
+      d.staff?.forEach(s => {
+        if (s.staffName) helpers.add(s.staffName);
+      });
+    });
+    return Array.from(helpers).sort();
+  }, [dispatches]);
+
   return {
     startDate,
     endDate,
@@ -187,6 +218,10 @@ export function useManageLogisticsAttendance() {
     setDriverFilter,
     helperFilter,
     setHelperFilter,
+    dispatchDateFilter,
+    setDispatchDateFilter,
+    uniqueDrivers,
+    uniqueHelpers,
     setCurrentPage,
     setPageSize,
     loadReport,
