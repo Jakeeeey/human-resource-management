@@ -54,7 +54,9 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Failed to fetch dispatch plans", details: errorText }, { status: pdpRes.status });
         }
 
-        const pdpData = (await pdpRes.json()).data || [];
+        const pdpDataRaw = (await pdpRes.json()).data || [];
+        // Exclude any dispatch plans that are marked as disregarded (is_not_payroll = 1 or true)
+        const pdpData = pdpDataRaw.filter((p: any) => p.is_not_payroll !== 1 && p.is_not_payroll !== true);
         const pdpIds = pdpData.map((p: any) => p.id);
 
         const chunkArray = <T>(arr: T[], size: number): T[][] => {

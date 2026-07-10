@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useEffect, useRef, useState } from "react";
 import { fetchLeaveReportData } from "./providers/fetchProvider";
 import type {
   LeaveRequestWithDetails,
@@ -21,73 +21,7 @@ export const LeaveReportFetchContext = createContext<
   LeaveReportFetchContextType | undefined
 >(undefined);
 
-export function LeaveReportFetchProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [leaveRequests, setLeaveRequests] = useState<
-    LeaveRequestWithDetails[]
-  >([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      setIsError(false);
-      setError(null);
-
-      const data = await fetchLeaveReportData();
-
-      setCurrentUser(data.currentUser);
-      setDepartments(data.departments);
-      setLeaveRequests(data.leaveRequests);
-    } catch (err) {
-      setIsError(true);
-      setError(
-        err instanceof Error ? err : new Error("Unknown error occurred")
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const refetch = async () => {
-    await fetchData();
-  };
-
-  const value: LeaveReportFetchContextType = {
-    leaveRequests,
-    departments,
-    currentUser,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  };
-
-  return (
-    <LeaveReportFetchContext.Provider value={value}>
-      {children}
-    </LeaveReportFetchContext.Provider>
-  );
-}
-
-// ============================================================================
-// FILTER CONTEXT
-// ============================================================================
-
-export const LeaveReportFilterContext = createContext<
-  LeaveReportFilterContextType | undefined
->(undefined);
+const DEFAULT_PAGE_SIZE = 10;
 
 const initialFilters: LeaveReportFilters = {
   searchQuery: "",
@@ -98,112 +32,181 @@ const initialFilters: LeaveReportFilters = {
   statusFilter: null,
 };
 
-export function LeaveReportFilterProvider({
+export function LeaveReportFetchProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequestWithDetails[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  // Server-side pagination state
+  const [currentPage, setCurrentPageState] = useState(1);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    totalItems: 0,
+    totalPages: 1,
+  });
+
+  // Filter state
   const [filters, setFilters] = useState<LeaveReportFilters>(initialFilters);
 
-  const setSearchQuery = (query: string) => {
-    setFilters((prev) => ({ ...prev, searchQuery: query }));
-  };
+  // Debounce timer for search
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const setDateFrom = (date: Date | undefined) => {
-    setFilters((prev) => ({ ...prev, dateFrom: date }));
-  };
+  // ── Core fetch ─────────────────────────────────────────────────────────────
+  const fetchData = useCallback(async (
+    page: number,
+    size: number,
+    activeFilters: LeaveReportFilters
+  ) => {
+    try {
+      setIsLoading(true);
+      setIsError(false);
+      setError(null);
 
-  const setDateTo = (date: Date | undefined) => {
-    setFilters((prev) => ({ ...prev, dateTo: date }));
-  };
+      const data = await fetchLeaveReportData({ page, pageSize: size, filters: activeFilters });
 
-  const setDepartmentId = (id: number | null) => {
-    setFilters((prev) => ({ ...prev, departmentId: id, nameFilter: null }));
-  };
+      setCurrentUser(data.currentUser);
+      setDepartments(data.departments);
+      setLeaveRequests(data.leaveRequests);
+      setPagination(data.pagination);
+    } catch (err) {
+      setIsError(true);
+      setError(err instanceof Error ? err : new Error("Unknown error occurred"));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const setNameFilter = (name: string | null) => {
-    setFilters((prev) => ({ ...prev, nameFilter: name }));
-  };
+  useEffect(() => {
+    fetchData(1, DEFAULT_PAGE_SIZE, initialFilters);
+  }, [fetchData]);
 
-  const setStatusFilter = (status: string | null) => {
-    setFilters((prev) => ({ ...prev, statusFilter: status }));
-  };
+  const refetch = useCallback(async () => {
+    await fetchData(currentPage, pageSize, filters);
+  }, [fetchData, currentPage, pageSize, filters]);
 
-  const resetFilters = () => {
-    setFilters(initialFilters);
-  };
+  // ── Page/size change ───────────────────────────────────────────────────────
+  const setCurrentPage = useCallback((page: number) => {
+    setCurrentPageState(page);
+    fetchData(page, pageSize, filters);
+  }, [fetchData, pageSize, filters]);
 
-  const filterRequests = React.useMemo(() => {
-    return (requests: LeaveRequestWithDetails[]) => {
-      let filtered = [...requests];
+  const setPageSize = useCallback((size: number) => {
+    setPageSizeState(size);
+    setCurrentPageState(1);
+    fetchData(1, size, filters);
+  }, [fetchData, filters]);
 
-      if (filters.searchQuery.trim()) {
-        const query = filters.searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (req) =>
-            req.employee_name.toLowerCase().includes(query) ||
-            req.reason?.toLowerCase().includes(query) ||
-            req.remarks?.toLowerCase().includes(query)
-        );
-      }
+  // ── Filter setters ─────────────────────────────────────────────────────────
+  const applyFilters = useCallback((newFilters: LeaveReportFilters) => {
+    setFilters(newFilters);
+    setCurrentPageState(1);
+    fetchData(1, pageSize, newFilters);
+  }, [fetchData, pageSize]);
 
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        filtered = filtered.filter((req) => {
-          const reqDate = new Date(req.filed_at);
-          return reqDate >= fromDate;
-        });
-      }
+  const setSearchQuery = useCallback((query: string) => {
+    const newFilters = { ...filters, searchQuery: query };
+    setFilters(newFilters);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setCurrentPageState(1);
+      fetchData(1, pageSize, newFilters);
+    }, 400);
+  }, [filters, fetchData, pageSize]);
 
-      if (filters.dateTo) {
-        const toDate = new Date(filters.dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        filtered = filtered.filter((req) => {
-          const reqDate = new Date(req.filed_at);
-          return reqDate <= toDate;
-        });
-      }
+  const setDateFrom = useCallback((date: Date | undefined) => {
+    applyFilters({ ...filters, dateFrom: date });
+  }, [filters, applyFilters]);
 
-      if (filters.departmentId !== null) {
-        filtered = filtered.filter(
-          (req) => req.department_id === filters.departmentId
-        );
-      }
+  const setDateTo = useCallback((date: Date | undefined) => {
+    applyFilters({ ...filters, dateTo: date });
+  }, [filters, applyFilters]);
 
-      if (filters.nameFilter !== null) {
-        filtered = filtered.filter(
-          (req) => req.employee_name === filters.nameFilter
-        );
-      }
+  const setDepartmentId = useCallback((id: number | null) => {
+    applyFilters({ ...filters, departmentId: id, nameFilter: null });
+  }, [filters, applyFilters]);
 
-      if (filters.statusFilter !== null) {
-        filtered = filtered.filter(
-          (req) => req.status === filters.statusFilter
-        );
-      }
+  const setNameFilter = useCallback((name: string | null) => {
+    applyFilters({ ...filters, nameFilter: name });
+  }, [filters, applyFilters]);
 
-      return filtered;
-    };
-  }, [filters]);
+  const setStatusFilter = useCallback((status: string | null) => {
+    applyFilters({ ...filters, statusFilter: status });
+  }, [filters, applyFilters]);
 
-  const value: LeaveReportFilterContextType = {
-    filters,
-    setSearchQuery,
-    setDateFrom,
-    setDateTo,
-    setDepartmentId,
-    setNameFilter,
-    setStatusFilter,
-    resetFilters,
-    filterRequests,
+  const resetFilters = useCallback(() => {
+    applyFilters(initialFilters);
+  }, [applyFilters]);
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const isHRAdmin = currentUser?.user_department === 2 || currentUser?.isAdmin === true;
+
+  const employeeNames = React.useMemo(() => {
+    const names = leaveRequests.map(r => r.employee_name);
+    return Array.from(new Set(names)).sort();
+  }, [leaveRequests]);
+
+  const fetchValue: LeaveReportFetchContextType = {
+    leaveRequests,
+    departments,
+    currentUser,
+    isLoading,
+    isError,
+    error,
+    refetch,
   };
 
   return (
-    <LeaveReportFilterContext.Provider value={value}>
-      {children}
-    </LeaveReportFilterContext.Provider>
+    <LeaveReportFetchContext.Provider value={fetchValue}>
+      <LeaveReportFilterContext.Provider value={{
+        filters,
+        setSearchQuery,
+        setDateFrom,
+        setDateTo,
+        setDepartmentId,
+        setNameFilter,
+        setStatusFilter,
+        resetFilters,
+        filterRequests: (reqs) => reqs,
+        employeeNames,
+        isHRAdmin,
+      }}>
+        <LeaveReportPaginationContext.Provider value={{
+          pagination,
+          setCurrentPage,
+          setPageSize,
+          paginateRequests: (reqs) => ({ paginatedData: reqs, pagination }),
+        }}>
+          {children}
+        </LeaveReportPaginationContext.Provider>
+      </LeaveReportFilterContext.Provider>
+    </LeaveReportFetchContext.Provider>
   );
+}
+
+// ============================================================================
+// FILTER CONTEXT
+// ============================================================================
+
+interface LeaveReportFilterContextExtended extends LeaveReportFilterContextType {
+  employeeNames: string[];
+  isHRAdmin: boolean;
+}
+
+export const LeaveReportFilterContext = createContext<
+  LeaveReportFilterContextExtended | undefined
+>(undefined);
+
+export function LeaveReportFilterProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
 
 // ============================================================================
@@ -214,57 +217,6 @@ export const LeaveReportPaginationContext = createContext<
   LeaveReportPaginationContextType | undefined
 >(undefined);
 
-const DEFAULT_PAGE_SIZE = 10;
-
-export function LeaveReportPaginationProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-
-  const paginateRequests = React.useMemo(() => {
-    return (requests: LeaveRequestWithDetails[]) => {
-      const totalItems = requests.length;
-      const totalPages = Math.ceil(totalItems / pageSize);
-
-      // Clamp current page to valid range without calling setState during render
-      const validPage = Math.min(Math.max(1, currentPage), totalPages || 1);
-
-      const startIndex = (validPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedData = requests.slice(startIndex, endIndex);
-
-      return {
-        paginatedData,
-        pagination: {
-          currentPage: validPage,
-          pageSize,
-          totalItems,
-          totalPages: totalPages || 1,
-        },
-      };
-    };
-  }, [currentPage, pageSize]);
-
-  const pagination: PaginationState = {
-    currentPage,
-    pageSize,
-    totalItems: 0,
-    totalPages: 1,
-  };
-
-  const value: LeaveReportPaginationContextType = {
-    pagination,
-    setCurrentPage,
-    setPageSize,
-    paginateRequests,
-  };
-
-  return (
-    <LeaveReportPaginationContext.Provider value={value}>
-      {children}
-    </LeaveReportPaginationContext.Provider>
-  );
+export function LeaveReportPaginationProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }

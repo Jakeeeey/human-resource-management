@@ -1,11 +1,8 @@
 "use client";
 
 import React from "react";
-import {
-  UndertimeReportFetchProvider,
-  UndertimeReportFilterProvider,
-  UndertimeReportPaginationProvider
-} from "./contexts";
+import { UndertimeReportFetchProvider } from "./contexts";
+
 import { useUndertimeReport } from "./hooks/useUndertimeReport";
 import { UndertimeReportFilters } from "./components/UndertimeReportFilters";
 import { UndertimeReportTable } from "./components/UndertimeReportTable";
@@ -135,11 +132,7 @@ function UndertimeReportModuleContent() {
 export default function UndertimeReportModule() {
   return (
     <UndertimeReportFetchProvider>
-      <UndertimeReportFilterProvider>
-        <UndertimeReportPaginationProvider>
-          <UndertimeReportModuleContent />
-        </UndertimeReportPaginationProvider>
-      </UndertimeReportFilterProvider>
+      <UndertimeReportModuleContent />
     </UndertimeReportFetchProvider>
   );
 }
