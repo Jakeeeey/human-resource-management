@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 interface ManageLogisticsDispatchListProps {
   dispatches: DispatchAttendance[];
   isLoading: boolean;
-  onUpdateStaff: (payload: { dispatchPlanId: number; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; }) => Promise<{ success: boolean; } | void>;
+  onUpdateStaff: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; }) => Promise<{ success: boolean; } | void>;
 }
 
 export function ManageLogisticsDispatchList({
@@ -62,7 +62,7 @@ export function ManageLogisticsDispatchList({
                 : "-";
               
               return (
-              <TableRow key={record.dispatchPlanId} className="hover:bg-slate-50/50">
+              <TableRow key={record.dispatchPlanId} className={`hover:bg-slate-50/50 ${record.isNotPayroll ? 'bg-red-50/50 hover:bg-red-100/50' : ''}`}>
                 <TableCell className="font-medium text-slate-900 text-sm align-top">
                   {record.dispatchDocNo || `PDP-${record.dispatchPlanId}`}
                 </TableCell>
@@ -93,9 +93,25 @@ export function ManageLogisticsDispatchList({
                     {record.timeOfDispatch ? new Date(record.timeOfDispatch).toLocaleString() : "-"}
                 </TableCell>
                 <TableCell className="text-right text-sm align-top">
-                  <Button variant="outline" size="sm" onClick={() => setEditingRecord(record)}>
-                    Edit Staff
-                  </Button>
+                  <div className="flex flex-col gap-2 items-end">
+                    <Button variant="outline" size="sm" onClick={() => setEditingRecord(record)}>
+                      Edit Staff
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className={record.isNotPayroll ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-red-600 hover:text-red-700 hover:bg-red-50"}
+                      onClick={() => onUpdateStaff({
+                        dispatchPlanId: record.dispatchPlanId as number,
+                        isExtra: record.isExtra,
+                        driverId: record.driverId,
+                        helperIds: record.staff.filter(s => s.staffRole === 'Helper' && s.staffUserId).map(s => s.staffUserId as number),
+                        isNotPayroll: !record.isNotPayroll
+                      })}
+                    >
+                      {record.isNotPayroll ? "Restore" : "Disregard"}
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
               );

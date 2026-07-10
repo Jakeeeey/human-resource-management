@@ -20,6 +20,10 @@ export function ManageLogisticsAttendanceModule() {
     setDriverFilter,
     helperFilter,
     setHelperFilter,
+    dispatchDateFilter,
+    setDispatchDateFilter,
+    showDisregarded,
+    setShowDisregarded,
     paginatedDispatches,
     isLoading,
     error,
@@ -58,6 +62,10 @@ export function ManageLogisticsAttendanceModule() {
         setDriverFilter={setDriverFilter}
         helperFilter={helperFilter}
         setHelperFilter={setHelperFilter}
+        dispatchDateFilter={dispatchDateFilter}
+        setDispatchDateFilter={setDispatchDateFilter}
+        showDisregarded={showDisregarded}
+        setShowDisregarded={setShowDisregarded}
         onAddManualDispatch={() => setIsAddDialogOpen(true)}
       />
 
