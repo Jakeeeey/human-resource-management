@@ -205,6 +205,8 @@ export function useManageLogisticsAttendance() {
     setDriverFilter,
     helperFilter,
     setHelperFilter,
+    uniqueDrivers,
+    uniqueHelpers,
     setCurrentPage,
     setPageSize,
     loadReport,
