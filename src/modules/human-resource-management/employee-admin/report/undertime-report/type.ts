@@ -83,6 +83,8 @@ export interface UndertimeReportFilterContextType {
   setStatusFilter: (status: string | null) => void;
   resetFilters: () => void;
   filterRequests: (requests: UndertimeRequestWithDetails[]) => UndertimeRequestWithDetails[];
+  employeeNames: string[];
+  isHRAdmin: boolean;
 }
 
 export interface UndertimeReportPaginationContextType {

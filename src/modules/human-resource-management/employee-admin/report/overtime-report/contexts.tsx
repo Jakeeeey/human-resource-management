@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useEffect, useRef, useState } from "react";
 import { fetchOvertimeReportData } from "./providers/fetchProvider";
 import type {
   OvertimeRequestWithDetails,
@@ -21,14 +21,23 @@ export const OvertimeReportFetchContext = createContext<
   OvertimeReportFetchContextType | undefined
 >(undefined);
 
+const DEFAULT_PAGE_SIZE = 10;
+
+const initialFilters: OvertimeReportFilters = {
+  searchQuery: "",
+  dateFrom: undefined,
+  dateTo: undefined,
+  departmentId: null,
+  nameFilter: null,
+  statusFilter: null,
+};
+
 export function OvertimeReportFetchProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [overtimeRequests, setOvertimeRequests] = useState<
-    OvertimeRequestWithDetails[]
-  >([]);
+  const [overtimeRequests, setOvertimeRequests] = useState<OvertimeRequestWithDetails[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -36,35 +45,126 @@ export function OvertimeReportFetchProvider({
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchData = async () => {
+  // Server-side pagination state
+  const [currentPage, setCurrentPageState] = useState(1);
+  const [pageSize, setPageSizeState] = useState(DEFAULT_PAGE_SIZE);
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+    totalItems: 0,
+    totalPages: 1,
+  });
+
+  // Filter state
+  const [filters, setFilters] = useState<OvertimeReportFilters>(initialFilters);
+
+  // Debounce timer for search
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Core fetch ─────────────────────────────────────────────────────────────
+  const fetchData = useCallback(async (
+    page: number,
+    size: number,
+    activeFilters: OvertimeReportFilters
+  ) => {
     try {
       setIsLoading(true);
       setIsError(false);
       setError(null);
 
-      const data = await fetchOvertimeReportData();
+      const data = await fetchOvertimeReportData({ page, pageSize: size, filters: activeFilters });
 
       setCurrentUser(data.currentUser);
       setDepartments(data.departments);
       setUsers(data.users);
       setOvertimeRequests(data.overtimeRequests);
+      setPagination(data.pagination);
     } catch (err) {
       setIsError(true);
-      setError(
-        err instanceof Error ? err : new Error("Unknown error occurred")
-      );
+      setError(err instanceof Error ? err : new Error("Unknown error occurred"));
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, []);
 
-  const refetch = async () => {
-    await fetchData();
-  };
+  // Initial load
+  useEffect(() => {
+    fetchData(1, DEFAULT_PAGE_SIZE, initialFilters);
+  }, [fetchData]);
+
+  // ── Public refetch ─────────────────────────────────────────────────────────
+  const refetch = useCallback(async () => {
+    await fetchData(currentPage, pageSize, filters);
+  }, [fetchData, currentPage, pageSize, filters]);
+
+  // ── Page/size change ───────────────────────────────────────────────────────
+  const setCurrentPage = useCallback((page: number) => {
+    setCurrentPageState(page);
+    fetchData(page, pageSize, filters);
+  }, [fetchData, pageSize, filters]);
+
+  const setPageSize = useCallback((size: number) => {
+    setPageSizeState(size);
+    setCurrentPageState(1);
+    fetchData(1, size, filters);
+  }, [fetchData, filters]);
+
+  // ── Filter setters — reset to page 1 on filter change ─────────────────────
+  const applyFilters = useCallback((newFilters: OvertimeReportFilters) => {
+    setFilters(newFilters);
+    setCurrentPageState(1);
+    fetchData(1, pageSize, newFilters);
+  }, [fetchData, pageSize]);
+
+  const setSearchQuery = useCallback((query: string) => {
+    const newFilters = { ...filters, searchQuery: query };
+    setFilters(newFilters);
+    // Debounce search
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setCurrentPageState(1);
+      fetchData(1, pageSize, newFilters);
+    }, 400);
+  }, [filters, fetchData, pageSize]);
+
+  const setDateFrom = useCallback((date: Date | undefined) => {
+    applyFilters({ ...filters, dateFrom: date });
+  }, [filters, applyFilters]);
+
+  const setDateTo = useCallback((date: Date | undefined) => {
+    applyFilters({ ...filters, dateTo: date });
+  }, [filters, applyFilters]);
+
+  const setDepartmentId = useCallback((id: number | null) => {
+    applyFilters({ ...filters, departmentId: id, nameFilter: null });
+  }, [filters, applyFilters]);
+
+  const setNameFilter = useCallback((name: string | null) => {
+    applyFilters({ ...filters, nameFilter: name });
+  }, [filters, applyFilters]);
+
+  const setStatusFilter = useCallback((status: string | null) => {
+    applyFilters({ ...filters, statusFilter: status });
+  }, [filters, applyFilters]);
+
+  const resetFilters = useCallback(() => {
+    applyFilters(initialFilters);
+  }, [applyFilters]);
+
+  // ── Check if HR admin ──────────────────────────────────────────────────────
+  const isHRAdmin = currentUser?.user_department === 2 || currentUser?.isAdmin === true;
+
+  // ── Employee names for filter dropdown ────────────────────────────────────
+  const employeeNames = React.useMemo(() => {
+    let usersToFilter = users;
+    if (isHRAdmin && filters.departmentId !== null) {
+      usersToFilter = users.filter(u => u.user_department === filters.departmentId);
+    }
+    const names = usersToFilter.map(
+      u => `${u.user_fname} ${u.user_mname ? u.user_mname + " " : ""}${u.user_lname}`
+    );
+    return Array.from(new Set(names)).sort();
+  }, [users, isHRAdmin, filters.departmentId]);
 
   const value: OvertimeReportFetchContextType = {
     overtimeRequests,
@@ -79,7 +179,31 @@ export function OvertimeReportFetchProvider({
 
   return (
     <OvertimeReportFetchContext.Provider value={value}>
-      {children}
+      {/* Expose filter/pagination via sibling contexts below */}
+      <OvertimeReportFilterContext.Provider value={{
+        filters,
+        setSearchQuery,
+        setDateFrom,
+        setDateTo,
+        setDepartmentId,
+        setNameFilter,
+        setStatusFilter,
+        resetFilters,
+        // No-op: filtering is now server-side
+        filterRequests: (reqs) => reqs,
+        employeeNames,
+        isHRAdmin,
+      }}>
+        <OvertimeReportPaginationContext.Provider value={{
+          pagination,
+          setCurrentPage,
+          setPageSize,
+          // No-op: pagination is now server-side
+          paginateRequests: (reqs) => ({ paginatedData: reqs, pagination }),
+        }}>
+          {children}
+        </OvertimeReportPaginationContext.Provider>
+      </OvertimeReportFilterContext.Provider>
     </OvertimeReportFetchContext.Provider>
   );
 }
@@ -88,125 +212,18 @@ export function OvertimeReportFetchProvider({
 // FILTER CONTEXT
 // ============================================================================
 
+interface OvertimeReportFilterContextExtended extends OvertimeReportFilterContextType {
+  employeeNames: string[];
+  isHRAdmin: boolean;
+}
+
 export const OvertimeReportFilterContext = createContext<
-  OvertimeReportFilterContextType | undefined
+  OvertimeReportFilterContextExtended | undefined
 >(undefined);
 
-const initialFilters: OvertimeReportFilters = {
-  searchQuery: "",
-  dateFrom: undefined,
-  dateTo: undefined,
-  departmentId: null,
-  nameFilter: null,
-  statusFilter: null,
-};
-
-export function OvertimeReportFilterProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [filters, setFilters] = useState<OvertimeReportFilters>(initialFilters);
-
-  const setSearchQuery = (query: string) => {
-    setFilters((prev) => ({ ...prev, searchQuery: query }));
-  };
-
-  const setDateFrom = (date: Date | undefined) => {
-    setFilters((prev) => ({ ...prev, dateFrom: date }));
-  };
-
-  const setDateTo = (date: Date | undefined) => {
-    setFilters((prev) => ({ ...prev, dateTo: date }));
-  };
-
-  const setDepartmentId = (id: number | null) => {
-    setFilters((prev) => ({ ...prev, departmentId: id, nameFilter: null }));
-  };
-
-  const setNameFilter = (name: string | null) => {
-    setFilters((prev) => ({ ...prev, nameFilter: name }));
-  };
-
-  const setStatusFilter = (status: string | null) => {
-    setFilters((prev) => ({ ...prev, statusFilter: status }));
-  };
-
-  const resetFilters = () => {
-    setFilters(initialFilters);
-  };
-
-  const filterRequests = React.useMemo(() => {
-    return (requests: OvertimeRequestWithDetails[]) => {
-      let filtered = [...requests];
-
-      if (filters.searchQuery.trim()) {
-        const query = filters.searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (req) =>
-            req.employee_name.toLowerCase().includes(query) ||
-            req.purpose?.toLowerCase().includes(query) ||
-            req.remarks?.toLowerCase().includes(query)
-        );
-      }
-
-      if (filters.dateFrom) {
-        const fromDate = new Date(filters.dateFrom);
-        fromDate.setHours(0, 0, 0, 0);
-        filtered = filtered.filter((req) => {
-          const reqDate = new Date(req.request_date);
-          return reqDate >= fromDate;
-        });
-      }
-
-      if (filters.dateTo) {
-        const toDate = new Date(filters.dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        filtered = filtered.filter((req) => {
-          const reqDate = new Date(req.request_date);
-          return reqDate <= toDate;
-        });
-      }
-
-      if (filters.departmentId !== null) {
-        filtered = filtered.filter(
-          (req) => req.department_id === filters.departmentId
-        );
-      }
-
-      if (filters.nameFilter !== null) {
-        filtered = filtered.filter(
-          (req) => req.employee_name === filters.nameFilter
-        );
-      }
-
-      if (filters.statusFilter !== null) {
-        filtered = filtered.filter(
-          (req) => req.status === filters.statusFilter
-        );
-      }
-
-      return filtered;
-    };
-  }, [filters]);
-
-  const value: OvertimeReportFilterContextType = {
-    filters,
-    setSearchQuery,
-    setDateFrom,
-    setDateTo,
-    setDepartmentId,
-    setNameFilter,
-    setStatusFilter,
-    resetFilters,
-    filterRequests,
-  };
-
-  return (
-    <OvertimeReportFilterContext.Provider value={value}>
-      {children}
-    </OvertimeReportFilterContext.Provider>
-  );
+// Stub provider — actual logic is in FetchProvider above
+export function OvertimeReportFilterProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
 
 // ============================================================================
@@ -217,57 +234,7 @@ export const OvertimeReportPaginationContext = createContext<
   OvertimeReportPaginationContextType | undefined
 >(undefined);
 
-const DEFAULT_PAGE_SIZE = 10;
-
-export function OvertimeReportPaginationProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-
-  const paginateRequests = React.useMemo(() => {
-    return (requests: OvertimeRequestWithDetails[]) => {
-      const totalItems = requests.length;
-      const totalPages = Math.ceil(totalItems / pageSize);
-
-      // Clamp current page to valid range without calling setState during render
-      const validPage = Math.min(Math.max(1, currentPage), totalPages || 1);
-
-      const startIndex = (validPage - 1) * pageSize;
-      const endIndex = startIndex + pageSize;
-      const paginatedData = requests.slice(startIndex, endIndex);
-
-      return {
-        paginatedData,
-        pagination: {
-          currentPage: validPage,
-          pageSize,
-          totalItems,
-          totalPages: totalPages || 1,
-        },
-      };
-    };
-  }, [currentPage, pageSize]);
-
-  const pagination: PaginationState = {
-    currentPage,
-    pageSize,
-    totalItems: 0,
-    totalPages: 1,
-  };
-
-  const value: OvertimeReportPaginationContextType = {
-    pagination,
-    setCurrentPage,
-    setPageSize,
-    paginateRequests,
-  };
-
-  return (
-    <OvertimeReportPaginationContext.Provider value={value}>
-      {children}
-    </OvertimeReportPaginationContext.Provider>
-  );
+// Stub provider — actual logic is in FetchProvider above
+export function OvertimeReportPaginationProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }

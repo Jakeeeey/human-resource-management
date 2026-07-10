@@ -1,10 +1,10 @@
 "use client";
 
-import { useContext, useMemo } from "react";
+import { useContext } from "react";
 import {
   UndertimeReportFetchContext,
   UndertimeReportFilterContext,
-  UndertimeReportPaginationContext
+  UndertimeReportPaginationContext,
 } from "../contexts";
 
 // ============================================================================
@@ -12,26 +12,18 @@ import {
 // ============================================================================
 
 export function useUndertimeReport() {
-  const fetchContext = useContext(UndertimeReportFetchContext);
-  const filterContext = useContext(UndertimeReportFilterContext);
+  const fetchContext      = useContext(UndertimeReportFetchContext);
+  const filterContext     = useContext(UndertimeReportFilterContext);
   const paginationContext = useContext(UndertimeReportPaginationContext);
 
   if (!fetchContext) {
-    throw new Error(
-      "useUndertimeReport must be used within UndertimeReportFetchProvider"
-    );
+    throw new Error("useUndertimeReport must be used within UndertimeReportFetchProvider");
   }
-
   if (!filterContext) {
-    throw new Error(
-      "useUndertimeReport must be used within UndertimeReportFilterProvider"
-    );
+    throw new Error("useUndertimeReport must be used within UndertimeReportFetchProvider");
   }
-
   if (!paginationContext) {
-    throw new Error(
-      "useUndertimeReport must be used within UndertimeReportPaginationProvider"
-    );
+    throw new Error("useUndertimeReport must be used within UndertimeReportFetchProvider");
   }
 
   const {
@@ -53,49 +45,16 @@ export function useUndertimeReport() {
     setNameFilter,
     setStatusFilter,
     resetFilters,
-    filterRequests,
+    employeeNames,
+    isHRAdmin,
   } = filterContext;
 
-  const {
-    setCurrentPage,
-    setPageSize,
-    paginateRequests,
-  } = paginationContext;
-
-  // Apply filters to requests
-  const filteredRequests = useMemo(() => {
-    return filterRequests(undertimeRequests);
-  }, [undertimeRequests, filterRequests]);
-
-  // Apply pagination to filtered requests
-  const { paginatedData, pagination: paginationState } = useMemo(() => {
-    return paginateRequests(filteredRequests);
-  }, [filteredRequests, paginateRequests]);
-
-  // Check if user is HR admin
-  const isHRAdmin = currentUser?.user_department === 2;
-
-  // Get unique employee names for filter dropdown
-  // If HR admin and department is selected, show only names from that department
-  const employeeNames = useMemo(() => {
-    let requestsToFilter = undertimeRequests;
-
-    // If HR admin selected a department, filter names by that department
-    if (isHRAdmin && filters.departmentId !== null) {
-      requestsToFilter = undertimeRequests.filter(
-        (req) => req.department_id === filters.departmentId
-      );
-    }
-
-    const names = requestsToFilter.map((req) => req.employee_name);
-    return Array.from(new Set(names)).sort();
-  }, [undertimeRequests, isHRAdmin, filters.departmentId]);
+  const { pagination, setCurrentPage, setPageSize } = paginationContext;
 
   return {
-    // Data
-    requests: paginatedData,
+    // Data — already the current page from server
+    requests: undertimeRequests,
     allRequests: undertimeRequests,
-    filteredRequests,
     departments,
     currentUser,
     isHRAdmin,
@@ -119,8 +78,8 @@ export function useUndertimeReport() {
     resetFilters,
     employeeNames,
 
-    // Pagination
-    pagination: paginationState,
+    // Pagination (server-side)
+    pagination,
     setCurrentPage,
     setPageSize,
   };

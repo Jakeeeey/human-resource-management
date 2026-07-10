@@ -2,17 +2,39 @@ import type {
   LeaveRequestWithDetails,
   User,
   Department,
+  LeaveReportFilters,
+  PaginationState,
 } from "../type";
 
 // ============================================================================
-// FETCH DATA
+// FETCH DATA (server-side pagination + filters)
 // ============================================================================
 
-export async function fetchLeaveReportData() {
+export interface LeaveReportParams {
+  page: number;
+  pageSize: number;
+  filters: LeaveReportFilters;
+}
+
+export async function fetchLeaveReportData(params: LeaveReportParams) {
   try {
-    const response = await fetch("/api/hrm/employee-admin/report/leave-report", {
-      credentials: "include",
-    });
+    const { page, pageSize, filters } = params;
+
+    const query = new URLSearchParams();
+    query.set("page", String(page));
+    query.set("pageSize", String(pageSize));
+
+    if (filters.searchQuery.trim()) query.set("search", filters.searchQuery.trim());
+    if (filters.dateFrom)   query.set("dateFrom",   filters.dateFrom.toISOString().split("T")[0]);
+    if (filters.dateTo)     query.set("dateTo",     filters.dateTo.toISOString().split("T")[0]);
+    if (filters.departmentId !== null) query.set("departmentId", String(filters.departmentId));
+    if (filters.nameFilter)  query.set("nameFilter",  filters.nameFilter);
+    if (filters.statusFilter) query.set("statusFilter", filters.statusFilter);
+
+    const response = await fetch(
+      `/api/hrm/employee-admin/report/leave-report?${query.toString()}`,
+      { credentials: "include" }
+    );
 
     if (!response.ok) {
       throw new Error("Failed to fetch leave report data");
@@ -21,9 +43,10 @@ export async function fetchLeaveReportData() {
     const data = await response.json();
 
     return {
-      currentUser: data.currentUser as User,
-      departments: (data.departments || []) as Department[],
+      currentUser:   data.currentUser as User,
+      departments:   (data.departments  || []) as Department[],
       leaveRequests: (data.leaveRequests || []) as LeaveRequestWithDetails[],
+      pagination:    data.pagination    as PaginationState,
     };
   } catch (err) {
     console.error("Error fetching leave report data:", err);

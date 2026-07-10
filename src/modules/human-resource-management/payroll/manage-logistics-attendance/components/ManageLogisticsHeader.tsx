@@ -74,8 +74,8 @@ export function ManageLogisticsHeader({
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-end justify-between mb-6 p-4 bg-white rounded-lg shadow-sm border border-slate-200">
-        <div className="flex flex-row items-end gap-4">
+    <div className="flex flex-col gap-4 items-start justify-between mb-6 p-4 bg-white rounded-lg shadow-sm border border-slate-200">
+        <div className="flex flex-wrap items-end gap-4 w-full">
             <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-slate-700">Month</span>
                 <input 
@@ -108,31 +108,31 @@ export function ManageLogisticsHeader({
             </Button>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto min-w-[250px]">
+        <div className="flex flex-wrap gap-3 w-full">
             <Input
                 type="search"
-                className="h-10 w-[200px]"
+                className="h-10 w-full sm:w-[220px]"
                 placeholder="Search by PDP No..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
             />
             <Input
                 type="search"
-                className="h-10"
+                className="h-10 w-full sm:w-[180px]"
                 placeholder="Filter by Driver..."
                 value={driverFilter}
                 onChange={(e) => setDriverFilter(e.target.value)}
             />
             <Input
                 type="search"
-                className="h-10"
+                className="h-10 w-full sm:w-[180px]"
                 placeholder="Filter by Helper..."
                 value={helperFilter}
                 onChange={(e) => setHelperFilter(e.target.value)}
             />
             <Input
                 type="date"
-                className="h-10 text-slate-500 w-[150px]"
+                className="h-10 text-slate-500 w-full sm:w-[160px]"
                 title="Filter by Dispatch Date"
                 value={dispatchDateFilter}
                 onChange={(e) => setDispatchDateFilter(e.target.value)}
@@ -140,7 +140,7 @@ export function ManageLogisticsHeader({
             <Button
                 variant={showDisregarded ? "default" : "outline"}
                 onClick={() => setShowDisregarded(!showDisregarded)}
-                className="h-10 min-w-[140px]"
+                className="h-10 w-full sm:w-auto min-w-[140px]"
             >
                 {showDisregarded ? "Hide Disregarded" : "Show Disregarded"}
             </Button>
