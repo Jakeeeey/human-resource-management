@@ -31,6 +31,7 @@ export interface DispatchAttendance {
 	areaName: string;
 	clusterId: number | null;
 	clusterName: string;
+	isNotPayroll?: boolean;
 	staff: StaffAttendance[];
 }
 

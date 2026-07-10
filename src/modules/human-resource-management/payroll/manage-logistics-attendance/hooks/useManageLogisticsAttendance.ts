@@ -41,6 +41,8 @@ export function useManageLogisticsAttendance() {
   const [searchQuery, setSearchQuery] = useState("");
   const [driverFilter, setDriverFilter] = useState("");
   const [helperFilter, setHelperFilter] = useState("");
+  const [dispatchDateFilter, setDispatchDateFilter] = useState("");
+  const [showDisregarded, setShowDisregarded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
@@ -81,7 +83,7 @@ export function useManageLogisticsAttendance() {
     }
   }, [startDate, endDate]);
 
-  const updateDispatchStaff = async (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; }) => {
+  const updateDispatchStaff = async (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; }) => {
     try {
       const response = await fetch("/api/hrm/manage-logistics-attendance", {
         method: "PATCH",
@@ -141,7 +143,21 @@ export function useManageLogisticsAttendance() {
             (s.staffName && s.staffName.toLowerCase().includes(helperFilter.toLowerCase())) ||
             (s.staffUserId && s.staffUserId.toString().includes(helperFilter))
           ));
-        return matchSearch && matchDriver && matchHelper;
+        
+        let matchDate = true;
+        if (dispatchDateFilter) {
+          if (!dispatch.timeOfDispatch) {
+            matchDate = false;
+          } else {
+            const dDate = new Date(dispatch.timeOfDispatch);
+            const dDateStr = `${dDate.getFullYear()}-${String(dDate.getMonth() + 1).padStart(2, '0')}-${String(dDate.getDate()).padStart(2, '0')}`;
+            matchDate = dDateStr === dispatchDateFilter;
+          }
+        }
+        
+        const matchDisregarded = showDisregarded ? true : !dispatch.isNotPayroll;
+
+        return matchSearch && matchDriver && matchHelper && matchDate && matchDisregarded;
       }
     )
     .sort((a, b) => {
@@ -205,6 +221,10 @@ export function useManageLogisticsAttendance() {
     setDriverFilter,
     helperFilter,
     setHelperFilter,
+    dispatchDateFilter,
+    setDispatchDateFilter,
+    showDisregarded,
+    setShowDisregarded,
     uniqueDrivers,
     uniqueHelpers,
     setCurrentPage,

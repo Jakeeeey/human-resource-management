@@ -19,6 +19,10 @@ interface ManageLogisticsHeaderProps {
   setDriverFilter: (value: string) => void;
   helperFilter: string;
   setHelperFilter: (value: string) => void;
+  dispatchDateFilter: string;
+  setDispatchDateFilter: (value: string) => void;
+  showDisregarded: boolean;
+  setShowDisregarded: (value: boolean) => void;
   onAddManualDispatch: () => void;
 }
 
@@ -33,6 +37,10 @@ export function ManageLogisticsHeader({
   setDriverFilter,
   helperFilter,
   setHelperFilter,
+  dispatchDateFilter,
+  setDispatchDateFilter,
+  showDisregarded,
+  setShowDisregarded,
   onAddManualDispatch,
 }: ManageLogisticsHeaderProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
@@ -122,6 +130,20 @@ export function ManageLogisticsHeader({
                 value={helperFilter}
                 onChange={(e) => setHelperFilter(e.target.value)}
             />
+            <Input
+                type="date"
+                className="h-10 text-slate-500 w-[150px]"
+                title="Filter by Dispatch Date"
+                value={dispatchDateFilter}
+                onChange={(e) => setDispatchDateFilter(e.target.value)}
+            />
+            <Button
+                variant={showDisregarded ? "default" : "outline"}
+                onClick={() => setShowDisregarded(!showDisregarded)}
+                className="h-10 min-w-[140px]"
+            >
+                {showDisregarded ? "Hide Disregarded" : "Show Disregarded"}
+            </Button>
         </div>
     </div>
   );

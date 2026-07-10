@@ -225,6 +225,7 @@ export async function GET(request: NextRequest) {
             return {
                 dispatchPlanId: p.id,
                 isExtra: p.isExtra,
+                isNotPayroll: p.is_not_payroll === 1 || p.is_not_payroll === true,
                 dispatchDocNo: p.doc_no,
                 dispatchStatus: p.status || "Posted",
                 deliveryStatus: "Unknown",
@@ -273,7 +274,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const body = await request.json();
-        const { dispatchPlanId, isExtra, driverId, helperIds, timeOfDispatch, vehicleId } = body;
+        const { dispatchPlanId, isExtra, driverId, helperIds, timeOfDispatch, vehicleId, isNotPayroll } = body;
 
         if (!dispatchPlanId) {
             return NextResponse.json({ error: "dispatchPlanId is required" }, { status: 400 });
@@ -287,11 +288,12 @@ export async function PATCH(request: NextRequest) {
         const staffTable = isExtra ? "post_dispatch_plan_extra_staff" : "post_dispatch_plan_staff";
         const staffIdField = isExtra ? "post_dispatch_plan_extra_id" : "post_dispatch_plan_id";
 
-        // Update time_of_dispatch and/or vehicle_id if provided
-        if (timeOfDispatch !== undefined || vehicleId !== undefined) {
+        // Update time_of_dispatch, vehicle_id, and/or is_not_payroll if provided
+        if (timeOfDispatch !== undefined || vehicleId !== undefined || isNotPayroll !== undefined) {
             const updatePayload: any = {};
             if (timeOfDispatch !== undefined) updatePayload.time_of_dispatch = timeOfDispatch;
             if (vehicleId !== undefined) updatePayload.vehicle_id = vehicleId;
+            if (isNotPayroll !== undefined) updatePayload.is_not_payroll = isNotPayroll;
 
             const updateRes = await fetch(`${DIRECTUS_URL}/items/${pdpTable}/${dispatchPlanId}`, {
                 method: "PATCH",
