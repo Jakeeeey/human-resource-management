@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, setDate } from "date-fns";
+import { Plus } from "lucide-react";
 
 interface ManageLogisticsHeaderProps {
   startDate: string;
@@ -14,6 +15,11 @@ interface ManageLogisticsHeaderProps {
   setEndDate: (date: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  driverFilter: string;
+  setDriverFilter: (value: string) => void;
+  helperFilter: string;
+  setHelperFilter: (value: string) => void;
+  onAddManualDispatch: () => void;
 }
 
 export function ManageLogisticsHeader({
@@ -23,6 +29,11 @@ export function ManageLogisticsHeader({
   setEndDate,
   searchQuery,
   setSearchQuery,
+  driverFilter,
+  setDriverFilter,
+  helperFilter,
+  setHelperFilter,
+  onAddManualDispatch,
 }: ManageLogisticsHeaderProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
   const [selectedCutoff, setSelectedCutoff] = useState<"11-25" | "26-10">("11-25");
@@ -83,15 +94,33 @@ export function ManageLogisticsHeader({
             <Button onClick={handleApplyFilter} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] h-10">
                 Apply Filter
             </Button>
+            
+            <Button onClick={onAddManualDispatch} variant="outline" className="h-10 gap-2 border-slate-300 text-slate-700 hover:bg-slate-50">
+                <Plus className="h-4 w-4" /> Add PDP
+            </Button>
         </div>
 
-        <div className="w-full md:w-auto min-w-[250px]">
+        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto min-w-[250px]">
             <Input
                 type="search"
                 className="h-10"
                 placeholder="Search by PDP No..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <Input
+                type="search"
+                className="h-10"
+                placeholder="Filter by Driver..."
+                value={driverFilter}
+                onChange={(e) => setDriverFilter(e.target.value)}
+            />
+            <Input
+                type="search"
+                className="h-10"
+                placeholder="Filter by Helper..."
+                value={helperFilter}
+                onChange={(e) => setHelperFilter(e.target.value)}
             />
         </div>
     </div>

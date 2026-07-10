@@ -31,25 +31,26 @@ export function ManageLogisticsDispatchList({
       <Table>
         <TableHeader className="bg-slate-50">
           <TableRow>
-            <TableHead className="font-semibold text-slate-700">PDP No</TableHead>
-            <TableHead className="font-semibold text-slate-700">Area</TableHead>
-            <TableHead className="font-semibold text-slate-700">Vehicle Type</TableHead>
-            <TableHead className="font-semibold text-slate-700">Driver ID</TableHead>
-            <TableHead className="font-semibold text-slate-700">Helpers</TableHead>
-            <TableHead className="font-semibold text-slate-700">Time of Dispatch</TableHead>
-            <TableHead className="text-right font-semibold text-slate-700">Action</TableHead>
+            <TableHead className="font-semibold text-slate-700 text-xs">PDP No</TableHead>
+            <TableHead className="font-semibold text-slate-700 text-xs">Location</TableHead>
+            <TableHead className="font-semibold text-slate-700 text-xs">Area</TableHead>
+            <TableHead className="font-semibold text-slate-700 text-xs">Vehicle Type</TableHead>
+            <TableHead className="font-semibold text-slate-700 text-xs">Driver ID</TableHead>
+            <TableHead className="font-semibold text-slate-700 text-xs">Helpers</TableHead>
+            <TableHead className="font-semibold text-slate-700 text-xs">Time of Dispatch</TableHead>
+            <TableHead className="text-right font-semibold text-slate-700 text-xs">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center text-slate-500">
+              <TableCell colSpan={8} className="h-24 text-center text-slate-500">
                 Loading dispatches...
               </TableCell>
             </TableRow>
           ) : dispatches.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center text-slate-500">
+              <TableCell colSpan={8} className="h-24 text-center text-slate-500">
                 No dispatch plans found.
               </TableCell>
             </TableRow>
@@ -58,23 +59,26 @@ export function ManageLogisticsDispatchList({
               // Ensure area is rendered correctly
               const area = record.areaName && record.areaName !== "N/A" 
                 ? record.areaName 
-                : [record.brgy, record.city, record.province].filter(Boolean).join(", ") || "N/A";
+                : "-";
               
               return (
               <TableRow key={record.dispatchPlanId} className="hover:bg-slate-50/50">
-                <TableCell className="font-medium text-slate-900">
+                <TableCell className="font-medium text-slate-900 text-sm align-top">
                   {record.dispatchDocNo || `PDP-${record.dispatchPlanId}`}
                 </TableCell>
-                <TableCell className="text-slate-600">
+                <TableCell className="text-slate-600 text-sm align-top">
+                  {[record.brgy, record.city, record.province].filter(Boolean).join(", ") || "-"}
+                </TableCell>
+                <TableCell className="text-slate-600 text-sm align-top">
                   {area}
                 </TableCell>
-                <TableCell className="text-slate-600">
+                <TableCell className="text-slate-600 text-sm align-top">
                   {record.vehicleType || "Unknown"}
                 </TableCell>
-                <TableCell className="text-slate-600">
+                <TableCell className="text-slate-600 text-sm align-top">
                   {record.driverName || record.driverId || "Unassigned"}
                 </TableCell>
-                <TableCell className="text-slate-600">
+                <TableCell className="text-slate-600 text-sm align-top">
                   {record.staff && record.staff.length > 0 ? (
                     <ul className="list-disc pl-4">
                         {record.staff.map((s, idx) => (
@@ -85,10 +89,10 @@ export function ManageLogisticsDispatchList({
                     "No helpers"
                   )}
                 </TableCell>
-                <TableCell className="text-slate-600">
+                <TableCell className="text-slate-600 text-sm align-top">
                     {record.timeOfDispatch ? new Date(record.timeOfDispatch).toLocaleString() : "-"}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right text-sm align-top">
                   <Button variant="outline" size="sm" onClick={() => setEditingRecord(record)}>
                     Edit Staff
                   </Button>

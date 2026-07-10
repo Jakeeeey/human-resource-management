@@ -39,6 +39,8 @@ export function useManageLogisticsAttendance() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [driverFilter, setDriverFilter] = useState("");
+  const [helperFilter, setHelperFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
@@ -79,7 +81,7 @@ export function useManageLogisticsAttendance() {
     }
   }, [startDate, endDate]);
 
-  const updateDispatchStaff = async (payload: { dispatchPlanId: number; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; }) => {
+  const updateDispatchStaff = async (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; }) => {
     try {
       const response = await fetch("/api/hrm/manage-logistics-attendance", {
         method: "PATCH",
@@ -89,6 +91,26 @@ export function useManageLogisticsAttendance() {
 
       if (!response.ok) {
         throw new Error("Failed to update staff.");
+      }
+
+      await loadReport();
+      return { success: true };
+    } catch (err) {
+        throw err;
+    }
+  };
+
+  const addManualDispatch = async (payload: { docNo: string; timeOfDispatch: string; driverId: number | null; vehicleId: number | null; helperIds: number[]; }) => {
+    try {
+      const response = await fetch("/api/hrm/manage-logistics-attendance/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to add manual dispatch.");
       }
 
       await loadReport();
@@ -109,11 +131,18 @@ export function useManageLogisticsAttendance() {
 
   const filteredDispatches = dispatches
     .filter(
-      (dispatch) =>
-        !searchQuery ||
-        dispatch.dispatchDocNo
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()),
+      (dispatch) => {
+        const matchSearch = !searchQuery || dispatch.dispatchDocNo?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchDriver = !driverFilter || driverFilter === 'all' || 
+          (dispatch.driverName && dispatch.driverName.toLowerCase().includes(driverFilter.toLowerCase())) ||
+          (dispatch.driverId && dispatch.driverId.toString().includes(driverFilter));
+        const matchHelper = !helperFilter || helperFilter === 'all' ||
+          (dispatch.staff && dispatch.staff.some(s => 
+            (s.staffName && s.staffName.toLowerCase().includes(helperFilter.toLowerCase())) ||
+            (s.staffUserId && s.staffUserId.toString().includes(helperFilter))
+          ));
+        return matchSearch && matchDriver && matchHelper;
+      }
     )
     .sort((a, b) => {
       const dateA = new Date(a.timeOfDispatch || 0).getTime();
@@ -154,9 +183,14 @@ export function useManageLogisticsAttendance() {
     setStartDate,
     setEndDate,
     setSearchQuery,
+    driverFilter,
+    setDriverFilter,
+    helperFilter,
+    setHelperFilter,
     setCurrentPage,
     setPageSize,
     loadReport,
     updateDispatchStaff,
+    addManualDispatch,
   };
 }
