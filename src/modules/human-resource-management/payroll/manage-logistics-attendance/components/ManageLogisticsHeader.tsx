@@ -52,10 +52,10 @@ export function ManageLogisticsHeader({
           start = setDate(date, 11);
           end = setDate(date, 25);
       } else {
-          start = setDate(date, 26);
-          // 26-10 goes to the 10th of the next month
-          const nextMonth = new Date(year, month + 1, 1);
-          end = setDate(nextMonth, 10);
+          // 26-10: 26th of previous month to 10th of selected month
+          const prevMonth = new Date(year, month - 1, 1);
+          start = setDate(prevMonth, 26);
+          end = setDate(date, 10);
       }
 
       const startStr = format(start, "yyyy-MM-dd");
@@ -103,7 +103,7 @@ export function ManageLogisticsHeader({
         <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto min-w-[250px]">
             <Input
                 type="search"
-                className="h-10"
+                className="h-10 w-[200px]"
                 placeholder="Search by PDP No..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

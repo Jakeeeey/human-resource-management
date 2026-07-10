@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LogisticsReportDateRange,
   LogisticsReportMeta,
@@ -165,6 +165,24 @@ export function useManageLogisticsAttendance() {
   const endIndex = startIndex + pageSize;
   const paginatedDispatches = filteredDispatches.slice(startIndex, endIndex);
 
+  const uniqueDrivers = useMemo(() => {
+    const drivers = new Set<string>();
+    dispatches.forEach(d => {
+      if (d.driverName) drivers.add(d.driverName);
+    });
+    return Array.from(drivers).sort();
+  }, [dispatches]);
+
+  const uniqueHelpers = useMemo(() => {
+    const helpers = new Set<string>();
+    dispatches.forEach(d => {
+      d.staff?.forEach(s => {
+        if (s.staffName) helpers.add(s.staffName);
+      });
+    });
+    return Array.from(helpers).sort();
+  }, [dispatches]);
+
   return {
     startDate,
     endDate,
@@ -187,6 +205,8 @@ export function useManageLogisticsAttendance() {
     setDriverFilter,
     helperFilter,
     setHelperFilter,
+    uniqueDrivers,
+    uniqueHelpers,
     setCurrentPage,
     setPageSize,
     loadReport,

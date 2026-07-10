@@ -26,10 +26,10 @@ export function LogisticsPayrollHeader() {
             start = setDate(date, 11);
             end = setDate(date, 25);
         } else {
-            start = setDate(date, 26);
-            // 26-10 goes to the 10th of the next month
-            const nextMonth = new Date(year, month + 1, 1);
-            end = setDate(nextMonth, 10);
+            // 26-10: 26th of previous month to 10th of selected month
+            const prevMonth = new Date(year, month - 1, 1);
+            start = setDate(prevMonth, 26);
+            end = setDate(date, 10);
         }
 
         const startStr = format(start, "yyyy-MM-dd");
