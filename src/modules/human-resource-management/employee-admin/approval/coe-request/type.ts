@@ -7,6 +7,7 @@ export interface COERequest {
   approved_by: number | null;
   approval_date: string | null;
   ecopy_file_url: string | null;
+  remarks: string | null;
   hr_remarks: string | null;
   updated_at: string;
 }

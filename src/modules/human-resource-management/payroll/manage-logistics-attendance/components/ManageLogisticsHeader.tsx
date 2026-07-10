@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, setDate } from "date-fns";
 import { Plus } from "lucide-react";
-import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface ManageLogisticsHeaderProps {
   startDate: string;
@@ -20,10 +19,6 @@ interface ManageLogisticsHeaderProps {
   setDriverFilter: (value: string) => void;
   helperFilter: string;
   setHelperFilter: (value: string) => void;
-  dispatchDateFilter: string;
-  setDispatchDateFilter: (value: string) => void;
-  uniqueDrivers: string[];
-  uniqueHelpers: string[];
   onAddManualDispatch: () => void;
 }
 
@@ -38,10 +33,6 @@ export function ManageLogisticsHeader({
   setDriverFilter,
   helperFilter,
   setHelperFilter,
-  dispatchDateFilter,
-  setDispatchDateFilter,
-  uniqueDrivers,
-  uniqueHelpers,
   onAddManualDispatch,
 }: ManageLogisticsHeaderProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
@@ -109,7 +100,7 @@ export function ManageLogisticsHeader({
             </Button>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto min-w-[250px] flex-wrap justify-end">
+        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto min-w-[250px]">
             <Input
                 type="search"
                 className="h-10 w-[200px]"
@@ -117,33 +108,20 @@ export function ManageLogisticsHeader({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <div className="flex flex-col gap-1 w-[200px]">
-                <Input
-                    type="date"
-                    className="h-10"
-                    placeholder="Dispatch Date"
-                    value={dispatchDateFilter}
-                    onChange={(e) => setDispatchDateFilter(e.target.value)}
-                />
-            </div>
-            <div className="flex flex-col gap-1 w-[200px]">
-                <SearchableSelect
-                    options={uniqueDrivers.map(d => ({ value: d, label: d }))}
-                    value={driverFilter}
-                    onValueChange={(val) => setDriverFilter(val)}
-                    placeholder="Filter by Driver..."
-                    className="h-10 w-full"
-                />
-            </div>
-            <div className="flex flex-col gap-1 w-[200px]">
-                <SearchableSelect
-                    options={uniqueHelpers.map(h => ({ value: h, label: h }))}
-                    value={helperFilter}
-                    onValueChange={(val) => setHelperFilter(val)}
-                    placeholder="Filter by Helper..."
-                    className="h-10 w-full"
-                />
-            </div>
+            <Input
+                type="search"
+                className="h-10"
+                placeholder="Filter by Driver..."
+                value={driverFilter}
+                onChange={(e) => setDriverFilter(e.target.value)}
+            />
+            <Input
+                type="search"
+                className="h-10"
+                placeholder="Filter by Helper..."
+                value={helperFilter}
+                onChange={(e) => setHelperFilter(e.target.value)}
+            />
         </div>
     </div>
   );
