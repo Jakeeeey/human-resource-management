@@ -41,9 +41,7 @@ export function useManageLogisticsAttendance() {
   const [searchQuery, setSearchQuery] = useState("");
   const [driverFilter, setDriverFilter] = useState("");
   const [helperFilter, setHelperFilter] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dispatchDateFilter, setDispatchDateFilter] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showDisregarded, setShowDisregarded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
@@ -223,6 +221,10 @@ export function useManageLogisticsAttendance() {
     setDriverFilter,
     helperFilter,
     setHelperFilter,
+    dispatchDateFilter,
+    setDispatchDateFilter,
+    showDisregarded,
+    setShowDisregarded,
     uniqueDrivers,
     uniqueHelpers,
     setCurrentPage,
