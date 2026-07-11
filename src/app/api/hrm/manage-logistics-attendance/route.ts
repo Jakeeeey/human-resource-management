@@ -22,7 +22,9 @@ export async function GET(request: NextRequest) {
 
         let filterQuery = "";
         if (startDate && endDate) {
-            filterQuery = `&filter[time_of_dispatch][_between]=${startDate},${endDate}T23:59:59`;
+            const startStr = encodeURIComponent(`${startDate}T00:00:00+08:00`);
+            const endStr = encodeURIComponent(`${endDate}T23:59:59+08:00`);
+            filterQuery = `&filter[time_of_dispatch][_between]=${startStr},${endStr}`;
         }
 
         const chunkArray = (arr: any[], size: number) => {

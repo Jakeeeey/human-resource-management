@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
 
         let filterQuery = "";
         if (cutoffStart && cutoffEnd) {
-            filterQuery = `&filter[time_of_dispatch][_between]=${cutoffStart},${cutoffEnd}T23:59:59`;
+            const startStr = encodeURIComponent(`${cutoffStart}T00:00:00+08:00`);
+            const endStr = encodeURIComponent(`${cutoffEnd}T23:59:59+08:00`);
+            filterQuery = `&filter[time_of_dispatch][_between]=${startStr},${endStr}`;
         }
 
         // 1. Fetch Post Dispatch Plans
@@ -55,9 +57,18 @@ export async function GET(request: NextRequest) {
         }
 
         const pdpDataRaw = (await pdpRes.json()).data || [];
-        // Exclude any dispatch plans that are marked as disregarded (is_not_payroll = 1 or true)
-        const pdpData = pdpDataRaw.filter((p: any) => p.is_not_payroll !== 1 && p.is_not_payroll !== true);
-        const pdpIds = pdpData.map((p: any) => p.id);
+        const extraPdpRes = await fetchWithRetry(`${DIRECTUS_URL}/items/post_dispatch_plan_extra?limit=1000&fields=${fields}${filterQuery}`, {
+            headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
+        });
+        const extraPdpDataRaw = extraPdpRes.ok ? ((await extraPdpRes.json()).data || []) : [];
+        
+        const pdpData = [
+            ...pdpDataRaw.map((p: any) => ({ ...p, isExtra: false })),
+            ...extraPdpDataRaw.map((p: any) => ({ ...p, isExtra: true }))
+        ];
+        
+        const pdpIds = pdpData.filter(p => !p.isExtra).map((p: any) => p.id);
+        const extraPdpIds = pdpData.filter(p => p.isExtra).map((p: any) => p.id);
 
         const chunkArray = <T>(arr: T[], size: number): T[][] => {
             return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
@@ -84,10 +95,18 @@ export async function GET(request: NextRequest) {
         };
 
         // 2. Fetch Staff (Drivers and Helpers)
-        const staffData = await fetchChunked('/items/post_dispatch_plan_staff?limit=1000', pdpIds, 'post_dispatch_plan_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+        let staffData: any[] = [];
+        if (pdpIds.length > 0) {
+            const sData = await fetchChunked('/items/post_dispatch_plan_staff?limit=1000', pdpIds, 'post_dispatch_plan_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            staffData = [...staffData, ...sData.map((s: any) => ({ ...s, isExtra: false }))];
+        }
+        if (extraPdpIds.length > 0) {
+            const sData = await fetchChunked('/items/post_dispatch_plan_extra_staff?limit=1000', extraPdpIds, 'post_dispatch_plan_extra_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            staffData = [...staffData, ...sData.map((s: any) => ({ ...s, post_dispatch_plan_id: s.post_dispatch_plan_extra_id, isExtra: true }))];
+        }
 
         // 3. Fetch Post Dispatch Invoices separately
-        const pdiData = await fetchChunked('/items/post_dispatch_invoices?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id');
+        const pdiData = pdpIds.length > 0 ? await fetchChunked('/items/post_dispatch_invoices?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id') : [];
 
         const invoiceIds = [...new Set(pdiData.map((i: any) => i.invoice_id).filter(Boolean))];
 
@@ -139,7 +158,7 @@ export async function GET(request: NextRequest) {
             let matchedAreaId: number | null = null;
             let destLocationStr = "N/A";
             
-            const pdInvoices = pdiData.filter(pdi => pdi.post_dispatch_plan_id === p.id);
+            const pdInvoices = pdiData.filter(pdi => pdi.post_dispatch_plan_id === p.id && !p.isExtra);
             const invoice = invoiceData.find(i => pdInvoices.some(pdi => pdi.invoice_id === i.invoice_id));
             if (invoice) {
                 const customer = customerData.find(c => c.customer_code === invoice.customer_code);
@@ -193,7 +212,7 @@ export async function GET(request: NextRequest) {
             const vType = vehicle?.vehicle_type ? (typeof vehicle.vehicle_type === 'object' ? String(vehicle.vehicle_type.type_name || "") : String(vehicle.vehicle_type)) : undefined;
             const vPlate = vehicle?.vehicle_plate ? String(vehicle.vehicle_plate).trim() : undefined;
 
-            const allStaff = staffData.filter(s => s.post_dispatch_plan_id === p.id);
+            const allStaff = staffData.filter(s => s.post_dispatch_plan_id === p.id && s.isExtra === p.isExtra);
             allStaff.forEach(s => {
                 const userObj = typeof s.user_id === 'object' && s.user_id !== null ? s.user_id : null;
                 const userId = userObj ? userObj.user_id : s.user_id;
@@ -272,23 +291,38 @@ export async function GET(request: NextRequest) {
                 }
 
                 // Determine if approved
+                let formattedDateStr = null;
                 const dateOnlyStr = p.time_of_dispatch ? p.time_of_dispatch.split('T')[0] : null;
                 let shortDateStr = null;
-                if (dateOnlyStr) {
-                    const parts = dateOnlyStr.split('-');
-                    if (parts.length === 3) {
-                        shortDateStr = `${parts[1]}/${parts[2]}`;
+                
+                if (p.time_of_dispatch) {
+                    const d = new Date(p.time_of_dispatch);
+                    d.setUTCHours(d.getUTCHours() + 8); // Convert to UTC+8
+                    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getUTCDate()).padStart(2, '0');
+                    const yyyy = d.getUTCFullYear();
+                    formattedDateStr = `${mm}/${dd}/${yyyy}`;
+                    
+                    if (dateOnlyStr) {
+                        const parts = dateOnlyStr.split('-');
+                        if (parts.length === 3) {
+                            shortDateStr = `${parts[1]}/${parts[2]}`;
+                        }
                     }
                 }
+                
                 const approvedRecord = approvedRecords.find(r => {
                     const desc = r.description || "";
                     return r.user_id === userId && (
+                        (formattedDateStr && desc.includes(formattedDateStr)) ||
                         desc.includes(dispatchDocNo) || 
                         (dateOnlyStr && desc.includes(dateOnlyStr)) ||
                         (shortDateStr && desc.includes(shortDateStr))
                     );
                 });
 
+                const isDisregarded = p.is_not_payroll === 1 || p.is_not_payroll === true;
+                
                 const dispatchDetail: DispatchDetail = {
                     dispatchPlanId: p.id,
                     dispatchDocNo: dispatchDocNo,
@@ -299,7 +333,9 @@ export async function GET(request: NextRequest) {
                     vehicleType: vType,
                     timeOfDispatch: p.time_of_dispatch,
                     isApproved: !!approvedRecord,
-                    approvedAmount: approvedRecord ? Number(approvedRecord.amount) : undefined
+                    approvedAmount: approvedRecord ? Number(approvedRecord.amount) : undefined,
+                    isDisregarded,
+                    isExtra: p.isExtra
                 };
 
                 if (!staffMap.has(userId)) {
@@ -328,8 +364,11 @@ export async function GET(request: NextRequest) {
                         existingDispatch.location += `\n${displayLocation}`;
                     }
                     if (calculatedAmount > existingDispatch.amount) {
-                        summary.totalAmount -= existingDispatch.amount;
-                        summary.totalAmount += calculatedAmount;
+                        // Only add to total amount if it's not disregarded
+                        if (!existingDispatch.isDisregarded) {
+                            summary.totalAmount -= existingDispatch.amount;
+                            summary.totalAmount += calculatedAmount;
+                        }
                         existingDispatch.amount = calculatedAmount;
                     }
                     if (approvedRecord && !existingDispatch.isApproved) {
@@ -337,7 +376,9 @@ export async function GET(request: NextRequest) {
                         existingDispatch.approvedAmount = Number(approvedRecord.amount);
                     }
                 } else {
-                    summary.totalAmount += calculatedAmount;
+                    if (!isDisregarded) {
+                        summary.totalAmount += calculatedAmount;
+                    }
                     summary.dispatches.push(dispatchDetail);
                 }
             });

@@ -38,16 +38,15 @@ export function useLogisticsPayroll() {
         try {
             const descriptionParts = [];
             if (dispatchDate) {
-                const dateParts = dispatchDate.split('T')[0].split('-');
-                if (dateParts.length === 3) {
-                    descriptionParts.push(`${dateParts[1]}/${dateParts[2]}`);
-                } else {
-                    descriptionParts.push(dispatchDate.split('T')[0]);
-                }
+                const d = new Date(dispatchDate);
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                const yyyy = d.getFullYear();
+                descriptionParts.push(`${mm}/${dd}/${yyyy}`);
             }
             if (areaName) descriptionParts.push(areaName);
             if (role) descriptionParts.push(role);
-            const description = descriptionParts.length > 0 ? descriptionParts.join(" - ") : undefined;
+            const description = descriptionParts.join(" - ");
 
             await approveLogisticsPayroll({
                 user_id: staffId,
