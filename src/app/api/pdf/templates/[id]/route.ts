@@ -1,20 +1,25 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 
 export async function PATCH(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const cookieStore = await cookies();
+        const userToken = cookieStore.get("vos_access_token")?.value;
+        const staticToken = process.env.DIRECTUS_STATIC_TOKEN;
+        const activeToken = userToken || staticToken;
+
         const { id } = await params;
         const body = await request.json();
         const response = await fetch(`${API_BASE_URL}/items/pdf_templates/${id}`, {
             method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${STATIC_TOKEN}`,
                 'Content-Type': 'application/json',
+                ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}),
             },
             body: JSON.stringify(body),
         });
@@ -33,11 +38,16 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const cookieStore = await cookies();
+        const userToken = cookieStore.get("vos_access_token")?.value;
+        const staticToken = process.env.DIRECTUS_STATIC_TOKEN;
+        const activeToken = userToken || staticToken;
+
         const { id } = await params;
         const response = await fetch(`${API_BASE_URL}/items/pdf_templates/${id}`, {
             method: 'DELETE',
             headers: {
-                'Authorization': `Bearer ${STATIC_TOKEN}`,
+                ...(activeToken ? { 'Authorization': `Bearer ${activeToken}` } : {}),
             },
         });
 

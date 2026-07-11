@@ -12,6 +12,8 @@ export interface DispatchDetail {
   timeOfDispatch: string | null;
   isApproved: boolean;
   approvedAmount?: number;
+  isDisregarded: boolean;
+  isExtra?: boolean;
 }
 
 export interface StaffPayrollSummary {
