@@ -132,7 +132,7 @@ export function ManageLogisticsHeader({
             />
             <Input
                 type="date"
-                className="h-10 text-slate-500 w-full sm:w-[160px]"
+                className="h-10 text-slate-500 w-[150px]"
                 title="Filter by Dispatch Date"
                 value={dispatchDateFilter}
                 onChange={(e) => setDispatchDateFilter(e.target.value)}
@@ -140,7 +140,7 @@ export function ManageLogisticsHeader({
             <Button
                 variant={showDisregarded ? "default" : "outline"}
                 onClick={() => setShowDisregarded(!showDisregarded)}
-                className="h-10 w-full sm:w-auto min-w-[140px]"
+                className="h-10 min-w-[140px]"
             >
                 {showDisregarded ? "Hide Disregarded" : "Show Disregarded"}
             </Button>

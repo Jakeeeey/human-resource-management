@@ -57,18 +57,9 @@ export async function GET(request: NextRequest) {
         }
 
         const pdpDataRaw = (await pdpRes.json()).data || [];
-        const extraPdpRes = await fetchWithRetry(`${DIRECTUS_URL}/items/post_dispatch_plan_extra?limit=1000&fields=${fields}${filterQuery}`, {
-            headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
-        });
-        const extraPdpDataRaw = extraPdpRes.ok ? ((await extraPdpRes.json()).data || []) : [];
-        
-        const pdpData = [
-            ...pdpDataRaw.map((p: any) => ({ ...p, isExtra: false })),
-            ...extraPdpDataRaw.map((p: any) => ({ ...p, isExtra: true }))
-        ];
-        
-        const pdpIds = pdpData.filter(p => !p.isExtra).map((p: any) => p.id);
-        const extraPdpIds = pdpData.filter(p => p.isExtra).map((p: any) => p.id);
+        // Exclude any dispatch plans that are marked as disregarded (is_not_payroll = 1 or true)
+        const pdpData = pdpDataRaw.filter((p: any) => p.is_not_payroll !== 1 && p.is_not_payroll !== true);
+        const pdpIds = pdpData.map((p: any) => p.id);
 
         const chunkArray = <T>(arr: T[], size: number): T[][] => {
             return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
