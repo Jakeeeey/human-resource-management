@@ -363,8 +363,37 @@ export async function GET(request: NextRequest) {
 
                 const summary = staffMap.get(userId)!;
                 
-                if (!isDisregarded) {
-                    summary.totalAmount += calculatedAmount;
+                const dateOnly = p.time_of_dispatch ? p.time_of_dispatch.split('T')[0] : null;
+                let existingDispatch = null;
+                if (dateOnly) {
+                    existingDispatch = summary.dispatches.find(d => d.timeOfDispatch && d.timeOfDispatch.startsWith(dateOnly));
+                }
+
+                if (existingDispatch) {
+                    // Merge into existing
+                    if (!existingDispatch.dispatchDocNo.includes(dispatchDocNo)) {
+                        existingDispatch.dispatchDocNo += `\n${dispatchDocNo}`;
+                    }
+                    if (!existingDispatch.location.includes(displayLocation)) {
+                        existingDispatch.location += `\n${displayLocation}`;
+                    }
+                    if (calculatedAmount > existingDispatch.amount) {
+                        // Only add to total amount if it's not disregarded
+                        if (!existingDispatch.isDisregarded) {
+                            summary.totalAmount -= existingDispatch.amount;
+                            summary.totalAmount += calculatedAmount;
+                        }
+                        existingDispatch.amount = calculatedAmount;
+                    }
+                    if (approvedRecord && !existingDispatch.isApproved) {
+                        existingDispatch.isApproved = true;
+                        existingDispatch.approvedAmount = Number(approvedRecord.amount);
+                    }
+                } else {
+                    if (!isDisregarded) {
+                        summary.totalAmount += calculatedAmount;
+                    }
+                    summary.dispatches.push(dispatchDetail);
                 }
                 summary.dispatches.push(dispatchDetail);
             });
