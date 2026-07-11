@@ -136,6 +136,9 @@ export async function GET(request: NextRequest) {
         const vehicleIds = [...new Set(pdpData.map((p: any) => p.vehicle_id).filter(Boolean))];
         const vehicleData = await fetchChunked('/items/vehicles?limit=1000', vehicleIds, 'vehicle_id', 'vehicle_id,vehicle_plate,vehicle_type.*');
 
+        const missingUserIds = [...new Set(staffData.map(s => typeof s.user_id === 'object' && s.user_id !== null ? null : s.user_id).filter(Boolean))];
+        const userData = await fetchChunked('/items/user?limit=1000', missingUserIds, 'user_id', 'user_id,user_fname,user_lname');
+
         // 5. Fetch approved records from payroll_other_additions
         let approvedRecords: any[] = [];
         if (cutoffStart && cutoffEnd) {
@@ -221,7 +224,15 @@ export async function GET(request: NextRequest) {
                 
                 if (!userId) return;
 
-                const name = userObj ? `${userObj.user_fname || ''} ${userObj.user_lname || ''}`.trim() : `User ${userId}`;
+                let name = `User ${userId}`;
+                if (userObj) {
+                    name = `${userObj.user_fname || ''} ${userObj.user_lname || ''}`.trim();
+                } else {
+                    const foundUser = userData.find((u: any) => u.user_id === userId);
+                    if (foundUser) {
+                        name = `${foundUser.user_fname || ''} ${foundUser.user_lname || ''}`.trim();
+                    }
+                }
                 const role = s.role || "Unknown";
 
                 // 1. Calculate amount
@@ -237,6 +248,7 @@ export async function GET(request: NextRequest) {
 
                 // 3. Find matching staff profile (staff_id) in payroll_logistics_staff
                 let staffProfile = pStaffData.find(ps => {
+                    if (ps.staff_id !== userId) return false;
                     if (ps.role !== role) return false;
                     
                     if (role === "Driver") {
@@ -254,7 +266,7 @@ export async function GET(request: NextRequest) {
 
                 // If multiple profiles match, prefer the one with specific vehicle_type_id over null
                 if (!staffProfile) {
-                    staffProfile = pStaffData.find(ps => ps.role === role); // Last resort fallback
+                    staffProfile = pStaffData.find(ps => ps.staff_id === userId && ps.role === role); // Last resort fallback
                 }
 
                 const actualStaffId = staffProfile ? staffProfile.staff_id : userId;
@@ -351,38 +363,10 @@ export async function GET(request: NextRequest) {
 
                 const summary = staffMap.get(userId)!;
                 
-                const dateOnly = p.time_of_dispatch ? p.time_of_dispatch.split('T')[0] : null;
-                let existingDispatch = null;
-                if (dateOnly) {
-                    existingDispatch = summary.dispatches.find(d => d.timeOfDispatch && d.timeOfDispatch.startsWith(dateOnly));
+                if (!isDisregarded) {
+                    summary.totalAmount += calculatedAmount;
                 }
-
-                if (existingDispatch) {
-                    // Merge into existing
-                    if (!existingDispatch.dispatchDocNo.includes(dispatchDocNo)) {
-                        existingDispatch.dispatchDocNo += `\n${dispatchDocNo}`;
-                    }
-                    if (!existingDispatch.location.includes(displayLocation)) {
-                        existingDispatch.location += `\n${displayLocation}`;
-                    }
-                    if (calculatedAmount > existingDispatch.amount) {
-                        // Only add to total amount if it's not disregarded
-                        if (!existingDispatch.isDisregarded) {
-                            summary.totalAmount -= existingDispatch.amount;
-                            summary.totalAmount += calculatedAmount;
-                        }
-                        existingDispatch.amount = calculatedAmount;
-                    }
-                    if (approvedRecord && !existingDispatch.isApproved) {
-                        existingDispatch.isApproved = true;
-                        existingDispatch.approvedAmount = Number(approvedRecord.amount);
-                    }
-                } else {
-                    if (!isDisregarded) {
-                        summary.totalAmount += calculatedAmount;
-                    }
-                    summary.dispatches.push(dispatchDetail);
-                }
+                summary.dispatches.push(dispatchDetail);
             });
         });
 
