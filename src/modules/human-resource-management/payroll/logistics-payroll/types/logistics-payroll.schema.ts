@@ -37,3 +37,8 @@ export interface ApprovePayrollPayload {
   dispatchDocNo: string;
 }
 
+export interface UpdatePayrollPayload {
+  id: number;
+  amount: number;
+}
+

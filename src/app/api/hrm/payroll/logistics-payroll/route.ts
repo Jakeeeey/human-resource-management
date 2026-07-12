@@ -363,10 +363,28 @@ export async function GET(request: NextRequest) {
 
                 const summary = staffMap.get(userId)!;
                 
-                const dateOnly = p.time_of_dispatch ? p.time_of_dispatch.split('T')[0] : null;
+                let dateOnly = null;
+                if (p.time_of_dispatch) {
+                    const d = new Date(p.time_of_dispatch);
+                    d.setUTCHours(d.getUTCHours() + 8); // PHT offset
+                    dateOnly = d.toISOString().split('T')[0];
+                }
+                
                 let existingDispatch = null;
-                if (dateOnly) {
-                    existingDispatch = summary.dispatches.find(d => d.timeOfDispatch && d.timeOfDispatch.startsWith(dateOnly));
+                
+                // Only merge regular dispatches that occur on the same day. 
+                // Extra/manual dispatches are intentionally kept as separate line items.
+                // We also strictly separate disregarded DPs from valid DPs so a disregarded trip doesn't "eat" and hide a valid trip.
+                if (dateOnly && !p.isExtra) {
+                    existingDispatch = summary.dispatches.find(d => {
+                        if (d.isExtra || d.isDisregarded !== isDisregarded || !d.timeOfDispatch) return false;
+                        
+                        const d1 = new Date(d.timeOfDispatch);
+                        d1.setUTCHours(d1.getUTCHours() + 8);
+                        const dateStr1 = d1.toISOString().split('T')[0];
+                        
+                        return dateStr1 === dateOnly;
+                    });
                 }
 
                 if (existingDispatch) {
@@ -461,6 +479,48 @@ export async function POST(req: NextRequest) {
         console.error("Error approving logistics payroll:", error);
         return NextResponse.json(
             { error: "Failed to approve logistics payroll" },
+            { status: 500 }
+        );
+    }
+}
+
+export async function PATCH(req: NextRequest) {
+    try {
+        const body = await req.json();
+        
+        const { id, amount } = body;
+        
+        if (!id || amount === undefined) {
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+
+        const updateData = { amount };
+        
+        const res = await fetch(`${DIRECTUS_URL}/items/payroll_other_additions/${id}`, {
+            method: "PATCH",
+            headers: {
+                "Authorization": `Bearer ${DIRECTUS_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(updateData),
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Error updating logistics payroll:", errorText);
+            return NextResponse.json(
+                { error: "Failed to update logistics payroll", details: errorText },
+                { status: res.status }
+            );
+        }
+
+        const json = await res.json();
+        return NextResponse.json({ success: true, data: json.data }, { status: 200 });
+
+    } catch (error) {
+        console.error("Error updating logistics payroll:", error);
+        return NextResponse.json(
+            { error: "Failed to update logistics payroll" },
             { status: 500 }
         );
     }
