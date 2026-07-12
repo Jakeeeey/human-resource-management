@@ -12,7 +12,6 @@ export interface DispatchDetail {
   timeOfDispatch: string | null;
   isApproved: boolean;
   approvedAmount?: number;
-  approvedId?: number;
   isDisregarded: boolean;
   isExtra?: boolean;
 }

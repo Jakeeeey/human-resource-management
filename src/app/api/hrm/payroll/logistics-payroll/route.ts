@@ -348,7 +348,6 @@ export async function GET(request: NextRequest) {
                     timeOfDispatch: p.time_of_dispatch,
                     isApproved: !!approvedRecord,
                     approvedAmount: approvedRecord ? Number(approvedRecord.amount) : undefined,
-                    approvedId: approvedRecord ? approvedRecord.id : undefined,
                     isDisregarded,
                     isExtra: p.isExtra
                 };
@@ -414,6 +413,7 @@ export async function GET(request: NextRequest) {
                     }
                     summary.dispatches.push(dispatchDetail);
                 }
+                summary.dispatches.push(dispatchDetail);
             });
         });
 
