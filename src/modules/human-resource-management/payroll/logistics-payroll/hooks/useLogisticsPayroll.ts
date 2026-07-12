@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { StaffPayrollSummary } from "../types/logistics-payroll.schema";
-import { fetchLogisticsPayroll, approveLogisticsPayroll } from "../services/logistics-payroll";
+import { fetchLogisticsPayroll, approveLogisticsPayroll, updateLogisticsPayroll } from "../services/logistics-payroll";
 
 export function useLogisticsPayroll() {
     const [data, setData] = useState<StaffPayrollSummary[]>([]);
@@ -65,6 +65,19 @@ export function useLogisticsPayroll() {
         }
     };
 
+    const updatePayroll = async (id: number, amount: number) => {
+        setIsLoading(true);
+        try {
+            await updateLogisticsPayroll({ id, amount });
+            await loadData(cutoffStart, cutoffEnd);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update payroll");
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return {
         data,
         isLoading,
@@ -74,5 +87,6 @@ export function useLogisticsPayroll() {
         setCutoffFilters,
         refresh: useCallback(() => loadData(cutoffStart, cutoffEnd), [loadData, cutoffStart, cutoffEnd]),
         approvePayroll,
+        updatePayroll,
     };
 }

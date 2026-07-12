@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { LogisticsPayrollDataResponse, ApprovePayrollPayload } from "../types/logistics-payroll.schema";
+import { LogisticsPayrollDataResponse, ApprovePayrollPayload, UpdatePayrollPayload } from "../types/logistics-payroll.schema";
 
 const API_BASE = "/api/hrm/payroll/logistics-payroll";
 
@@ -53,6 +53,13 @@ export async function fetchLogisticsPayroll(cutoffStart?: string, cutoffEnd?: st
 export async function approveLogisticsPayroll(payload: ApprovePayrollPayload) {
     return http<any>(API_BASE, {
         method: "POST",
+        body: JSON.stringify(payload),
+    });
+}
+
+export async function updateLogisticsPayroll(payload: UpdatePayrollPayload) {
+    return http<any>(API_BASE, {
+        method: "PATCH",
         body: JSON.stringify(payload),
     });
 }
