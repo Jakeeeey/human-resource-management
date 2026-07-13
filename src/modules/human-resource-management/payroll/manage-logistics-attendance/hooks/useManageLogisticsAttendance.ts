@@ -83,7 +83,7 @@ export function useManageLogisticsAttendance() {
     }
   }, [startDate, endDate]);
 
-  const updateDispatchStaff = async (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; }) => {
+  const updateDispatchStaff = async (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; area?: string; }) => {
     try {
       const response = await fetch("/api/hrm/manage-logistics-attendance", {
         method: "PATCH",

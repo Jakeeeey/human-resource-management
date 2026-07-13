@@ -19,7 +19,7 @@ import { PlusCircle, Trash2 } from "lucide-react";
 interface AddManualDispatchDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    onSave: (payload: { docNo: string; timeOfDispatch: string; driverId: number | null; vehicleId: number | null; helperIds: number[]; }) => Promise<{ success: boolean; } | void>;
+    onSave: (payload: { docNo: string; timeOfDispatch: string; driverId: number | null; vehicleId: number | null; helperIds: number[]; area?: string; }) => Promise<{ success: boolean; } | void>;
 }
 
 interface UserOption {
@@ -43,6 +43,7 @@ export function AddManualDispatchDialog({
     const [helperIds, setHelperIds] = useState<string[]>([]);
     const [timeOfDispatch, setTimeOfDispatch] = useState<string>("");
     const [vehicleId, setVehicleId] = useState<string>("none");
+    const [area, setArea] = useState<string>("");
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +55,7 @@ export function AddManualDispatchDialog({
             setHelperIds([]);
             setTimeOfDispatch("");
             setVehicleId("none");
+            setArea("");
             setError(null);
 
             if (users.length === 0) {
@@ -111,6 +113,7 @@ export function AddManualDispatchDialog({
                 driverId: parsedDriverId,
                 helperIds: parsedHelperIds,
                 vehicleId: parsedVehicleId,
+                area: area.trim() || undefined,
             });
             onOpenChange(false);
         } catch (error) {
@@ -160,6 +163,17 @@ export function AddManualDispatchDialog({
                             placeholder="e.g. PDP-2026-0001"
                             value={docNo}
                             onChange={(e) => setDocNo(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Area */}
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="area" className="font-semibold text-slate-700">Area <span className="text-muted-foreground font-normal">(Optional)</span></Label>
+                        <Input
+                            id="area"
+                            placeholder="e.g. Metro Manila"
+                            value={area}
+                            onChange={(e) => setArea(e.target.value)}
                         />
                     </div>
 

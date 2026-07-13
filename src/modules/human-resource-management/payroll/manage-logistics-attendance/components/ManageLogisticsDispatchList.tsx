@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 interface ManageLogisticsDispatchListProps {
   dispatches: DispatchAttendance[];
   isLoading: boolean;
-  onUpdateStaff: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; }) => Promise<{ success: boolean; } | void>;
+  onUpdateStaff: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; area?: string; }) => Promise<{ success: boolean; } | void>;
 }
 
 export function ManageLogisticsDispatchList({

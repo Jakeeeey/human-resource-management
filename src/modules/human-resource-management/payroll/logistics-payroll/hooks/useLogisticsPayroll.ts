@@ -8,8 +8,10 @@ export function useLogisticsPayroll() {
     const [error, setError] = useState<string | null>(null);
 
     // Current filter state
+    const [searchQuery, setSearchQuery] = useState("");
     const [cutoffStart, setCutoffStart] = useState<string | undefined>();
     const [cutoffEnd, setCutoffEnd] = useState<string | undefined>();
+    const [showPendingOnly, setShowPendingOnly] = useState(false);
 
     const loadData = useCallback(async (start?: string, end?: string) => {
         setIsLoading(true);
@@ -41,12 +43,11 @@ export function useLogisticsPayroll() {
                 const d = new Date(dispatchDate);
                 const mm = String(d.getMonth() + 1).padStart(2, '0');
                 const dd = String(d.getDate()).padStart(2, '0');
-                const yyyy = d.getFullYear();
-                descriptionParts.push(`${mm}/${dd}/${yyyy}`);
+                descriptionParts.push(`${mm}/${dd}`);
             }
             if (areaName) descriptionParts.push(areaName);
             if (role) descriptionParts.push(role);
-            const description = descriptionParts.join(" - ");
+            const description = `Dispatch - ${dispatchDocNo}` + (descriptionParts.length > 0 ? ` - ${descriptionParts.join(" - ")}` : "");
 
             await approveLogisticsPayroll({
                 user_id: staffId,
@@ -84,7 +85,11 @@ export function useLogisticsPayroll() {
         error,
         cutoffStart,
         cutoffEnd,
+        searchQuery,
+        setSearchQuery,
         setCutoffFilters,
+        showPendingOnly,
+        setShowPendingOnly,
         refresh: useCallback(() => loadData(cutoffStart, cutoffEnd), [loadData, cutoffStart, cutoffEnd]),
         approvePayroll,
         updatePayroll,

@@ -21,8 +21,10 @@ export async function GET(request: NextRequest) {
 
         let filterQuery = "";
         if (cutoffStart && cutoffEnd) {
-            const startStr = encodeURIComponent(`${cutoffStart}T00:00:00+08:00`);
-            const endStr = encodeURIComponent(`${cutoffEnd}T23:59:59+08:00`);
+            const startUtc = new Date(`${cutoffStart}T00:00:00+08:00`).toISOString();
+            const endUtc = new Date(`${cutoffEnd}T23:59:59+08:00`).toISOString();
+            const startStr = encodeURIComponent(startUtc);
+            const endStr = encodeURIComponent(endUtc);
             filterQuery = `&filter[time_of_dispatch][_between]=${startStr},${endStr}`;
         }
 
@@ -109,6 +111,10 @@ export async function GET(request: NextRequest) {
 
         // 3. Fetch Post Dispatch Invoices separately
         const pdiData = pdpIds.length > 0 ? await fetchChunked('/items/post_dispatch_invoices?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id') : [];
+
+        const pddpData = pdpIds.length > 0 ? await fetchChunked('/items/post_dispatch_dispatch_plans?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,dispatch_plan_id') : [];
+        const dpIds = [...new Set(pddpData.map((d: any) => d.dispatch_plan_id).filter(Boolean))];
+        const dpData = await fetchChunked('/items/dispatch_plan?limit=1000', dpIds, 'dispatch_id', 'dispatch_id,dispatch_no');
 
         const invoiceIds = [...new Set(pdiData.map((i: any) => i.invoice_id).filter(Boolean))];
 
@@ -217,6 +223,10 @@ export async function GET(request: NextRequest) {
             const vType = vehicle?.vehicle_type ? (typeof vehicle.vehicle_type === 'object' ? String(vehicle.vehicle_type.type_name || "") : String(vehicle.vehicle_type)) : undefined;
             const vPlate = vehicle?.vehicle_plate ? String(vehicle.vehicle_plate).trim() : undefined;
 
+            const linkedPddp = pddpData.filter((d: any) => d.post_dispatch_plan_id === p.id && !p.isExtra);
+            const linkedDps = dpData.filter((d: any) => linkedPddp.some((pddp: any) => pddp.dispatch_plan_id === d.dispatch_id));
+            const linkedDispatchNos = linkedDps.map((d: any) => d.dispatch_no).join(", ");
+
             const allStaff = staffData.filter(s => s.post_dispatch_plan_id === p.id && s.isExtra === p.isExtra);
             allStaff.forEach(s => {
                 const userObj = typeof s.user_id === 'object' && s.user_id !== null ? s.user_id : null;
@@ -306,33 +316,28 @@ export async function GET(request: NextRequest) {
 
                 // Determine if approved
                 let formattedDateStr = null;
-                const dateOnlyStr = p.time_of_dispatch ? p.time_of_dispatch.split('T')[0] : null;
-                let shortDateStr = null;
                 
                 if (p.time_of_dispatch) {
                     const d = new Date(p.time_of_dispatch);
                     d.setUTCHours(d.getUTCHours() + 8); // Convert to UTC+8
                     const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
                     const dd = String(d.getUTCDate()).padStart(2, '0');
-                    const yyyy = d.getUTCFullYear();
-                    formattedDateStr = `${mm}/${dd}/${yyyy}`;
-                    
-                    if (dateOnlyStr) {
-                        const parts = dateOnlyStr.split('-');
-                        if (parts.length === 3) {
-                            shortDateStr = `${parts[1]}/${parts[2]}`;
-                        }
-                    }
+                    formattedDateStr = `${mm}/${dd}`;
                 }
                 
                 const approvedRecord = approvedRecords.find(r => {
                     const desc = r.description || "";
-                    return r.user_id === userId && (
-                        (formattedDateStr && desc.includes(formattedDateStr)) ||
-                        desc.includes(dispatchDocNo) || 
-                        (dateOnlyStr && desc.includes(dateOnlyStr)) ||
-                        (shortDateStr && desc.includes(shortDateStr))
-                    );
+                    if (String(r.user_id) !== String(userId)) return false;
+                    
+                    if (formattedDateStr && desc.includes(formattedDateStr)) return true;
+                    
+                    if (desc === `Dispatch - ${dispatchDocNo}`) return true;
+                    if (dispatchDocNo && dispatchDocNo.length > 4) {
+                        if (desc.includes(`Dispatch - ${dispatchDocNo}`)) return true;
+                        if ((dispatchDocNo.startsWith("DP-") || dispatchDocNo.startsWith("PDP-")) && desc.includes(dispatchDocNo)) return true;
+                    }
+
+                    return false;
                 });
 
                 const isDisregarded = p.is_not_payroll === 1 || p.is_not_payroll === true;
@@ -348,8 +353,10 @@ export async function GET(request: NextRequest) {
                     timeOfDispatch: p.time_of_dispatch,
                     isApproved: !!approvedRecord,
                     approvedAmount: approvedRecord ? Number(approvedRecord.amount) : undefined,
+                    approvedId: approvedRecord ? approvedRecord.id : undefined,
                     isDisregarded,
-                    isExtra: p.isExtra
+                    isExtra: p.isExtra,
+                    linkedDispatchNos: linkedDispatchNos || undefined
                 };
 
                 if (!staffMap.has(userId)) {
@@ -391,6 +398,11 @@ export async function GET(request: NextRequest) {
                     // Merge into existing
                     if (!existingDispatch.dispatchDocNo.includes(dispatchDocNo)) {
                         existingDispatch.dispatchDocNo += `\n${dispatchDocNo}`;
+                    }
+                    if (linkedDispatchNos && (!existingDispatch.linkedDispatchNos || !existingDispatch.linkedDispatchNos.includes(linkedDispatchNos))) {
+                        existingDispatch.linkedDispatchNos = existingDispatch.linkedDispatchNos 
+                            ? `${existingDispatch.linkedDispatchNos}, ${linkedDispatchNos}`
+                            : linkedDispatchNos;
                     }
                     if (!existingDispatch.location.includes(displayLocation)) {
                         existingDispatch.location += `\n${displayLocation}`;

@@ -14,14 +14,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PlusCircle, Trash2 } from "lucide-react";
 
 interface EditDispatchStaffDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     dispatchRecord: DispatchAttendance | null;
-    onSave: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; }) => Promise<{ success: boolean; } | void>;
+    onSave: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; area?: string; }) => Promise<{ success: boolean; } | void>;
 }
 
 interface UserOption {
@@ -45,6 +46,7 @@ export function EditDispatchStaffDialog({
     const [helperIds, setHelperIds] = useState<string[]>([]);
     const [timeOfDispatch, setTimeOfDispatch] = useState<string>("");
     const [vehicleId, setVehicleId] = useState<string>("none");
+    const [area, setArea] = useState<string>("");
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -81,6 +83,8 @@ export function EditDispatchStaffDialog({
                 .map(s => s.staffUserId)
                 .filter((id): id is number => id !== null);
             setHelperIds(currentHelperIds.map(id => String(id)));
+            
+            setArea(dispatchRecord.isExtra && dispatchRecord.areaName !== "N/A" ? (dispatchRecord.areaName || "") : "");
             
             if (dispatchRecord.timeOfDispatch) {
                 // Convert UTC to local datetime-local format YYYY-MM-DDTHH:mm
@@ -121,6 +125,7 @@ export function EditDispatchStaffDialog({
                 helperIds: parsedHelperIds,
                 timeOfDispatch: finalTime,
                 vehicleId: parsedVehicleId,
+                area: dispatchRecord.isExtra ? (area.trim() || undefined) : undefined,
             });
             onOpenChange(false);
         } catch (error) {
@@ -144,6 +149,30 @@ export function EditDispatchStaffDialog({
         setHelperIds(helperIds.filter((_, i) => i !== index));
     };
 
+    const vehicleOptions = [
+        { value: "none", label: "No Vehicle Assigned" },
+        ...vehicles.map(v => ({
+            value: String(v.id),
+            label: `${v.plate || "No Plate"} (${v.type})`
+        }))
+    ];
+
+    const driverOptions = [
+        { value: "none", label: "No Driver Assigned" },
+        ...users.map(u => ({
+            value: String(u.id),
+            label: `${u.name} (${u.position})`
+        }))
+    ];
+
+    const helperOptions = [
+        { value: "none", label: "Select Helper..." },
+        ...users.map(u => ({
+            value: String(u.id),
+            label: `${u.name} (${u.position})`
+        }))
+    ];
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
@@ -166,40 +195,41 @@ export function EditDispatchStaffDialog({
                         />
                     </div>
                     
+                    {/* Area (Only show if it's an Extra PDP) */}
+                    {dispatchRecord.isExtra && (
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="area" className="font-semibold text-slate-700">Area</Label>
+                            <Input
+                                id="area"
+                                placeholder="e.g. Metro Manila"
+                                value={area}
+                                onChange={(e) => setArea(e.target.value)}
+                            />
+                        </div>
+                    )}
+                    
                     {/* Vehicle Selection */}
                     <div className="flex flex-col gap-2">
                         <Label htmlFor="vehicleId" className="font-semibold text-slate-700">Vehicle</Label>
-                        <Select value={vehicleId} onValueChange={setVehicleId} disabled={isLoadingVehicles}>
-                            <SelectTrigger id="vehicleId">
-                                <SelectValue placeholder={isLoadingVehicles ? "Loading vehicles..." : "Select Vehicle"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">No Vehicle Assigned</SelectItem>
-                                {vehicles.map(v => (
-                                    <SelectItem key={v.id} value={String(v.id)}>
-                                        {v.plate || "No Plate"} <span className="text-muted-foreground text-xs ml-1">({v.type})</span>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <SearchableSelect 
+                            options={vehicleOptions}
+                            value={vehicleId}
+                            onValueChange={setVehicleId}
+                            disabled={isLoadingVehicles}
+                            placeholder={isLoadingVehicles ? "Loading vehicles..." : "Select Vehicle"}
+                        />
                     </div>
 
                     {/* Driver Selection */}
                     <div className="flex flex-col gap-2">
                         <Label htmlFor="driverId" className="font-semibold text-slate-700">Driver</Label>
-                        <Select value={driverId} onValueChange={setDriverId} disabled={isLoadingUsers}>
-                            <SelectTrigger id="driverId">
-                                <SelectValue placeholder={isLoadingUsers ? "Loading users..." : "Select Driver"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">No Driver Assigned</SelectItem>
-                                {users.map(u => (
-                                    <SelectItem key={u.id} value={String(u.id)}>
-                                        {u.name} <span className="text-muted-foreground text-xs ml-1">({u.position})</span>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <SearchableSelect 
+                            options={driverOptions}
+                            value={driverId}
+                            onValueChange={setDriverId}
+                            disabled={isLoadingUsers}
+                            placeholder={isLoadingUsers ? "Loading users..." : "Select Driver"}
+                        />
                     </div>
 
                     {/* Helpers Selection */}
@@ -217,19 +247,14 @@ export function EditDispatchStaffDialog({
                             <div className="flex flex-col gap-2">
                                 {helperIds.map((hId, index) => (
                                     <div key={index} className="flex items-center gap-2">
-                                        <Select value={hId} onValueChange={(val) => updateHelper(index, val)} disabled={isLoadingUsers}>
-                                            <SelectTrigger className="flex-1">
-                                                <SelectValue placeholder="Select Helper" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">Select Helper...</SelectItem>
-                                                {users.map(u => (
-                                                    <SelectItem key={u.id} value={String(u.id)}>
-                                                        {u.name} <span className="text-muted-foreground text-xs ml-1">({u.position})</span>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <SearchableSelect 
+                                            className="flex-1"
+                                            options={helperOptions}
+                                            value={hId}
+                                            onValueChange={(val) => updateHelper(index, val)}
+                                            disabled={isLoadingUsers}
+                                            placeholder="Select Helper"
+                                        />
                                         <Button variant="ghost" size="icon" onClick={() => removeHelper(index)} className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0">
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
