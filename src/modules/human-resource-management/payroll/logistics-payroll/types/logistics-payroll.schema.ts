@@ -15,6 +15,7 @@ export interface DispatchDetail {
   approvedId?: number;
   isDisregarded: boolean;
   isExtra?: boolean;
+  linkedDispatchNos?: string;
 }
 
 export interface StaffPayrollSummary {

@@ -22,8 +22,10 @@ export async function GET(request: NextRequest) {
 
         let filterQuery = "";
         if (startDate && endDate) {
-            const startStr = encodeURIComponent(`${startDate}T00:00:00+08:00`);
-            const endStr = encodeURIComponent(`${endDate}T23:59:59+08:00`);
+            const startUtc = new Date(`${startDate}T00:00:00+08:00`).toISOString();
+            const endUtc = new Date(`${endDate}T23:59:59+08:00`).toISOString();
+            const startStr = encodeURIComponent(startUtc);
+            const endStr = encodeURIComponent(endUtc);
             filterQuery = `&filter[time_of_dispatch][_between]=${startStr},${endStr}`;
         }
 
@@ -176,45 +178,50 @@ export async function GET(request: NextRequest) {
 
             // Resolve Area using SQL logic equivalent
             let brgy = "", city = "", province = "", areaName = "N/A";
+            let invoice: any = null;
             
-            const pdInvoices = pdiData.filter((pdi: any) => pdi.post_dispatch_plan_id === p.id && !p.isExtra);
-            const invoice = invoiceData.find(i => pdInvoices.some((pdi: any) => pdi.invoice_id === i.invoice_id));
-            if (invoice) {
-                const customer = customerData.find(c => c.customer_code === invoice.customer_code);
-                if (customer) {
-                    brgy = customer.brgy || "";
-                    city = customer.city || "";
-                    province = customer.province || "";
-                    
-                    const cleanString = (s: string) => s.toUpperCase().replace(/CITY OF /g, '').replace(/ CITY/g, '').replace(/\([^)]+\)/g, '').trim();
-                    const cCityClean = cleanString(city);
-                    const cProvClean = cleanString(province);
+            if (p.isExtra && p.area) {
+                areaName = p.area;
+            } else {
+                const pdInvoices = pdiData.filter((pdi: any) => pdi.post_dispatch_plan_id === p.id && !p.isExtra);
+                invoice = invoiceData.find(i => pdInvoices.some((pdi: any) => pdi.invoice_id === i.invoice_id));
+                if (invoice) {
+                    const customer = customerData.find(c => c.customer_code === invoice.customer_code);
+                    if (customer) {
+                        brgy = customer.brgy || "";
+                        city = customer.city || "";
+                        province = customer.province || "";
+                        
+                        const cleanString = (s: string) => s.toUpperCase().replace(/CITY OF /g, '').replace(/ CITY/g, '').replace(/\([^)]+\)/g, '').trim();
+                        const cCityClean = cleanString(city);
+                        const cProvClean = cleanString(province);
 
-                    const matchedLoc = locationsData.find(l => {
-                        const lCityClean = cleanString(l.city || "");
-                        const lProvClean = cleanString(l.province || "");
+                        const matchedLoc = locationsData.find(l => {
+                            const lCityClean = cleanString(l.city || "");
+                            const lProvClean = cleanString(l.province || "");
 
-                        if (!lCityClean && !lProvClean) return false;
+                            if (!lCityClean && !lProvClean) return false;
 
-                        // Exact match
-                        if (cCityClean === lCityClean && cProvClean === lProvClean) return true;
+                            // Exact match
+                            if (cCityClean === lCityClean && cProvClean === lProvClean) return true;
 
-                        // Flexible match
-                        const cityMatch = lCityClean && cCityClean ? (cCityClean.includes(lCityClean) || lCityClean.includes(cCityClean)) : false;
-                        const provMatch = lProvClean && cProvClean ? (
-                            cProvClean.includes(lProvClean) || 
-                            lProvClean.includes(cProvClean) ||
-                            (cProvClean.includes("NCR") && lProvClean.includes("METRO MANILA")) ||
-                            (cProvClean.includes("METRO MANILA") && lProvClean.includes("NCR"))
-                        ) : false;
+                            // Flexible match
+                            const cityMatch = lCityClean && cCityClean ? (cCityClean.includes(lCityClean) || lCityClean.includes(cCityClean)) : false;
+                            const provMatch = lProvClean && cProvClean ? (
+                                cProvClean.includes(lProvClean) || 
+                                lProvClean.includes(cProvClean) ||
+                                (cProvClean.includes("NCR") && lProvClean.includes("METRO MANILA")) ||
+                                (cProvClean.includes("METRO MANILA") && lProvClean.includes("NCR"))
+                            ) : false;
 
-                        return cityMatch && provMatch;
-                    });
+                            return cityMatch && provMatch;
+                        });
 
-                    if (matchedLoc) {
-                        const matchedArea = areasData.find(a => a.area_id === matchedLoc.area_id);
-                        if (matchedArea) {
-                            areaName = matchedArea.area_name;
+                        if (matchedLoc) {
+                            const matchedArea = areasData.find(a => a.area_id === matchedLoc.area_id);
+                            if (matchedArea) {
+                                areaName = matchedArea.area_name;
+                            }
                         }
                     }
                 }
@@ -276,7 +283,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const body = await request.json();
-        const { dispatchPlanId, isExtra, driverId, helperIds, timeOfDispatch, vehicleId, isNotPayroll } = body;
+        const { dispatchPlanId, isExtra, driverId, helperIds, timeOfDispatch, vehicleId, isNotPayroll, area } = body;
 
         if (!dispatchPlanId) {
             return NextResponse.json({ error: "dispatchPlanId is required" }, { status: 400 });
@@ -291,11 +298,12 @@ export async function PATCH(request: NextRequest) {
         const staffIdField = isExtra ? "post_dispatch_plan_extra_id" : "post_dispatch_plan_id";
 
         // Update time_of_dispatch, vehicle_id, and/or is_not_payroll if provided
-        if (timeOfDispatch !== undefined || vehicleId !== undefined || isNotPayroll !== undefined) {
+        if (timeOfDispatch !== undefined || vehicleId !== undefined || isNotPayroll !== undefined || area !== undefined) {
             const updatePayload: any = {};
             if (timeOfDispatch !== undefined) updatePayload.time_of_dispatch = timeOfDispatch;
             if (vehicleId !== undefined) updatePayload.vehicle_id = vehicleId;
             if (isNotPayroll !== undefined) updatePayload.is_not_payroll = isNotPayroll;
+            if (area !== undefined && isExtra) updatePayload.area = area;
 
             const updateRes = await fetch(`${DIRECTUS_URL}/items/${pdpTable}/${dispatchPlanId}`, {
                 method: "PATCH",

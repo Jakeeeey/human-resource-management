@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/popover";
 
 export interface SearchableSelectProps {
-    options: { value: string; label: string }[];
+    options: { value: string; label: string; node?: React.ReactNode }[];
     value?: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
@@ -39,8 +39,8 @@ export function SearchableSelect({
     const [open, setOpen] = React.useState(false);
 
     // Find the label for the current value
-    const selectedLabel = React.useMemo(() => {
-        return options.find((opt) => opt.value === value)?.label;
+    const selectedOption = React.useMemo(() => {
+        return options.find((opt) => opt.value === value);
     }, [options, value]);
 
     return (
@@ -53,7 +53,9 @@ export function SearchableSelect({
                     className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
                     disabled={disabled}
                 >
-                    {selectedLabel || placeholder}
+                    <span className="truncate flex-1 text-left">
+                        {selectedOption ? (selectedOption.node || selectedOption.label) : placeholder}
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
@@ -85,7 +87,7 @@ export function SearchableSelect({
                                             value === opt.value ? "opacity-100" : "opacity-0"
                                         )}
                                     />
-                                    {opt.label}
+                                    {opt.node || opt.label}
                                 </CommandItem>
                             ))}
                         </CommandGroup>

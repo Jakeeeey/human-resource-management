@@ -12,7 +12,7 @@ const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { docNo, driverId, helperIds, timeOfDispatch, vehicleId } = body;
+        const { docNo, driverId, helperIds, timeOfDispatch, vehicleId, area } = body;
 
         if (!docNo || !timeOfDispatch) {
             return NextResponse.json({ error: "docNo and timeOfDispatch are required" }, { status: 400 });
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
         };
         if (driverId) pdpPayload.driver_id = driverId;
         if (vehicleId) pdpPayload.vehicle_id = vehicleId;
+        if (area) pdpPayload.area = area;
 
         const pdpRes = await fetch(`${DIRECTUS_URL}/items/post_dispatch_plan_extra`, {
             method: "POST",
