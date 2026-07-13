@@ -425,6 +425,7 @@ export async function GET(request: NextRequest) {
                     }
                     summary.dispatches.push(dispatchDetail);
                 }
+                summary.dispatches.push(dispatchDetail);
             });
         });
 
