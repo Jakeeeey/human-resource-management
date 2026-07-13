@@ -153,8 +153,7 @@ export function EditDispatchStaffDialog({
         { value: "none", label: "No Vehicle Assigned" },
         ...vehicles.map(v => ({
             value: String(v.id),
-            label: `${v.plate || "No Plate"} ${v.type}`,
-            node: <>{v.plate || "No Plate"} <span className="text-muted-foreground text-xs ml-1">({v.type})</span></>
+            label: `${v.plate || "No Plate"} (${v.type})`
         }))
     ];
 
@@ -162,8 +161,7 @@ export function EditDispatchStaffDialog({
         { value: "none", label: "No Driver Assigned" },
         ...users.map(u => ({
             value: String(u.id),
-            label: `${u.name} ${u.position}`,
-            node: <>{u.name} <span className="text-muted-foreground text-xs ml-1">({u.position})</span></>
+            label: `${u.name} (${u.position})`
         }))
     ];
 
@@ -171,8 +169,7 @@ export function EditDispatchStaffDialog({
         { value: "none", label: "Select Helper..." },
         ...users.map(u => ({
             value: String(u.id),
-            label: `${u.name} ${u.position}`,
-            node: <>{u.name} <span className="text-muted-foreground text-xs ml-1">({u.position})</span></>
+            label: `${u.name} (${u.position})`
         }))
     ];
 
