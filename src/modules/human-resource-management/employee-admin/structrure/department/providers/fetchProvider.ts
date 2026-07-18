@@ -6,40 +6,27 @@ import type {
     DirectusResponse,
     DepartmentPosition,
 } from "../types";
-
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-const LIMIT_PER_REQUEST = 1000;
 
 const COLLECTIONS = {
     DEPARTMENT: "department",
     DIVISION: "division",
     USERS: "user",
-    DEPARTMENT_POSITIONS: "positions",
+    DEPARTMENT_POSITIONS: "department_positions",
 } as const;
 
 // ============================================================================
 // GENERIC FETCH
 // ============================================================================
 
-async function fetchAll<T>(
-    collection: string,
-    offset = 0,
-    accumulated: T[] = []
-): Promise<T[]> {
-    const url = `${DIRECTUS_URL}/items/${collection}?limit=${LIMIT_PER_REQUEST}&offset=${offset}`;
+async function fetchAll<T>(collection: string): Promise<T[]> {
+    const url = `${DIRECTUS_URL}/items/${collection}?limit=-1`;
 
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`Fetch failed ${collection}`);
 
     const json: DirectusResponse<T> = await res.json();
-    const items = json.data ?? [];
-    const all = [...accumulated, ...items];
-
-    if (items.length === LIMIT_PER_REQUEST) {
-        return fetchAll(collection, offset + LIMIT_PER_REQUEST, all);
-    }
-
-    return all;
+    return json.data ?? [];
 }
 
 // ============================================================================
@@ -54,7 +41,7 @@ export const fetchAllDivisions = () =>
 
 export async function fetchAllUsers(): Promise<User[]> {
     const res = await fetch(
-        `${DIRECTUS_URL}/items/${COLLECTIONS.USERS}?fields=user_id,user_fname,user_lname,user_email,user_department`,
+        `${DIRECTUS_URL}/items/${COLLECTIONS.USERS}?fields=user_id,user_fname,user_lname,user_email,user_department&limit=-1`,
         { cache: "no-store" }
     );
 
@@ -97,10 +84,7 @@ export async function fetchDepartmentsWithRelations() {
     const departmentsWithRelations: DepartmentWithRelations[] =
         departments.map(dept => {
 
-            const headId =
-                typeof dept.department_head === "number"
-                    ? dept.department_head
-                    : Number(dept.department_head) || null;
+            const headId = dept.department_head_id;
 
             return {
                 ...dept,
@@ -121,43 +105,4 @@ export async function fetchDepartmentsWithRelations() {
 
 
 
-// ============================================================================
-// CRUD
-// ============================================================================
 
-export async function createDepartment(data: {
-    department_name: string;
-    department_description: string;
-    department_head: number | null;
-}) {
-    const res = await fetch(`${DIRECTUS_URL}/items/department`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-    });
-
-    return (await res.json()).data[0];
-}
-
-export async function updateDepartment(
-    id: number,
-    data: Partial<{
-        department_name: string;
-        department_description: string;
-        department_head: number | null;
-    }>
-) {
-    const res = await fetch(`${DIRECTUS_URL}/items/department/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-    });
-
-    return (await res.json()).data[0];
-}
-
-export async function deleteDepartment(id: number) {
-    await fetch(`${DIRECTUS_URL}/items/department/${id}`, {
-        method: "DELETE",
-    });
-}
