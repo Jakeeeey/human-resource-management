@@ -11,11 +11,9 @@ interface SchedulingFetchContextType {
     lines: ManufacturingLine[];
     isLoading: boolean;
     refetch: () => Promise<void>;
-    addSchedule: (data: ScheduleFormValues) => Promise<boolean>;
-    updateSchedule: (id: number, data: ScheduleFormValues, current: ProductionSchedule) => Promise<boolean>;
-    removeSchedule: (id: number) => Promise<boolean>;
-    approveTarget: (id: number, userId: number | null) => Promise<boolean>;
-    approveHeadcount: (posItemId: number, userId: number | null) => Promise<boolean>;
+    addSchedule: (data: ScheduleFormValues, userId: number | null) => Promise<boolean>;
+    updateSchedule: (id: number, data: ScheduleFormValues, current: ProductionSchedule, userId: number | null) => Promise<boolean>;
+    removeSchedule: (id: number, userId?: number | null) => Promise<boolean>;
 }
 
 const SchedulingFetchContext = createContext<SchedulingFetchContextType | undefined>(undefined);
@@ -49,8 +47,8 @@ export function SchedulingFetchProvider({
         fetchData();
     }, [fetchData]);
 
-    const addSchedule = async (data: ScheduleFormValues) => {
-        const created = await SchedulingService.createSchedule(data);
+    const addSchedule = async (data: ScheduleFormValues, userId: number | null) => {
+        const created = await SchedulingService.createSchedule(data, userId);
         if (created) {
             await fetchData();
             return true;
@@ -58,37 +56,21 @@ export function SchedulingFetchProvider({
         return false;
     };
 
-    const updateSchedule = async (id: number, data: ScheduleFormValues, current: ProductionSchedule) => {
-        const success = await SchedulingService.updateSchedule(id, data, current);
+    const updateSchedule = async (id: number, data: ScheduleFormValues, current: ProductionSchedule, userId: number | null) => {
+        const success = await SchedulingService.updateSchedule(id, data, current, userId);
         if (success) {
             await fetchData();
         }
         return success;
     };
 
-    const removeSchedule = async (id: number) => {
-        const success = await SchedulingService.deleteSchedule(id);
+    const removeSchedule = async (id: number, userId: number | null = null) => {
+        const success = await SchedulingService.deleteSchedule(id, userId);
         if (success) {
             await fetchData();
             return true;
         }
         return false;
-    };
-
-    const approveTarget = async (id: number, userId: number | null) => {
-        const success = await SchedulingService.approveTarget(id, userId);
-        if (success) {
-            await fetchData();
-        }
-        return success;
-    };
-
-    const approveHeadcount = async (posItemId: number, userId: number | null) => {
-        const success = await SchedulingService.approveHeadcount(posItemId, userId);
-        if (success) {
-            await fetchData();
-        }
-        return success;
     };
 
     return React.createElement(
@@ -102,8 +84,6 @@ export function SchedulingFetchProvider({
                 addSchedule,
                 updateSchedule,
                 removeSchedule,
-                approveTarget,
-                approveHeadcount,
             },
         },
         children

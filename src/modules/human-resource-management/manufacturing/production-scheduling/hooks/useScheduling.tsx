@@ -1,3 +1,4 @@
+/* eslint-disable */
 "use client";
 
 import { useState } from "react";
@@ -16,11 +17,10 @@ function getUserIdFromCookie(): number | null {
         const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
         const userId = payload.id || payload.sub || payload.user_id || payload.id;
         // Directus uuid string can fail if DB expects INT for user_id.
-        // If it's a UUID string, check if it's numeric, or fall back to a dummy integer or parsed integer
         const parsed = parseInt(userId, 10);
-        return isNaN(parsed) ? 1 : parsed; // Fallback to 1 if it's a UUID string and table expects INT
+        return isNaN(parsed) ? null : parsed;
     } catch {
-        return 1;
+        return null;
     }
 }
 
@@ -33,8 +33,6 @@ export function useScheduling() {
         addSchedule,
         updateSchedule,
         removeSchedule,
-        approveTarget,
-        approveHeadcount,
     } = useSchedulingFetchContext();
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -42,11 +40,15 @@ export function useScheduling() {
 
     // Delete dialog
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+    const [scheduleToDelete, setScheduleToDelete] = useState<ProductionSchedule | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
     // Save loading state
     const [isSaving, setIsSaving] = useState(false);
+
+    // Attachments dialog
+    const [isAttachmentsOpen, setIsAttachmentsOpen] = useState(false);
+    const [attachmentsSchedule, setAttachmentsSchedule] = useState<ProductionSchedule | null>(null);
 
     const handleAdd = () => {
         setSelectedSchedule(null);
@@ -58,33 +60,41 @@ export function useScheduling() {
         setIsDialogOpen(true);
     };
 
-    const handleRequestDelete = (id: number) => {
-        setDeleteTargetId(id);
+    const handleRequestDelete = (schedule: ProductionSchedule) => {
+        setScheduleToDelete(schedule);
         setIsDeleteOpen(true);
     };
 
+    const handleAttachments = (schedule: ProductionSchedule) => {
+        setAttachmentsSchedule(schedule);
+        setIsAttachmentsOpen(true);
+    };
+
     const handleConfirmDelete = async () => {
-        if (!deleteTargetId) return;
-        setIsDeleting(true);
-        try {
-            const success = await removeSchedule(deleteTargetId);
-            if (success) {
-                toast.success("Schedule deleted successfully");
-            } else {
-                toast.error("Failed to delete schedule");
+        if (scheduleToDelete) {
+            setIsDeleting(true);
+            try {
+                const userId = getUserIdFromCookie();
+                const success = await removeSchedule(scheduleToDelete.id, userId);
+                if (success) {
+                    toast.success("Schedule deleted successfully");
+                    setIsDeleteOpen(false);
+                    setScheduleToDelete(null);
+                } else {
+                    toast.error("Failed to delete schedule");
+                }
+            } finally {
+                setIsDeleting(false);
             }
-        } finally {
-            setIsDeleting(false);
-            setIsDeleteOpen(false);
-            setDeleteTargetId(null);
         }
     };
 
     const handleSubmit = async (data: ScheduleFormValues): Promise<boolean> => {
         setIsSaving(true);
+        const userId = getUserIdFromCookie();
         try {
             if (selectedSchedule) {
-                const success = await updateSchedule(selectedSchedule.id, data, selectedSchedule);
+                const success = await updateSchedule(selectedSchedule.id, data, selectedSchedule, userId);
                 if (success) {
                     toast.success("Schedule updated successfully");
                     setIsDialogOpen(false);
@@ -94,7 +104,7 @@ export function useScheduling() {
                     return false;
                 }
             } else {
-                const success = await addSchedule(data);
+                const success = await addSchedule(data, userId);
                 if (success) {
                     toast.success("Schedule created successfully");
                     setIsDialogOpen(false);
@@ -104,34 +114,15 @@ export function useScheduling() {
                     return false;
                 }
             }
-        } catch (error) {
-            console.error("Submit failed:", error);
-            toast.error("An unexpected error occurred");
+        } catch (error: any) {
+            toast.error(error.message || "An unexpected error occurred");
             return false;
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleApproveTarget = async (id: number) => {
-        const userId = getUserIdFromCookie() || 1;
-        const success = await approveTarget(id, userId);
-        if (success) {
-            toast.success("Daily target approved");
-        } else {
-            toast.error("Failed to approve target");
-        }
-    };
 
-    const handleApproveHeadcount = async (posItemId: number) => {
-        const userId = getUserIdFromCookie() || 1;
-        const success = await approveHeadcount(posItemId, userId);
-        if (success) {
-            toast.success("Position headcount approved");
-        } else {
-            toast.error("Failed to approve headcount");
-        }
-    };
 
     return {
         schedules,
@@ -145,12 +136,14 @@ export function useScheduling() {
         isDeleteOpen,
         setIsDeleteOpen,
         isDeleting,
+        isAttachmentsOpen,
+        setIsAttachmentsOpen,
+        attachmentsSchedule,
         handleAdd,
         handleEdit,
         handleRequestDelete,
+        handleAttachments,
         handleConfirmDelete,
         handleSubmit,
-        handleApproveTarget,
-        handleApproveHeadcount,
     };
 }

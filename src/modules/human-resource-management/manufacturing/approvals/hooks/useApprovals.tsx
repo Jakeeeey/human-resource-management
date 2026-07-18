@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useApprovalsFetchContext } from "../providers/fetchProvider";
 import { toast } from "sonner";
 
@@ -14,9 +15,9 @@ function getUserIdFromCookie(): number | null {
         const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
         const userId = payload.id || payload.sub || payload.user_id;
         const parsed = parseInt(userId, 10);
-        return isNaN(parsed) ? 1 : parsed;
+        return isNaN(parsed) ? null : parsed;
     } catch {
-        return 1;
+        return null;
     }
 }
 
@@ -25,24 +26,20 @@ export function useApprovals() {
         pendingItems,
         isLoading,
         refetch,
-        processTarget,
-        processHeadcount,
+        processSchedule,
     } = useApprovalsFetchContext();
 
-    const handleApprove = async (id: string, type: "target" | "headcount", refId: number) => {
-        const userId = getUserIdFromCookie() || 1;
-        let success = false;
-        try {
-            if (type === "target") {
-                success = await processTarget(refId, "APPROVED", userId);
-            } else {
-                success = await processHeadcount(refId, "APPROVED", userId);
-            }
+    const [isRejectOpen, setIsRejectOpen] = useState(false);
+    const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
 
+    const handleApprove = async (scheduleId: number) => {
+        const userId = getUserIdFromCookie();
+        try {
+            const success = await processSchedule(scheduleId, "APPROVED", userId);
             if (success) {
-                toast.success("Override request approved successfully");
+                toast.success("Schedule override approved successfully");
             } else {
-                toast.error("Failed to approve override request");
+                toast.error("Failed to approve schedule");
             }
         } catch (error) {
             console.error("Approval error:", error);
@@ -50,20 +47,22 @@ export function useApprovals() {
         }
     };
 
-    const handleReject = async (id: string, type: "target" | "headcount", refId: number) => {
-        const userId = getUserIdFromCookie() || 1;
-        let success = false;
-        try {
-            if (type === "target") {
-                success = await processTarget(refId, "REJECTED", userId);
-            } else {
-                success = await processHeadcount(refId, "REJECTED", userId);
-            }
+    const promptReject = (scheduleId: number) => {
+        setRejectTargetId(scheduleId);
+        setIsRejectOpen(true);
+    };
 
+    const handleRejectConfirm = async (reason: string) => {
+        if (!rejectTargetId) return;
+        const userId = getUserIdFromCookie();
+        try {
+            const success = await processSchedule(rejectTargetId, "REJECTED", userId, reason);
             if (success) {
-                toast.success("Override request rejected successfully");
+                toast.success("Schedule override rejected successfully");
+                setIsRejectOpen(false);
+                setRejectTargetId(null);
             } else {
-                toast.error("Failed to reject override request");
+                toast.error("Failed to reject schedule");
             }
         } catch (error) {
             console.error("Rejection error:", error);
@@ -76,6 +75,9 @@ export function useApprovals() {
         isLoading,
         refetch,
         handleApprove,
-        handleReject,
+        promptReject,
+        isRejectOpen,
+        setIsRejectOpen,
+        handleRejectConfirm,
     };
 }

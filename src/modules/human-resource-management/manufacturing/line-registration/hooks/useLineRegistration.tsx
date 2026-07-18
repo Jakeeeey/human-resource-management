@@ -115,6 +115,17 @@ export function useLineRegistration() {
     const handleSubmitPosition = async (data: PositionFormValues): Promise<boolean> => {
         if (!managedLine) return false;
 
+        const normalizedName = data.position_name.trim().toLowerCase();
+        const isDuplicate = positions.some(p => 
+            p.position_name.trim().toLowerCase() === normalizedName && 
+            p.id !== selectedPosition?.id
+        );
+
+        if (isDuplicate) {
+            toast.error(`A position named "${data.position_name}" already exists on this line.`);
+            return false;
+        }
+
         if (selectedPosition) {
             const success = await LineRegistrationService.updatePosition(selectedPosition.id, data);
             if (success) {

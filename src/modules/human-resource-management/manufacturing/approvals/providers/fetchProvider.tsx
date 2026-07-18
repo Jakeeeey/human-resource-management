@@ -8,8 +8,7 @@ interface ApprovalsFetchContextType {
     pendingItems: PendingApprovalItem[];
     isLoading: boolean;
     refetch: () => Promise<void>;
-    processTarget: (id: number, status: "APPROVED" | "REJECTED", userId: number | null) => Promise<boolean>;
-    processHeadcount: (posItemId: number, status: "APPROVED" | "REJECTED", userId: number | null) => Promise<boolean>;
+    processSchedule: (scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason?: string | null) => Promise<boolean>;
 }
 
 const ApprovalsFetchContext = createContext<ApprovalsFetchContextType | undefined>(undefined);
@@ -38,16 +37,8 @@ export function ApprovalsFetchProvider({
         fetchPending();
     }, [fetchPending]);
 
-    const processTarget = async (id: number, status: "APPROVED" | "REJECTED", userId: number | null) => {
-        const success = await ApprovalService.updateTargetStatus(id, status, userId);
-        if (success) {
-            await fetchPending();
-        }
-        return success;
-    };
-
-    const processHeadcount = async (posItemId: number, status: "APPROVED" | "REJECTED", userId: number | null) => {
-        const success = await ApprovalService.updateHeadcountStatus(posItemId, status, userId);
+    const processSchedule = async (scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason?: string | null) => {
+        const success = await ApprovalService.processScheduleStatus(scheduleId, status, userId, reason);
         if (success) {
             await fetchPending();
         }
@@ -61,8 +52,7 @@ export function ApprovalsFetchProvider({
                 pendingItems,
                 isLoading,
                 refetch: fetchPending,
-                processTarget,
-                processHeadcount,
+                processSchedule,
             },
         },
         children

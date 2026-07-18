@@ -5,6 +5,7 @@ import { SchedulingFetchProvider } from "./providers/fetchProvider";
 import { useScheduling } from "./hooks/useScheduling";
 import { SchedulingTable } from "./components/SchedulingTable";
 import { ScheduleDialog } from "./components/ScheduleDialog";
+import { ScheduleAttachmentsDialog } from "./components/ScheduleAttachmentsDialog";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -29,27 +30,38 @@ const ProductionSchedulingContent = () => {
         isDeleteOpen,
         setIsDeleteOpen,
         isDeleting,
+        isAttachmentsOpen,
+        setIsAttachmentsOpen,
+        attachmentsSchedule,
         handleAdd,
         handleEdit,
         handleRequestDelete,
+        handleAttachments,
         handleConfirmDelete,
         handleSubmit,
-        handleApproveTarget,
-        handleApproveHeadcount,
     } = useScheduling();
 
     // ─── Stat Dashboard Calculations ───────────────────────────────
     const totalSchedules = schedules.length;
     
     // Count schedules that require target approval or position headcount approval
-    const pendingApprovalsCount = schedules.filter((s) => {
-        const targetPending = s.target_approval_status === "PENDING_APPROVAL";
-        const positionsList = s.positions || s.manu_hr_schedule_positions || [];
-        const positionsPending = positionsList.some(
-            (p) => p.headcount_approval_status === "PENDING_APPROVAL"
-        );
-        return targetPending || positionsPending;
+    const targetPendingCount = schedules.filter((s) => {
+        const status = s.approval_status || s.target_approval_status;
+        if (status !== "PENDING_APPROVAL") return false;
+        return s.daily_target < (s.line?.target_produce_8_hrs || 0);
     }).length;
+
+    const headcountPendingCount = schedules.reduce((acc, s) => {
+        const status = s.approval_status || s.target_approval_status;
+        if (status !== "PENDING_APPROVAL") return acc;
+        const positions = s.positions || s.manu_hr_schedule_positions || [];
+        const pendingPositions = positions.filter(
+            (p) => p.assigned_persons > (p.position?.persons_allowed || 0)
+        );
+        return acc + pendingPositions.length;
+    }, 0);
+
+    const pendingApprovalsCount = targetPendingCount + headcountPendingCount;
 
     const totalActualProduce = schedules.reduce((sum, s) => sum + (s.actual_produce || 0), 0);
 
@@ -133,8 +145,8 @@ const ProductionSchedulingContent = () => {
                 data={schedules}
                 onEdit={handleEdit}
                 onDelete={handleRequestDelete}
-                onApproveTarget={handleApproveTarget}
-                onApproveHeadcount={handleApproveHeadcount}
+                onAdd={handleAdd}
+                onAttachments={handleAttachments}
                 isLoading={isLoading}
             />
 
@@ -145,6 +157,7 @@ const ProductionSchedulingContent = () => {
                 schedule={selectedSchedule}
                 onSubmit={handleSubmit}
                 lines={lines}
+                schedules={schedules}
             />
 
             {/* Confirm Delete Dialog */}
@@ -179,6 +192,12 @@ const ProductionSchedulingContent = () => {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <ScheduleAttachmentsDialog
+                open={isAttachmentsOpen}
+                onOpenChange={setIsAttachmentsOpen}
+                schedule={attachmentsSchedule}
+            />
         </div>
     );
 };

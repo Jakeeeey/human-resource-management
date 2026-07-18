@@ -1,3 +1,4 @@
+/* eslint-disable */
 import type { PendingApprovalItem } from "../types";
 import { SchedulingService } from "../../production-scheduling/services/SchedulingService";
 
@@ -11,48 +12,51 @@ export class ApprovalService {
                 const lineName = sched.line?.line_name || `Line #${sched.line_id}`;
                 const stdTarget = sched.line?.target_produce_8_hrs || 0;
 
-                // 1. Check Target Approval Status
-                if (sched.target_approval_status === "PENDING_APPROVAL") {
-                    pendingItems.push({
-                        id: `target_${sched.id}`,
-                        type: "target",
+                let statusVal = sched.approval_status || sched.target_approval_status;
+                const isTargetDeviation = sched.daily_target < stdTarget;
+                
+                const positions = sched.positions || sched.manu_hr_schedule_positions || [];
+                const anyHeadcountRequiresApproval = positions.some(pos => pos.assigned_persons > (pos.position?.persons_allowed || 0));
+
+                // Force pending status if deviations exist and it hasn't been explicitly approved/rejected
+                if ((isTargetDeviation || anyHeadcountRequiresApproval) && statusVal !== "APPROVED" && statusVal !== "REJECTED") {
+                    statusVal = "PENDING_APPROVAL";
+                }
+
+                const isPending = statusVal === "PENDING_APPROVAL";
+                
+                if (isPending) {
+                    const item: PendingApprovalItem = {
+                        id: String(sched.id),
+                        type: "schedule",
                         schedule_id: sched.id,
                         date: sched.schedule_date,
                         line_name: lineName,
-                        target_value: {
-                            requested: sched.daily_target,
-                            standard: stdTarget,
-                        },
+                        deviations: { headcounts: [] },
                         status: "PENDING_APPROVAL",
                         raw_schedule: sched,
-                    });
-                }
+                    };
 
-                // 2. Check Headcount Approval Statuses
-                const positions = sched.positions || sched.manu_hr_schedule_positions || [];
-                positions.forEach((pos) => {
-                    if (pos.headcount_approval_status === "PENDING_APPROVAL") {
+                    if (isTargetDeviation) {
+                        item.deviations.target = {
+                            requested: sched.daily_target,
+                            standard: stdTarget,
+                        };
+                    }
+
+                    positions.forEach((pos) => {
                         const posName = pos.position?.position_name || `Position #${pos.position_id}`;
                         const allowedCount = pos.position?.persons_allowed || 0;
-
-                        pendingItems.push({
-                            id: `headcount_${pos.id}`,
-                            type: "headcount",
-                            schedule_id: sched.id,
-                            date: sched.schedule_date,
-                            line_name: lineName,
-                            headcount_value: {
-                                position_name: posName,
-                                assigned: pos.assigned_persons,
-                                allowed: allowedCount,
-                                position_item_id: pos.id,
-                            },
-                            status: "PENDING_APPROVAL",
-                            raw_schedule: sched,
-                            raw_position_item: pos,
+                        item.deviations.headcounts.push({
+                            position_name: posName,
+                            assigned: pos.assigned_persons,
+                            allowed: allowedCount,
+                            position_item_id: pos.id,
                         });
-                    }
-                });
+                    });
+
+                    pendingItems.push(item);
+                }
             });
 
             // Sort by schedule date descending
@@ -63,36 +67,39 @@ export class ApprovalService {
         }
     }
 
-    static async updateTargetStatus(id: number, status: "APPROVED" | "REJECTED", userId: number | null): Promise<boolean> {
+    static async processScheduleStatus(scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason: string | null = null): Promise<boolean> {
         try {
-            const res = await fetch(`/api/hrm/manufacturing/schedules?id=${id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    target_approval_status: status,
-                    target_approved_by: userId,
-                }),
-            });
-            return res.ok;
-        } catch (error) {
-            console.error("Error updating target approval status:", error);
-            return false;
-        }
-    }
+            const sched = await SchedulingService.getScheduleById(scheduleId);
+            if (!sched) return false;
 
-    static async updateHeadcountStatus(posItemId: number, status: "APPROVED" | "REJECTED", userId: number | null): Promise<boolean> {
-        try {
-            const res = await fetch(`/api/hrm/manufacturing/schedule-positions?id=${posItemId}`, {
+            const now = new Date().toISOString();
+            const payload: any = {
+                approval_status: status,
+                // Legacy fallback
+                target_approval_status: status,
+            };
+
+            if (status === "APPROVED") {
+                payload.approved_by = userId;
+                payload.approved_at = now;
+                payload.target_approved_by = userId;
+            } else if (status === "REJECTED") {
+                payload.rejected_by = userId;
+                payload.rejected_at = now;
+                if (reason) {
+                    payload.rejected_reason = reason;
+                }
+            }
+
+            const res = await fetch(`/api/hrm/manufacturing/schedules?id=${scheduleId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    headcount_approval_status: status,
-                    headcount_approved_by: userId,
-                }),
+                body: JSON.stringify(payload),
             });
-            return res.ok;
+            
+            return res.ok || res.status === 204;
         } catch (error) {
-            console.error("Error updating headcount approval status:", error);
+            console.error("Error updating schedule status:", error);
             return false;
         }
     }

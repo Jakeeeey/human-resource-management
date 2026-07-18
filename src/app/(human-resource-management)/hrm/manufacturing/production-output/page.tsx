@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 import { cookies } from "next/headers";
-import { ApprovalsModule } from "@/modules/human-resource-management/manufacturing/approvals";
+import { ProductionOutputModule } from "@/modules/human-resource-management/manufacturing/production-output/ProductionOutputModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +18,8 @@ export const dynamic = "force-dynamic";
 const COOKIE_NAME = "vos_access_token";
 
 export const metadata = {
-    title: "Manufacturing Schedule Approvals | VOS ERP",
-    description: "Manage and approve target deviations and headcount overrides.",
+    title: "Production Output | VOS ERP",
+    description: "Record and track actual production outputs.",
 };
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
@@ -74,7 +74,7 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
     };
 }
 
-export default async function ManufacturingApprovalsPage() {
+export default async function ProductionOutputPage() {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
     const headerUser = buildHeaderUserFromToken(token);
@@ -98,7 +98,7 @@ export default async function ManufacturingApprovalsPage() {
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Schedule Approvals
+                                        Production Output
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -112,7 +112,7 @@ export default async function ManufacturingApprovalsPage() {
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-                <ApprovalsModule />
+                <ProductionOutputModule />
             </main>
         </div>
     );

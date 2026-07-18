@@ -30,6 +30,7 @@ interface ScheduleDialogProps {
     onSubmit: (data: ScheduleFormValues) => Promise<boolean>;
     lines: ManufacturingLine[];
     schedule?: ProductionSchedule | null;
+    schedules?: ProductionSchedule[];
 }
 
 export function ScheduleDialog({
@@ -38,6 +39,7 @@ export function ScheduleDialog({
     onSubmit,
     lines,
     schedule,
+    schedules = [],
 }: ScheduleDialogProps) {
     const isEdit = !!schedule;
     const [isSaving, setIsSaving] = React.useState(false);
@@ -45,9 +47,10 @@ export function ScheduleDialog({
 
     // Form states
     const [scheduleDate, setScheduleDate] = React.useState("");
+    const [startTime, setStartTime] = React.useState("08:00");
+    const [endTime, setEndTime] = React.useState("17:00");
     const [lineId, setLineId] = React.useState<number>(0);
     const [dailyTarget, setDailyTarget] = React.useState<number>(0);
-    const [actualProduce, setActualProduce] = React.useState<number>(0);
 
     // Selected Line configurations
     const [selectedLineInfo, setSelectedLineInfo] = React.useState<ManufacturingLine | null>(null);
@@ -62,9 +65,10 @@ export function ScheduleDialog({
         const loadInitialData = async () => {
             if (schedule) {
                 setScheduleDate(schedule.schedule_date);
+                setStartTime(schedule.start_time || "08:00");
+                setEndTime(schedule.end_time || "17:00");
                 setLineId(schedule.line_id);
                 setDailyTarget(schedule.daily_target);
-                setActualProduce(schedule.actual_produce || 0);
 
                 setIsLineLoading(true);
                 try {
@@ -99,9 +103,10 @@ export function ScheduleDialog({
                 }
             } else {
                 setScheduleDate(new Date().toISOString().split("T")[0]);
+                setStartTime("08:00");
+                setEndTime("17:00");
                 setLineId(0);
                 setDailyTarget(0);
-                setActualProduce(0);
                 setSelectedLineInfo(null);
                 setLinePositions([]);
                 setAssignments({});
@@ -165,9 +170,10 @@ export function ScheduleDialog({
 
         const payload = {
             schedule_date: scheduleDate,
+            start_time: startTime,
+            end_time: endTime,
             line_id: lineId,
             daily_target: dailyTarget,
-            actual_produce: actualProduce,
             positions: posArray,
         };
 
@@ -198,6 +204,14 @@ export function ScheduleDialog({
 
     // Derived approval warnings for real-time user help
     const targetRequiresApproval = selectedLineInfo && dailyTarget < selectedLineInfo.target_produce_8_hrs;
+
+    // Check for existing schedules on the same date and line
+    const existingSchedules = schedules.filter(s => 
+        s.line_id === lineId && 
+        s.schedule_date === scheduleDate && 
+        (!isEdit || s.id !== schedule?.id)
+    );
+    const hasExistingSchedules = existingSchedules.length > 0;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -238,6 +252,40 @@ export function ScheduleDialog({
                                 )}
                             </div>
 
+                            {/* Shift Times */}
+                            <div className="flex gap-3">
+                                <div className="space-y-2 flex-1">
+                                    <Label htmlFor="start_time" className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70">
+                                        Time In
+                                    </Label>
+                                    <Input
+                                        id="start_time"
+                                        type="time"
+                                        value={startTime}
+                                        onChange={(e) => setStartTime(e.target.value)}
+                                        className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-sm"
+                                    />
+                                    {errors.start_time && (
+                                        <p className="text-[10px] font-bold text-destructive">{errors.start_time}</p>
+                                    )}
+                                </div>
+                                <div className="space-y-2 flex-1">
+                                    <Label htmlFor="end_time" className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70">
+                                        Time Out
+                                    </Label>
+                                    <Input
+                                        id="end_time"
+                                        type="time"
+                                        value={endTime}
+                                        onChange={(e) => setEndTime(e.target.value)}
+                                        className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-sm"
+                                    />
+                                    {errors.end_time && (
+                                        <p className="text-[10px] font-bold text-destructive">{errors.end_time}</p>
+                                    )}
+                                </div>
+                            </div>
+                            
                             {/* Line Dropdown */}
                             <div className="space-y-2">
                                 <Label htmlFor="line_id" className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70 flex items-center gap-1.5">
@@ -285,21 +333,7 @@ export function ScheduleDialog({
                                 )}
                             </div>
 
-                            {isEdit && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="actual_produce" className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70 flex items-center gap-1.5">
-                                        Actual Output (pcs)
-                                    </Label>
-                                    <Input
-                                        id="actual_produce"
-                                        type="number"
-                                        min={0}
-                                        value={actualProduce}
-                                        onChange={(e) => setActualProduce(e.target.value === "" ? 0 : parseInt(e.target.value, 10))}
-                                        className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-sm tabular-nums"
-                                    />
-                                </div>
-                            )}
+                            {/* actual produce removed */}
                         </div>
 
                         {/* Real-time Target Approval Warning */}
@@ -312,6 +346,21 @@ export function ScheduleDialog({
                                     </p>
                                     <p className="text-[9px] text-amber-700/90 font-bold leading-normal uppercase">
                                         The daily target is lower than the line standard of {selectedLineInfo.target_produce_8_hrs} pcs. This will require manager approval.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Existing Schedules Warning */}
+                        {hasExistingSchedules && (
+                            <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                                <Info className="h-4.5 w-4.5 text-blue-600 shrink-0 mt-0.5" />
+                                <div className="space-y-0.5">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-800">
+                                        Existing Schedules
+                                    </p>
+                                    <p className="text-[9px] text-blue-700/90 font-bold leading-normal uppercase">
+                                        This line already has {existingSchedules.length} schedule(s) for the selected date. Please ensure your new shift time does not overlap with existing shifts.
                                     </p>
                                 </div>
                             </div>

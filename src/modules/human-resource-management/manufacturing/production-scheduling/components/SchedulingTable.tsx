@@ -29,10 +29,9 @@ import { createColumns } from "./columns";
 interface SchedulingTableProps {
     data: ProductionSchedule[];
     onEdit: (schedule: ProductionSchedule) => void;
-    onDelete: (id: number) => void;
-    onApproveTarget: (id: number) => void;
-    onApproveHeadcount: (posItemId: number) => void;
+    onDelete: (schedule: ProductionSchedule) => void;
     onAdd: () => void;
+    onAttachments?: (schedule: ProductionSchedule) => void;
     isLoading?: boolean;
 }
 
@@ -40,17 +39,16 @@ export function SchedulingTable({
     data,
     onEdit,
     onDelete,
-    onApproveTarget,
-    onApproveHeadcount,
     onAdd,
+    onAttachments,
     isLoading = false,
 }: SchedulingTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
     const columns = React.useMemo(
-        () => createColumns(onEdit, onDelete, onApproveTarget, onApproveHeadcount),
-        [onEdit, onDelete, onApproveTarget, onApproveHeadcount]
+        () => createColumns(onEdit, onDelete, onAttachments),
+        [onEdit, onDelete, onAttachments]
     );
 
     const table = useReactTable({

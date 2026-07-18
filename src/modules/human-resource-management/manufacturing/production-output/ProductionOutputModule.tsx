@@ -1,41 +1,38 @@
 "use client";
 
 import React from "react";
-import { ApprovalsFetchProvider } from "./providers/fetchProvider";
-import { useApprovals } from "./hooks/useApprovals";
-import { ApprovalsTable } from "./components/ApprovalsTable";
-import { RejectDialog } from "./components/RejectDialog";
-import { ShieldAlert, ArrowDownCircle, Users, Activity } from "lucide-react";
+import { ProductionOutputFetchProvider } from "./providers/fetchProvider";
+import { useProductionOutput } from "./hooks/useProductionOutput";
+import { OutputTable } from "./components/OutputTable";
+import { UpdateOutputDialog } from "./components/UpdateOutputDialog";
+import { CheckCircle2, TrendingUp, InboxIcon } from "lucide-react";
 
-const ApprovalsContent = () => {
+const ProductionOutputContent = () => {
     const {
-        pendingItems,
+        schedules,
         isLoading,
-        handleApprove,
-        promptReject,
-        isRejectOpen,
-        setIsRejectOpen,
-        handleRejectConfirm,
-    } = useApprovals();
+        selectedSchedule,
+        isUpdateOpen,
+        setIsUpdateOpen,
+        promptUpdate,
+        handleUpdateActualProduce,
+    } = useProductionOutput();
 
     // Stats calculations
-    const totalPending = pendingItems.length;
-    const targetPendingCount = pendingItems.filter(i => !!i.deviations.target).length;
-    const headcountPendingCount = pendingItems.reduce((acc, i) => {
-        const overrides = i.deviations.headcounts?.filter(h => h.assigned > h.allowed) || [];
-        return acc + overrides.length;
-    }, 0);
+    const totalSchedules = schedules.length;
+    const completedSchedules = schedules.filter(s => s.actual_produce > 0).length;
+    const pendingSchedules = totalSchedules - completedSchedules;
 
     return (
         <div className="flex-1 space-y-8 p-6 pt-8 h-full overflow-auto bg-gradient-to-br from-background via-background/95 to-primary/[0.03]">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="space-y-1.5">
                     <h2 className="text-3xl font-black tracking-tight text-foreground leading-tight bg-gradient-to-r from-foreground via-foreground/90 to-primary/80 bg-clip-text text-transparent">
-                        Manufacturing Schedule Approvals
+                        Production Output
                     </h2>
                     <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.25em] opacity-80 flex items-center gap-1.5">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                        Target deviations & headcount limits override queue
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Record and track actual production outputs
                     </p>
                 </div>
             </div>
@@ -44,76 +41,76 @@ const ApprovalsContent = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
-                        <Activity className="h-24 w-24" />
+                        <TrendingUp className="h-24 w-24" />
                     </div>
                     <div className="space-y-2">
                         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
-                            <ShieldAlert className="h-3 w-3 text-amber-500" /> Pending Requests
+                            <TrendingUp className="h-3 w-3 text-primary" /> Total Schedules
                         </p>
                         <span className="text-3xl font-black tracking-tight tabular-nums block">
-                            {totalPending}
+                            {totalSchedules}
                         </span>
                         <p className="text-[10px] text-muted-foreground font-medium">
-                            Combined tasks requiring action
+                            All tracked production schedules
                         </p>
                     </div>
                 </div>
 
                 <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
-                        <ArrowDownCircle className="h-24 w-24" />
+                        <CheckCircle2 className="h-24 w-24" />
                     </div>
                     <div className="space-y-2">
                         <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
-                            <ArrowDownCircle className="h-3 w-3 text-amber-500" /> Target Deviations
+                            <CheckCircle2 className="h-3 w-3 text-emerald-500" /> Recorded Output
+                        </p>
+                        <span className="text-3xl font-black tracking-tight tabular-nums block text-emerald-600">
+                            {completedSchedules}
+                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                            Schedules with recorded production
+                        </p>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
+                        <InboxIcon className="h-24 w-24" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                            <InboxIcon className="h-3 w-3 text-amber-500" /> Pending Entry
                         </p>
                         <span className="text-3xl font-black tracking-tight tabular-nums block text-amber-600">
-                            {targetPendingCount}
+                            {pendingSchedules}
                         </span>
                         <p className="text-[10px] text-muted-foreground font-medium">
-                            Shifts scheduled below target limits
-                        </p>
-                    </div>
-                </div>
-
-                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
-                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
-                        <Users className="h-24 w-24" />
-                    </div>
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
-                            <Users className="h-3 w-3 text-orange-500" /> Headcount Overrides
-                        </p>
-                        <span className="text-3xl font-black tracking-tight tabular-nums block text-orange-600">
-                            {headcountPendingCount}
-                        </span>
-                        <p className="text-[10px] text-muted-foreground font-medium">
-                            Positions assigned above headcount cap
+                            Schedules awaiting output records
                         </p>
                     </div>
                 </div>
             </div>
 
-            <ApprovalsTable
-                data={pendingItems}
-                onApprove={handleApprove}
-                onReject={promptReject}
+            <OutputTable
+                data={schedules}
+                onUpdateOutput={promptUpdate}
                 isLoading={isLoading}
             />
 
-            <RejectDialog
-                open={isRejectOpen}
-                onOpenChange={setIsRejectOpen}
-                onConfirm={handleRejectConfirm}
+            <UpdateOutputDialog
+                open={isUpdateOpen}
+                onOpenChange={setIsUpdateOpen}
+                onSubmit={handleUpdateActualProduce}
+                schedule={selectedSchedule}
             />
         </div>
     );
 };
 
-export const ApprovalsModule = () => {
+export const ProductionOutputModule = () => {
     return (
-        <ApprovalsFetchProvider>
-            <ApprovalsContent />
-        </ApprovalsFetchProvider>
+        <ProductionOutputFetchProvider>
+            <ProductionOutputContent />
+        </ProductionOutputFetchProvider>
     );
 };

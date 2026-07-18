@@ -28,8 +28,8 @@ import { createColumns } from "./columns";
 
 interface ApprovalsTableProps {
     data: PendingApprovalItem[];
-    onApprove: (id: string, type: "target" | "headcount", refId: number) => void;
-    onReject: (id: string, type: "target" | "headcount", refId: number) => void;
+    onApprove: (scheduleId: number) => void;
+    onReject: (scheduleId: number) => void;
     isLoading?: boolean;
 }
 

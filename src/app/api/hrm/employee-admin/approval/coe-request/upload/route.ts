@@ -31,8 +31,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const buffer = await file.arrayBuffer();
+    const blob = new Blob([buffer], { type: file.type });
+
     const directusForm = new FormData();
-    directusForm.append("file", file, file.name);
+    directusForm.append("file", blob, file.name);
 
     const uploadRes = await fetch(`${DIRECTUS_URL}/files`, {
       method: "POST",
