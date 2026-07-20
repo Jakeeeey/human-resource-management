@@ -110,16 +110,6 @@ export function CompanyProfileForm({ onCancel }: CompanyProfileFormProps) {
 
             // Step 2: Update form state immediately for preview
             form.setValue("company_logo", logoFileId, { shouldDirty: true });
-
-            // Step 3: Auto-save the UUID to the database right away so ALL
-            // machines can see the logo without requiring a separate "Save Changes" click.
-            const saved = await updateProfile({ company_logo: logoFileId });
-            if (saved) {
-                toast.success("Logo uploaded and saved successfully");
-            } else {
-                // Upload worked but DB save failed — still show preview but warn
-                toast.warning("Logo uploaded but could not be saved. Please click Save Changes.");
-            }
         } catch (error) {
             console.error("Upload error:", error);
             toast.error("Failed to upload logo");
