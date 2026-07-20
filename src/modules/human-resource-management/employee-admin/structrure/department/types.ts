@@ -23,7 +23,8 @@ export interface Department {
     department_name: string;
     parent_division: number;
     department_description: string;
-    department_head: number | string | User | null;
+    department_head: string | null;
+    department_head_id: number | null;
     date_added: string;
 }
 
