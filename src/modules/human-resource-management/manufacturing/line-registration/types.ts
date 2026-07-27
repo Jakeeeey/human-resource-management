@@ -8,6 +8,7 @@ export interface ManufacturingLine {
     description: string | null;
     target_produce_8_hrs: number;
     overtime_target_per_hr: number;
+    target_labor_cost: number | null;
     created_by: number | null;
     created_at: string;
     updated_by: number | null;
@@ -48,6 +49,11 @@ export const lineFormSchema = z.object({
         .number()
         .int("Must be a whole number")
         .min(1, "OT target must be at least 1"),
+    target_labor_cost: z
+        .number()
+        .min(0, "Target labor cost must be positive")
+        .nullable()
+        .optional(),
 });
 
 export type LineFormValues = z.infer<typeof lineFormSchema>;

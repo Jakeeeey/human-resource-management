@@ -1,11 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
-import type { ManufacturingLine, LineFormValues } from "../types";
+import type { ManufacturingLineWithPositions, LineFormValues } from "../types";
 import { LineRegistrationService } from "../services/LineRegistrationService";
 
 interface LineRegistrationFetchContextType {
-    lines: ManufacturingLine[];
+    lines: ManufacturingLineWithPositions[];
     isLoading: boolean;
     refetch: () => Promise<void>;
     addLine: (data: LineFormValues) => Promise<boolean>;
@@ -21,7 +21,7 @@ export function LineRegistrationFetchProvider({
 }: {
     children: React.ReactNode;
 }): React.ReactNode {
-    const [lines, setLines] = useState<ManufacturingLine[]>([]);
+    const [lines, setLines] = useState<ManufacturingLineWithPositions[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
