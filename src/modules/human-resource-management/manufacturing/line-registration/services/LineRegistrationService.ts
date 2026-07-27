@@ -13,12 +13,22 @@ import type {
 export class LineRegistrationService {
     // ── Lines ────────────────────────────────────────────────────────
 
-    static async getLines(): Promise<ManufacturingLine[]> {
+    static async getLines(): Promise<ManufacturingLineWithPositions[]> {
         try {
-            const res = await fetch(`/api/hrm/manufacturing/lines?limit=-1&sort=-created_at`);
-            if (!res.ok) return [];
-            const { data } = await res.json();
-            return data || [];
+            const [linesRes, posRes] = await Promise.all([
+                fetch(`/api/hrm/manufacturing/lines?limit=-1&sort=-created_at`),
+                fetch(`/api/hrm/manufacturing/line-positions?limit=-1`)
+            ]);
+            
+            if (!linesRes.ok) return [];
+            
+            const linesData: ManufacturingLine[] = (await linesRes.json()).data || [];
+            const posData: LinePosition[] = posRes.ok ? (await posRes.json()).data || [] : [];
+            
+            return linesData.map(line => ({
+                ...line,
+                positions: posData.filter(p => p.line_id === line.id)
+            }));
         } catch (error) {
             console.error("Error fetching manufacturing lines:", error);
             return [];

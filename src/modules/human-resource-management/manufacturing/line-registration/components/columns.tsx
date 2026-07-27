@@ -2,14 +2,14 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Trash2, Users, Factory, Target, Clock } from "lucide-react";
-import type { ManufacturingLine } from "../types";
+import { Edit2, Trash2, Users, Factory, Target, Clock, PhilippinePeso } from "lucide-react";
+import type { ManufacturingLine, ManufacturingLineWithPositions } from "../types";
 
 export const createColumns = (
     onEdit: (line: ManufacturingLine) => void,
     onDelete: (line: ManufacturingLine) => void,
     onManagePositions: (line: ManufacturingLine) => void
-): ColumnDef<ManufacturingLine>[] => [
+): ColumnDef<ManufacturingLineWithPositions>[] => [
     {
         accessorKey: "line_name",
         header: "Production Line",
@@ -66,6 +66,55 @@ export const createColumns = (
                 </div>
             </div>
         ),
+    },
+    {
+        id: "labor_cost",
+        header: "Labor Cost / Pcs",
+        cell: ({ row }) => {
+            const positions = row.original.positions || [];
+            const totalRate = positions.reduce((sum, pos) => sum + (pos.persons_allowed * pos.position_rate), 0);
+            const targetPcs = row.original.target_produce_8_hrs;
+            const laborCostPerPcs = targetPcs > 0 ? totalRate / targetPcs : 0;
+            const targetLaborCost = row.original.target_labor_cost || 0;
+            
+            const isOverBudget = targetLaborCost > 0 && laborCostPerPcs > targetLaborCost;
+            const suggestedTarget = targetLaborCost > 0 ? Math.ceil(totalRate / targetLaborCost) : 0;
+            
+            return (
+                <div className="flex flex-col gap-1.5 py-1">
+                    <div className="flex items-center gap-2.5">
+                        <div className={`p-2 rounded-xl border ${isOverBudget ? 'bg-destructive/10 border-destructive/20' : 'bg-blue-500/5 border-blue-500/10'}`}>
+                            <PhilippinePeso className={`h-4 w-4 ${isOverBudget ? 'text-destructive' : 'text-blue-600'}`} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className={`font-black text-sm tabular-nums tracking-tight ${isOverBudget ? 'text-destructive' : 'text-foreground'}`}>
+                                ₱{laborCostPerPcs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} 
+                                <span className={`text-[10px] ml-1 font-semibold uppercase tracking-wider ${isOverBudget ? 'text-destructive/80' : 'text-muted-foreground'}`}>(Actual)</span>
+                            </span>
+                            <div className="flex flex-col mt-0.5 gap-0.5">
+                                <span className="text-[9px] text-blue-600/80 font-black uppercase tracking-wider">
+                                    Total Rate: ₱{totalRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                                <span className="text-[9px] text-emerald-600/80 font-black uppercase tracking-wider">
+                                    Target Cost: ₱{targetLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {isOverBudget && (
+                        <div className="mt-1 bg-destructive/5 border border-destructive/10 rounded-lg p-2 flex flex-col gap-0.5 animate-in fade-in zoom-in-95">
+                            <span className="text-[10px] font-bold text-destructive flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
+                                Over Target Cost
+                            </span>
+                            <span className="text-[9px] font-semibold text-destructive/80 leading-tight">
+                                Suggestion: Increase target to <strong className="font-black text-destructive">{suggestedTarget.toLocaleString()} pcs</strong> to meet budget.
+                            </span>
+                        </div>
+                    )}
+                </div>
+            );
+        },
     },
     {
         id: "actions",

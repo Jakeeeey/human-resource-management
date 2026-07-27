@@ -23,11 +23,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus, Search } from "lucide-react";
-import type { ManufacturingLine } from "../types";
+import type { ManufacturingLine, ManufacturingLineWithPositions } from "../types";
 import { createColumns } from "./columns";
 
 interface LineRegistrationTableProps {
-    data: ManufacturingLine[];
+    data: ManufacturingLineWithPositions[];
     onEdit: (line: ManufacturingLine) => void;
     onDelete: (line: ManufacturingLine) => void;
     onManagePositions: (line: ManufacturingLine) => void;

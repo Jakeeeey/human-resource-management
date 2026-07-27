@@ -39,6 +39,7 @@ export function LineDialog({
         description: "",
         target_produce_8_hrs: 0,
         overtime_target_per_hr: 0,
+        target_labor_cost: 0,
     });
 
     React.useEffect(() => {
@@ -48,6 +49,7 @@ export function LineDialog({
                 description: line.description || "",
                 target_produce_8_hrs: line.target_produce_8_hrs,
                 overtime_target_per_hr: line.overtime_target_per_hr,
+                target_labor_cost: line.target_labor_cost || 0,
             });
         } else {
             setFormData({
@@ -55,6 +57,7 @@ export function LineDialog({
                 description: "",
                 target_produce_8_hrs: 0,
                 overtime_target_per_hr: 0,
+                target_labor_cost: 0,
             });
         }
         setErrors({});
@@ -78,6 +81,7 @@ export function LineDialog({
             ...formData,
             target_produce_8_hrs: Number(formData.target_produce_8_hrs),
             overtime_target_per_hr: Number(formData.overtime_target_per_hr),
+            target_labor_cost: formData.target_labor_cost ? Number(formData.target_labor_cost) : null,
         });
 
         if (!result.success) {
@@ -156,7 +160,7 @@ export function LineDialog({
                         </div>
 
                         {/* Target Fields */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                             <div className="space-y-2">
                                 <Label htmlFor="target_produce_8_hrs" className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70 flex items-center gap-1.5">
                                     <Target className="h-3 w-3" /> 8-Hr Target (pcs)
@@ -193,6 +197,26 @@ export function LineDialog({
                                 />
                                 {errors.overtime_target_per_hr && (
                                     <p className="text-[10px] font-bold text-destructive">{errors.overtime_target_per_hr}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="target_labor_cost" className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70 flex items-center gap-1.5">
+                                    Target Labor Cost
+                                </Label>
+                                <Input
+                                    id="target_labor_cost"
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    value={formData.target_labor_cost || ""}
+                                    onChange={(e) =>
+                                        handleChange("target_labor_cost", e.target.value === "" ? 0 : parseFloat(e.target.value))
+                                    }
+                                    className="h-10 rounded-xl border-muted-foreground/10 focus-visible:ring-primary/20 bg-card font-black text-sm tabular-nums placeholder:text-muted-foreground/30 placeholder:italic placeholder:font-medium"
+                                    placeholder="e.g. 5.50"
+                                />
+                                {errors.target_labor_cost && (
+                                    <p className="text-[10px] font-bold text-destructive">{errors.target_labor_cost}</p>
                                 )}
                             </div>
                         </div>
