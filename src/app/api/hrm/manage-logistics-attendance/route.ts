@@ -85,12 +85,12 @@ export async function GET(request: NextRequest) {
         // 2. Fetch Staff (Drivers and Helpers)
         let staffData: any[] = [];
         if (pdpIds.length > 0) {
-            const sData = await fetchChunked('/items/post_dispatch_plan_staff?limit=1000', pdpIds, 'post_dispatch_plan_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            const sData = await fetchChunked('/items/post_dispatch_plan_staff?limit=-1', pdpIds, 'post_dispatch_plan_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
             staffData = [...staffData, ...sData.map((s: any) => ({ ...s, isExtra: false }))];
         }
 
         if (extraPdpIds.length > 0) {
-            const sData = await fetchChunked('/items/post_dispatch_plan_extra_staff?limit=1000', extraPdpIds, 'post_dispatch_plan_extra_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            const sData = await fetchChunked('/items/post_dispatch_plan_extra_staff?limit=-1', extraPdpIds, 'post_dispatch_plan_extra_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
             staffData = [...staffData, ...sData.map((s: any) => ({ ...s, post_dispatch_plan_id: s.post_dispatch_plan_extra_id, isExtra: true }))];
         }
 
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
         const unexpandedUserIds = [...new Set(staffData.map(s => typeof s.user_id === 'number' ? s.user_id : null).filter(Boolean))];
         let usersData: any[] = [];
         if (unexpandedUserIds.length > 0) {
-            usersData = await fetchChunked('/items/user?limit=1000', unexpandedUserIds, 'user_id', 'user_id,user_fname,user_lname');
+            usersData = await fetchChunked('/items/user?limit=-1', unexpandedUserIds, 'user_id', 'user_id,user_fname,user_lname');
         }
 
         // 3. Collect IDs for related records
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         // 4. Fetch Vehicles
         let vehiclesData: any[] = [];
         if (vehicleIds.length > 0) {
-            vehiclesData = await fetchChunked('/items/vehicles?limit=1000', vehicleIds, 'vehicle_id', 'vehicle_id,vehicle_plate,vehicle_type.type_name');
+            vehiclesData = await fetchChunked('/items/vehicles?limit=-1', vehicleIds, 'vehicle_id', 'vehicle_id,vehicle_plate,vehicle_type.type_name');
         }
 
         // 5. Fetch Sales Invoices -> Customers -> Areas
@@ -116,22 +116,22 @@ export async function GET(request: NextRequest) {
         let areasData: any[] = [];
         let locationsData: any[] = [];
 
-        const pdiData = await fetchChunked('/items/post_dispatch_invoices?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id');
+        const pdiData = await fetchChunked('/items/post_dispatch_invoices?limit=-1', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id');
         const invoiceIds = [...new Set(pdiData.map((i: any) => i.invoice_id).filter(Boolean))];
 
         if (invoiceIds.length > 0) {
-            invoiceData = await fetchChunked('/items/sales_invoice?limit=1000', invoiceIds, 'invoice_id', 'invoice_id,customer_code');
+            invoiceData = await fetchChunked('/items/sales_invoice?limit=-1', invoiceIds, 'invoice_id', 'invoice_id,customer_code');
             const customerCodes = [...new Set(invoiceData.map((i: any) => i.customer_code).filter(Boolean))];
             
             if (customerCodes.length > 0) {
-                customerData = await fetchChunked('/items/customer?limit=1000', customerCodes, 'customer_code', 'customer_code,city,province,brgy', true);
+                customerData = await fetchChunked('/items/customer?limit=-1', customerCodes, 'customer_code', 'customer_code,city,province,brgy', true);
             }
 
             // Fetch Areas and Locations
-            const aRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_area?limit=1000`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
+            const aRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_area?limit=-1`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
             if (aRes.ok) areasData = (await aRes.json()).data || [];
 
-            const lRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_location?limit=1000`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
+            const lRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_location?limit=-1`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
             if (lRes.ok) locationsData = (await lRes.json()).data || [];
         }
 
@@ -283,7 +283,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const body = await request.json();
-        const { dispatchPlanId, isExtra, driverId, helperIds, timeOfDispatch, vehicleId, isNotPayroll, area } = body;
+        const { dispatchPlanId, isExtra, driverId, helperIds, timeOfDispatch, vehicleId, isNotPayroll, area, docNo } = body;
 
         if (!dispatchPlanId) {
             return NextResponse.json({ error: "dispatchPlanId is required" }, { status: 400 });
@@ -298,12 +298,13 @@ export async function PATCH(request: NextRequest) {
         const staffIdField = isExtra ? "post_dispatch_plan_extra_id" : "post_dispatch_plan_id";
 
         // Update time_of_dispatch, vehicle_id, and/or is_not_payroll if provided
-        if (timeOfDispatch !== undefined || vehicleId !== undefined || isNotPayroll !== undefined || area !== undefined) {
+        if (timeOfDispatch !== undefined || vehicleId !== undefined || isNotPayroll !== undefined || area !== undefined || docNo !== undefined) {
             const updatePayload: any = {};
             if (timeOfDispatch !== undefined) updatePayload.time_of_dispatch = timeOfDispatch;
             if (vehicleId !== undefined) updatePayload.vehicle_id = vehicleId;
             if (isNotPayroll !== undefined) updatePayload.is_not_payroll = isNotPayroll;
             if (area !== undefined && isExtra) updatePayload.area = area;
+            if (docNo !== undefined && isExtra) updatePayload.doc_no = docNo;
 
             const updateRes = await fetch(`${DIRECTUS_URL}/items/${pdpTable}/${dispatchPlanId}`, {
                 method: "PATCH",

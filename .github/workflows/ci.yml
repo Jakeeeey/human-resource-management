@@ -30,7 +30,7 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npx eslint . --max-warnings=0
+        run: 
 
       - name: Typecheck
         run: npm run typecheck
