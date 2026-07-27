@@ -22,7 +22,7 @@ interface EditDispatchStaffDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     dispatchRecord: DispatchAttendance | null;
-    onSave: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; area?: string; }) => Promise<{ success: boolean; } | void>;
+    onSave: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; area?: string; docNo?: string; }) => Promise<{ success: boolean; } | void>;
 }
 
 interface UserOption {
@@ -47,6 +47,7 @@ export function EditDispatchStaffDialog({
     const [timeOfDispatch, setTimeOfDispatch] = useState<string>("");
     const [vehicleId, setVehicleId] = useState<string>("none");
     const [area, setArea] = useState<string>("");
+    const [docNo, setDocNo] = useState<string>("");
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -85,6 +86,7 @@ export function EditDispatchStaffDialog({
             setHelperIds(currentHelperIds.map(id => String(id)));
             
             setArea(dispatchRecord.isExtra && dispatchRecord.areaName !== "N/A" ? (dispatchRecord.areaName || "") : "");
+            setDocNo(dispatchRecord.dispatchDocNo || "");
             
             if (dispatchRecord.timeOfDispatch) {
                 // Convert UTC to local datetime-local format YYYY-MM-DDTHH:mm
@@ -126,6 +128,7 @@ export function EditDispatchStaffDialog({
                 timeOfDispatch: finalTime,
                 vehicleId: parsedVehicleId,
                 area: dispatchRecord.isExtra ? (area.trim() || undefined) : undefined,
+                docNo: dispatchRecord.isExtra ? (docNo.trim() || undefined) : undefined,
             });
             onOpenChange(false);
         } catch (error) {
@@ -192,6 +195,18 @@ export function EditDispatchStaffDialog({
                             type="datetime-local"
                             value={timeOfDispatch}
                             onChange={(e) => setTimeOfDispatch(e.target.value)}
+                        />
+                    </div>
+                    
+                    {/* PDP No (Always show, but only editable for Extra PDP) */}
+                    <div className="flex flex-col gap-2">
+                        <Label htmlFor="docNo" className="font-semibold text-slate-700">PDP No</Label>
+                        <Input
+                            id="docNo"
+                            placeholder="e.g. PDP-2026-0001"
+                            value={docNo}
+                            onChange={(e) => setDocNo(e.target.value)}
+                            disabled={!dispatchRecord.isExtra}
                         />
                     </div>
                     

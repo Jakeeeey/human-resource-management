@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 interface ManageLogisticsDispatchListProps {
   dispatches: DispatchAttendance[];
   isLoading: boolean;
-  onUpdateStaff: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; area?: string; }) => Promise<{ success: boolean; } | void>;
+  onUpdateStaff: (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; area?: string; docNo?: string; }) => Promise<{ success: boolean; } | void>;
 }
 
 export function ManageLogisticsDispatchList({
@@ -66,10 +66,10 @@ export function ManageLogisticsDispatchList({
                 <TableCell className="font-medium text-slate-900 text-sm align-top">
                   {record.dispatchDocNo || `PDP-${record.dispatchPlanId}`}
                 </TableCell>
-                <TableCell className="text-slate-600 text-sm align-top">
+                <TableCell className="text-slate-600 text-sm align-top max-w-[250px] whitespace-normal break-words">
                   {[record.brgy, record.city, record.province].filter(Boolean).join(", ") || "-"}
                 </TableCell>
-                <TableCell className="text-slate-600 text-sm align-top">
+                <TableCell className="text-slate-600 text-sm align-top max-w-[200px] whitespace-normal break-words">
                   {area}
                 </TableCell>
                 <TableCell className="text-slate-600 text-sm align-top">
