@@ -18,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Calendar, Target, Factory, Users, AlertTriangle, Info } from "lucide-react";
+import { Loader2, Calendar, Target, Factory, Users, AlertTriangle, Info, PhilippinePeso } from "lucide-react";
 import type { ProductionSchedule, ScheduleFormValues } from "../types";
 import type { ManufacturingLine, LinePosition } from "../../line-registration/types";
 import { scheduleFormSchema } from "../types";
@@ -206,12 +206,45 @@ export function ScheduleDialog({
     const targetRequiresApproval = selectedLineInfo && dailyTarget < selectedLineInfo.target_produce_8_hrs;
 
     // Check for existing schedules on the same date and line
-    const existingSchedules = schedules.filter(s => 
-        s.line_id === lineId && 
-        s.schedule_date === scheduleDate && 
-        (!isEdit || s.id !== schedule?.id)
-    );
-    const hasExistingSchedules = existingSchedules.length > 0;
+    const existingSchedules = schedules.filter(s => {
+        const sDate = s.schedule_date ? s.schedule_date.split("T")[0] : "";
+        const inputDate = scheduleDate ? scheduleDate.split("T")[0] : "";
+        return s.line_id === lineId && 
+               sDate === inputDate && 
+               (!isEdit || s.id !== schedule?.id);
+    });
+    
+    const overlappingSchedules = existingSchedules.filter(s => {
+        // Ignore rejected schedules
+        if (s.approval_status === "REJECTED" || s.target_approval_status === "REJECTED") return false;
+
+        if (!s.start_time || !s.end_time) return true;
+        return startTime < s.end_time && endTime > s.start_time;
+    });
+    const hasOverlap = overlappingSchedules.length > 0;
+
+    // Helper to determine if a line has overlaps for the dropdown
+    const isLineOverlapping = (targetLineId: number) => {
+        const lineSchedules = schedules.filter(s => {
+            const sDate = s.schedule_date ? s.schedule_date.split("T")[0] : "";
+            const inputDate = scheduleDate ? scheduleDate.split("T")[0] : "";
+            return s.line_id === targetLineId && 
+                   sDate === inputDate && 
+                   (!isEdit || s.id !== schedule?.id);
+        });
+        return lineSchedules.some(s => {
+            if (s.approval_status === "REJECTED" || s.target_approval_status === "REJECTED") return false;
+            if (!s.start_time || !s.end_time) return true;
+            return startTime < s.end_time && endTime > s.start_time;
+        });
+    };
+
+    // Derived values for labor cost estimation
+    const totalRate = linePositions.reduce((sum, pos) => sum + ((assignments[pos.id] || 0) * (pos.position_rate || 0)), 0);
+    const targetLaborCost = selectedLineInfo?.target_labor_cost || 0;
+    const laborCostPerPcs = dailyTarget > 0 ? totalRate / dailyTarget : 0;
+    const isOverBudget = targetLaborCost > 0 && laborCostPerPcs > targetLaborCost;
+    const suggestedTarget = targetLaborCost > 0 ? Math.ceil(totalRate / targetLaborCost) : 0;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -300,11 +333,20 @@ export function ScheduleDialog({
                                         <SelectValue placeholder="Select working line" />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-xl border shadow-2xl">
-                                        {lines.map((l) => (
-                                            <SelectItem key={l.id} value={String(l.id)} className="text-xs font-bold rounded-lg my-0.5">
-                                                {l.line_name} (Std: {l.target_produce_8_hrs} pcs)
-                                            </SelectItem>
-                                        ))}
+                                        {lines.map((l) => {
+                                            const isConflict = isLineOverlapping(l.id);
+                                            return (
+                                                <SelectItem 
+                                                    key={l.id} 
+                                                    value={String(l.id)} 
+                                                    disabled={isConflict && (!isEdit || l.id !== schedule?.line_id)}
+                                                    className="text-xs font-bold rounded-lg my-0.5"
+                                                >
+                                                    {l.line_name} (Std: {l.target_produce_8_hrs} pcs)
+                                                    {isConflict && <span className="ml-2 text-[9px] text-destructive uppercase tracking-widest">(Time Conflict)</span>}
+                                                </SelectItem>
+                                            );
+                                        })}
                                     </SelectContent>
                                 </Select>
                                 {errors.line_id && (
@@ -333,7 +375,29 @@ export function ScheduleDialog({
                                 )}
                             </div>
 
-                            {/* actual produce removed */}
+                            {/* Labor Cost Estimation */}
+                            {lineId > 0 && (
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70 flex items-center gap-1.5">
+                                        <PhilippinePeso className="h-3 w-3" /> Est. Labor Cost / Pcs
+                                    </Label>
+                                    <div className={`flex items-center gap-3 p-2.5 rounded-xl border ${isOverBudget ? 'bg-destructive/5 border-destructive/20 text-destructive' : 'bg-primary/5 border-primary/10 text-primary'} h-10`}>
+                                        <span className="font-black text-sm tabular-nums tracking-tight">
+                                            ₱{laborCostPerPcs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                                        </span>
+                                        <div className="flex flex-col border-l border-current/20 pl-3">
+                                            <span className="text-[8px] font-black uppercase tracking-wider opacity-80 leading-none">
+                                                Target: ₱{targetLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {isOverBudget && (
+                                        <p className="text-[9px] font-bold text-destructive leading-tight animate-in fade-in">
+                                            Exceeds budget! Target should be at least <span className="font-black">{suggestedTarget.toLocaleString()} pcs</span>.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Real-time Target Approval Warning */}
@@ -351,16 +415,16 @@ export function ScheduleDialog({
                             </div>
                         )}
 
-                        {/* Existing Schedules Warning */}
-                        {hasExistingSchedules && (
-                            <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                                <Info className="h-4.5 w-4.5 text-blue-600 shrink-0 mt-0.5" />
+                        {/* Schedule Overlap Error */}
+                        {hasOverlap && (
+                            <div className="p-3.5 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+                                <AlertTriangle className="h-4.5 w-4.5 text-destructive shrink-0 mt-0.5" />
                                 <div className="space-y-0.5">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-800">
-                                        Existing Schedules
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-destructive">
+                                        Time Conflict Detected
                                     </p>
-                                    <p className="text-[9px] text-blue-700/90 font-bold leading-normal uppercase">
-                                        This line already has {existingSchedules.length} schedule(s) for the selected date. Please ensure your new shift time does not overlap with existing shifts.
+                                    <p className="text-[9px] text-destructive/90 font-bold leading-normal uppercase">
+                                        This line already has {overlappingSchedules.length} schedule(s) running during this exact time. You cannot create overlapping schedules on the same line.
                                     </p>
                                 </div>
                             </div>
@@ -448,7 +512,7 @@ export function ScheduleDialog({
                     </Button>
                     <Button
                         onClick={handleAction}
-                        disabled={isSaving || lineId === 0 || isLineLoading}
+                        disabled={isSaving || lineId === 0 || isLineLoading || hasOverlap}
                         className="flex-1 sm:flex-none rounded-xl px-12 font-black shadow-xl shadow-primary/20 bg-primary h-10 text-[10px] uppercase tracking-widest transition-all active:scale-95"
                     >
                         {isSaving ? (

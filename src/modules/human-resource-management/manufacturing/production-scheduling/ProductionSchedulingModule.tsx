@@ -17,7 +17,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Calendar, ShieldAlert, Target, Award, ListTodo, Plus } from "lucide-react";
+import { Loader2, Calendar, ShieldAlert, Target, Award, ListTodo, Plus, Users } from "lucide-react";
 
 const ProductionSchedulingContent = () => {
     const {
@@ -65,6 +65,11 @@ const ProductionSchedulingContent = () => {
 
     const totalActualProduce = schedules.reduce((sum, s) => sum + (s.actual_produce || 0), 0);
 
+    const totalPersonsAssigned = schedules.reduce((sum, s) => {
+        const positions = s.manu_hr_schedule_positions || s.positions || [];
+        return sum + positions.reduce((pSum: number, p) => pSum + (p.assigned_persons || 0), 0);
+    }, 0);
+
     return (
         <div className="flex-1 space-y-8 p-6 pt-8 h-full overflow-auto bg-gradient-to-br from-background via-background/95 to-primary/[0.03]">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -88,7 +93,7 @@ const ProductionSchedulingContent = () => {
             </div>
 
             {/* Premium Stat Summary Dashboard */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
                         <Calendar className="h-24 w-24" />
@@ -136,6 +141,28 @@ const ProductionSchedulingContent = () => {
                         </span>
                         <p className="text-[10px] text-muted-foreground font-medium">
                             Total units manufactured to date
+                        </p>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
+                        <Users className="h-24 w-24" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                            <Users className="h-3 w-3 text-primary" /> Total Workforce
+                        </p>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black tracking-tight tabular-nums text-primary block">
+                                {totalPersonsAssigned.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-black text-primary/50 uppercase tracking-widest">
+                                persons
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                            Currently assigned across all schedules
                         </p>
                     </div>
                 </div>
