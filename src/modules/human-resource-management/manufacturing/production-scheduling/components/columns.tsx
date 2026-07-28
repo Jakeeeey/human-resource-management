@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Edit2, Trash2, Calendar, Target, ShieldAlert, CheckCircle2, UserCheck, Users, Factory, Clock, Paperclip } from "lucide-react";
+import { Edit2, Trash2, Calendar, Target, ShieldAlert, CheckCircle2, UserCheck, Users, Factory, Clock, Paperclip, PhilippinePeso } from "lucide-react";
 import type { ProductionSchedule } from "../types";
 import { format } from "date-fns";
 
@@ -45,16 +45,36 @@ export const createColumns = (
     {
         accessorKey: "line_id",
         header: "Production Line",
-        cell: ({ row }) => (
-            <div className="flex items-center gap-3">
-                <div className="bg-primary/5 p-2 rounded-xl border border-primary/10">
-                    <Factory className="h-4 w-4 text-primary" />
+        cell: ({ row }) => {
+            const rawPositions = row.original.positions || row.original.manu_hr_schedule_positions || [];
+            const uniqueMap = new Map<number, typeof rawPositions[0]>();
+            rawPositions.forEach((p) => {
+                uniqueMap.set(p.position_id, p);
+            });
+            const positions = Array.from(uniqueMap.values());
+            const totalPersons = positions.reduce((sum, p) => sum + (p.assigned_persons || 0), 0);
+            
+            return (
+                <div className="flex items-center gap-3">
+                    <div className="bg-primary/5 p-2 rounded-xl border border-primary/10 shadow-sm transition-all group-hover:scale-105">
+                        <Factory className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs tracking-tight text-foreground truncate max-w-[150px]">
+                                {row.original.line?.line_name || `Line #${row.original.line_id}`}
+                            </span>
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-1.5 py-0.5 rounded-md border border-primary/20">
+                                <Users className="h-2 w-2" />
+                                <span className="text-[9px] font-bold uppercase tracking-wider">
+                                    {totalPersons} {totalPersons === 1 ? 'Person' : 'Persons'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <span className="font-bold text-xs tracking-tight text-foreground truncate max-w-[150px]">
-                    {row.original.line?.line_name || `Line #${row.original.line_id}`}
-                </span>
-            </div>
-        ),
+            );
+        },
     },
     {
         accessorKey: "daily_target",
@@ -108,6 +128,61 @@ export const createColumns = (
                         <span className="text-[9px] font-bold text-muted-foreground/55 uppercase tracking-widest pl-5">
                             Within Limits
                         </span>
+                    )}
+                </div>
+            );
+        },
+    },
+    {
+        id: "labor_cost",
+        header: "Labor Cost / Pcs",
+        cell: ({ row }) => {
+            const rawPositions = row.original.positions || row.original.manu_hr_schedule_positions || [];
+            const uniqueMap = new Map<number, typeof rawPositions[0]>();
+            rawPositions.forEach((p) => {
+                uniqueMap.set(p.position_id, p);
+            });
+            const positions = Array.from(uniqueMap.values());
+            
+            const totalRate = positions.reduce((sum, pos) => sum + (pos.assigned_persons * (pos.position?.position_rate || 0)), 0);
+            const targetPcs = row.original.daily_target || 0;
+            const laborCostPerPcs = targetPcs > 0 ? totalRate / targetPcs : 0;
+            const targetLaborCost = row.original.line?.target_labor_cost || 0;
+            
+            const isOverBudget = targetLaborCost > 0 && laborCostPerPcs > targetLaborCost;
+            const suggestedTarget = targetLaborCost > 0 ? Math.ceil(totalRate / targetLaborCost) : 0;
+
+            return (
+                <div className="flex flex-col gap-1.5 py-1">
+                    <div className="flex items-center gap-2.5">
+                        <div className={`p-2 rounded-xl border ${isOverBudget ? 'bg-destructive/10 border-destructive/20' : 'bg-blue-500/5 border-blue-500/10'}`}>
+                            <PhilippinePeso className={`h-4 w-4 ${isOverBudget ? 'text-destructive' : 'text-blue-600'}`} />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className={`font-black text-sm tabular-nums tracking-tight ${isOverBudget ? 'text-destructive' : 'text-foreground'}`}>
+                                ₱{laborCostPerPcs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} 
+                                <span className={`text-[10px] ml-1 font-semibold uppercase tracking-wider ${isOverBudget ? 'text-destructive/80' : 'text-muted-foreground'}`}>(Actual)</span>
+                            </span>
+                            <div className="flex flex-col mt-0.5 gap-0.5">
+                                <span className="text-[9px] text-blue-600/80 font-black uppercase tracking-wider">
+                                    Total Rate: ₱{totalRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                                <span className="text-[9px] text-emerald-600/80 font-black uppercase tracking-wider">
+                                    Target Cost: ₱{targetLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {isOverBudget && (
+                        <div className="mt-1 bg-destructive/5 border border-destructive/10 rounded-lg p-2 flex flex-col gap-0.5 animate-in fade-in zoom-in-95">
+                            <span className="text-[10px] font-bold text-destructive flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
+                                Over Target Cost
+                            </span>
+                            <span className="text-[9px] font-semibold text-destructive/80 leading-tight">
+                                Suggestion: Increase target to <strong className="font-black text-destructive">{suggestedTarget.toLocaleString()} pcs</strong> to meet budget.
+                            </span>
+                        </div>
                     )}
                 </div>
             );
