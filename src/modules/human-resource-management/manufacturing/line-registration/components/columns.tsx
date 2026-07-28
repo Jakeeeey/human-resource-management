@@ -13,21 +13,34 @@ export const createColumns = (
     {
         accessorKey: "line_name",
         header: "Production Line",
-        cell: ({ row }) => (
-            <div className="flex items-center gap-3.5 py-1.5">
-                <div className="bg-primary/5 p-2.5 rounded-xl border border-primary/10 shadow-sm transition-all group-hover:scale-105">
-                    <Factory className="h-4.5 w-4.5 text-primary" />
+        cell: ({ row }) => {
+            const positions = row.original.positions || [];
+            const totalPersons = positions.reduce((sum, pos) => sum + pos.persons_allowed, 0);
+
+            return (
+                <div className="flex items-center gap-3.5 py-1.5">
+                    <div className="bg-primary/5 p-2.5 rounded-xl border border-primary/10 shadow-sm transition-all group-hover:scale-105">
+                        <Factory className="h-4.5 w-4.5 text-primary" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-[13px] sm:text-[14px] tracking-tight text-foreground truncate">
+                                {row.original.line_name}
+                            </span>
+                            <div className="flex items-center gap-1 bg-primary/10 text-primary px-1.5 py-0.5 rounded-md border border-primary/20">
+                                <Users className="h-2.5 w-2.5" />
+                                <span className="text-[9px] font-bold uppercase tracking-wider">
+                                    {totalPersons} {totalPersons === 1 ? 'Person' : 'Persons'}
+                                </span>
+                            </div>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-semibold truncate opacity-80 mt-0.5 max-w-[280px]">
+                            {row.original.description || "No operational description provided"}
+                        </span>
+                    </div>
                 </div>
-                <div className="flex flex-col min-w-0">
-                    <span className="font-extrabold text-[13px] sm:text-[14px] tracking-tight text-foreground truncate">
-                        {row.original.line_name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground font-semibold truncate opacity-80 mt-0.5 max-w-[280px]">
-                        {row.original.description || "No operational description provided"}
-                    </span>
-                </div>
-            </div>
-        ),
+            );
+        },
     },
     {
         accessorKey: "target_produce_8_hrs",
