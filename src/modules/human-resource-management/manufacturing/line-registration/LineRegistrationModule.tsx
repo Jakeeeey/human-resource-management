@@ -16,8 +16,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2 } from "lucide-react";
-import type { ManufacturingLine, LinePosition } from "./types";
+import { Loader2, Users } from "lucide-react";
+import type { ManufacturingLine, LinePosition, ManufacturingLineWithPositions } from "./types";
 
 const LineRegistrationContent = () => {
     const {
@@ -69,6 +69,10 @@ const LineRegistrationContent = () => {
     const averageOTTarget = totalLines > 0 
         ? Math.round(lines.reduce((sum, line) => sum + (line.overtime_target_per_hr || 0), 0) / totalLines) 
         : 0;
+    const totalPersons = (lines as unknown as ManufacturingLineWithPositions[]).reduce((sum, line) => {
+        const positions = line.positions || [];
+        return sum + positions.reduce((pSum, pos) => pSum + (pos.persons_allowed || 0), 0);
+    }, 0);
 
     return (
         <div className="flex-1 space-y-8 p-6 pt-8 h-full overflow-auto bg-gradient-to-br from-background via-background/95 to-primary/[0.03]">
@@ -85,7 +89,7 @@ const LineRegistrationContent = () => {
             </div>
 
             {/* Premium Stat Summary Dashboard */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                 <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
                         <svg className="h-24 w-24" fill="currentColor" viewBox="0 0 24 24"><path d="M4 19h16v2H4v-2zm16-2H4V3h16v14zM6 5v10h12V5H6z"/></svg>
@@ -148,6 +152,28 @@ const LineRegistrationContent = () => {
                         </div>
                         <p className="text-[10px] text-muted-foreground font-medium">
                             Overall mean output target during OT hours
+                        </p>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
+                        <Users className="h-24 w-24" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70">
+                            Total Workforce
+                        </p>
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black tracking-tight tabular-nums text-primary">
+                                {totalPersons.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] font-black text-primary/50 uppercase tracking-widest">
+                                persons
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                            Allocated across all production lines
                         </p>
                     </div>
                 </div>
