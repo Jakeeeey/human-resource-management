@@ -67,7 +67,7 @@ export class ApprovalService {
         }
     }
 
-    static async processScheduleStatus(scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason: string | null = null): Promise<boolean> {
+    static async processScheduleStatus(scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason: string | null = null, overrides?: { approved_target: number, approved_headcounts: any[] }): Promise<boolean> {
         try {
             const sched = await SchedulingService.getScheduleById(scheduleId);
             if (!sched) return false;
@@ -83,6 +83,11 @@ export class ApprovalService {
                 payload.approved_by = userId;
                 payload.approved_at = now;
                 payload.target_approved_by = userId;
+                
+                if (overrides) {
+                    payload.approved_target = overrides.approved_target;
+                    payload.approved_headcounts = overrides.approved_headcounts;
+                }
             } else if (status === "REJECTED") {
                 payload.rejected_by = userId;
                 payload.rejected_at = now;

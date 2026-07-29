@@ -32,10 +32,10 @@ export function useApprovals() {
     const [isRejectOpen, setIsRejectOpen] = useState(false);
     const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
 
-    const handleApprove = async (scheduleId: number) => {
+    const handleApprove = async (scheduleId: number, overrides?: { approved_target: number, approved_headcounts: any[] }) => {
         const userId = getUserIdFromCookie();
         try {
-            const success = await processSchedule(scheduleId, "APPROVED", userId);
+            const success = await processSchedule(scheduleId, "APPROVED", userId, null, overrides);
             if (success) {
                 toast.success("Schedule override approved successfully");
             } else {

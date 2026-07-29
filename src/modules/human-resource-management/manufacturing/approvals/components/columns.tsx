@@ -3,13 +3,14 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Calendar, CheckCircle2, XCircle, ArrowDownCircle, Users, Factory, AlertTriangle } from "lucide-react";
+import { Calendar, CheckCircle2, XCircle, ArrowDownCircle, Users, Factory, AlertTriangle, PhilippinePeso } from "lucide-react";
 import type { PendingApprovalItem } from "../types";
 import { format } from "date-fns";
 
 export const createColumns = (
-    onApprove: (scheduleId: number) => void,
-    onReject: (scheduleId: number) => void
+    onApprove: (scheduleId: number, overrides?: any) => void,
+    onReject: (scheduleId: number) => void,
+    onApproveWarning: (scheduleId: number, suggestedTarget: number, currentTarget: number, positions: any[], targetLaborCost: number, baseTotalRate: number) => void
 ): ColumnDef<PendingApprovalItem>[] => [
     {
         accessorKey: "date",
@@ -82,6 +83,28 @@ export const createColumns = (
         cell: ({ row }) => {
             const dev = row.original.deviations;
             const issues = [];
+            
+            // Check for labor cost over budget
+            const rawPositions = row.original.raw_schedule?.positions || row.original.raw_schedule?.manu_hr_schedule_positions || [];
+            const uniqueMap = new Map<number, typeof rawPositions[0]>();
+            rawPositions.forEach((p) => {
+                uniqueMap.set(p.position_id, p);
+            });
+            const positions = Array.from(uniqueMap.values());
+            const totalRate = positions.reduce((sum, pos) => sum + ((pos.assigned_persons || 0) * (pos.position?.position_rate || 0)), 0);
+            const targetPcs = row.original.raw_schedule?.daily_target || 0;
+            const laborCostPerPcs = targetPcs > 0 ? totalRate / targetPcs : 0;
+            const targetLaborCost = row.original.raw_schedule?.line?.target_labor_cost || 0;
+            const isOverBudget = targetLaborCost > 0 && laborCostPerPcs > targetLaborCost;
+
+            if (isOverBudget) {
+                issues.push(
+                    <span key="labor" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-red-500/25 bg-red-500/5 text-[9px] font-black text-red-700 uppercase tracking-wider">
+                        <AlertTriangle className="h-3 w-3" /> High Labor Cost
+                    </span>
+                );
+            }
+
             if (dev.target) {
                 issues.push(
                     <span key="target" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-amber-500/25 bg-amber-500/5 text-[9px] font-black text-amber-700 uppercase tracking-wider">
@@ -109,11 +132,43 @@ export const createColumns = (
         header: "Deviation Details",
         cell: ({ row }) => {
             const dev = row.original.deviations;
+            const rawPositions = row.original.raw_schedule?.positions || row.original.raw_schedule?.manu_hr_schedule_positions || [];
+            
+            // Calculate Labor Cost
+            const uniqueMap = new Map<number, typeof rawPositions[0]>();
+            rawPositions.forEach((p) => {
+                uniqueMap.set(p.position_id, p);
+            });
+            const positions = Array.from(uniqueMap.values());
+            
+            const totalRate = positions.reduce((sum, pos) => sum + ((pos.assigned_persons || 0) * (pos.position?.position_rate || 0)), 0);
+            const targetPcs = row.original.raw_schedule?.daily_target || 0;
+            const laborCostPerPcs = targetPcs > 0 ? totalRate / targetPcs : 0;
+            
+            // Getting target labor cost from manufacturing lines
+            const lineData = row.original.raw_schedule?.line;
+            const targetLaborCost = lineData?.target_labor_cost || 0;
+            
+            const isOverBudget = targetLaborCost > 0 && laborCostPerPcs > targetLaborCost;
+            const suggestedTarget = targetLaborCost > 0 ? Math.ceil(totalRate / targetLaborCost) : 0;
             
             return (
                 <div className="flex flex-col gap-2 py-1 max-w-[250px]">
+                    {/* Labor Cost Section */}
+                    {targetLaborCost > 0 && (
+                        <div className={`flex flex-col gap-0.5 pb-1.5 border-b border-muted-foreground/10 last:border-0 last:pb-0 ${isOverBudget ? 'bg-destructive/10 p-2 rounded-lg -mx-2 border-transparent' : ''}`}>
+                            <span className={`font-bold text-xs flex items-center gap-1 ${isOverBudget ? 'text-destructive' : 'text-foreground'}`}>
+                                <PhilippinePeso className={`h-3 w-3 ${isOverBudget ? 'text-destructive' : 'text-blue-500'}`} /> Cost/Pcs: ₱{laborCostPerPcs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
+                            </span>
+                            <span className={`text-[10px] font-semibold ${isOverBudget ? 'text-destructive/80' : 'text-muted-foreground'}`}>
+                                Target Limit is ₱{targetLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} 
+                                {isOverBudget && <span className="text-destructive font-black ml-1">(OVER BUDGET)</span>}
+                            </span>
+                        </div>
+                    )}
+
                     {dev.target && (
-                        <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-col gap-0.5 pb-1.5 border-b border-muted-foreground/10 last:border-0 last:pb-0">
                             <span className="font-bold text-xs text-foreground flex items-center gap-1">
                                 <ArrowDownCircle className="h-3 w-3 text-amber-500" /> Target: {dev.target.requested.toLocaleString()} pcs
                             </span>
@@ -126,16 +181,16 @@ export const createColumns = (
                     {dev.headcounts && dev.headcounts.map((hc, idx) => {
                         const isOverride = hc.assigned > hc.allowed;
                         return (
-                            <div key={idx} className="flex flex-col gap-0.5">
-                                <span className={`font-bold text-xs flex items-center gap-1 ${isOverride ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                    <Users className={`h-3 w-3 ${isOverride ? 'text-orange-500' : 'text-muted-foreground/60'}`} /> {hc.position_name}: {hc.assigned} persons
-                                </span>
-                                <span className="text-[10px] text-muted-foreground font-semibold">
-                                    Allowed Limit is {hc.allowed} max {isOverride && <span className="text-orange-600 font-bold">(Override: +{hc.assigned - hc.allowed})</span>}
-                                </span>
-                            </div>
-                        );
-                    })}
+                            <div key={idx} className="flex flex-col gap-0.5 pb-1.5 border-b border-muted-foreground/10 last:border-0 last:pb-0">
+                                    <span className={`font-bold text-xs flex items-center gap-1 ${isOverride ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                        <Users className={`h-3 w-3 ${isOverride ? 'text-orange-500' : 'text-muted-foreground/60'}`} /> {hc.position_name}: {hc.assigned} persons
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground font-semibold">
+                                        Allowed Limit is {hc.allowed} max {isOverride && <span className="text-orange-600 font-bold">(Override: +{hc.assigned - hc.allowed})</span>}
+                                    </span>
+                                </div>
+                            );
+                        })}
                 </div>
             );
         },
@@ -145,12 +200,40 @@ export const createColumns = (
         header: "Review Actions",
         cell: ({ row }) => {
             const item = row.original;
+            
+            const rawPositions = item.raw_schedule?.positions || item.raw_schedule?.manu_hr_schedule_positions || [];
+            const uniqueMap = new Map<number, typeof rawPositions[0]>();
+            rawPositions.forEach((p) => {
+                uniqueMap.set(p.position_id, p);
+            });
+            const positions = Array.from(uniqueMap.values());
+            const totalRate = positions.reduce((sum, pos) => sum + ((pos.assigned_persons || 0) * (pos.position?.position_rate || 0)), 0);
+            const targetPcs = item.raw_schedule?.daily_target || 0;
+            const laborCostPerPcs = targetPcs > 0 ? totalRate / targetPcs : 0;
+            const targetLaborCost = item.raw_schedule?.line?.target_labor_cost || 0;
+            const isOverBudget = targetLaborCost > 0 && laborCostPerPcs > targetLaborCost;
+            const suggestedTarget = targetLaborCost > 0 ? Math.ceil(totalRate / targetLaborCost) : 0;
+
+            const handleApprove = () => {
+                if (isOverBudget) {
+                    const enrichedPositions = (item.deviations.headcounts || []).map(hc => {
+                        const raw = positions.find(p => p.id === hc.position_item_id || p.position?.position_name === hc.position_name);
+                        return {
+                            ...hc,
+                            position_rate: raw?.position?.position_rate || 0
+                        };
+                    });
+                    onApproveWarning(item.schedule_id, suggestedTarget, targetPcs, enrichedPositions, targetLaborCost, totalRate);
+                } else {
+                    onApprove(item.schedule_id);
+                }
+            };
 
             return (
                 <div className="flex items-center gap-2">
                     <Button
                         size="xs"
-                        onClick={() => onApprove(item.schedule_id)}
+                        onClick={handleApprove}
                         className="h-7 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black uppercase tracking-widest gap-1 shadow-md shadow-emerald-600/10 active:scale-95 transition-all"
                     >
                         <CheckCircle2 className="h-3.5 w-3.5" /> Approve

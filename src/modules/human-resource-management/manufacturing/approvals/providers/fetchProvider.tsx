@@ -8,7 +8,7 @@ interface ApprovalsFetchContextType {
     pendingItems: PendingApprovalItem[];
     isLoading: boolean;
     refetch: () => Promise<void>;
-    processSchedule: (scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason?: string | null) => Promise<boolean>;
+    processSchedule: (scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason?: string | null, overrides?: { approved_target: number, approved_headcounts: any[] }) => Promise<boolean>;
 }
 
 const ApprovalsFetchContext = createContext<ApprovalsFetchContextType | undefined>(undefined);
@@ -37,8 +37,8 @@ export function ApprovalsFetchProvider({
         fetchPending();
     }, [fetchPending]);
 
-    const processSchedule = async (scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason?: string | null) => {
-        const success = await ApprovalService.processScheduleStatus(scheduleId, status, userId, reason);
+    const processSchedule = async (scheduleId: number, status: "APPROVED" | "REJECTED", userId: number | null, reason?: string | null, overrides?: { approved_target: number, approved_headcounts: any[] }) => {
+        const success = await ApprovalService.processScheduleStatus(scheduleId, status, userId, reason, overrides);
         if (success) {
             await fetchPending();
         }
