@@ -32,7 +32,7 @@ export function useApprovals() {
     const [isRejectOpen, setIsRejectOpen] = useState(false);
     const [rejectTargetId, setRejectTargetId] = useState<number | null>(null);
 
-    const handleApprove = async (scheduleId: number, overrides?: { approved_target: number, approved_headcounts: any[] }) => {
+    const handleApprove = async (scheduleId: number, overrides?: { approved_target: number, approved_headcounts: { position_item_id: number; position_name: string; assigned: number }[] }) => {
         const userId = getUserIdFromCookie();
         try {
             const success = await processSchedule(scheduleId, "APPROVED", userId, null, overrides);
