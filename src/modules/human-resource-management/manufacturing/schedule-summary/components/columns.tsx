@@ -97,6 +97,93 @@ export const createColumns = (): ColumnDef<ProductionSchedule>[] => [
         },
     },
     {
+        accessorKey: "actual_produce",
+        header: "Actual Output",
+        cell: ({ row }) => {
+            const actual = row.original.actual_produce || 0;
+            const target = row.original.daily_target || 0;
+            const percent = target > 0 ? ((actual / target) * 100).toFixed(1) : 0;
+            return (
+                <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-xs tabular-nums text-foreground">
+                        {actual.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70 font-semibold">
+                        {percent}%
+                    </span>
+                </div>
+            );
+        },
+    },
+    {
+        id: "manpower",
+        header: "Manpower",
+        cell: ({ row }) => {
+            const positions = row.original.positions || row.original.manu_hr_schedule_positions || [];
+            const totalManpower = positions.reduce((acc: number, p: any) => acc + (p.assigned_persons || 0), 0);
+            return (
+                <div className="flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    <span className="font-bold text-xs tabular-nums text-foreground">
+                        {totalManpower}
+                    </span>
+                </div>
+            );
+        },
+    },
+    {
+        id: "est_labor_cost",
+        header: "Est. Labor Cost",
+        cell: ({ row }) => {
+            const positions = row.original.positions || row.original.manu_hr_schedule_positions || [];
+            const totalCost = positions.reduce((acc: number, p: any) => {
+                const rate = p.position?.position_rate || 0;
+                const persons = p.assigned_persons || 0;
+                // Cost for the shift. If rate is hourly, we'd need shift hours. 
+                // Assuming position_rate is a daily rate for simplicity, or we compute based on start/end time.
+                // Let's check how it's defined. Usually position_rate is per day or per hour.
+                // Let's just multiply rate * persons for a standard 8 hr shift if rate is hourly.
+                // Wait, if it's hourly, let's use an 8-hour multiplier as baseline, or if it's daily rate, just rate * persons.
+                // Without knowing, we'll do: persons * rate.
+                return acc + (persons * rate);
+            }, 0);
+
+            // Let's adjust based on: "the rate here is 8hrs of work then 1 hr of break"
+            let workingHours = 8; // Default full day of work
+            let elapsedHours = 9; 
+            
+            if (row.original.start_time && row.original.end_time) {
+                const start = row.original.start_time.split(":");
+                const end = row.original.end_time.split(":");
+                const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+                const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+                elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+                
+                // Deduct 1 hour for break
+                workingHours = Math.max(0, elapsedHours - 1);
+            }
+            
+            // Recompute total cost: daily rate is for 8 hrs of work.
+            const actualTotalCost = positions.reduce((acc: number, p: any) => {
+                const dailyRate = p.position?.position_rate || 0;
+                const hourlyRate = dailyRate / 8; // Calculate hourly rate
+                const persons = p.assigned_persons || 0;
+                return acc + (persons * hourlyRate * workingHours);
+            }, 0);
+
+            return (
+                <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-xs tabular-nums text-foreground">
+                        ₱{actualTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70 font-semibold">
+                        {workingHours.toFixed(1)} hrs work
+                    </span>
+                </div>
+            );
+        },
+    },
+    {
         id: "status",
         header: "Status",
         cell: ({ row }) => {

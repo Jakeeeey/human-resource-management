@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Inbox } from "lucide-react";
 import type { ProductionSchedule } from "../../production-scheduling/types";
 import { createColumns } from "./columns";
+import { CostAnalysisModal } from "./CostAnalysisCell";
 
 interface SummaryTableProps {
     data: ProductionSchedule[];
@@ -39,6 +40,7 @@ export function SummaryTable({
         { id: "schedule_date", desc: true }
     ]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+    const [selectedSchedule, setSelectedSchedule] = React.useState<ProductionSchedule | null>(null);
 
     const columns = useMemo(() => createColumns(), []);
 
@@ -119,7 +121,11 @@ export function SummaryTable({
                         <TableBody>
                             {table.getRowModel().rows?.length ? (
                                 table.getRowModel().rows.map((row) => (
-                                    <TableRow key={row.id}>
+                                    <TableRow 
+                                        key={row.id}
+                                        onClick={() => setSelectedSchedule(row.original)}
+                                        className="cursor-pointer hover:bg-muted/10 transition-colors"
+                                    >
                                         {row.getVisibleCells().map((cell) => (
                                             <TableCell key={cell.id}>
                                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -177,6 +183,12 @@ export function SummaryTable({
                     </div>
                 </div>
             </div>
+
+            <CostAnalysisModal 
+                schedule={selectedSchedule} 
+                isOpen={!!selectedSchedule} 
+                onClose={() => setSelectedSchedule(null)} 
+            />
         </div>
     );
 }

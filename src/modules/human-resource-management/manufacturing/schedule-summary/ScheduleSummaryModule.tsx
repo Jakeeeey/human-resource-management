@@ -14,6 +14,30 @@ const ScheduleSummaryContent = () => {
     const approvedSchedules = schedules.filter(s => s.approval_status === "APPROVED" || s.approval_status === "NOT_REQUIRED" || s.target_approval_status === "APPROVED" || s.target_approval_status === "NOT_REQUIRED").length;
     const pendingSchedules = schedules.filter(s => s.approval_status === "PENDING_APPROVAL" || s.target_approval_status === "PENDING_APPROVAL").length;
 
+    const totalTarget = schedules.reduce((acc, s) => acc + (s.daily_target || 0), 0);
+    const totalActual = schedules.reduce((acc, s) => acc + (s.actual_produce || 0), 0);
+
+    const totalEstLaborCost = schedules.reduce((acc, s) => {
+        const positions = s.positions || s.manu_hr_schedule_positions || [];
+        let workingHours = 8;
+        let elapsedHours = 9;
+        if (s.start_time && s.end_time) {
+            const start = s.start_time.split(":");
+            const end = s.end_time.split(":");
+            const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+            const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+            elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+            workingHours = Math.max(0, elapsedHours - 1);
+        }
+        const cost = positions.reduce((c: number, p: { position?: { position_rate?: string | number }, assigned_persons?: string | number }) => {
+            const dailyRate = Number(p.position?.position_rate || 0);
+            const hourlyRate = dailyRate / 8;
+            const persons = Number(p.assigned_persons || 0);
+            return c + (persons * hourlyRate * workingHours);
+        }, 0);
+        return acc + cost;
+    }, 0);
+
     return (
         <div className="flex-1 flex flex-col space-y-8 p-6 pt-8 h-full overflow-hidden bg-gradient-to-br from-background via-background/95 to-primary/[0.03]">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -29,7 +53,7 @@ const ScheduleSummaryContent = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                 <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
                         <Activity className="h-24 w-24" />
@@ -68,6 +92,34 @@ const ScheduleSummaryContent = () => {
                         </p>
                         <span className="text-3xl font-black tracking-tight tabular-nums block text-amber-600">
                             {pendingSchedules}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
+                        <Activity className="h-24 w-24" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                            <Activity className="h-3 w-3 text-primary" /> Production (Actual / Target)
+                        </p>
+                        <span className="text-3xl font-black tracking-tight tabular-nums block text-foreground">
+                            {totalActual.toLocaleString()} <span className="text-xl text-muted-foreground">/ {totalTarget.toLocaleString()}</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
+                        <Activity className="h-24 w-24" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                            <Activity className="h-3 w-3 text-purple-500" /> Est. Labor Cost
+                        </p>
+                        <span className="text-3xl font-black tracking-tight tabular-nums block text-purple-600">
+                            ₱{totalEstLaborCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                     </div>
                 </div>
