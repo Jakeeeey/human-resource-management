@@ -5,7 +5,7 @@ import { ProductionOutputFetchProvider } from "./providers/fetchProvider";
 import { useProductionOutput } from "./hooks/useProductionOutput";
 import { OutputTable } from "./components/OutputTable";
 import { UpdateOutputDialog } from "./components/UpdateOutputDialog";
-import { CheckCircle2, TrendingUp, InboxIcon } from "lucide-react";
+import { CheckCircle2, TrendingUp, InboxIcon, Banknote, Coins } from "lucide-react";
 
 const ProductionOutputContent = () => {
     const {
@@ -16,6 +16,7 @@ const ProductionOutputContent = () => {
         setIsUpdateOpen,
         promptUpdate,
         handleUpdateActualProduce,
+        financeStats,
     } = useProductionOutput();
 
     // Stats calculations
@@ -38,7 +39,7 @@ const ProductionOutputContent = () => {
             </div>
 
             {/* Premium Stat Summary Dashboard */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                 <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
                         <TrendingUp className="h-24 w-24" />
@@ -86,6 +87,48 @@ const ProductionOutputContent = () => {
                         </span>
                         <p className="text-[10px] text-muted-foreground font-medium">
                             Schedules awaiting output records
+                        </p>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
+                        <Banknote className="h-24 w-24" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                            <Banknote className="h-3 w-3 text-rose-500" /> Actual Cost (Pending)
+                        </p>
+                        {financeStats.isLoading ? (
+                            <div className="h-8 w-24 bg-muted/50 rounded-md animate-pulse mt-1 mb-1" />
+                        ) : (
+                            <span className="text-2xl font-black tracking-tight tabular-nums block text-rose-600">
+                                ₱{financeStats.totalActualCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                        )}
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                            Live total actual cost
+                        </p>
+                    </div>
+                </div>
+
+                <div className="relative overflow-hidden rounded-2xl border bg-card/60 backdrop-blur-md p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/10 group">
+                    <div className="absolute top-0 right-0 p-8 opacity-[0.03] text-foreground group-hover:scale-110 transition-transform">
+                        <Coins className="h-24 w-24" />
+                    </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/70 flex items-center gap-1.5">
+                            <Coins className="h-3 w-3 text-emerald-500" /> Target Cost (Pending)
+                        </p>
+                        {financeStats.isLoading ? (
+                            <div className="h-8 w-24 bg-muted/50 rounded-md animate-pulse mt-1 mb-1" />
+                        ) : (
+                            <span className="text-2xl font-black tracking-tight tabular-nums block text-emerald-600">
+                                ₱{financeStats.totalEstCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                        )}
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                            Estimated target cost
                         </p>
                     </div>
                 </div>

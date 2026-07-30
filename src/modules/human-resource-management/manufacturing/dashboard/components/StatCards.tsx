@@ -1,4 +1,4 @@
-import { Users, Target, Package, TrendingUp } from "lucide-react";
+import { Users, Target, Package, TrendingUp, Banknote, Coins, CircleDollarSign } from "lucide-react";
 import type { DashboardStats } from "../types";
 import { formatNumber } from "@/lib/utils";
 
@@ -44,6 +44,38 @@ export function StatCards({ stats }: StatCardsProps) {
             color: stats.productivityPercentage >= 100 ? "text-emerald-600" : stats.productivityPercentage >= 80 ? "text-amber-600" : "text-rose-600",
             bg: stats.productivityPercentage >= 100 ? "bg-emerald-600/10" : stats.productivityPercentage >= 80 ? "bg-amber-600/10" : "bg-rose-600/10",
             description: "Actual vs Target ratio",
+        },
+        {
+            title: "Total Actual Cost",
+            value: `₱${(stats.totalActualCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            icon: Banknote,
+            color: "text-rose-600",
+            bg: "bg-rose-600/10",
+            description: "Total live cost based on attendance",
+        },
+        {
+            title: "Total Est. Cost",
+            value: `₱${(stats.totalEstCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            icon: Coins,
+            color: "text-indigo-600",
+            bg: "bg-indigo-600/10",
+            description: "Total estimated target cost",
+        },
+        {
+            title: "Est. Cost Per Piece",
+            value: `₱${(stats.totalTargetProduce > 0 ? ((stats.totalEstCost || 0) / stats.totalTargetProduce) : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            icon: CircleDollarSign,
+            color: "text-purple-600",
+            bg: "bg-purple-600/10",
+            description: "Target cost divided by target produce",
+        },
+        {
+            title: "Actual Cost Per Piece",
+            value: `₱${(stats.totalActualProduce > 0 ? ((stats.totalActualCost || 0) / stats.totalActualProduce) : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            icon: CircleDollarSign,
+            color: "text-rose-600",
+            bg: "bg-rose-600/10",
+            description: "Live cost divided by actual produce",
         },
     ];
 
