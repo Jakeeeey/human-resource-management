@@ -74,6 +74,16 @@ export function UpdateOutputDialog({
         }
     };
 
+    let workingHours = 8;
+    if (schedule?.start_time && schedule?.end_time) {
+        const start = schedule.start_time.split(":");
+        const end = schedule.end_time.split(":");
+        const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+        const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+        const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+        workingHours = Math.max(0, elapsedHours - 1);
+    }
+
     useEffect(() => {
         if (open && schedule) {
             setActualProduce(schedule.actual_produce || 0);
@@ -382,12 +392,23 @@ export function UpdateOutputDialog({
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="font-bold text-foreground text-xs">{name}</span>
                                                                     {metrics && (
-                                                                        <div className="flex gap-2">
+                                                                        <div className="flex gap-2 items-center">
                                                                             {metrics.late && <span className="text-[9px] font-black uppercase text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-500/20 shadow-sm">Late: {metrics.late}</span>}
                                                                             {metrics.undertime && <span className="text-[9px] font-black uppercase text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20 shadow-sm">Undertime: {metrics.undertime}</span>}
                                                                             <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20 shadow-sm">
                                                                                 {metrics.workingHours === 'Incomplete' ? 'No Time Out' : `${metrics.workingHours} Total`}
                                                                             </span>
+                                                                            {(() => {
+                                                                                const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                                                                                const cost = metrics.workingHoursRaw > 0 
+                                                                                    ? (metrics.workingHoursRaw / 60) * hourlyRate 
+                                                                                    : (workingHours * hourlyRate);
+                                                                                return (
+                                                                                    <span className="text-[9px] font-black uppercase text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded-md border border-blue-500/20 shadow-sm">
+                                                                                        ₱{cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                    </span>
+                                                                                );
+                                                                            })()}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -410,16 +431,6 @@ export function UpdateOutputDialog({
                     </div>
 
                     {(() => {
-                        let workingHours = 8;
-                        if (schedule?.start_time && schedule?.end_time) {
-                            const start = schedule.start_time.split(":");
-                            const end = schedule.end_time.split(":");
-                            const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
-                            const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
-                            const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
-                            workingHours = Math.max(0, elapsedHours - 1);
-                        }
-                        
                         const posData = schedule?.manu_hr_schedule_positions || schedule?.positions || [];
                         
                         const totalEstCost = posData.reduce((acc, pos) => {
@@ -430,9 +441,26 @@ export function UpdateOutputDialog({
 
                         const totalActualCost = posData.reduce((acc, pos) => {
                             const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
-                            const actualPersons = posAttendance.length;
                             const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
-                            return acc + (actualPersons * hourlyRate * workingHours);
+                            
+                            const posCost = posAttendance.reduce((posAcc, log) => {
+                                const metrics = computeMetrics(log);
+                                // If they haven't timed out, we might want to calculate cost based on schedule hours or 0.
+                                // For now, if they have actual working minutes, use that. 
+                                // Otherwise, if they just tapped in, it's incomplete so we can assume schedule workingHours or 0.
+                                // Let's use actual raw hours if available, otherwise fallback to schedule working hours if they are tapped in.
+                                if (metrics) {
+                                    if (metrics.workingHoursRaw > 0) {
+                                        return posAcc + ((metrics.workingHoursRaw / 60) * hourlyRate);
+                                    } else {
+                                        // Still working (no time out), project using full schedule hours
+                                        return posAcc + (workingHours * hourlyRate);
+                                    }
+                                }
+                                return posAcc;
+                            }, 0);
+                            
+                            return acc + posCost;
                         }, 0);
 
                         const targetCpp = (schedule?.daily_target || 0) > 0 ? totalEstCost / (schedule?.daily_target || 1) : 0;
@@ -447,10 +475,10 @@ export function UpdateOutputDialog({
                                     Cost Projection
                                 </Label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="p-4 rounded-xl border bg-card/50 shadow-sm flex flex-col justify-between transition-colors hover:bg-card/80">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 mb-1">Final Total Cost</p>
-                                        <p className="text-xl font-black tabular-nums text-foreground">₱{totalActualCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mt-2 bg-muted/50 w-fit px-2 py-1 rounded-md border border-muted-foreground/10">
+                                    <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between transition-colors hover:bg-card/80 ${actualProduce === 0 ? 'bg-card/50 border-muted-foreground/20' : isOver ? 'bg-rose-500/10 border-rose-500/20' : 'bg-card/50'}`}>
+                                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isOver ? 'text-rose-600/70' : 'text-muted-foreground/70'}`}>Final Total Cost</p>
+                                        <p className={`text-xl font-black tabular-nums ${isOver ? 'text-rose-700 dark:text-rose-400' : 'text-foreground'}`}>₱{totalActualCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                        <p className={`text-[9px] font-black uppercase tracking-widest mt-2 w-fit px-2 py-1 rounded-md border ${isOver ? 'bg-rose-500/10 text-rose-600/70 border-rose-500/20' : 'bg-muted/50 text-muted-foreground border-muted-foreground/10'}`}>
                                             Based on {attendanceLogs.filter(a => a.time_in).length} actual workers
                                         </p>
                                     </div>
