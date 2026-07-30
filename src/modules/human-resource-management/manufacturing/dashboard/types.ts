@@ -8,6 +8,8 @@ export interface ChartDataPoint {
     actual: number;
     targetWorkers: number;
     actualWorkers: number;
+    actualCost?: number;
+    targetCost?: number;
 }
 
 export interface DashboardStats {
@@ -17,6 +19,8 @@ export interface DashboardStats {
     totalTargetProduce: number;
     productivityPercentage: number;
     chartData: ChartDataPoint[];
+    totalActualCost?: number;
+    totalEstCost?: number;
 }
 
 export const dashboardFilterSchema = z.object({

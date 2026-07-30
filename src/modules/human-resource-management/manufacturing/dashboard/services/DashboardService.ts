@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { DashboardStats, ChartDataPoint } from "../types";
 import { format, parseISO } from "date-fns";
+import { ProductionOutputService } from "../../production-output/services/ProductionOutputService";
 
 const UPSTREAM_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 const TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -34,7 +35,9 @@ export class DashboardService {
                     totalActualProduce: 0,
                     totalTargetProduce: 0,
                     productivityPercentage: 0,
-                    chartData: []
+                    chartData: [],
+                    totalActualCost: 0,
+                    totalEstCost: 0
                 };
             }
 
@@ -44,10 +47,15 @@ export class DashboardService {
             let totalActualWorkers = 0;
             let totalSetWorkers = 0;
             const workforceMap: Record<string, { set: number, actual: number }> = {};
+            const costMap: Record<string, { actualCost: number, estCost: number }> = {};
 
             schedules.forEach((s: any) => {
                 workforceMap[s.schedule_date] = { set: 0, actual: 0 };
+                costMap[s.schedule_date] = { actualCost: 0, estCost: 0 };
             });
+
+            let allAttendance: any[] = [];
+            let allPositions: any[] = [];
 
             if (scheduleIds.length > 0) {
                 // Fetch Attendance
@@ -59,6 +67,7 @@ export class DashboardService {
                 if (attRes.ok) {
                     const { data: attendance } = await attRes.json();
                     if (attendance && attendance.length > 0) {
+                        allAttendance = attendance;
                         totalActualWorkers = attendance.length;
                         attendance.forEach((a: any) => {
                             const sched = schedules.find((s: any) => s.id === a.schedule_id);
@@ -73,11 +82,13 @@ export class DashboardService {
                 const posUrl = new URL(`${UPSTREAM_BASE.replace(/\/+$/, "")}/items/manu_hr_schedule_positions`);
                 posUrl.searchParams.set("limit", "-1");
                 posUrl.searchParams.set("filter[schedule_id][_in]", scheduleIds.join(","));
+                posUrl.searchParams.set("fields", "*,position.*,position_id.*");
                 
                 const posRes = await fetch(posUrl.toString(), { method: "GET", headers, cache: "no-store" });
                 if (posRes.ok) {
                     const { data: positions } = await posRes.json();
                     if (positions && positions.length > 0) {
+                        allPositions = positions;
                         positions.forEach((p: any) => {
                             totalSetWorkers += (p.assigned_persons || 0);
                             const sched = schedules.find((s: any) => s.id === p.schedule_id);
@@ -89,9 +100,11 @@ export class DashboardService {
                 }
             }
 
-            // 3. Aggregate totals
+            // 3. Aggregate totals and costs
             let totalActualProduce = 0;
             let totalTargetProduce = 0;
+            let totalActualCost = 0;
+            let totalEstCost = 0;
             const dateMap: Record<string, { target: number, actual: number }> = {};
 
             schedules.forEach((s: any) => {
@@ -104,6 +117,28 @@ export class DashboardService {
                 }
                 dateMap[dateStr].target += (s.daily_target || 0);
                 dateMap[dateStr].actual += (s.actual_produce || 0);
+
+                // Compute costs for this schedule
+                const schedPositions = allPositions.filter(p => p.schedule_id === s.id);
+                s.manu_hr_schedule_positions = schedPositions;
+                const schedAttendance = allAttendance.filter(a => a.schedule_id === s.id);
+                const costCalc = ProductionOutputService.calculateScheduleCost(s, schedAttendance);
+                
+                console.log(`[DashboardService] Schedule ${s.id}:`, {
+                    schedPositionsCount: schedPositions.length,
+                    firstPosRate: schedPositions[0]?.position?.position_rate,
+                    actualCost: costCalc.actualCost,
+                    estCost: costCalc.estCost
+                });
+
+                if (s.schedule_date) {
+                    if (!costMap[s.schedule_date]) costMap[s.schedule_date] = { actualCost: 0, estCost: 0 };
+                    costMap[s.schedule_date].actualCost += costCalc.actualCost;
+                    costMap[s.schedule_date].estCost += costCalc.estCost;
+                }
+
+                totalActualCost += costCalc.actualCost;
+                totalEstCost += costCalc.estCost;
             });
 
             // 4. Calculate Productivity
@@ -122,6 +157,8 @@ export class DashboardService {
                 actual: dateMap[date].actual,
                 targetWorkers: workforceMap[date]?.set || 0,
                 actualWorkers: workforceMap[date]?.actual || 0,
+                actualCost: costMap[date]?.actualCost || 0,
+                targetCost: costMap[date]?.estCost || 0,
             }));
 
             return {
@@ -130,7 +167,9 @@ export class DashboardService {
                 totalActualProduce,
                 totalTargetProduce,
                 productivityPercentage,
-                chartData
+                chartData,
+                totalActualCost,
+                totalEstCost
             };
         } catch (error) {
             console.error("[DashboardService] Error:", error);

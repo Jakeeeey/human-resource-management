@@ -4,6 +4,7 @@ import { useDashboard } from "@/modules/human-resource-management/manufacturing/
 import { StatCards } from "@/modules/human-resource-management/manufacturing/dashboard/components/StatCards";
 import { ProductivityChart } from "@/modules/human-resource-management/manufacturing/dashboard/components/ProductivityChart";
 import { WorkforceChart } from "@/modules/human-resource-management/manufacturing/dashboard/components/WorkforceChart";
+import { FinanceChart } from "@/modules/human-resource-management/manufacturing/dashboard/components/FinanceChart";
 import { AiInsightsCard } from "@/modules/human-resource-management/manufacturing/dashboard/components/AiInsightsCard";
 import { DashboardDateFilter } from "@/modules/human-resource-management/manufacturing/dashboard/components/DashboardDateFilter";
 import { Loader2, RefreshCcw, Activity } from "lucide-react";
@@ -64,6 +65,7 @@ export default function ManufacturingDashboardPage() {
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                             <ProductivityChart data={stats.chartData} />
                             <WorkforceChart data={stats.chartData} />
+                            <FinanceChart data={stats.chartData} />
                         </div>
                     </div>
                 ) : null}

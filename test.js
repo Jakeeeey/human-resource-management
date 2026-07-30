@@ -1,0 +1,1 @@
+fetch("http://goatedcodoer:8091/items/manu_hr_schedule_positions?limit=1&fields=*,position_id.*", {headers:{"Authorization":"Bearer rTilKSsclzuQW8WfQWK1ba8wrD_LetNn"}}).then(r=>r.json()).then(r => console.log(JSON.stringify(r, null, 2)));

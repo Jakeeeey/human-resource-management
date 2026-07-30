@@ -23,69 +23,7 @@ function LiveCostCell({ schedule }: { schedule: ProductionSchedule }) {
             try {
                 const attendanceLogs = await ProductionOutputService.getScheduleAttendance(schedule.id);
                 
-                let workingHours = 8;
-                if (schedule.start_time && schedule.end_time) {
-                    const start = schedule.start_time.split(":");
-                    const end = schedule.end_time.split(":");
-                    const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
-                    const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
-                    const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
-                    workingHours = Math.max(0, elapsedHours - 1);
-                }
-
-                const hasManuPositions = schedule.manu_hr_schedule_positions && schedule.manu_hr_schedule_positions.length > 0;
-                const posData = hasManuPositions ? schedule.manu_hr_schedule_positions! : (schedule.positions || []);
-
-                const computeMetrics = (log: ScheduleAttendance) => {
-                    if (!schedule?.start_time || !schedule?.end_time || !log.time_in) return null;
-                    const schedDateStr = schedule.schedule_date;
-                    if (!schedDateStr) return null;
-                    
-                    const expectedStart = parse(`${schedDateStr} ${schedule.start_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
-                    const expectedEnd = parse(`${schedDateStr} ${schedule.end_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
-                    
-                    const timeIn = new Date(log.time_in);
-                    const timeOut = log.time_out ? new Date(log.time_out) : null;
-
-                    let totalWorkingMins = 0;
-                    if (timeOut && isValid(timeIn)) {
-                        totalWorkingMins = differenceInMinutes(timeOut, timeIn);
-                        if (log.lunch_start && log.lunch_end) {
-                            totalWorkingMins -= differenceInMinutes(new Date(log.lunch_end), new Date(log.lunch_start));
-                        }
-                        if (log.break_start && log.break_end) {
-                            totalWorkingMins -= differenceInMinutes(new Date(log.break_end), new Date(log.break_start));
-                        }
-                        if (totalWorkingMins < 0) totalWorkingMins = 0;
-                    }
-
-                    return { workingHoursRaw: totalWorkingMins };
-                };
-
-                const totalActualCost = posData.reduce((acc, pos) => {
-                    const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
-                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
-                    
-                    const posCost = posAttendance.reduce((posAcc, log) => {
-                        const metrics = computeMetrics(log);
-                        if (metrics) {
-                            if (metrics.workingHoursRaw > 0) {
-                                return posAcc + ((metrics.workingHoursRaw / 60) * hourlyRate);
-                            } else {
-                                return posAcc + (workingHours * hourlyRate);
-                            }
-                        }
-                        return posAcc;
-                    }, 0);
-                    
-                    return acc + posCost;
-                }, 0);
-
-                const totalEstCost = posData.reduce((acc, pos) => {
-                    const setPersons = Number(pos.assigned_persons || 0);
-                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
-                    return acc + (setPersons * hourlyRate * workingHours);
-                }, 0);
+                const { actualCost: totalActualCost, estCost: totalEstCost } = ProductionOutputService.calculateScheduleCost(schedule, attendanceLogs);
 
                 liveCostCache.set(schedule.id, { cost: totalActualCost, estCost: totalEstCost });
 
@@ -146,69 +84,7 @@ function LiveCostPerPieceCell({ schedule }: { schedule: ProductionSchedule }) {
             try {
                 const attendanceLogs = await ProductionOutputService.getScheduleAttendance(schedule.id);
                 
-                let workingHours = 8;
-                if (schedule.start_time && schedule.end_time) {
-                    const start = schedule.start_time.split(":");
-                    const end = schedule.end_time.split(":");
-                    const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
-                    const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
-                    const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
-                    workingHours = Math.max(0, elapsedHours - 1);
-                }
-
-                const hasManuPositions = schedule.manu_hr_schedule_positions && schedule.manu_hr_schedule_positions.length > 0;
-                const posData = hasManuPositions ? schedule.manu_hr_schedule_positions! : (schedule.positions || []);
-
-                const computeMetrics = (log: ScheduleAttendance) => {
-                    if (!schedule?.start_time || !schedule?.end_time || !log.time_in) return null;
-                    const schedDateStr = schedule.schedule_date;
-                    if (!schedDateStr) return null;
-                    
-                    const expectedStart = parse(`${schedDateStr} ${schedule.start_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
-                    const expectedEnd = parse(`${schedDateStr} ${schedule.end_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
-                    
-                    const timeIn = new Date(log.time_in);
-                    const timeOut = log.time_out ? new Date(log.time_out) : null;
-
-                    let totalWorkingMins = 0;
-                    if (timeOut && isValid(timeIn)) {
-                        totalWorkingMins = differenceInMinutes(timeOut, timeIn);
-                        if (log.lunch_start && log.lunch_end) {
-                            totalWorkingMins -= differenceInMinutes(new Date(log.lunch_end), new Date(log.lunch_start));
-                        }
-                        if (log.break_start && log.break_end) {
-                            totalWorkingMins -= differenceInMinutes(new Date(log.break_end), new Date(log.break_start));
-                        }
-                        if (totalWorkingMins < 0) totalWorkingMins = 0;
-                    }
-
-                    return { workingHoursRaw: totalWorkingMins };
-                };
-
-                const totalActualCost = posData.reduce((acc, pos) => {
-                    const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
-                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
-                    
-                    const posCost = posAttendance.reduce((posAcc, log) => {
-                        const metrics = computeMetrics(log);
-                        if (metrics) {
-                            if (metrics.workingHoursRaw > 0) {
-                                return posAcc + ((metrics.workingHoursRaw / 60) * hourlyRate);
-                            } else {
-                                return posAcc + (workingHours * hourlyRate);
-                            }
-                        }
-                        return posAcc;
-                    }, 0);
-                    
-                    return acc + posCost;
-                }, 0);
-
-                const totalEstCost = posData.reduce((acc, pos) => {
-                    const setPersons = Number(pos.assigned_persons || 0);
-                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
-                    return acc + (setPersons * hourlyRate * workingHours);
-                }, 0);
+                const { actualCost: totalActualCost, estCost: totalEstCost } = ProductionOutputService.calculateScheduleCost(schedule, attendanceLogs);
 
                 liveCostCache.set(schedule.id, { cost: totalActualCost, estCost: totalEstCost });
 

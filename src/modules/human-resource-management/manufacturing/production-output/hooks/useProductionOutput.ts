@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useProductionOutputFetch } from "../providers/fetchProvider";
 import { ProductionOutputService } from "../services/ProductionOutputService";
@@ -18,6 +18,32 @@ export function useProductionOutput() {
     const { schedules, isLoading, refreshData } = useProductionOutputFetch();
     const [selectedSchedule, setSelectedSchedule] = useState<ProductionSchedule | null>(null);
     const [isUpdateOpen, setIsUpdateOpen] = useState(false);
+    const [financeStats, setFinanceStats] = useState({ totalActualCost: 0, totalEstCost: 0, isLoading: false });
+
+    useEffect(() => {
+        const fetchFinance = async () => {
+            const unposted = schedules.filter(s => !s.is_output_posted);
+            if (unposted.length === 0) {
+                setFinanceStats({ totalActualCost: 0, totalEstCost: 0, isLoading: false });
+                return;
+            }
+            setFinanceStats(prev => ({ ...prev, isLoading: true }));
+            try {
+                let actual = 0;
+                let est = 0;
+                await Promise.all(unposted.map(async (schedule) => {
+                    const logs = await ProductionOutputService.getScheduleAttendance(schedule.id);
+                    const { actualCost, estCost } = ProductionOutputService.calculateScheduleCost(schedule, logs);
+                    actual += actualCost;
+                    est += estCost;
+                }));
+                setFinanceStats({ totalActualCost: actual, totalEstCost: est, isLoading: false });
+            } catch {
+                setFinanceStats(prev => ({ ...prev, isLoading: false }));
+            }
+        };
+        fetchFinance();
+    }, [schedules]);
 
     const handleUpdateActualProduce = async (id: number, actualProduce: number, isPosted: boolean) => {
         const userId = getUserIdFromCookie();
@@ -48,5 +74,6 @@ export function useProductionOutput() {
         setIsUpdateOpen,
         promptUpdate,
         handleUpdateActualProduce,
+        financeStats,
     };
 }

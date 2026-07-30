@@ -20,7 +20,7 @@ export function WorkforceChart({ data }: WorkforceChartProps) {
         <div className="h-[400px] w-full rounded-xl border bg-card p-6 shadow-sm">
             <h3 className="font-bold text-lg mb-6">Workforce Attendance Over Time</h3>
             <ResponsiveContainer width="100%" height="85%">
-                <ComposedChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <ComposedChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
                     <defs>
                         <linearGradient id="workerGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.9}/>
