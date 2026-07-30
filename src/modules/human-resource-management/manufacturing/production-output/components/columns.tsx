@@ -2,10 +2,117 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { format } from "date-fns";
-import { CheckCircle2, Factory, Hash, Calendar } from "lucide-react";
-import type { ProductionSchedule } from "../../production-scheduling/types";
+import { format, parse, differenceInMinutes, isValid } from "date-fns";
+import { CheckCircle2, Factory, Hash, Calendar, Loader2 } from "lucide-react";
+import type { ProductionSchedule, ScheduleAttendance } from "../../production-scheduling/types";
 import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { ProductionOutputService } from "../services/ProductionOutputService";
+
+function LiveCostCell({ schedule }: { schedule: ProductionSchedule }) {
+    const [cost, setCost] = useState<number | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchCost = async () => {
+            try {
+                // If it's posted, we could ideally just show the saved actual cost, but we don't have it saved on the schedule object.
+                // We'll calculate it live.
+                const attendanceLogs = await ProductionOutputService.getScheduleAttendance(schedule.id);
+                
+                let workingHours = 8;
+                if (schedule.start_time && schedule.end_time) {
+                    const start = schedule.start_time.split(":");
+                    const end = schedule.end_time.split(":");
+                    const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+                    const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+                    const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+                    workingHours = Math.max(0, elapsedHours - 1);
+                }
+
+                const hasManuPositions = schedule.manu_hr_schedule_positions && schedule.manu_hr_schedule_positions.length > 0;
+                const posData = hasManuPositions ? schedule.manu_hr_schedule_positions! : (schedule.positions || []);
+
+                const computeMetrics = (log: ScheduleAttendance) => {
+                    if (!schedule?.start_time || !schedule?.end_time || !log.time_in) return null;
+                    const schedDateStr = schedule.schedule_date;
+                    if (!schedDateStr) return null;
+                    
+                    const expectedStart = parse(`${schedDateStr} ${schedule.start_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
+                    const expectedEnd = parse(`${schedDateStr} ${schedule.end_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
+                    
+                    const timeIn = new Date(log.time_in);
+                    const timeOut = log.time_out ? new Date(log.time_out) : null;
+
+                    let totalWorkingMins = 0;
+                    if (timeOut && isValid(timeIn)) {
+                        totalWorkingMins = differenceInMinutes(timeOut, timeIn);
+                        if (log.lunch_start && log.lunch_end) {
+                            totalWorkingMins -= differenceInMinutes(new Date(log.lunch_end), new Date(log.lunch_start));
+                        }
+                        if (log.break_start && log.break_end) {
+                            totalWorkingMins -= differenceInMinutes(new Date(log.break_end), new Date(log.break_start));
+                        }
+                        if (totalWorkingMins < 0) totalWorkingMins = 0;
+                    }
+
+                    return { workingHoursRaw: totalWorkingMins };
+                };
+
+                const totalActualCost = posData.reduce((acc, pos) => {
+                    const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
+                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                    
+                    const posCost = posAttendance.reduce((posAcc, log) => {
+                        const metrics = computeMetrics(log);
+                        if (metrics) {
+                            if (metrics.workingHoursRaw > 0) {
+                                return posAcc + ((metrics.workingHoursRaw / 60) * hourlyRate);
+                            } else {
+                                return posAcc + (workingHours * hourlyRate);
+                            }
+                        }
+                        return posAcc;
+                    }, 0);
+                    
+                    return acc + posCost;
+                }, 0);
+
+                if (isMounted) setCost(totalActualCost);
+            } catch (error) {
+                console.error("Failed to fetch live cost:", error);
+                if (isMounted) setCost(0);
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        fetchCost();
+        return () => { isMounted = false; };
+    }, [schedule]);
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col gap-0.5 animate-pulse opacity-50">
+                <span className="font-bold text-xs tabular-nums text-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Calculating...
+                </span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-0.5">
+            <span className="font-bold text-xs tabular-nums text-foreground">
+                ₱{(cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-[10px] text-emerald-600/70 font-black tracking-widest uppercase">
+                Actual Cost
+            </span>
+        </div>
+    );
+}
 
 export const getColumns = (
     onUpdateOutput: (schedule: ProductionSchedule) => void
@@ -111,37 +218,7 @@ export const getColumns = (
         id: "est_labor_cost",
         header: "Cost Analysis",
         cell: ({ row }) => {
-            const positions = row.original.positions || row.original.manu_hr_schedule_positions || [];
-            
-            let workingHours = 8;
-            let elapsedHours = 9; 
-            
-            if (row.original.start_time && row.original.end_time) {
-                const start = row.original.start_time.split(":");
-                const end = row.original.end_time.split(":");
-                const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
-                const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
-                elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
-                workingHours = Math.max(0, elapsedHours - 1);
-            }
-            
-            const actualTotalCost = positions.reduce((acc: number, p: any) => {
-                const dailyRate = p.position?.position_rate || 0;
-                const hourlyRate = dailyRate / 8;
-                const persons = p.actual_persons || 0;
-                return acc + (persons * hourlyRate * workingHours);
-            }, 0);
-
-            return (
-                <div className="flex flex-col gap-0.5">
-                    <span className="font-bold text-xs tabular-nums text-foreground">
-                        ₱{actualTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground/70 font-semibold">
-                        {workingHours.toFixed(1)} hrs work
-                    </span>
-                </div>
-            );
+            return <LiveCostCell schedule={row.original} />;
         },
     },
     {

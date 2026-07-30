@@ -382,12 +382,23 @@ export function UpdateOutputDialog({
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="font-bold text-foreground text-xs">{name}</span>
                                                                     {metrics && (
-                                                                        <div className="flex gap-2">
+                                                                        <div className="flex gap-2 items-center">
                                                                             {metrics.late && <span className="text-[9px] font-black uppercase text-rose-500 bg-rose-500/10 px-1.5 py-0.5 rounded-md border border-rose-500/20 shadow-sm">Late: {metrics.late}</span>}
                                                                             {metrics.undertime && <span className="text-[9px] font-black uppercase text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded-md border border-amber-500/20 shadow-sm">Undertime: {metrics.undertime}</span>}
                                                                             <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20 shadow-sm">
                                                                                 {metrics.workingHours === 'Incomplete' ? 'No Time Out' : `${metrics.workingHours} Total`}
                                                                             </span>
+                                                                            {(() => {
+                                                                                const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                                                                                const cost = metrics.workingHoursRaw > 0 
+                                                                                    ? (metrics.workingHoursRaw / 60) * hourlyRate 
+                                                                                    : (workingHours * hourlyRate);
+                                                                                return (
+                                                                                    <span className="text-[9px] font-black uppercase text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded-md border border-blue-500/20 shadow-sm">
+                                                                                        ₱{cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                    </span>
+                                                                                );
+                                                                            })()}
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -430,9 +441,26 @@ export function UpdateOutputDialog({
 
                         const totalActualCost = posData.reduce((acc, pos) => {
                             const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
-                            const actualPersons = posAttendance.length;
                             const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
-                            return acc + (actualPersons * hourlyRate * workingHours);
+                            
+                            const posCost = posAttendance.reduce((posAcc, log) => {
+                                const metrics = computeMetrics(log);
+                                // If they haven't timed out, we might want to calculate cost based on schedule hours or 0.
+                                // For now, if they have actual working minutes, use that. 
+                                // Otherwise, if they just tapped in, it's incomplete so we can assume schedule workingHours or 0.
+                                // Let's use actual raw hours if available, otherwise fallback to schedule working hours if they are tapped in.
+                                if (metrics) {
+                                    if (metrics.workingHoursRaw > 0) {
+                                        return posAcc + ((metrics.workingHoursRaw / 60) * hourlyRate);
+                                    } else {
+                                        // Still working (no time out), project using full schedule hours
+                                        return posAcc + (workingHours * hourlyRate);
+                                    }
+                                }
+                                return posAcc;
+                            }, 0);
+                            
+                            return acc + posCost;
                         }, 0);
 
                         const targetCpp = (schedule?.daily_target || 0) > 0 ? totalEstCost / (schedule?.daily_target || 1) : 0;
