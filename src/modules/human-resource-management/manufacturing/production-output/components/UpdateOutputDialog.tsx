@@ -74,6 +74,16 @@ export function UpdateOutputDialog({
         }
     };
 
+    let workingHours = 8;
+    if (schedule?.start_time && schedule?.end_time) {
+        const start = schedule.start_time.split(":");
+        const end = schedule.end_time.split(":");
+        const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+        const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+        const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+        workingHours = Math.max(0, elapsedHours - 1);
+    }
+
     useEffect(() => {
         if (open && schedule) {
             setActualProduce(schedule.actual_produce || 0);
@@ -421,16 +431,6 @@ export function UpdateOutputDialog({
                     </div>
 
                     {(() => {
-                        let workingHours = 8;
-                        if (schedule?.start_time && schedule?.end_time) {
-                            const start = schedule.start_time.split(":");
-                            const end = schedule.end_time.split(":");
-                            const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
-                            const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
-                            const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
-                            workingHours = Math.max(0, elapsedHours - 1);
-                        }
-                        
                         const posData = schedule?.manu_hr_schedule_positions || schedule?.positions || [];
                         
                         const totalEstCost = posData.reduce((acc, pos) => {
@@ -475,10 +475,10 @@ export function UpdateOutputDialog({
                                     Cost Projection
                                 </Label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="p-4 rounded-xl border bg-card/50 shadow-sm flex flex-col justify-between transition-colors hover:bg-card/80">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 mb-1">Final Total Cost</p>
-                                        <p className="text-xl font-black tabular-nums text-foreground">₱{totalActualCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mt-2 bg-muted/50 w-fit px-2 py-1 rounded-md border border-muted-foreground/10">
+                                    <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between transition-colors hover:bg-card/80 ${actualProduce === 0 ? 'bg-card/50 border-muted-foreground/20' : isOver ? 'bg-rose-500/10 border-rose-500/20' : 'bg-card/50'}`}>
+                                        <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isOver ? 'text-rose-600/70' : 'text-muted-foreground/70'}`}>Final Total Cost</p>
+                                        <p className={`text-xl font-black tabular-nums ${isOver ? 'text-rose-700 dark:text-rose-400' : 'text-foreground'}`}>₱{totalActualCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                        <p className={`text-[9px] font-black uppercase tracking-widest mt-2 w-fit px-2 py-1 rounded-md border ${isOver ? 'bg-rose-500/10 text-rose-600/70 border-rose-500/20' : 'bg-muted/50 text-muted-foreground border-muted-foreground/10'}`}>
                                             Based on {attendanceLogs.filter(a => a.time_in).length} actual workers
                                         </p>
                                     </div>

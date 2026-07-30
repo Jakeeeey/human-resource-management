@@ -9,16 +9,18 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { ProductionOutputService } from "../services/ProductionOutputService";
 
+const liveCostCache = new Map<number, { cost: number, estCost: number }>();
+
 function LiveCostCell({ schedule }: { schedule: ProductionSchedule }) {
-    const [cost, setCost] = useState<number | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const cached = liveCostCache.get(schedule.id);
+    const [cost, setCost] = useState<number | null>(cached ? cached.cost : null);
+    const [estCost, setEstCost] = useState<number | null>(cached ? cached.estCost : null);
+    const [isLoading, setIsLoading] = useState(!cached);
 
     useEffect(() => {
         let isMounted = true;
         const fetchCost = async () => {
             try {
-                // If it's posted, we could ideally just show the saved actual cost, but we don't have it saved on the schedule object.
-                // We'll calculate it live.
                 const attendanceLogs = await ProductionOutputService.getScheduleAttendance(schedule.id);
                 
                 let workingHours = 8;
@@ -79,10 +81,24 @@ function LiveCostCell({ schedule }: { schedule: ProductionSchedule }) {
                     return acc + posCost;
                 }, 0);
 
-                if (isMounted) setCost(totalActualCost);
+                const totalEstCost = posData.reduce((acc, pos) => {
+                    const setPersons = Number(pos.assigned_persons || 0);
+                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                    return acc + (setPersons * hourlyRate * workingHours);
+                }, 0);
+
+                liveCostCache.set(schedule.id, { cost: totalActualCost, estCost: totalEstCost });
+
+                if (isMounted) {
+                    setCost(totalActualCost);
+                    setEstCost(totalEstCost);
+                }
             } catch (error) {
                 console.error("Failed to fetch live cost:", error);
-                if (isMounted) setCost(0);
+                if (isMounted && !cached) {
+                    setCost(0);
+                    setEstCost(0);
+                }
             } finally {
                 if (isMounted) setIsLoading(false);
             }
@@ -90,25 +106,159 @@ function LiveCostCell({ schedule }: { schedule: ProductionSchedule }) {
 
         fetchCost();
         return () => { isMounted = false; };
-    }, [schedule]);
+    }, [schedule, cached]);
 
     if (isLoading) {
         return (
             <div className="flex flex-col gap-0.5 animate-pulse opacity-50">
-                <span className="font-bold text-xs tabular-nums text-foreground flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Calculating...
-                </span>
+                <div className="h-4 w-16 bg-muted rounded-md"></div>
+                <div className="h-3 w-12 bg-muted rounded-md mt-1"></div>
             </div>
         );
     }
 
+    const actualProduce = schedule.actual_produce || 0;
+    const targetCpp = (schedule.daily_target || 0) > 0 ? (estCost || 0) / (schedule.daily_target || 1) : 0;
+    const actualCpp = actualProduce > 0 ? (cost || 0) / actualProduce : 0;
+    const isOver = actualProduce > 0 && actualCpp > targetCpp;
+
     return (
         <div className="flex flex-col gap-0.5">
-            <span className="font-bold text-xs tabular-nums text-foreground">
+            <span className={`font-bold text-xs tabular-nums ${isOver ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}`}>
                 ₱{(cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
-            <span className="text-[10px] text-emerald-600/70 font-black tracking-widest uppercase">
+            <span className={`text-[10px] font-black tracking-widest uppercase ${isOver ? 'text-rose-600/70' : 'text-emerald-600/70'}`}>
                 Actual Cost
+            </span>
+        </div>
+    );
+}
+
+function LiveCostPerPieceCell({ schedule }: { schedule: ProductionSchedule }) {
+    const cached = liveCostCache.get(schedule.id);
+    const [cost, setCost] = useState<number | null>(cached ? cached.cost : null);
+    const [estCost, setEstCost] = useState<number | null>(cached ? cached.estCost : null);
+    const [isLoading, setIsLoading] = useState(!cached);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchCost = async () => {
+            try {
+                const attendanceLogs = await ProductionOutputService.getScheduleAttendance(schedule.id);
+                
+                let workingHours = 8;
+                if (schedule.start_time && schedule.end_time) {
+                    const start = schedule.start_time.split(":");
+                    const end = schedule.end_time.split(":");
+                    const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+                    const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+                    const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+                    workingHours = Math.max(0, elapsedHours - 1);
+                }
+
+                const hasManuPositions = schedule.manu_hr_schedule_positions && schedule.manu_hr_schedule_positions.length > 0;
+                const posData = hasManuPositions ? schedule.manu_hr_schedule_positions! : (schedule.positions || []);
+
+                const computeMetrics = (log: ScheduleAttendance) => {
+                    if (!schedule?.start_time || !schedule?.end_time || !log.time_in) return null;
+                    const schedDateStr = schedule.schedule_date;
+                    if (!schedDateStr) return null;
+                    
+                    const expectedStart = parse(`${schedDateStr} ${schedule.start_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
+                    const expectedEnd = parse(`${schedDateStr} ${schedule.end_time}`, 'yyyy-MM-dd HH:mm:ss', new Date());
+                    
+                    const timeIn = new Date(log.time_in);
+                    const timeOut = log.time_out ? new Date(log.time_out) : null;
+
+                    let totalWorkingMins = 0;
+                    if (timeOut && isValid(timeIn)) {
+                        totalWorkingMins = differenceInMinutes(timeOut, timeIn);
+                        if (log.lunch_start && log.lunch_end) {
+                            totalWorkingMins -= differenceInMinutes(new Date(log.lunch_end), new Date(log.lunch_start));
+                        }
+                        if (log.break_start && log.break_end) {
+                            totalWorkingMins -= differenceInMinutes(new Date(log.break_end), new Date(log.break_start));
+                        }
+                        if (totalWorkingMins < 0) totalWorkingMins = 0;
+                    }
+
+                    return { workingHoursRaw: totalWorkingMins };
+                };
+
+                const totalActualCost = posData.reduce((acc, pos) => {
+                    const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
+                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                    
+                    const posCost = posAttendance.reduce((posAcc, log) => {
+                        const metrics = computeMetrics(log);
+                        if (metrics) {
+                            if (metrics.workingHoursRaw > 0) {
+                                return posAcc + ((metrics.workingHoursRaw / 60) * hourlyRate);
+                            } else {
+                                return posAcc + (workingHours * hourlyRate);
+                            }
+                        }
+                        return posAcc;
+                    }, 0);
+                    
+                    return acc + posCost;
+                }, 0);
+
+                const totalEstCost = posData.reduce((acc, pos) => {
+                    const setPersons = Number(pos.assigned_persons || 0);
+                    const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                    return acc + (setPersons * hourlyRate * workingHours);
+                }, 0);
+
+                liveCostCache.set(schedule.id, { cost: totalActualCost, estCost: totalEstCost });
+
+                if (isMounted) {
+                    setCost(totalActualCost);
+                    setEstCost(totalEstCost);
+                }
+            } catch (error) {
+                if (isMounted && !cached) {
+                    setCost(0);
+                    setEstCost(0);
+                }
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        fetchCost();
+        return () => { isMounted = false; };
+    }, [schedule, cached]);
+
+    if (isLoading) {
+        return (
+            <div className="flex flex-col gap-0.5 animate-pulse opacity-50">
+                <div className="h-6 w-20 bg-muted rounded-md"></div>
+            </div>
+        );
+    }
+
+    const actualProduce = schedule.actual_produce || 0;
+    const targetCpp = (schedule.daily_target || 0) > 0 ? (estCost || 0) / (schedule.daily_target || 1) : 0;
+    const actualCpp = actualProduce > 0 ? (cost || 0) / actualProduce : 0;
+    const isOver = actualProduce > 0 && actualCpp > targetCpp;
+
+    if (actualProduce === 0) {
+        return (
+            <span className="text-[10px] text-muted-foreground/50 font-semibold italic">
+                Awaiting output...
+            </span>
+        );
+    }
+
+    return (
+        <div className="flex flex-col">
+            <span className={`text-[10.5px] font-black tabular-nums tracking-wider uppercase px-2.5 py-1 rounded-md border w-fit shadow-sm transition-colors ${
+                isOver 
+                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20' 
+                : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20'
+            }`}>
+                ₱{actualCpp.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} / pc
             </span>
         </div>
     );
@@ -122,13 +272,37 @@ export const getColumns = (
         header: "Schedule Date",
         cell: ({ row }) => {
             const dateStr = row.original.schedule_date;
+            const startTime = row.original.start_time;
+            const endTime = row.original.end_time;
             if (!dateStr) return null;
+            
+            const formatTime = (timeStr?: string) => {
+                if (!timeStr) return "";
+                // Handle different time string formats
+                const cleanTime = timeStr.length > 5 ? timeStr : `${timeStr}:00`;
+                const date = parse(cleanTime, 'HH:mm:ss', new Date());
+                return isValid(date) ? format(date, 'h:mm a') : timeStr;
+            };
+
+            const timeDisplay = startTime && endTime 
+                ? `${formatTime(startTime)} - ${formatTime(endTime)}`
+                : "";
+
             return (
-                <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-foreground">
-                        {format(new Date(dateStr), "MMM dd, yyyy")}
-                    </span>
+                <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground whitespace-nowrap">
+                            {format(new Date(dateStr), "MMM dd, yyyy")}
+                        </span>
+                    </div>
+                    {timeDisplay && (
+                        <div className="flex items-center gap-2 pl-6">
+                            <span className="text-[10px] text-muted-foreground/70 font-semibold tracking-wide whitespace-nowrap">
+                                {timeDisplay}
+                            </span>
+                        </div>
+                    )}
                 </div>
             );
         },
@@ -219,6 +393,13 @@ export const getColumns = (
         header: "Cost Analysis",
         cell: ({ row }) => {
             return <LiveCostCell schedule={row.original} />;
+        },
+    },
+    {
+        id: "cost_per_piece",
+        header: "Cost per Piece",
+        cell: ({ row }) => {
+            return <LiveCostPerPieceCell schedule={row.original} />;
         },
     },
     {

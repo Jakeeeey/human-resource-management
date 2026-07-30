@@ -92,7 +92,7 @@ const ProductionOutputContent = () => {
             </div>
 
             <OutputTable
-                data={schedules}
+                data={schedules.filter(s => !s.is_output_posted)}
                 onUpdateOutput={promptUpdate}
                 isLoading={isLoading}
             />
