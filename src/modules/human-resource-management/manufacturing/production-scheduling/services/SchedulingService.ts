@@ -15,6 +15,21 @@ export class SchedulingService {
             const { data } = await res.json();
             const schedules = data || [];
 
+            // Fetch all attendance logs to compute actual_persons dynamically
+            const attRes = await fetch(`/api/hrm/manufacturing/schedules/attendance`);
+            let attendanceLogs: any[] = [];
+            if (attRes.ok) {
+                const attData = await attRes.json();
+                attendanceLogs = attData.data || [];
+            }
+            
+            // Map attendance counts per schedule and position
+            const attendanceCounts = new Map<string, number>();
+            attendanceLogs.forEach((log: any) => {
+                const key = `${log.schedule_id}_${log.position_id}`;
+                attendanceCounts.set(key, (attendanceCounts.get(key) || 0) + 1);
+            });
+
             // Fetch positions manually since Directus O2M alias might not be configured
             const posRes = await fetch(`/api/hrm/manufacturing/schedule-positions?limit=-1&fields=*,position_id.*`);
             if (posRes.ok) {
@@ -26,7 +41,14 @@ export class SchedulingService {
                     
                     sched.positions = allPositions
                         .filter((p: any) => p.schedule_id === sched.id)
-                        .map((p: any) => ({ ...p, position: p.position_id }));
+                        .map((p: any) => {
+                            const actualCount = attendanceCounts.get(`${sched.id}_${p.position_id}`);
+                            return { 
+                                ...p, 
+                                position: p.position_id,
+                                actual_persons: actualCount != null ? actualCount : p.actual_persons
+                            };
+                        });
                 });
             }
 
@@ -56,9 +78,28 @@ export class SchedulingService {
             }
 
             const posRes = await fetch(`/api/hrm/manufacturing/schedule-positions?filter[schedule_id][_eq]=${id}&fields=*,position_id.*`);
+            
+            // Fetch attendance logs for this specific schedule
+            const attRes = await fetch(`/api/hrm/manufacturing/schedules/attendance?schedule_id=${id}`);
+            let attendanceCounts = new Map<number, number>();
+            if (attRes.ok) {
+                const attData = await attRes.json();
+                const logs = attData.data || [];
+                logs.forEach((log: any) => {
+                    attendanceCounts.set(log.position_id, (attendanceCounts.get(log.position_id) || 0) + 1);
+                });
+            }
+
             if (posRes.ok) {
                 const { data: posData } = await posRes.json();
-                schedule.positions = (posData || []).map((p: any) => ({ ...p, position: p.position_id }));
+                schedule.positions = (posData || []).map((p: any) => {
+                    const actualCount = attendanceCounts.get(p.position_id);
+                    return { 
+                        ...p, 
+                        position: p.position_id,
+                        actual_persons: actualCount != null ? actualCount : p.actual_persons
+                    };
+                });
             }
 
             return schedule;

@@ -252,14 +252,22 @@ export function UpdateOutputDialog({
                             <DialogTitle className="text-xl font-black tracking-tighter text-foreground leading-none">
                                 Update Actual Output
                             </DialogTitle>
-                            <div className="flex items-center gap-2">
-                                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-60">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">
                                     Record production results
                                 </p>
+                                {schedule?.schedule_date && (
+                                    <>
+                                        <span className="text-muted-foreground/40 text-[10px] hidden sm:inline">•</span>
+                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest whitespace-nowrap">
+                                            {format(new Date(schedule.schedule_date), 'MMM dd, yyyy')}
+                                        </p>
+                                    </>
+                                )}
                                 {schedule?.start_time && schedule?.end_time && (
                                     <>
-                                        <span className="text-muted-foreground/40 text-[10px]">•</span>
-                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">
+                                        <span className="text-muted-foreground/40 text-[10px] hidden sm:inline">•</span>
+                                        <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest whitespace-nowrap">
                                             {format(parse(schedule.start_time, 'HH:mm:ss', new Date()), 'hh:mm a')} - {format(parse(schedule.end_time, 'HH:mm:ss', new Date()), 'hh:mm a')}
                                         </p>
                                     </>
@@ -340,7 +348,7 @@ export function UpdateOutputDialog({
                             return (
                                 <div className="grid gap-3">
                                     {posData.map(pos => {
-                                        const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id) || [];
+                                        const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
                                         return (
                                         <div key={pos.id} className="flex flex-col gap-2 p-3 rounded-xl border bg-card/50 shadow-sm transition-all hover:bg-card">
                                             <div className="flex items-center justify-between gap-4">
@@ -400,6 +408,79 @@ export function UpdateOutputDialog({
                             );
                         })()}
                     </div>
+
+                    {(() => {
+                        let workingHours = 8;
+                        if (schedule?.start_time && schedule?.end_time) {
+                            const start = schedule.start_time.split(":");
+                            const end = schedule.end_time.split(":");
+                            const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+                            const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+                            const elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+                            workingHours = Math.max(0, elapsedHours - 1);
+                        }
+                        
+                        const posData = schedule?.manu_hr_schedule_positions || schedule?.positions || [];
+                        
+                        const totalEstCost = posData.reduce((acc, pos) => {
+                            const setPersons = Number(pos.assigned_persons || 0);
+                            const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                            return acc + (setPersons * hourlyRate * workingHours);
+                        }, 0);
+
+                        const totalActualCost = posData.reduce((acc, pos) => {
+                            const posAttendance = attendanceLogs.filter(a => a.position_id === pos.position?.id && a.time_in) || [];
+                            const actualPersons = posAttendance.length;
+                            const hourlyRate = Number(pos.position?.position_rate || 0) / 8;
+                            return acc + (actualPersons * hourlyRate * workingHours);
+                        }, 0);
+
+                        const targetCpp = (schedule?.daily_target || 0) > 0 ? totalEstCost / (schedule?.daily_target || 1) : 0;
+                        const actualCpp = actualProduce > 0 ? totalActualCost / actualProduce : 0;
+                        
+                        const isOver = actualProduce > 0 && actualCpp > targetCpp;
+                        const variance = actualCpp - targetCpp;
+                        
+                        return (
+                            <div className="space-y-3 pt-4 border-t border-muted/50">
+                                <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70 flex items-center gap-1.5">
+                                    Cost Projection
+                                </Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="p-4 rounded-xl border bg-card/50 shadow-sm flex flex-col justify-between transition-colors hover:bg-card/80">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70 mb-1">Final Total Cost</p>
+                                        <p className="text-xl font-black tabular-nums text-foreground">₱{totalActualCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mt-2 bg-muted/50 w-fit px-2 py-1 rounded-md border border-muted-foreground/10">
+                                            Based on {attendanceLogs.filter(a => a.time_in).length} actual workers
+                                        </p>
+                                    </div>
+                                    <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between transition-all ${actualProduce === 0 ? 'bg-card/50 border-muted-foreground/20 hover:bg-card/80' : isOver ? 'bg-rose-500/10 border-rose-500/20' : 'bg-emerald-500/10 border-emerald-500/20'}`}>
+                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                            <p className={`text-[10px] font-black uppercase tracking-widest ${actualProduce === 0 ? 'text-muted-foreground/70' : isOver ? 'text-rose-600/70' : 'text-emerald-600/70'}`}>Cost / Piece</p>
+                                            {actualProduce > 0 && (
+                                                <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border shadow-sm ${isOver ? 'text-rose-600 bg-rose-500/10 border-rose-500/20' : 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20'}`}>
+                                                    Target: ₱{targetCpp.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className={`text-xl font-black tabular-nums ${actualProduce === 0 ? 'text-foreground/50' : isOver ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                            {actualProduce > 0 ? `₱${actualCpp.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}` : 'N/A'}
+                                        </p>
+                                        {actualProduce > 0 && (
+                                            <p className={`text-[9px] font-black uppercase tracking-widest mt-2 px-2 py-1 rounded-md border w-fit shadow-sm whitespace-nowrap ${isOver ? 'text-rose-600 bg-rose-500/10 border-rose-500/20' : 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20'}`}>
+                                                {isOver ? `+₱${variance.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} OVER TARGET` : variance === 0 ? 'ON TARGET' : `-₱${Math.abs(variance).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} UNDER TARGET`}
+                                            </p>
+                                        )}
+                                        {actualProduce === 0 && (
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground mt-2 bg-muted/50 w-fit px-2 py-1 rounded-md border border-muted-foreground/10">
+                                                Enter actual output
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     <div className="space-y-3 pt-4 border-t border-muted/50">
                         <Label className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/70 flex items-center gap-1.5">

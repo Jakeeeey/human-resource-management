@@ -14,15 +14,12 @@ async function proxy(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const scheduleId = searchParams.get("schedule_id");
 
-    if (!scheduleId) {
-        return NextResponse.json({ error: "schedule_id is required" }, { status: 400 });
-    }
-
-    // Construct upstream URL for manu_hr_schedule_attendance
     let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/manu_hr_schedule_attendance`;
 
     const queryParams = new URLSearchParams();
-    queryParams.set("filter[schedule_id][_eq]", scheduleId);
+    if (scheduleId) {
+        queryParams.set("filter[schedule_id][_eq]", scheduleId);
+    }
     queryParams.set("fields", "*,user_id.*"); // Get all fields plus joined user info
     queryParams.set("limit", "-1");
 

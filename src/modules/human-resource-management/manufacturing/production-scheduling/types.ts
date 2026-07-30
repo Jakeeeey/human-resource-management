@@ -96,10 +96,10 @@ export const scheduleFormSchema = z.object({
         })
     ).min(1, "At least one position must be configured"),
 }).refine((data) => {
-    // Basic time validation: end_time must be strictly after start_time if on same day
-    return data.end_time > data.start_time;
+    // Allow graveyard shifts that cross midnight. Just ensure they aren't the exact same time.
+    return data.end_time !== data.start_time;
 }, {
-    message: "End time must be strictly after start time",
+    message: "End time cannot be the exact same as start time",
     path: ["end_time"],
 });
 

@@ -31,6 +31,7 @@ import {
 import { Search, ChevronLeft, ChevronRight, InboxIcon } from "lucide-react";
 import type { ProductionSchedule } from "../../production-scheduling/types";
 import { getColumns } from "./columns";
+import { CostAnalysisModal } from "../../schedule-summary/components/CostAnalysisCell";
 
 interface OutputTableProps {
     data: ProductionSchedule[];
@@ -43,6 +44,7 @@ export function OutputTable({ data, onUpdateOutput, isLoading }: OutputTableProp
     const [globalFilter, setGlobalFilter] = useState("");
     const [lineFilter, setLineFilter] = useState<string>("all");
     const [dateFilter, setDateFilter] = useState<string>("");
+    const [selectedCostSchedule, setSelectedCostSchedule] = useState<ProductionSchedule | null>(null);
 
     const columns = React.useMemo(() => getColumns(onUpdateOutput), [onUpdateOutput]);
 
@@ -161,7 +163,8 @@ export function OutputTable({ data, onUpdateOutput, isLoading }: OutputTableProp
                                 <TableRow
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
-                                    className="border-b-muted-foreground/10 hover:bg-muted/20 transition-colors"
+                                    onClick={() => setSelectedCostSchedule(row.original)}
+                                    className="border-b-muted-foreground/10 hover:bg-muted/20 transition-colors cursor-pointer"
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id} className="px-4 py-3">
@@ -211,6 +214,12 @@ export function OutputTable({ data, onUpdateOutput, isLoading }: OutputTableProp
                     </Button>
                 </div>
             </div>
+
+            <CostAnalysisModal 
+                schedule={selectedCostSchedule} 
+                isOpen={!!selectedCostSchedule} 
+                onClose={() => setSelectedCostSchedule(null)} 
+            />
         </div>
     );
 }
