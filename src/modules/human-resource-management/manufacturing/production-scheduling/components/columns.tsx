@@ -273,13 +273,15 @@ export const createColumns = (
         id: "actions",
         header: "Controls",
         cell: ({ row }) => {
-            const overallStatus = row.original.approval_status || row.original.target_approval_status;
-            const isLocked = overallStatus === "APPROVED" || overallStatus === "REJECTED";
+            const overallStatus = row.original.approval_status || row.original.target_approval_status || "NOT_REQUIRED";
+            const isLocked = overallStatus === "APPROVED" || overallStatus === "REJECTED" || overallStatus === "NOT_REQUIRED";
             const tooltipMessage = overallStatus === "APPROVED" 
                 ? "Approved schedule cannot be modified" 
                 : overallStatus === "REJECTED" 
                     ? "Rejected schedule cannot be modified" 
-                    : "Edit Schedule";
+                    : overallStatus === "NOT_REQUIRED"
+                        ? "Auto-approved schedule cannot be modified"
+                        : "Edit Schedule";
 
             return (
                 <div className="flex items-center gap-1.5">

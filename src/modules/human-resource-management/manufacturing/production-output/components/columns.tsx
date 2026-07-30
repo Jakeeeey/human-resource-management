@@ -108,6 +108,43 @@ export const getColumns = (
         },
     },
     {
+        id: "est_labor_cost",
+        header: "Cost Analysis",
+        cell: ({ row }) => {
+            const positions = row.original.positions || row.original.manu_hr_schedule_positions || [];
+            
+            let workingHours = 8;
+            let elapsedHours = 9; 
+            
+            if (row.original.start_time && row.original.end_time) {
+                const start = row.original.start_time.split(":");
+                const end = row.original.end_time.split(":");
+                const startH = parseInt(start[0], 10) + parseInt(start[1], 10)/60;
+                const endH = parseInt(end[0], 10) + parseInt(end[1], 10)/60;
+                elapsedHours = endH > startH ? endH - startH : (endH + 24) - startH;
+                workingHours = Math.max(0, elapsedHours - 1);
+            }
+            
+            const actualTotalCost = positions.reduce((acc: number, p: any) => {
+                const dailyRate = p.position?.position_rate || 0;
+                const hourlyRate = dailyRate / 8;
+                const persons = p.actual_persons || 0;
+                return acc + (persons * hourlyRate * workingHours);
+            }, 0);
+
+            return (
+                <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-xs tabular-nums text-foreground">
+                        ₱{actualTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70 font-semibold">
+                        {workingHours.toFixed(1)} hrs work
+                    </span>
+                </div>
+            );
+        },
+    },
+    {
         id: "actions",
         header: "Actions",
         cell: ({ row }) => {
@@ -121,7 +158,10 @@ export const getColumns = (
                     className={`font-bold text-[10px] tracking-wider uppercase h-8 transition-all ${
                         isPosted ? "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10 cursor-not-allowed opacity-100 border-none shadow-none" : ""
                     }`}
-                    onClick={() => !isPosted && onUpdateOutput(schedule)}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isPosted) onUpdateOutput(schedule);
+                    }}
                     disabled={isPosted}
                 >
                     {isPosted ? (
