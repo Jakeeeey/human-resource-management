@@ -6,15 +6,9 @@
 "use client";
 
 import React from "react";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DivisionWithDepartments } from "../types";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface DivisionSelectorProps {
     divisions: DivisionWithDepartments[];
@@ -29,36 +23,31 @@ export function DivisionSelector({
     onSelectDivision,
     disabled = false,
 }: DivisionSelectorProps) {
+    const options = React.useMemo(() => {
+        return divisions.map((division) => ({
+            value: division.division_id.toString(),
+            label: division.division_code
+                ? `${division.division_code} - ${division.division_name}`
+                : division.division_name,
+        }));
+    }, [divisions]);
+
     return (
         <div className="space-y-2">
             <Label htmlFor="division-select">Division</Label>
-            <Select
+            <SearchableSelect
+                options={options}
                 value={selectedDivisionId?.toString() || ""}
                 onValueChange={(value) => {
-                    if (value === "") {
+                    if (!value) {
                         onSelectDivision(null);
                     } else {
                         onSelectDivision(parseInt(value));
                     }
                 }}
+                placeholder="Select a division"
                 disabled={disabled}
-            >
-                <SelectTrigger id="division-select" className="w-full">
-                    <SelectValue placeholder="Select a division" />
-                </SelectTrigger>
-                <SelectContent>
-                    {divisions.map((division) => (
-                        <SelectItem
-                            key={division.division_id}
-                            value={division.division_id.toString()}
-                        >
-                            {division.division_code
-                                ? `${division.division_code} - ${division.division_name}`
-                                : division.division_name}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            />
         </div>
     );
 }

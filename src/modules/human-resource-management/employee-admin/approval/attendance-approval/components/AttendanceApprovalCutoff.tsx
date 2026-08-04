@@ -13,7 +13,9 @@ import {
   ChevronRight,
   Save,
   Database,
-  Check
+  Check,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +43,7 @@ import { AttendanceTable } from "./AttendanceTable";
 import { toast } from "sonner";
 import { format, setDate, subMonths, setMonth as dateFnsSetMonth, setYear as dateFnsSetYear, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   fetchAttendanceRequests, 
   approveOrRejectAttendance,
@@ -58,6 +61,7 @@ export function AttendanceApprovalCutoff() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<AttendanceLogWithUser[]>([]);
   const [departments, setDepartments] = useState<{ department_id: number, department_name: string }[]>([]);
+  const [showApproved, setShowApproved] = useState(false);
   
   // const [viewMode, setViewMode] = useState<"list" | "detail">("list");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -114,7 +118,8 @@ export function AttendanceApprovalCutoff() {
       const response = await fetchAttendanceRequests({ 
         startDate, 
         endDate,
-        departmentId: department
+        departmentId: department,
+        approvalStatus: showApproved ? "all" : "pending"
       });
       setLogs(response.data || []);
       toast.success("Logs loaded successfully");
@@ -152,7 +157,8 @@ export function AttendanceApprovalCutoff() {
       const response = await fetchAttendanceRequests({ 
         startDate, 
         endDate,
-        departmentId: department
+        departmentId: department,
+        approvalStatus: showApproved ? "all" : "pending"
       });
       setLogs(response.data || []);
     } catch {
@@ -404,7 +410,7 @@ export function AttendanceApprovalCutoff() {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Filters Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-card/50 p-6 rounded-2xl border border-border/50 backdrop-blur-sm shadow-sm">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-card/50 p-6 rounded-2xl border border-border/50 backdrop-blur-sm shadow-sm">
         
         <div className="space-y-2">
           <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Cutoff</label>
@@ -526,7 +532,26 @@ export function AttendanceApprovalCutoff() {
           </Select>
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="space-y-2 flex flex-col justify-end">
+          <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1 opacity-0 pointer-events-none">Status</label>
+          <div className="flex items-center gap-2 bg-background/50 border border-muted-foreground/20 px-3 py-2 rounded-xl h-11">
+            <Checkbox 
+              id="show-approved" 
+              checked={showApproved} 
+              onCheckedChange={(checked) => setShowApproved(checked === true)}
+              className="border-primary/50 data-[state=checked]:bg-primary"
+            />
+            <label
+              htmlFor="show-approved"
+              className="text-sm font-bold text-muted-foreground cursor-pointer select-none whitespace-nowrap flex items-center gap-1.5"
+            >
+              {showApproved ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              Show Approved
+            </label>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 md:col-span-2 lg:col-span-1">
           <Button 
             onClick={handleLoadPending}
             disabled={isLoading || isProcessing}

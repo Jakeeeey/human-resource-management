@@ -44,43 +44,43 @@ export default function OvertimeRequestModule() {
     loadData();
   }, []);
 
-  const handleApprove = async (overtimeId: number, remarks: string) => {
+  const handleApprove = async (overtimeIds: number[], remarks: string) => {
     try {
       await approveOrRejectOvertimeRequest({
-        overtime_id: overtimeId,
+        overtime_ids: overtimeIds,
         status: "approved",
         remarks,
-        approver_id: 0, // Will be set by API from token
+        approver_id: 0, // Set by backend using token
       });
 
-      toast.success("Overtime request approved successfully");
+      toast.success("Overtime requests approved successfully");
 
       // Reload data
       await loadData();
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to approve overtime request";
+        err instanceof Error ? err.message : "Failed to approve overtime requests";
       toast.error(errorMessage);
       throw err;
     }
   };
 
-  const handleReject = async (overtimeId: number, remarks: string) => {
+  const handleReject = async (overtimeIds: number[], remarks: string) => {
     try {
       await approveOrRejectOvertimeRequest({
-        overtime_id: overtimeId,
+        overtime_ids: overtimeIds,
         status: "rejected",
         remarks,
-        approver_id: 0, // Will be set by API from token
+        approver_id: 0, // Set by backend using token
       });
 
-      toast.success("Overtime request rejected successfully");
+      toast.success("Overtime requests rejected successfully");
 
       // Reload data
       await loadData();
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to reject overtime request";
+        err instanceof Error ? err.message : "Failed to reject overtime requests";
       toast.error(errorMessage);
       throw err;
     }

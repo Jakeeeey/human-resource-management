@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -10,16 +10,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import type { OvertimeRequestWithUser } from "../type";
 import { ApprovalModal } from "./ApprovalModal";
 import { ViewDetailsModal } from "./ViewDetailsModal";
 
+import { UserOvertimeRequestsModal } from "./UserOvertimeRequestsModal";
+
 interface OvertimeTableProps {
   data: OvertimeRequestWithUser[];
-  onApprove: (overtimeId: number, remarks: string) => Promise<void>;
-  onReject: (overtimeId: number, remarks: string) => Promise<void>;
+  onApprove: (overtimeIds: number[], remarks: string) => Promise<void>;
+  onReject: (overtimeIds: number[], remarks: string) => Promise<void>;
   onRefresh: () => Promise<void>;
   isLoading?: boolean;
 }
@@ -28,12 +30,12 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     action: "approve" | "reject" | null;
-    overtimeId: number | null;
+    overtimeIds: number[];
     employeeName: string;
   }>({
     isOpen: false,
     action: null,
-    overtimeId: null,
+    overtimeIds: [],
     employeeName: "",
   });
   const [viewModalState, setViewModalState] = useState<{
@@ -43,54 +45,59 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
     isOpen: false,
     data: null,
   });
+  
+  // State for the new User Modal
+  const [userModalState, setUserModalState] = useState<{
+    isOpen: boolean;
+    userId: number | null;
+    employeeName: string;
+  }>({
+    isOpen: false,
+    userId: null,
+    employeeName: "",
+  });
+
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  // Group by user
+  const groupedUsers = useMemo(() => {
+    const map = new Map<number, OvertimeRequestWithUser[]>();
+    for (const req of data) {
+      if (!map.has(req.user_id)) {
+        map.set(req.user_id, []);
+      }
+      map.get(req.user_id)!.push(req);
+    }
+    return Array.from(map.values());
+  }, [data]);
+
   // Calculate pagination
-  const totalItems = data.length;
+  const totalItems = groupedUsers.length;
   const totalPages = Math.ceil(totalItems / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const displayedData = data.slice(startIndex, endIndex);
+  const displayedData = groupedUsers.slice(startIndex, endIndex);
 
-  const formatTime = (time: string) => {
-    if (!time) return "N/A";
-    // Format time from HH:MM:SS to HH:MM AM/PM
-    const [hours, minutes] = time.split(":");
-    const hour = parseInt(hours, 10);
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
-
-  const formatDate = (date: string) => {
-    if (!date) return "N/A";
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const handleOpenModal = (
+  const handleOpenApprovalModal = (
     action: "approve" | "reject",
-    overtimeId: number,
+    overtimeIds: number[],
     employeeName: string
   ) => {
     setModalState({
       isOpen: true,
       action,
-      overtimeId,
+      overtimeIds,
       employeeName,
     });
   };
 
-  const handleCloseModal = () => {
+  const handleCloseApprovalModal = () => {
     setModalState({
       isOpen: false,
       action: null,
-      overtimeId: null,
+      overtimeIds: [],
       employeeName: "",
     });
   };
@@ -109,19 +116,36 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
     });
   };
 
-  const handleConfirm = async (remarks: string) => {
-    if (!modalState.overtimeId || !modalState.action) return;
+  const handleOpenUserModal = (userId: number, employeeName: string) => {
+    setUserModalState({
+      isOpen: true,
+      userId,
+      employeeName,
+    });
+  };
+
+  const handleCloseUserModal = () => {
+    setUserModalState({
+      isOpen: false,
+      userId: null,
+      employeeName: "",
+    });
+  };
+
+  const handleConfirmAction = async (remarks: string) => {
+    if (modalState.overtimeIds.length === 0 || !modalState.action) return;
 
     try {
-      setProcessingId(modalState.overtimeId);
+      // Just set processing for the first one, or disable all buttons since we have global isLoading 
+      setProcessingId(modalState.overtimeIds[0]);
       
       if (modalState.action === "approve") {
-        await onApprove(modalState.overtimeId, remarks);
+        await onApprove(modalState.overtimeIds, remarks);
       } else {
-        await onReject(modalState.overtimeId, remarks);
+        await onReject(modalState.overtimeIds, remarks);
       }
       
-      handleCloseModal();
+      handleCloseApprovalModal();
     } catch (error) {
       console.error("Error processing request:", error);
     } finally {
@@ -155,77 +179,45 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Request Date</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Purpose</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Total Requests</TableHead>
+                  <TableHead>Total Duration</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayedData.map((request) => {
+                {displayedData.map((userRequests) => {
+                  const firstReq = userRequests[0];
                   const fullName = [
-                    request.user_fname,
-                    request.user_mname,
-                    request.user_lname,
+                    firstReq.user_fname,
+                    firstReq.user_mname,
+                    firstReq.user_lname,
                   ]
                     .filter(Boolean)
                     .join(" ");
                   
-                  const isProcessing = processingId === request.overtime_id;
-                  const durationHours = Math.floor(request.duration_minutes / 60);
-                  const durationMins = request.duration_minutes % 60;
+                  const totalDurationMins = userRequests.reduce((acc, req) => acc + req.duration_minutes, 0);
+                  const durationHours = Math.floor(totalDurationMins / 60);
+                  const durationMins = totalDurationMins % 60;
                   const durationDisplay = durationHours > 0 
                     ? `${durationHours}h ${durationMins}m` 
                     : `${durationMins}m`;
 
                   return (
-                    <TableRow key={request.overtime_id}>
+                    <TableRow key={firstReq.user_id}>
                       <TableCell className="font-medium">{fullName}</TableCell>
-                      <TableCell>{formatDate(request.request_date)}</TableCell>
-                      <TableCell>{formatTime(request.ot_from)}</TableCell>
-                      <TableCell>{formatTime(request.ot_to)}</TableCell>
+                      <TableCell>{firstReq.department_name || "N/A"}</TableCell>
+                      <TableCell>{userRequests.length}</TableCell>
                       <TableCell>{durationDisplay}</TableCell>
-                      <TableCell className="max-w-xs truncate" title={request.purpose}>
-                        {request.purpose}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{request.status}</Badge>
-                      </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleOpenViewModal(request)}
-                            disabled={isLoading || isProcessing}
-                            className="border dark:border-gray-600"
-                          >
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() =>
-                              handleOpenModal("approve", request.overtime_id, fullName)
-                            }
-                            disabled={isLoading || isProcessing}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() =>
-                              handleOpenModal("reject", request.overtime_id, fullName)
-                            }
-                            disabled={isLoading || isProcessing}
-                          >
-                            Reject
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleOpenUserModal(firstReq.user_id, fullName)}
+                          disabled={isLoading}
+                        >
+                          View Requests
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -238,7 +230,7 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
       {totalPages > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {Math.min(currentPage * pageSize, totalItems)} of {totalItems} rows
+            Showing {Math.min(currentPage * pageSize, totalItems)} of {totalItems} users
           </p>
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
@@ -270,6 +262,23 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
       )}
       </div>
 
+      <UserOvertimeRequestsModal
+        isOpen={userModalState.isOpen}
+        onClose={handleCloseUserModal}
+        requests={groupedUsers.find(g => g[0]?.user_id === userModalState.userId) || []}
+        employeeName={userModalState.employeeName}
+        onApprove={(overtimeId) => {
+          handleOpenApprovalModal("approve", overtimeId, userModalState.employeeName);
+          return Promise.resolve();
+        }}
+        onReject={(overtimeId) => {
+          handleOpenApprovalModal("reject", overtimeId, userModalState.employeeName);
+          return Promise.resolve();
+        }}
+        onViewDetails={handleOpenViewModal}
+        isLoading={processingId !== null}
+      />
+
       <ViewDetailsModal
         isOpen={viewModalState.isOpen}
         onClose={handleCloseViewModal}
@@ -278,8 +287,8 @@ export function OvertimeTable({ data, onApprove, onReject, isLoading = false }: 
 
       <ApprovalModal
         isOpen={modalState.isOpen}
-        onClose={handleCloseModal}
-        onConfirm={handleConfirm}
+        onClose={handleCloseApprovalModal}
+        onConfirm={handleConfirmAction}
         action={modalState.action}
         employeeName={modalState.employeeName}
         isLoading={processingId !== null}

@@ -50,7 +50,23 @@ export interface ChartOfAccount {
     added_by: number | null;
     isPayment: boolean;
     is_payment: boolean | null;
+    status?: string | null;
+    status_updated_by?: number | null;
+    status_updated_at?: string | null;
     account_type_info?: AccountType | null; // Enriched with account type data
+}
+
+/**
+ * Allowed account types for budgeting (OpEx, COGS, CapEx)
+ * 7: Cost of Sales (COGS)
+ * 8: Cost of Service (COGS)
+ * 9: General and Administrative Expenses (OpEx)
+ * 10: Finance Cost (CapEx)
+ */
+export const BUDGETING_ACCOUNT_TYPES = [7, 8, 9, 10];
+
+export function isBudgetingAccount(account: ChartOfAccount): boolean {
+    return account.account_type !== null && BUDGETING_ACCOUNT_TYPES.includes(account.account_type);
 }
 
 export interface DepartmentDivisionCOA {

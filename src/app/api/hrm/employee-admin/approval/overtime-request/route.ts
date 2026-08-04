@@ -75,18 +75,20 @@ export async function GET() {
     );
     
     const currentUserDepartment = userResponse.data?.user_department;
+    const isAdmin = userResponse.data?.isAdmin === 1 || userResponse.data?.isAdmin === true;
+    const isHR = currentUserDepartment === 2;
 
     // Build query - only show pending requests from the user's department
     let filter = `filter[status][_eq]=pending`;
     
-    // If user has a department, filter by that department
-    if (currentUserDepartment) {
+    // If user has a department and is not HR or Admin, filter by their department
+    if (currentUserDepartment && !isHR && !isAdmin) {
       filter += `&filter[department_id][_eq]=${currentUserDepartment}`;
     }
 
     // Fetch overtime requests with user details
     const overtimeResponse = await directusFetch(
-      `/items/overtime_request?${filter}&sort=-filed_at&limit=1000&fields=*`
+      `/items/overtime_request?${filter}&sort=-filed_at&limit=-1&fields=*`
     );
 
     const requests = overtimeResponse.data || [];
@@ -162,11 +164,11 @@ export async function PATCH(req: NextRequest) {
 
     const userId = payload?.id || payload?.user_id || payload?.sub;
     const body = await req.json();
-    const { overtime_id, status, remarks } = body;
+    const { overtime_ids, status, remarks } = body;
 
-    if (!overtime_id || !status || !['approved', 'rejected'].includes(status)) {
+    if (!overtime_ids || !Array.isArray(overtime_ids) || overtime_ids.length === 0 || !status || !['approved', 'rejected'].includes(status)) {
       return NextResponse.json(
-        { error: "Invalid request: overtime_id and status (approved/rejected) are required" },
+        { error: "Invalid request: overtime_ids (array) and status (approved/rejected) are required" },
         { status: 400 }
       );
     }
@@ -179,14 +181,14 @@ export async function PATCH(req: NextRequest) {
       approved_at: new Date().toISOString(),
     };
 
-    await directusFetch(`/items/overtime_request/${overtime_id}`, {
+    await directusFetch(`/items/overtime_request`, {
       method: "PATCH",
-      body: JSON.stringify(updateData),
+      body: JSON.stringify({ keys: overtime_ids, data: updateData }),
     });
 
     return NextResponse.json({
       success: true,
-      message: `Overtime request ${status} successfully`,
+      message: `Overtime request(s) ${status} successfully`,
     });
   } catch (error) {
     console.error("PATCH overtime_request error:", error);

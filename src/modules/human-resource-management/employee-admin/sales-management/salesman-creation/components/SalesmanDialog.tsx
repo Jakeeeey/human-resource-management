@@ -31,6 +31,8 @@ import type {
     Branch,
     Operation,
     PriceType,
+    Company,
+    Supplier,
 } from "../types";
 import { usePsgc } from "../hooks/usePsgc";
 
@@ -50,6 +52,8 @@ interface SalesmanFormData {
     bad_branch_code: string;
     operation: string;
     price_type_id: string;
+    company_code: string;
+    supplier_code: string;
     isActive: boolean;
     isInventory: boolean;
     canCollect: boolean;
@@ -76,6 +80,8 @@ interface SalesmanDialogProps {
     badBranches: Branch[];
     operations: Operation[];
     priceTypes: PriceType[];
+    companies: Company[];
+    suppliers: Supplier[];
     onSubmit: (data: Record<string, unknown>) => Promise<void>;
 }
 
@@ -89,6 +95,8 @@ export function SalesmanDialog({
     badBranches,
     operations,
     priceTypes,
+    companies,
+    suppliers,
     onSubmit,
 }: SalesmanDialogProps) {
     const isEdit = !!salesman;
@@ -111,6 +119,8 @@ export function SalesmanDialog({
             bad_branch_code: "",
             operation: "",
             price_type_id: "",
+            company_code: "",
+            supplier_code: "",
             isActive: true,
             isInventory: false,
             canCollect: false,
@@ -166,6 +176,8 @@ export function SalesmanDialog({
                 bad_branch_code: salesman.bad_branch_code?.toString() || "",
                 operation: salesman.operation?.toString() || "",
                 price_type_id: salesman.price_type_id?.toString() || "",
+                company_code: salesman.company_code?.toString() || "",
+                supplier_code: salesman.supplier_code?.toString() || "",
                 isActive: salesman.isActive === 1,
                 isInventory: salesman.isInventory === 1,
                 canCollect: salesman.canCollect === 1,
@@ -187,6 +199,8 @@ export function SalesmanDialog({
                 bad_branch_code: "",
                 operation: "",
                 price_type_id: "",
+                company_code: "",
+                supplier_code: "",
                 isActive: true,
                 isInventory: false,
                 canCollect: false,
@@ -200,6 +214,32 @@ export function SalesmanDialog({
             form.setValue("inventory_day", "");
         }
     }, [hasInventory, form]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const handleScrollEvent = (e: Event) => {
+            const target = e.target as HTMLElement;
+            if (
+                target && (
+                    target.closest("[data-radix-select-viewport]") ||
+                    target.closest("[data-slot='command-list']") ||
+                    target.closest("[cmdk-list]") ||
+                    target.closest("[data-radix-popper-content-wrapper]")
+                )
+            ) {
+                e.stopPropagation();
+            }
+        };
+
+        document.addEventListener("wheel", handleScrollEvent, { capture: true });
+        document.addEventListener("touchmove", handleScrollEvent, { capture: true });
+
+        return () => {
+            document.removeEventListener("wheel", handleScrollEvent, { capture: true });
+            document.removeEventListener("touchmove", handleScrollEvent, { capture: true });
+        };
+    }, [open]);
 
     const handleSubmit = async (data: SalesmanFormData) => {
         setIsSubmitting(true);
@@ -225,6 +265,8 @@ export function SalesmanDialog({
                 operation: data.operation ? parseInt(data.operation, 10) : null,
                 price_type: selectedPriceType?.price_type_name || null,
                 price_type_id: data.price_type_id ? parseInt(data.price_type_id, 10) : null,
+                company_code: data.company_code ? parseInt(data.company_code, 10) : null,
+                supplier_code: data.supplier_code ? parseInt(data.supplier_code, 10) : null,
                 isActive: data.isActive ? 1 : 0,
                 isInventory: data.isInventory ? 1 : 0,
                 canCollect: data.canCollect ? 1 : 0,
@@ -451,6 +493,52 @@ export function SalesmanDialog({
                                 />
                             </div>
                         )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="company_code"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Company</FormLabel>
+                                        <FormControl>
+                                            <SearchableSelect
+                                                placeholder="Select company"
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={companies.map((c) => ({
+                                                    value: c.company_id.toString(),
+                                                    label: c.company_name,
+                                                }))}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control}
+                                name="supplier_code"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Supplier</FormLabel>
+                                        <FormControl>
+                                            <SearchableSelect
+                                                placeholder="Select supplier"
+                                                value={field.value}
+                                                onValueChange={field.onChange}
+                                                options={suppliers.map((s) => ({
+                                                    value: s.id.toString(),
+                                                    label: s.supplier_name,
+                                                }))}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
 
                         <div className="grid grid-cols-3 gap-4">
                             <FormField

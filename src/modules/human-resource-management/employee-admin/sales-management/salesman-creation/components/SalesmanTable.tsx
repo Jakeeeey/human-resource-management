@@ -60,10 +60,12 @@ export function SalesmanTable({
     const columns: ColumnDef<SalesmanWithRelations>[] = [
         {
             accessorKey: "employee_id",
-            header: "Employee ID",
+            header: "Employee Name",
             cell: ({ row }) => {
                 const employee = row.original.employee;
-                return <div>{employee?.user_id || row.getValue("employee_id")}</div>;
+                if (!employee) return <div>{row.getValue("employee_id")}</div>;
+                const name = [employee.user_fname, employee.user_lname].filter(Boolean).join(" ");
+                return <div>{name || employee.user_id}</div>;
             },
         },
         {

@@ -1,4 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+
+const COOKIE_NAME = "vos_access_token";
+
+function decodeJwt(token: string): Record<string, unknown> | null {
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
+        let s = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+        while (s.length % 4) s += "=";
+        const json = Buffer.from(s, "base64").toString("utf8");
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -184,6 +200,25 @@ async function getCurrentTimeInTimeZone() {
     }
 }
 
+async function checkApprovalSetting(moduleName: string): Promise<boolean> {
+    try {
+        const url = `${DIRECTUS_URL}/items/approval_setting?filter[module_name][_eq]=${moduleName}`;
+        const res = await fetch(url, {
+            cache: "no-store",
+            headers: {
+                Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+        });
+        if (!res.ok) return false;
+        const json = await res.json();
+        return json.data && json.data.length > 0 && (json.data[0].is_approval === 1 || json.data[0].is_approval === true);
+    } catch (e) {
+        console.error("Error checking approval setting:", e);
+        return false;
+    }
+}
+
 async function findSalesmanConflict(params: {
     employeeId?: number;
     salesmanCode?: string;
@@ -194,53 +229,77 @@ async function findSalesmanConflict(params: {
     const { employeeId, salesmanCode, salesmanName, truckPlate, excludeId } = params;
     if (!employeeId && !salesmanCode && !salesmanName && !truckPlate) return null;
 
-    const search = new URLSearchParams();
-    search.set("limit", "1");
+    const checkCollection = async (collection: string) => {
+        const search = new URLSearchParams();
+        search.set("limit", "1");
 
-    let orIndex = 0;
-    if (salesmanCode) {
-        search.set(`filter[_or][${orIndex}][salesman_code][_eq]`, salesmanCode);
-        orIndex += 1;
-    }
+        let orIndex = 0;
+        if (salesmanCode && salesmanName) {
+            search.set(`filter[_or][${orIndex}][_and][0][salesman_code][_eq]`, salesmanCode);
+            search.set(`filter[_or][${orIndex}][_and][1][salesman_name][_eq]`, salesmanName);
+            orIndex += 1;
+        }
 
-    if (truckPlate) {
-        search.set(`filter[_or][${orIndex}][truck_plate][_eq]`, truckPlate);
-        orIndex += 1;
-    }
+        if (truckPlate) {
+            search.set(`filter[_or][${orIndex}][truck_plate][_eq]`, truckPlate);
+            orIndex += 1;
+        }
 
-    if (excludeId) {
-        search.set("filter[id][_neq]", String(excludeId));
-    }
+        if (excludeId) {
+            search.set("filter[id][_neq]", String(excludeId));
+        }
 
-    const url = `${DIRECTUS_URL}/items/salesman?${search.toString()}`;
-    const res = await fetch(url, {
-        cache: "no-store",
-        headers: {
-            Authorization: `Bearer ${DIRECTUS_TOKEN}`,
-            "Content-Type": "application/json",
-        },
-    });
+        if (orIndex === 0) return null;
 
-    if (!res.ok) {
-        const text = await res.text();
-        console.error(`DIRECTUS ERROR [${url}]:`, text);
-        throw new Error("Failed to check existing salesman");
-    }
+        const url = `${DIRECTUS_URL}/items/${collection}?${search.toString()}`;
+        const res = await fetch(url, {
+            cache: "no-store",
+            headers: {
+                Authorization: `Bearer ${DIRECTUS_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+        });
 
-    const json: DirectusResponse<Salesman> = await res.json();
-    const data = json.data || [];
-    return data.length ? data[0] : null;
+        if (!res.ok) {
+            const text = await res.text();
+            console.error(`DIRECTUS ERROR [${url}]:`, text);
+            return null;
+        }
+
+        const json: DirectusResponse<Salesman> = await res.json();
+        const data = json.data || [];
+        return data.length ? data[0] : null;
+    };
+
+    const conflictSalesman = await checkCollection("salesman");
+    if (conflictSalesman) return conflictSalesman;
+    
+    return await checkCollection("salesman_draft");
+}
+
+interface Company {
+    company_id: number;
+    company_name: string;
+    company_code?: string | null;
+}
+
+interface Supplier {
+    id: number;
+    supplier_name: string;
+    supplier_code?: string | null;
 }
 
 async function buildSalesmanRelations() {
     try {
-        const [salesmen, users, divisions, branches, operations, priceTypes] = await Promise.all([
+        const [salesmen, users, divisions, branches, operations, priceTypes, companies, suppliers] = await Promise.all([
             fetchAll<Salesman>("salesman").catch(() => []),
             fetchAll<User>("user").catch(() => []),
             fetchAll<Division>("division").catch(() => []),
             fetchAll<Branch>("branches").catch(() => []),
             fetchAll<Operation>("operation").catch(() => []),
             fetchAll<PriceType>("price_types").catch(() => []),
+            fetchAll<Company>("company").catch(() => []),
+            fetchAll<Supplier>("suppliers").catch(() => []),
         ]);
 
         const regularBranches = branches.filter((b) => b.isReturn === 0 || b.isReturn === null);
@@ -271,6 +330,8 @@ async function buildSalesmanRelations() {
             badBranches,
             operations,
             priceTypes,
+            companies,
+            suppliers,
         };
     } catch (error) {
         console.error("Error building salesman relations:", error);
@@ -338,7 +399,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(
                 {
                     error: "Duplicate salesman",
-                    message: "A salesman with this code or truck plate already exists.",
+                    message: "A salesman with this code and name combination or truck plate already exists.",
                     conflictId: conflict.id,
                 },
                 { status: 409 }
@@ -348,9 +409,23 @@ export async function POST(req: NextRequest) {
         // Update linked employee info first (email/contact/address)
         await patchEmployee(employeeId, employeePatch);
 
+        // Resolve encoder_id from cookie session
+        const cookieStore = await cookies();
+        const token = cookieStore.get(COOKIE_NAME)?.value;
+        if (token) {
+            const payload = decodeJwt(token);
+            const userId = payload?.id || payload?.user_id || payload?.sub;
+            if (userId) {
+                salesmanBody["encoder_id"] = Number(userId);
+            }
+        }
+
         salesmanBody["modified_date"] = await getCurrentTimeInTimeZone();
 
-        const res = await fetch(`${DIRECTUS_URL}/items/salesman`, {
+        const isApproval = await checkApprovalSetting("salesman");
+        const targetCollection = isApproval ? "salesman_draft" : "salesman";
+
+        const res = await fetch(`${DIRECTUS_URL}/items/${targetCollection}`, {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${DIRECTUS_TOKEN}`,
@@ -434,7 +509,7 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json(
                 {
                     error: "Duplicate salesman",
-                    message: "A salesman with this code or truck plate already exists.",
+                    message: "A salesman with this code and name combination or truck plate already exists.",
                     conflictId: conflict.id,
                 },
                 { status: 409 }
@@ -443,6 +518,17 @@ export async function PATCH(req: NextRequest) {
 
         // Update linked employee info first (email/contact/address)
         await patchEmployee(employeeId, employeePatch);
+
+        // Resolve encoder_id from cookie session
+        const cookieStore = await cookies();
+        const token = cookieStore.get(COOKIE_NAME)?.value;
+        if (token) {
+            const payload = decodeJwt(token);
+            const userId = payload?.id || payload?.user_id || payload?.sub;
+            if (userId) {
+                updateData["encoder_id"] = Number(userId);
+            }
+        }
 
         updateData["modified_date"] = await getCurrentTimeInTimeZone();
 

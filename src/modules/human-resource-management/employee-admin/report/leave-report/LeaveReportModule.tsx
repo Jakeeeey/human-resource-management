@@ -1,11 +1,8 @@
 "use client";
 
 import React from "react";
-import {
-  LeaveReportFetchProvider,
-  LeaveReportFilterProvider,
-  LeaveReportPaginationProvider
-} from "./contexts";
+import { LeaveReportFetchProvider } from "./contexts";
+
 import { useLeaveReport } from "./hooks/useLeaveReport";
 import { LeaveReportFilters } from "./components/LeaveReportFilters";
 import { LeaveReportTable } from "./components/LeaveReportTable";
@@ -135,11 +132,7 @@ function LeaveReportModuleContent() {
 export default function LeaveReportModule() {
   return (
     <LeaveReportFetchProvider>
-      <LeaveReportFilterProvider>
-        <LeaveReportPaginationProvider>
-          <LeaveReportModuleContent />
-        </LeaveReportPaginationProvider>
-      </LeaveReportFilterProvider>
+      <LeaveReportModuleContent />
     </LeaveReportFetchProvider>
   );
 }

@@ -31,6 +31,8 @@ function SalesmanCreationContent() {
         badBranches,
         operations,
         priceTypes,
+        companies,
+        suppliers,
         isLoading,
         isError,
         error,
@@ -190,6 +192,8 @@ function SalesmanCreationContent() {
                 badBranches={badBranches}
                 operations={operations}
                 priceTypes={priceTypes}
+                companies={companies}
+                suppliers={suppliers}
                 onSubmit={handleSubmit}
             />
 

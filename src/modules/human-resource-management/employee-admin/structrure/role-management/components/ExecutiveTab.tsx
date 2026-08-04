@@ -116,9 +116,6 @@ export function ExecutiveTab({ data, isLoading, onDelete, onCreate, users }: Exe
                           <div className="font-bold text-foreground/90 tracking-tight leading-tight">
                             {user?.user_fname} {user?.user_lname}
                           </div>
-                          <div className="text-[11px] text-muted-foreground uppercase font-bold tracking-widest mt-0.5 opacity-60">
-                            ID: #{item.id}
-                          </div>
                         </div>
                       </div>
                     </TableCell>

@@ -60,6 +60,18 @@ export interface PriceType {
     sort?: number | null;
 }
 
+export interface Company {
+    company_id: number;
+    company_name: string;
+    company_code?: string | null;
+}
+
+export interface Supplier {
+    id: number;
+    supplier_name: string;
+    supplier_code?: string | null;
+}
+
 export interface Customer {
     id: number;
     customer_code: string;
@@ -88,6 +100,8 @@ export interface SalesmanWithRelations extends Salesman {
     bad_branch?: Branch | null;
     operation_details?: Operation | null;
     price_type_details?: PriceType | null;
+    company?: Company | null;
+    supplier?: Supplier | null;
     customers?: Customer[];
 }
 

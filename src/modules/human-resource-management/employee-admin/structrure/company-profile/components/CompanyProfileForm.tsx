@@ -101,16 +101,22 @@ export function CompanyProfileForm({ onCancel }: CompanyProfileFormProps) {
 
         setIsUploading(true);
         try {
-            const logoUrl = await uploadLogo(file);
-            if (logoUrl) {
-                form.setValue("company_logo", logoUrl, { shouldDirty: true });
-                toast.success("Logo uploaded successfully");
+            // Step 1: Upload file to Directus — returns a UUID
+            const logoFileId = await uploadLogo(file);
+            if (!logoFileId) {
+                toast.error("Failed to upload logo");
+                return;
             }
+
+            // Step 2: Update form state immediately for preview
+            form.setValue("company_logo", logoFileId, { shouldDirty: true });
         } catch (error) {
             console.error("Upload error:", error);
             toast.error("Failed to upload logo");
         } finally {
             setIsUploading(false);
+            // Clear the file input so the same file can be re-selected if needed
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 

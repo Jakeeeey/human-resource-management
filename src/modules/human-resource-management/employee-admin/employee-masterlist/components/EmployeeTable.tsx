@@ -45,6 +45,7 @@ interface EmployeeTableProps {
     isLoading?: boolean;
     onViewDetails?: (employee: User) => void;
     onDeleteEmployee?: (id: number) => Promise<void>;
+    onScanIris?: (employee: User) => void;
 }
 
 export function EmployeeTable({ 
@@ -52,7 +53,8 @@ export function EmployeeTable({
     departments = [],
     isLoading = false,
     onViewDetails,
-    onDeleteEmployee
+    onDeleteEmployee,
+    onScanIris
 }: EmployeeTableProps) {
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -71,7 +73,13 @@ export function EmployeeTable({
         }
     }, [onDeleteEmployee]);
 
-    const columns = React.useMemo(() => createColumns(handleViewDetails, handleDelete, departments), [handleViewDetails, handleDelete, departments]);
+    const handleScanIris = React.useCallback((user: User) => {
+        if (onScanIris) {
+            onScanIris(user);
+        }
+    }, [onScanIris]);
+
+    const columns = React.useMemo(() => createColumns(handleViewDetails, handleDelete, handleScanIris, departments), [handleViewDetails, handleDelete, handleScanIris, departments]);
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
