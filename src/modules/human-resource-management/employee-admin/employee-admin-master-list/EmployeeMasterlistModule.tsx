@@ -52,11 +52,7 @@ export default function EmployeeMasterlistModule() {
         email: data.user_email,
         hashPassword: data.user_password,
         userPassword: data.user_password,
-        password: data.user_password,
         user_password: data.user_password,
-        newPassword: data.user_password,
-        plainPassword: data.user_password,
-        rawPassword: data.user_password,
         // Personal
         firstName: data.user_fname,
         middleName: data.user_mname || undefined,

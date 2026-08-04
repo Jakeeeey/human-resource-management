@@ -155,7 +155,7 @@ export function ScannerTerminal() {
             setScanStatus("scanning");
             setScanResult(null);
 
-            const descriptorArray = Array.from(detection.descriptor);
+            const descriptorArray = Array.from(detection.descriptor) as number[];
             const { success, matchedUserId } = await verifyFaceMatch(descriptorArray);
             
             setIsScanning(false);

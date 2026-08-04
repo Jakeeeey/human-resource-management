@@ -443,8 +443,7 @@ export function AddEmployeeModal({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className="p-0 border-none shadow-2xl rounded-3xl overflow-hidden flex flex-col max-h-[80vh]"
-        style={{ maxWidth: "40vw", width: "90vw" }}
+        className="p-0 border-none shadow-2xl rounded-3xl overflow-hidden flex flex-col max-h-[90vh] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl w-[95vw]"
       >
         {/* ── Header ── */}
         <div className="p-6 pb-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent flex items-center gap-4 shrink-0">
