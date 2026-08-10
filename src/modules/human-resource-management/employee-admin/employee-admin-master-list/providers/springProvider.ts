@@ -10,8 +10,8 @@ export interface CreateEmployeePayload {
   email: string;
   hashPassword?: string;
   userPassword?: string;
-  user_password?: string;
   password?: string;
+  user_password?: string;
   newPassword?: string;
   plainPassword?: string;
   rawPassword?: string;

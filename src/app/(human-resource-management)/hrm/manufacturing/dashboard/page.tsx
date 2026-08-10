@@ -1,75 +1,119 @@
-"use client";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { NavUser } from "@/components/shared/app-sidebar/nav-user";
+import { cookies } from "next/headers";
+import { DashboardModule } from "@/modules/human-resource-management/manufacturing/dashboard/DashboardModule";
 
-import { useDashboard } from "@/modules/human-resource-management/manufacturing/dashboard/hooks/useDashboard";
-import { StatCards } from "@/modules/human-resource-management/manufacturing/dashboard/components/StatCards";
-import { ProductivityChart } from "@/modules/human-resource-management/manufacturing/dashboard/components/ProductivityChart";
-import { WorkforceChart } from "@/modules/human-resource-management/manufacturing/dashboard/components/WorkforceChart";
-import { FinanceChart } from "@/modules/human-resource-management/manufacturing/dashboard/components/FinanceChart";
-import { AiInsightsCard } from "@/modules/human-resource-management/manufacturing/dashboard/components/AiInsightsCard";
-import { DashboardDateFilter } from "@/modules/human-resource-management/manufacturing/dashboard/components/DashboardDateFilter";
-import { Loader2, RefreshCcw, Activity } from "lucide-react";
-import { Button } from "@/components/ui/button";
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-export default function ManufacturingDashboardPage() {
-    const { stats, lines, isLoading, error, filter, updateFilter, refresh } = useDashboard();
+const COOKIE_NAME = "vos_access_token";
+
+export const metadata = {
+    title: "Manufacturing Dashboard | VOS ERP",
+    description: "Monitor production output, workforce productivity, and performance metrics.",
+};
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+    try {
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
+
+        const p = parts[1];
+        const b64 = p.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+
+        const json = Buffer.from(padded, "base64").toString("utf8");
+        return JSON.parse(json);
+    } catch {
+        return null;
+    }
+}
+
+function pickString(obj: Record<string, unknown> | null | undefined, keys: string[]): string {
+    for (const k of keys) {
+        const v = obj ? obj[k] : undefined;
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
+
+function buildHeaderUserFromToken(token: string | null | undefined) {
+    const payload = token ? decodeJwtPayload(token) : null;
+
+    const first = pickString(payload, [
+        "Firstname",
+        "FirstName",
+        "firstName",
+        "firstname",
+        "first_name",
+    ]);
+    const last = pickString(payload, [
+        "LastName",
+        "Lastname",
+        "lastName",
+        "lastname",
+        "last_name",
+    ]);
+    const email = pickString(payload, ["email", "Email"]);
+
+    const name = [first, last].filter(Boolean).join(" ") || email || "User";
+
+    return {
+        name,
+        email: email || "",
+        avatar: "/avatars/shadcn.jpg",
+    };
+}
+
+export default async function ManufacturingDashboardPage() {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
+    const headerUser = buildHeaderUserFromToken(token);
 
     return (
-        <div className="flex-1 overflow-y-auto h-full">
-            <div className="space-y-6 p-8 pt-6 max-w-[1600px] mx-auto w-full min-h-full pb-20">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <h2 className="text-3xl font-black tracking-tight flex items-center gap-2">
-                            <Activity className="h-8 w-8 text-emerald-600" />
-                            Manufacturing Dashboard
-                        </h2>
-                        <p className="text-muted-foreground mt-1 font-medium">
-                            Monitor production output, workforce productivity, and performance metrics.
-                        </p>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                        <DashboardDateFilter 
-                            startDate={filter.startDate} 
-                            endDate={filter.endDate}
-                            lineId={filter.lineId}
-                            lines={lines}
-                            onChange={(type, value) => updateFilter({ [type]: value })}
-                        />
-                        <Button 
-                            variant="outline" 
-                            size="icon" 
-                            onClick={refresh}
-                            disabled={isLoading}
-                            className="h-9 w-9 rounded-xl shrink-0"
-                        >
-                            <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin text-emerald-600' : 'text-muted-foreground'}`} />
-                        </Button>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-sm bg-background sm:h-16 overflow-hidden">
+                <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
+                    <SidebarTrigger className="-ml-1 shrink-0" />
+                    <Separator orientation="vertical" className="hidden sm:block mr-2 data-[orientation=vertical]:h-4 shrink-0" />
+                    <div className="min-w-0 overflow-hidden">
+                        <Breadcrumb>
+                            <BreadcrumbList className="min-w-0 overflow-hidden">
+                                <BreadcrumbItem className="hidden md:block shrink-0">
+                                    <BreadcrumbLink href="#">HRM</BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block shrink-0" />
+                                <BreadcrumbItem className="hidden md:block shrink-0">
+                                    <BreadcrumbLink href="#">Manufacturing</BreadcrumbLink>
+                                </BreadcrumbItem>
+                                <BreadcrumbSeparator className="hidden md:block shrink-0" />
+                                <BreadcrumbItem className="min-w-0 overflow-hidden">
+                                    <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
+                                        Dashboard
+                                    </BreadcrumbPage>
+                                </BreadcrumbItem>
+                            </BreadcrumbList>
+                        </Breadcrumb>
                     </div>
                 </div>
 
-                {error ? (
-                    <div className="flex flex-col items-center justify-center h-[400px] rounded-2xl border bg-rose-500/5 text-rose-600 space-y-4">
-                        <p className="font-bold text-lg">Failed to load dashboard data</p>
-                        <p className="text-sm opacity-80">{error}</p>
-                        <Button variant="outline" onClick={refresh}>Try Again</Button>
-                    </div>
-                ) : isLoading && !stats ? (
-                    <div className="flex flex-col items-center justify-center h-[400px] space-y-4">
-                        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-                        <p className="text-sm text-muted-foreground font-medium animate-pulse">Gathering productivity metrics...</p>
-                    </div>
-                ) : stats ? (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <StatCards stats={stats} />
-                        <AiInsightsCard stats={stats} />
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                            <ProductivityChart data={stats.chartData} />
-                            <WorkforceChart data={stats.chartData} />
-                            <FinanceChart data={stats.chartData} />
-                        </div>
-                    </div>
-                ) : null}
-            </div>
+                <div className="flex h-full items-center px-2 sm:px-4 shrink-0 max-w-[48vw] sm:max-w-none overflow-hidden">
+                    <NavUser user={headerUser} />
+                </div>
+            </header>
+
+            <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+                <DashboardModule />
+            </main>
         </div>
     );
 }
