@@ -10,9 +10,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { AttendanceApprovalDaily } from "./components/AttendanceApprovalDaily";
 import { AttendanceApprovalCutoff } from "./components/AttendanceApprovalCutoff";
+import { AttendanceModificationRequests } from "./components/AttendanceModificationRequests";
 import { cn } from "@/lib/utils";
+import { FileEdit } from "lucide-react";
 
-type TabType = "daily" | "cutoff";
+type TabType = "daily" | "cutoff" | "modifications";
 
 export default function AttendanceApprovalModule() {
   const [activeTab, setActiveTab] = useState<TabType>("daily");
@@ -54,6 +56,12 @@ export default function AttendanceApprovalModule() {
             icon={<Timer className="h-4 w-4" />}
             label="Cutoff Approval"
           />
+          <TabTrigger 
+            active={activeTab === "modifications"} 
+            onClick={() => setActiveTab("modifications")}
+            icon={<FileEdit className="h-4 w-4" />}
+            label="Modification Requests"
+          />
           <div className="w-[1px] h-4 bg-border/60 mx-1" />
           <Button 
             variant="ghost" 
@@ -71,6 +79,7 @@ export default function AttendanceApprovalModule() {
       <div className="min-h-[600px]">
         {activeTab === "daily" && <AttendanceApprovalDaily />}
         {activeTab === "cutoff" && <AttendanceApprovalCutoff />}
+        {activeTab === "modifications" && <AttendanceModificationRequests />}
       </div>
     </div>
   );

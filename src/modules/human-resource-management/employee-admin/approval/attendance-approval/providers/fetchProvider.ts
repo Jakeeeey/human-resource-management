@@ -53,3 +53,36 @@ export async function approveOrRejectAttendance(
 
   return response.json();
 }
+
+export async function fetchModificationRequests(status: string = "pending"): Promise<{ data: import("../type").AttendanceChangeRequestWithUser[] }> {
+  const query = new URLSearchParams();
+  query.append("status", status);
+  
+  const response = await fetch(`${API_BASE}/modifications?${query.toString()}`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.details || errorData.error || 'Failed to fetch modification requests');
+  }
+  return response.json();
+}
+
+export async function approveOrRejectModification(
+  id: number,
+  status: 'approved' | 'rejected',
+  remarks?: string
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_BASE}/modifications/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status, remarks }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Failed to update modification request");
+  }
+
+  return response.json();
+}
