@@ -181,7 +181,7 @@ export function CreateCompanyMemoDialog({ open, onOpenChange }: Props) {
 
                         <div className="grid grid-cols-2 gap-4">
                             <FormField
-                                // @ts-expect-error - Type mismatch between zodResolver and react-hook-form
+
                                 control={form.control}
                                 name="priority"
                                 render={({ field }) => (
@@ -207,7 +207,7 @@ export function CreateCompanyMemoDialog({ open, onOpenChange }: Props) {
                             />
 
                             <FormField
-                                // @ts-expect-error - Type mismatch between zodResolver and react-hook-form
+
                                 control={form.control}
                                 name="status"
                                 render={({ field }) => (
