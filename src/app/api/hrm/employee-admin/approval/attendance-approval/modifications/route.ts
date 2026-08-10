@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     // 3. Fetch junction files
     const requestIds = changeRequests.map((r: { id: number }) => r.id).join(",");
-    let junctionData: { attendance_change_request_id: number, directus_files_id: any }[] = [];
+    let junctionData: { attendance_change_request_id: number, directus_files_id: { id: string, filename_download: string } }[] = [];
     if (requestIds) {
       try {
         const junctionResponse = await directusFetch(

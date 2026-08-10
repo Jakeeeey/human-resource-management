@@ -94,7 +94,7 @@ export function ModificationReviewDialog({ open, onOpenChange, request, onSucces
             <div>
               <DialogTitle className="text-xl">Review Modification</DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Requested by <span className="font-semibold text-foreground">{request.user_fname} {request.user_lname}</span> for {request.log_date}
+                Requested by <span className="font-semibold text-foreground">{request.user_fname} {request.user_lname}</span> for {format(new Date(request.log_date), "MMMM d, yyyy")}
               </p>
             </div>
           </div>
