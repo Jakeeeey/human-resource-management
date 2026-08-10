@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    console.log("[create employee payload]:", JSON.stringify(body, null, 2));
 
     const vosToken = req.cookies.get("vos_access_token")?.value;
 

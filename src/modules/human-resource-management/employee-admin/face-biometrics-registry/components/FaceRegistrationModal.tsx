@@ -115,7 +115,7 @@ export function FaceRegistrationModal({ isOpen, onOpenChange, user }: FaceRegist
         }
 
         setIsScanning(false);
-        const descriptorArray = Array.from(detection.descriptor);
+        const descriptorArray = Array.from(detection.descriptor) as number[];
         
         // Check for duplicates
         const { isDuplicate } = await checkDuplicateFace(descriptorArray);
