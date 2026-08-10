@@ -494,13 +494,20 @@ export async function middleware(req: NextRequest) {
                     })
                 ]);
 
-                if (subRes.ok && modRes.ok && allModsRes.ok && userRes.ok) {
-                    const [subData, modData, allModsData, userData] = await Promise.all([
+                if (subRes.ok && modRes.ok && allModsRes.ok) {
+                    const [subData, modData, allModsData] = await Promise.all([
                         subRes.json(),
                         modRes.json(),
                         allModsRes.json(),
-                        userRes.json()
                     ]);
+
+                    let userData: { data?: { role?: string; isAdmin?: boolean | number } } = { data: {} };
+                    if (userRes.ok) {
+                        userData = await userRes.json();
+                    } else {
+                        const errorText = await userRes.text().catch(() => "Could not read error text");
+                        console.error("[Middleware] User fetch failed:", userRes.status, errorText);
+                    }
 
                     const u = userData?.data || {};
                     const isAdmin = u.role === "ADMIN" || u.isAdmin === 1 || u.isAdmin === true;
@@ -529,7 +536,7 @@ export async function middleware(req: NextRequest) {
                     });
                 } else {
                     // Fail-fast on server errors
-                    const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus" : "Spring Boot";
+                    const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus Permissions" : "Directus User Profile";
                     throw new Error(service);
                 }
             } catch (err) {
