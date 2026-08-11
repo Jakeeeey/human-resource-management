@@ -61,3 +61,41 @@ export interface AttendanceListResponse {
   data: AttendanceLogWithUser[];
   total: number;
 }
+
+export interface AttendanceChangeRequestFile {
+  id: number;
+  attendance_change_request_id: number;
+  directus_files_id: {
+    id: string;
+    filename_download: string;
+  } | string;
+}
+
+export interface AttendanceChangeRequest {
+  id: number;
+  user_id: number;
+  log_date: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  old_time_in?: string | null;
+  old_lunch_start?: string | null;
+  old_lunch_end?: string | null;
+  old_break_start?: string | null;
+  old_break_end?: string | null;
+  old_time_out?: string | null;
+  time_in: string | null;
+  lunch_start: string | null;
+  lunch_end: string | null;
+  break_start: string | null;
+  break_end: string | null;
+  time_out: string | null;
+  date_created: string;
+  attendance_change_request_files?: AttendanceChangeRequestFile[];
+}
+
+export interface AttendanceChangeRequestWithUser extends AttendanceChangeRequest {
+  user_fname: string;
+  user_lname: string;
+  department_name: string | null;
+  original_log?: AttendanceLog;
+}
