@@ -121,11 +121,11 @@ export async function GET(req: NextRequest) {
     }
 
     if (startDate) {
-      leaveUrl += `&filter[filed_at][_gte]=${startDate}`;
+      leaveUrl += `&filter[leave_end][_gte]=${startDate}`;
     }
 
     if (endDate) {
-      leaveUrl += `&filter[filed_at][_lte]=${endDate}`;
+      leaveUrl += `&filter[leave_start][_lte]=${endDate}`;
     }
 
     const leaveResponse = await directusFetch(leaveUrl);
