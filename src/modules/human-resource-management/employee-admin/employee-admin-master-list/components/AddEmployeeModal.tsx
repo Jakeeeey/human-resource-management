@@ -273,12 +273,10 @@ export function AddEmployeeModal({
   // ── Password validation (mirrors Spring Boot rules) ──
   function validatePassword(pwd: string): string | null {
     if (!pwd) return "Password is required";
-    if (pwd.length < 15) return "Password must be at least 15 characters long.";
+    if (pwd.length < 8) return "Password must be at least 8 characters long.";
     if (pwd.length > 64) return "Password must not exceed 64 characters.";
     if (!/[a-z]/.test(pwd)) return "Password must contain at least one lowercase letter.";
-    if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
     if (!/\d/.test(pwd))    return "Password must contain at least one digit.";
-    if (!/[@$!%*?&]/.test(pwd)) return "Password must contain at least one special character (@$!%*?&).";
     return null;
   }
 
@@ -758,7 +756,7 @@ export function AddEmployeeModal({
                         // Validate on change so error clears as user fixes it
                         setPasswordError(validatePassword(e.target.value));
                       }}
-                      placeholder="Min 15 chars, upper, lower, digit, @$!%*?&"
+                      placeholder="Min 8 chars, lowercase, digit"
                       required
                     />
                   </div>

@@ -133,12 +133,12 @@ export async function GET(req: NextRequest) {
       filterParts.push(`filter[status][_eq]=${encodeURIComponent(statusFilter)}`);
     }
 
-    // Leave uses filed_at for date range
+    // Leave uses leave_start and leave_end for date range so it captures overlapping leaves
     if (dateFrom) {
-      filterParts.push(`filter[filed_at][_gte]=${encodeURIComponent(dateFrom)}`);
+      filterParts.push(`filter[leave_end][_gte]=${encodeURIComponent(dateFrom)}`);
     }
     if (dateTo) {
-      filterParts.push(`filter[filed_at][_lte]=${encodeURIComponent(dateTo)}`);
+      filterParts.push(`filter[leave_start][_lte]=${encodeURIComponent(dateTo)}`);
     }
 
     // Resolve name/search → user_id list
@@ -160,9 +160,7 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      matchedIds.forEach((id: number, i: number) => {
-        filterParts.push(`filter[user_id][_in][${i}]=${id}`);
-      });
+      filterParts.push(`filter[user_id][_in]=${matchedIds.join(",")}`);
     }
 
     const filterQuery = filterParts.length > 0 ? `&${filterParts.join("&")}` : "";
