@@ -4,13 +4,11 @@ import { useHandbook } from "../hooks/useHandbook";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { FileText, Download, Trash2, BookOpen, Calendar, AlignLeft, Paperclip, Eye, ZoomIn, ZoomOut, Edit } from "lucide-react";
-import { toast } from "sonner";
+import { FileText, Download, BookOpen, Calendar, AlignLeft, Paperclip, Eye, ZoomIn, ZoomOut, Edit } from "lucide-react";
 import { useState } from "react";
 
 export function HandbookDetail() {
-    const { isDetailOpen, setIsDetailOpen, setIsEditOpen, selectedHandbook, deleteHandbook } = useHandbook();
-    const [isDeleting, setIsDeleting] = useState(false);
+    const { isDetailOpen, setIsDetailOpen, setIsEditOpen, selectedHandbook } = useHandbook();
     const [previewAtt, setPreviewAtt] = useState<{ url: string; name: string } | null>(null);
     const [zoomLevel, setZoomLevel] = useState(1);
 
@@ -18,20 +16,6 @@ export function HandbookDetail() {
 
     const isImage = (filename: string) => {
         return /\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
-    };
-
-    const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this handbook?")) return;
-        
-        setIsDeleting(true);
-        try {
-            const success = await deleteHandbook(selectedHandbook.id!);
-            if (success) {
-                setIsDetailOpen(false);
-            }
-        } finally {
-            setIsDeleting(false);
-        }
     };
 
     const openPreview = (url: string, name: string) => {
@@ -164,6 +148,7 @@ export function HandbookDetail() {
                     <div className="flex-1 min-h-0 bg-muted/30 overflow-auto flex items-center justify-center">
                         {previewAtt && isImage(previewAtt.name) ? (
                             <div className="p-4 flex items-center justify-center min-w-full min-h-full">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img 
                                     src={previewAtt.url} 
                                     alt={previewAtt.name} 
