@@ -69,19 +69,36 @@ export async function GET() {
 
     const userId = payload?.id || payload?.user_id || payload?.sub;
 
-    // Fetch user details to get department
+    // Fetch user details to get department (and role)
     const userResponse = await directusFetch(
-      `/items/user/${userId}?fields=user_id,user_department,isAdmin,role`
+      `/items/user/${userId}?fields=user_id,user_department,isAdmin,role.name`
     );
 
-    const currentUserDepartment = userResponse.data?.user_department;
+    const isAdmin = userResponse.data?.isAdmin === true || userResponse.data?.role?.name === 'Administrator';
 
-    // Build query - only show pending requests from the user's department
+    // Fetch TA Approver mappings for this user
+    const taApproversResponse = await directusFetch(
+      `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0`
+    );
+    
+    const approvedDepartments: number[] = taApproversResponse.data?.map((a: { department_id: number }) => a.department_id) || [];
+
+    // Build query - only show pending requests
     let filter = `filter[status][_eq]=pending`;
 
-    // If user has a department, filter by that department
-    if (currentUserDepartment) {
-      filter += `&filter[department_id][_eq]=${currentUserDepartment}`;
+    if (isAdmin) {
+      // Admins see all pending requests, no department filter needed
+    } else if (approvedDepartments.length > 0) {
+      // Filter by departments the user is an approver for
+      const deptFilter = approvedDepartments.join(',');
+      filter += `&filter[department_id][_in]=${deptFilter}`;
+    } else {
+      // User is not an approver for any department and not an admin
+      return NextResponse.json({
+        data: [],
+        total: 0,
+        message: "You are not an assigned approver for any department."
+      });
     }
 
     // Fetch leave requests with user details

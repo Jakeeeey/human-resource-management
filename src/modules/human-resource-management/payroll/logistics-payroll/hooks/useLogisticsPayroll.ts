@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { StaffPayrollSummary } from "../types/logistics-payroll.schema";
-import { fetchLogisticsPayroll, approveLogisticsPayroll } from "../services/logistics-payroll";
+import { fetchLogisticsPayroll, approveLogisticsPayroll, updateLogisticsPayroll } from "../services/logistics-payroll";
 
 export function useLogisticsPayroll() {
     const [data, setData] = useState<StaffPayrollSummary[]>([]);
@@ -8,8 +8,10 @@ export function useLogisticsPayroll() {
     const [error, setError] = useState<string | null>(null);
 
     // Current filter state
+    const [searchQuery, setSearchQuery] = useState("");
     const [cutoffStart, setCutoffStart] = useState<string | undefined>();
     const [cutoffEnd, setCutoffEnd] = useState<string | undefined>();
+    const [showPendingOnly, setShowPendingOnly] = useState(false);
 
     const loadData = useCallback(async (start?: string, end?: string) => {
         setIsLoading(true);
@@ -38,16 +40,14 @@ export function useLogisticsPayroll() {
         try {
             const descriptionParts = [];
             if (dispatchDate) {
-                const dateParts = dispatchDate.split('T')[0].split('-');
-                if (dateParts.length === 3) {
-                    descriptionParts.push(`${dateParts[1]}/${dateParts[2]}`);
-                } else {
-                    descriptionParts.push(dispatchDate.split('T')[0]);
-                }
+                const d = new Date(dispatchDate);
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const dd = String(d.getDate()).padStart(2, '0');
+                descriptionParts.push(`${mm}/${dd}`);
             }
             if (areaName) descriptionParts.push(areaName);
             if (role) descriptionParts.push(role);
-            const description = descriptionParts.length > 0 ? descriptionParts.join(" - ") : undefined;
+            const description = `Dispatch - ${dispatchDocNo}` + (descriptionParts.length > 0 ? ` - ${descriptionParts.join(" - ")}` : "");
 
             await approveLogisticsPayroll({
                 user_id: staffId,
@@ -66,14 +66,32 @@ export function useLogisticsPayroll() {
         }
     };
 
+    const updatePayroll = async (id: number, amount: number) => {
+        setIsLoading(true);
+        try {
+            await updateLogisticsPayroll({ id, amount });
+            await loadData(cutoffStart, cutoffEnd);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to update payroll");
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return {
         data,
         isLoading,
         error,
         cutoffStart,
         cutoffEnd,
+        searchQuery,
+        setSearchQuery,
         setCutoffFilters,
+        showPendingOnly,
+        setShowPendingOnly,
         refresh: useCallback(() => loadData(cutoffStart, cutoffEnd), [loadData, cutoffStart, cutoffEnd]),
         approvePayroll,
+        updatePayroll,
     };
 }

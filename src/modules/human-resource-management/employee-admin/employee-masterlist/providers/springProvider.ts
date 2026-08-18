@@ -8,7 +8,13 @@ const PROXY_BASE = "/api/hrm/employee-admin/employee-master-list";
 
 export interface CreateEmployeePayload {
   email: string;
-  hashPassword: string;
+  hashPassword?: string;
+  userPassword?: string;
+  password?: string;
+  user_password?: string;
+  newPassword?: string;
+  plainPassword?: string;
+  rawPassword?: string;
   firstName: string;
   middleName?: string;
   lastName: string;

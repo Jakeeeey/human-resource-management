@@ -273,12 +273,10 @@ export function AddEmployeeModal({
   // ── Password validation (mirrors Spring Boot rules) ──
   function validatePassword(pwd: string): string | null {
     if (!pwd) return "Password is required";
-    if (pwd.length < 15) return "Password must be at least 15 characters long.";
+    if (pwd.length < 8) return "Password must be at least 8 characters long.";
     if (pwd.length > 64) return "Password must not exceed 64 characters.";
     if (!/[a-z]/.test(pwd)) return "Password must contain at least one lowercase letter.";
-    if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
     if (!/\d/.test(pwd))    return "Password must contain at least one digit.";
-    if (!/[@$!%*?&]/.test(pwd)) return "Password must contain at least one special character (@$!%*?&).";
     return null;
   }
 
@@ -443,8 +441,7 @@ export function AddEmployeeModal({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className="p-0 border-none shadow-2xl rounded-3xl overflow-hidden flex flex-col max-h-[80vh]"
-        style={{ maxWidth: "40vw", width: "90vw" }}
+        className="p-0 border-none shadow-2xl rounded-3xl overflow-hidden flex flex-col max-h-[90vh] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl w-[95vw]"
       >
         {/* ── Header ── */}
         <div className="p-6 pb-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent flex items-center gap-4 shrink-0">
@@ -759,7 +756,7 @@ export function AddEmployeeModal({
                         // Validate on change so error clears as user fixes it
                         setPasswordError(validatePassword(e.target.value));
                       }}
-                      placeholder="Min 15 chars, upper, lower, digit, @$!%*?&"
+                      placeholder="Min 8 chars, lowercase, digit"
                       required
                     />
                   </div>

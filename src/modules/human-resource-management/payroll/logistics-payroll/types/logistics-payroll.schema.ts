@@ -12,6 +12,10 @@ export interface DispatchDetail {
   timeOfDispatch: string | null;
   isApproved: boolean;
   approvedAmount?: number;
+  approvedId?: number;
+  isDisregarded: boolean;
+  isExtra?: boolean;
+  linkedDispatchNos?: string;
 }
 
 export interface StaffPayrollSummary {
@@ -33,5 +37,10 @@ export interface ApprovePayrollPayload {
   cutoff_end: string;
   description?: string;
   dispatchDocNo: string;
+}
+
+export interface UpdatePayrollPayload {
+  id: number;
+  amount: number;
 }
 

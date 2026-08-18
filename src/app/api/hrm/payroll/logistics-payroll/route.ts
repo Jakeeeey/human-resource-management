@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
 
         let filterQuery = "";
         if (cutoffStart && cutoffEnd) {
-            filterQuery = `&filter[time_of_dispatch][_between]=${cutoffStart},${cutoffEnd}T23:59:59`;
+            const startUtc = new Date(`${cutoffStart}T00:00:00+08:00`).toISOString();
+            const endUtc = new Date(`${cutoffEnd}T23:59:59+08:00`).toISOString();
+            const startStr = encodeURIComponent(startUtc);
+            const endStr = encodeURIComponent(endUtc);
+            filterQuery = `&filter[time_of_dispatch][_between]=${startStr},${endStr}`;
         }
 
         // 1. Fetch Post Dispatch Plans
@@ -54,8 +58,21 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Failed to fetch dispatch plans", details: errorText }, { status: pdpRes.status });
         }
 
-        const pdpData = (await pdpRes.json()).data || [];
-        const pdpIds = pdpData.map((p: any) => p.id);
+        const pdpDataRaw = (await pdpRes.json()).data || [];
+        
+        const extraPdpRes = await fetchWithRetry(`${DIRECTUS_URL}/items/post_dispatch_plan_extra?limit=1000&fields=${fields}${filterQuery}`, {
+            headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
+        });
+        const extraPdpDataRaw = extraPdpRes.ok ? ((await extraPdpRes.json()).data || []) : [];
+        
+        // Exclude any dispatch plans that are marked as disregarded (is_not_payroll = 1 or true)
+        const pdpData = [
+            ...pdpDataRaw.map((p: any) => ({ ...p, isExtra: false })),
+            ...extraPdpDataRaw.map((p: any) => ({ ...p, isExtra: true }))
+        ];
+        
+        const pdpIds = pdpData.filter((p: any) => !p.isExtra).map((p: any) => p.id);
+        const extraPdpIds = pdpData.filter((p: any) => p.isExtra).map((p: any) => p.id);
 
         const chunkArray = <T>(arr: T[], size: number): T[][] => {
             return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
@@ -82,10 +99,22 @@ export async function GET(request: NextRequest) {
         };
 
         // 2. Fetch Staff (Drivers and Helpers)
-        const staffData = await fetchChunked('/items/post_dispatch_plan_staff?limit=1000', pdpIds, 'post_dispatch_plan_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+        let staffData: any[] = [];
+        if (pdpIds.length > 0) {
+            const sData = await fetchChunked('/items/post_dispatch_plan_staff?limit=1000', pdpIds, 'post_dispatch_plan_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            staffData = [...staffData, ...sData.map((s: any) => ({ ...s, isExtra: false }))];
+        }
+        if (extraPdpIds.length > 0) {
+            const sData = await fetchChunked('/items/post_dispatch_plan_extra_staff?limit=1000', extraPdpIds, 'post_dispatch_plan_extra_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            staffData = [...staffData, ...sData.map((s: any) => ({ ...s, post_dispatch_plan_id: s.post_dispatch_plan_extra_id, isExtra: true }))];
+        }
 
         // 3. Fetch Post Dispatch Invoices separately
-        const pdiData = await fetchChunked('/items/post_dispatch_invoices?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id');
+        const pdiData = pdpIds.length > 0 ? await fetchChunked('/items/post_dispatch_invoices?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id') : [];
+
+        const pddpData = pdpIds.length > 0 ? await fetchChunked('/items/post_dispatch_dispatch_plans?limit=1000', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,dispatch_plan_id') : [];
+        const dpIds = [...new Set(pddpData.map((d: any) => d.dispatch_plan_id).filter(Boolean))];
+        const dpData = await fetchChunked('/items/dispatch_plan?limit=1000', dpIds, 'dispatch_id', 'dispatch_id,dispatch_no');
 
         const invoiceIds = [...new Set(pdiData.map((i: any) => i.invoice_id).filter(Boolean))];
 
@@ -113,6 +142,9 @@ export async function GET(request: NextRequest) {
         const vehicleIds = [...new Set(pdpData.map((p: any) => p.vehicle_id).filter(Boolean))];
         const vehicleData = await fetchChunked('/items/vehicles?limit=1000', vehicleIds, 'vehicle_id', 'vehicle_id,vehicle_plate,vehicle_type.*');
 
+        const missingUserIds = [...new Set(staffData.map(s => typeof s.user_id === 'object' && s.user_id !== null ? null : s.user_id).filter(Boolean))];
+        const userData = await fetchChunked('/items/user?limit=1000', missingUserIds, 'user_id', 'user_id,user_fname,user_lname');
+
         // 5. Fetch approved records from payroll_other_additions
         let approvedRecords: any[] = [];
         if (cutoffStart && cutoffEnd) {
@@ -137,7 +169,7 @@ export async function GET(request: NextRequest) {
             let matchedAreaId: number | null = null;
             let destLocationStr = "N/A";
             
-            const pdInvoices = pdiData.filter(pdi => pdi.post_dispatch_plan_id === p.id);
+            const pdInvoices = pdiData.filter(pdi => pdi.post_dispatch_plan_id === p.id && !p.isExtra);
             const invoice = invoiceData.find(i => pdInvoices.some(pdi => pdi.invoice_id === i.invoice_id));
             if (invoice) {
                 const customer = customerData.find(c => c.customer_code === invoice.customer_code);
@@ -191,14 +223,26 @@ export async function GET(request: NextRequest) {
             const vType = vehicle?.vehicle_type ? (typeof vehicle.vehicle_type === 'object' ? String(vehicle.vehicle_type.type_name || "") : String(vehicle.vehicle_type)) : undefined;
             const vPlate = vehicle?.vehicle_plate ? String(vehicle.vehicle_plate).trim() : undefined;
 
-            const allStaff = staffData.filter(s => s.post_dispatch_plan_id === p.id);
+            const linkedPddp = pddpData.filter((d: any) => d.post_dispatch_plan_id === p.id && !p.isExtra);
+            const linkedDps = dpData.filter((d: any) => linkedPddp.some((pddp: any) => pddp.dispatch_plan_id === d.dispatch_id));
+            const linkedDispatchNos = linkedDps.map((d: any) => d.dispatch_no).join(", ");
+
+            const allStaff = staffData.filter(s => s.post_dispatch_plan_id === p.id && s.isExtra === p.isExtra);
             allStaff.forEach(s => {
                 const userObj = typeof s.user_id === 'object' && s.user_id !== null ? s.user_id : null;
                 const userId = userObj ? userObj.user_id : s.user_id;
                 
                 if (!userId) return;
 
-                const name = userObj ? `${userObj.user_fname || ''} ${userObj.user_lname || ''}`.trim() : `User ${userId}`;
+                let name = `User ${userId}`;
+                if (userObj) {
+                    name = `${userObj.user_fname || ''} ${userObj.user_lname || ''}`.trim();
+                } else {
+                    const foundUser = userData.find((u: any) => u.user_id === userId);
+                    if (foundUser) {
+                        name = `${foundUser.user_fname || ''} ${foundUser.user_lname || ''}`.trim();
+                    }
+                }
                 const role = s.role || "Unknown";
 
                 // 1. Calculate amount
@@ -214,6 +258,7 @@ export async function GET(request: NextRequest) {
 
                 // 3. Find matching staff profile (staff_id) in payroll_logistics_staff
                 let staffProfile = pStaffData.find(ps => {
+                    if (ps.staff_id !== userId) return false;
                     if (ps.role !== role) return false;
                     
                     if (role === "Driver") {
@@ -231,7 +276,7 @@ export async function GET(request: NextRequest) {
 
                 // If multiple profiles match, prefer the one with specific vehicle_type_id over null
                 if (!staffProfile) {
-                    staffProfile = pStaffData.find(ps => ps.role === role); // Last resort fallback
+                    staffProfile = pStaffData.find(ps => ps.staff_id === userId && ps.role === role); // Last resort fallback
                 }
 
                 const actualStaffId = staffProfile ? staffProfile.staff_id : userId;
@@ -270,23 +315,33 @@ export async function GET(request: NextRequest) {
                 }
 
                 // Determine if approved
-                const dateOnlyStr = p.time_of_dispatch ? p.time_of_dispatch.split('T')[0] : null;
-                let shortDateStr = null;
-                if (dateOnlyStr) {
-                    const parts = dateOnlyStr.split('-');
-                    if (parts.length === 3) {
-                        shortDateStr = `${parts[1]}/${parts[2]}`;
-                    }
+                let formattedDateStr = null;
+                
+                if (p.time_of_dispatch) {
+                    const d = new Date(p.time_of_dispatch);
+                    d.setUTCHours(d.getUTCHours() + 8); // Convert to UTC+8
+                    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getUTCDate()).padStart(2, '0');
+                    formattedDateStr = `${mm}/${dd}`;
                 }
+                
                 const approvedRecord = approvedRecords.find(r => {
                     const desc = r.description || "";
-                    return r.user_id === userId && (
-                        desc.includes(dispatchDocNo) || 
-                        (dateOnlyStr && desc.includes(dateOnlyStr)) ||
-                        (shortDateStr && desc.includes(shortDateStr))
-                    );
+                    if (String(r.user_id) !== String(userId)) return false;
+                    
+                    if (formattedDateStr && desc.includes(formattedDateStr)) return true;
+                    
+                    if (desc === `Dispatch - ${dispatchDocNo}`) return true;
+                    if (dispatchDocNo && dispatchDocNo.length > 4) {
+                        if (desc.includes(`Dispatch - ${dispatchDocNo}`)) return true;
+                        if ((dispatchDocNo.startsWith("DP-") || dispatchDocNo.startsWith("PDP-")) && desc.includes(dispatchDocNo)) return true;
+                    }
+
+                    return false;
                 });
 
+                const isDisregarded = p.is_not_payroll === 1 || p.is_not_payroll === true;
+                
                 const dispatchDetail: DispatchDetail = {
                     dispatchPlanId: p.id,
                     dispatchDocNo: dispatchDocNo,
@@ -297,7 +352,11 @@ export async function GET(request: NextRequest) {
                     vehicleType: vType,
                     timeOfDispatch: p.time_of_dispatch,
                     isApproved: !!approvedRecord,
-                    approvedAmount: approvedRecord ? Number(approvedRecord.amount) : undefined
+                    approvedAmount: approvedRecord ? Number(approvedRecord.amount) : undefined,
+                    approvedId: approvedRecord ? approvedRecord.id : undefined,
+                    isDisregarded,
+                    isExtra: p.isExtra,
+                    linkedDispatchNos: linkedDispatchNos || undefined
                 };
 
                 if (!staffMap.has(userId)) {
@@ -311,10 +370,28 @@ export async function GET(request: NextRequest) {
 
                 const summary = staffMap.get(userId)!;
                 
-                const dateOnly = p.time_of_dispatch ? p.time_of_dispatch.split('T')[0] : null;
+                let dateOnly = null;
+                if (p.time_of_dispatch) {
+                    const d = new Date(p.time_of_dispatch);
+                    d.setUTCHours(d.getUTCHours() + 8); // PHT offset
+                    dateOnly = d.toISOString().split('T')[0];
+                }
+                
                 let existingDispatch = null;
-                if (dateOnly) {
-                    existingDispatch = summary.dispatches.find(d => d.timeOfDispatch && d.timeOfDispatch.startsWith(dateOnly));
+                
+                // Only merge regular dispatches that occur on the same day. 
+                // Extra/manual dispatches are intentionally kept as separate line items.
+                // We also strictly separate disregarded DPs from valid DPs so a disregarded trip doesn't "eat" and hide a valid trip.
+                if (dateOnly && !p.isExtra) {
+                    existingDispatch = summary.dispatches.find(d => {
+                        if (d.isExtra || d.isDisregarded !== isDisregarded || !d.timeOfDispatch) return false;
+                        
+                        const d1 = new Date(d.timeOfDispatch);
+                        d1.setUTCHours(d1.getUTCHours() + 8);
+                        const dateStr1 = d1.toISOString().split('T')[0];
+                        
+                        return dateStr1 === dateOnly;
+                    });
                 }
 
                 if (existingDispatch) {
@@ -322,12 +399,20 @@ export async function GET(request: NextRequest) {
                     if (!existingDispatch.dispatchDocNo.includes(dispatchDocNo)) {
                         existingDispatch.dispatchDocNo += `\n${dispatchDocNo}`;
                     }
+                    if (linkedDispatchNos && (!existingDispatch.linkedDispatchNos || !existingDispatch.linkedDispatchNos.includes(linkedDispatchNos))) {
+                        existingDispatch.linkedDispatchNos = existingDispatch.linkedDispatchNos 
+                            ? `${existingDispatch.linkedDispatchNos}, ${linkedDispatchNos}`
+                            : linkedDispatchNos;
+                    }
                     if (!existingDispatch.location.includes(displayLocation)) {
                         existingDispatch.location += `\n${displayLocation}`;
                     }
                     if (calculatedAmount > existingDispatch.amount) {
-                        summary.totalAmount -= existingDispatch.amount;
-                        summary.totalAmount += calculatedAmount;
+                        // Only add to total amount if it's not disregarded
+                        if (!existingDispatch.isDisregarded) {
+                            summary.totalAmount -= existingDispatch.amount;
+                            summary.totalAmount += calculatedAmount;
+                        }
                         existingDispatch.amount = calculatedAmount;
                     }
                     if (approvedRecord && !existingDispatch.isApproved) {
@@ -335,7 +420,9 @@ export async function GET(request: NextRequest) {
                         existingDispatch.approvedAmount = Number(approvedRecord.amount);
                     }
                 } else {
-                    summary.totalAmount += calculatedAmount;
+                    if (!isDisregarded) {
+                        summary.totalAmount += calculatedAmount;
+                    }
                     summary.dispatches.push(dispatchDetail);
                 }
             });
@@ -403,6 +490,48 @@ export async function POST(req: NextRequest) {
         console.error("Error approving logistics payroll:", error);
         return NextResponse.json(
             { error: "Failed to approve logistics payroll" },
+            { status: 500 }
+        );
+    }
+}
+
+export async function PATCH(req: NextRequest) {
+    try {
+        const body = await req.json();
+        
+        const { id, amount } = body;
+        
+        if (!id || amount === undefined) {
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+
+        const updateData = { amount };
+        
+        const res = await fetch(`${DIRECTUS_URL}/items/payroll_other_additions/${id}`, {
+            method: "PATCH",
+            headers: {
+                "Authorization": `Bearer ${DIRECTUS_TOKEN}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(updateData),
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("Error updating logistics payroll:", errorText);
+            return NextResponse.json(
+                { error: "Failed to update logistics payroll", details: errorText },
+                { status: res.status }
+            );
+        }
+
+        const json = await res.json();
+        return NextResponse.json({ success: true, data: json.data }, { status: 200 });
+
+    } catch (error) {
+        console.error("Error updating logistics payroll:", error);
+        return NextResponse.json(
+            { error: "Failed to update logistics payroll" },
             { status: 500 }
         );
     }

@@ -66,6 +66,25 @@ export default function COEApprovalContent() {
     }
   };
 
+  const handleEditRemarks = async (coeId: number, hr_remarks: string) => {
+    try {
+      await approveOrRejectCOERequest({
+        coe_id: coeId,
+        status: "APPROVED",
+        remarks: hr_remarks,
+        approver_id: 0,
+      });
+
+      toast.success("HR remarks updated successfully");
+      await loadData();
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update HR remarks";
+      toast.error(errorMessage);
+      throw err;
+    }
+  };
+
   const handleReject = async (coeId: number, remarks: string) => {
     try {
       await approveOrRejectCOERequest({
@@ -226,6 +245,7 @@ export default function COEApprovalContent() {
         data={filteredRequests}
         onApprove={handleApprove}
         onReject={handleReject}
+        onEditRemarks={handleEditRemarks}
         isLoading={isLoading}
       />
     </div>

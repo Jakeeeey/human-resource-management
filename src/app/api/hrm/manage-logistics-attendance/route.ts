@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from "next/server";
 
@@ -21,8 +22,35 @@ export async function GET(request: NextRequest) {
 
         let filterQuery = "";
         if (startDate && endDate) {
-            filterQuery = `&filter[time_of_dispatch][_between]=${startDate},${endDate}T23:59:59`;
+            const startUtc = new Date(`${startDate}T00:00:00+08:00`).toISOString();
+            const endUtc = new Date(`${endDate}T23:59:59+08:00`).toISOString();
+            const startStr = encodeURIComponent(startUtc);
+            const endStr = encodeURIComponent(endUtc);
+            filterQuery = `&filter[time_of_dispatch][_between]=${startStr},${endStr}`;
         }
+
+        const chunkArray = (arr: any[], size: number) => {
+            const chunks = [];
+            for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+            return chunks;
+        };
+
+        const fetchChunked = async (urlBase: string, ids: any[], idField: string, fields: string, isString: boolean = false) => {
+            if (ids.length === 0) return [];
+            const chunks = chunkArray(ids, 150);
+            let results: any[] = [];
+            for (const chunk of chunks) {
+                const encodedIds = isString ? chunk.map(id => encodeURIComponent(String(id))) : chunk;
+                const res = await fetch(`${DIRECTUS_URL}${urlBase}&filter[${idField}][_in]=${encodedIds.join(",")}&fields=${fields}`, {
+                    headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.data) results = [...results, ...data.data];
+                }
+            }
+            return results;
+        };
 
         // 1. Fetch Post Dispatch Plans
         const fields = [
@@ -41,31 +69,45 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Failed to fetch dispatch plans", details: errorText }, { status: pdpRes.status });
         }
 
-        const pdpData = (await pdpRes.json()).data || [];
+        const pdpDataRaw = (await pdpRes.json()).data || [];
+        const pdpData = pdpDataRaw.map((p: any) => ({ ...p, isExtra: false }));
         const pdpIds = pdpData.map((p: any) => p.id);
+
+        const extraPdpRes = await fetch(`${DIRECTUS_URL}/items/post_dispatch_plan_extra?limit=1000&fields=*${filterQuery}`, {
+            headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
+        });
+        const extraPdpDataRaw = extraPdpRes.ok ? (await extraPdpRes.json()).data || [] : [];
+        const extraPdpData = extraPdpDataRaw.map((p: any) => ({ ...p, isExtra: true }));
+        const extraPdpIds = extraPdpData.map((p: any) => p.id);
+
+        const allPdpData = [...pdpData, ...extraPdpData];
 
         // 2. Fetch Staff (Drivers and Helpers)
         let staffData: any[] = [];
         if (pdpIds.length > 0) {
-            const staffRes = await fetch(`${DIRECTUS_URL}/items/post_dispatch_plan_staff?limit=5000&filter[post_dispatch_plan_id][_in]=${pdpIds.join(",")}&fields=*,user_id.user_id,user_id.user_fname,user_id.user_lname`, {
-                headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
-            });
-            if (staffRes.ok) {
-                staffData = (await staffRes.json()).data || [];
-            }
+            const sData = await fetchChunked('/items/post_dispatch_plan_staff?limit=-1', pdpIds, 'post_dispatch_plan_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            staffData = [...staffData, ...sData.map((s: any) => ({ ...s, isExtra: false }))];
+        }
+
+        if (extraPdpIds.length > 0) {
+            const sData = await fetchChunked('/items/post_dispatch_plan_extra_staff?limit=-1', extraPdpIds, 'post_dispatch_plan_extra_id', '*,user_id.user_id,user_id.user_fname,user_id.user_lname');
+            staffData = [...staffData, ...sData.map((s: any) => ({ ...s, post_dispatch_plan_id: s.post_dispatch_plan_extra_id, isExtra: true }))];
+        }
+
+        // Fix for missing Directus relationship on user_id (where user_id is just an integer)
+        const unexpandedUserIds = [...new Set(staffData.map(s => typeof s.user_id === 'number' ? s.user_id : null).filter(Boolean))];
+        let usersData: any[] = [];
+        if (unexpandedUserIds.length > 0) {
+            usersData = await fetchChunked('/items/user?limit=-1', unexpandedUserIds, 'user_id', 'user_id,user_fname,user_lname');
         }
 
         // 3. Collect IDs for related records
-        const vehicleIds = [...new Set(pdpData.map((p: any) => p.vehicle_id).filter(Boolean))];
-        const invoiceIds = [...new Set(pdpData.flatMap((p: any) => p.post_dispatch_invoices?.map((i: any) => i.invoice_id)).filter(Boolean))];
+        const vehicleIds = [...new Set(allPdpData.map((p: any) => p.vehicle_id).filter(Boolean))];
 
         // 4. Fetch Vehicles
         let vehiclesData: any[] = [];
         if (vehicleIds.length > 0) {
-            const vRes = await fetch(`${DIRECTUS_URL}/items/vehicles?limit=1000&filter[vehicle_id][_in]=${vehicleIds.join(",")}&fields=vehicle_id,vehicle_plate,vehicle_type.type_name`, {
-                headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
-            });
-            if (vRes.ok) vehiclesData = (await vRes.json()).data || [];
+            vehiclesData = await fetchChunked('/items/vehicles?limit=-1', vehicleIds, 'vehicle_id', 'vehicle_id,vehicle_plate,vehicle_type.type_name');
         }
 
         // 5. Fetch Sales Invoices -> Customers -> Areas
@@ -74,42 +116,47 @@ export async function GET(request: NextRequest) {
         let areasData: any[] = [];
         let locationsData: any[] = [];
 
-        if (invoiceIds.length > 0) {
-            const siRes = await fetch(`${DIRECTUS_URL}/items/sales_invoice?limit=1000&filter[invoice_id][_in]=${invoiceIds.join(",")}&fields=invoice_id,customer_code`, {
-                headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
-            });
-            if (siRes.ok) invoiceData = (await siRes.json()).data || [];
+        const pdiData = await fetchChunked('/items/post_dispatch_invoices?limit=-1', pdpIds, 'post_dispatch_plan_id', 'post_dispatch_plan_id,invoice_id');
+        const invoiceIds = [...new Set(pdiData.map((i: any) => i.invoice_id).filter(Boolean))];
 
+        if (invoiceIds.length > 0) {
+            invoiceData = await fetchChunked('/items/sales_invoice?limit=-1', invoiceIds, 'invoice_id', 'invoice_id,customer_code');
             const customerCodes = [...new Set(invoiceData.map((i: any) => i.customer_code).filter(Boolean))];
             
-            // Note: Since customer_code is a string, we map over them and encode properly
             if (customerCodes.length > 0) {
-                // Avoid URL too long error by taking a chunk, or just fetching all and filtering in memory.
-                // Fetching all customers might be heavy, let's filter by the specific codes.
-                // We'll join them into a valid query string
-                const cQuery = customerCodes.map(c => encodeURIComponent(c)).join(",");
-                const cRes = await fetch(`${DIRECTUS_URL}/items/customer?limit=1000&filter[customer_code][_in]=${cQuery}&fields=customer_code,city,province,brgy`, {
-                    headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
-                });
-                if (cRes.ok) customerData = (await cRes.json()).data || [];
+                customerData = await fetchChunked('/items/customer?limit=-1', customerCodes, 'customer_code', 'customer_code,city,province,brgy', true);
             }
 
             // Fetch Areas and Locations
-            const aRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_area?limit=1000`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
+            const aRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_area?limit=-1`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
             if (aRes.ok) areasData = (await aRes.json()).data || [];
 
-            const lRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_location?limit=1000`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
+            const lRes = await fetch(`${DIRECTUS_URL}/items/payroll_logistics_location?limit=-1`, { headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` } });
             if (lRes.ok) locationsData = (await lRes.json()).data || [];
         }
 
         // 6. Assemble the DispatchAttendance format
-        const data = pdpData.map((p: any) => {
-            const allStaff = staffData.filter(s => s.post_dispatch_plan_id === p.id);
+        const data = allPdpData.map((p: any) => {
+            const allStaff = staffData.filter(s => s.post_dispatch_plan_id === p.id && s.isExtra === p.isExtra);
             
             const getStaffInfo = (s: any) => {
                 const userObj = typeof s.user_id === 'object' && s.user_id !== null ? s.user_id : null;
                 const userId = userObj ? userObj.user_id : s.user_id;
-                const name = userObj ? `${userObj.user_fname || ''} ${userObj.user_lname || ''}`.trim() : `User ${userId}`;
+                
+                let fname = "";
+                let lname = "";
+                
+                if (userObj) {
+                    fname = userObj.user_fname || "";
+                    lname = userObj.user_lname || "";
+                } else {
+                    const fallbackUser = usersData.find(u => u.user_id === userId);
+                    if (fallbackUser) {
+                        fname = fallbackUser.user_fname || "";
+                        lname = fallbackUser.user_lname || "";
+                    }
+                }
+                const name = fname || lname ? `${fname} ${lname}`.trim() : `User ${userId}`;
                 return { userId, name, isPresent: s.is_present === 1 || s.is_present === true, role: s.role };
             };
 
@@ -127,32 +174,54 @@ export async function GET(request: NextRequest) {
 
             const driverRecord = allStaff.find(s => s.role === 'Driver');
             const driverInfo = driverRecord ? getStaffInfo(driverRecord) : null;
+            const driverName = driverInfo ? driverInfo.name : null;
 
             // Resolve Area using SQL logic equivalent
             let brgy = "", city = "", province = "", areaName = "N/A";
+            let invoice: any = null;
             
-            const invoice = invoiceData.find(i => p.post_dispatch_invoices?.some((pdi: any) => pdi.invoice_id === i.invoice_id));
-            if (invoice) {
-                const customer = customerData.find(c => c.customer_code === invoice.customer_code);
-                if (customer) {
-                    brgy = customer.brgy || "";
-                    city = customer.city || "";
-                    province = customer.province || "";
-                    
-                    // Match location exactly like view_logistics_payroll SQL
-                    const cCityClean = city.toUpperCase().replace(/CITY OF /g, '').replace(/ CITY/g, '').replace(/\(CAPITAL\)/g, '').trim();
-                    const cProvClean = province.toUpperCase().trim();
+            if (p.isExtra && p.area) {
+                areaName = p.area;
+            } else {
+                const pdInvoices = pdiData.filter((pdi: any) => pdi.post_dispatch_plan_id === p.id && !p.isExtra);
+                invoice = invoiceData.find(i => pdInvoices.some((pdi: any) => pdi.invoice_id === i.invoice_id));
+                if (invoice) {
+                    const customer = customerData.find(c => c.customer_code === invoice.customer_code);
+                    if (customer) {
+                        brgy = customer.brgy || "";
+                        city = customer.city || "";
+                        province = customer.province || "";
+                        
+                        const cleanString = (s: string) => s.toUpperCase().replace(/CITY OF /g, '').replace(/ CITY/g, '').replace(/\([^)]+\)/g, '').trim();
+                        const cCityClean = cleanString(city);
+                        const cProvClean = cleanString(province);
 
-                    const matchedLoc = locationsData.find(l => {
-                        const lCityClean = (l.city || "").toUpperCase().replace(/CITY OF /g, '').replace(/ CITY/g, '').replace(/\(CAPITAL\)/g, '').trim();
-                        const lProvClean = (l.province || "").toUpperCase().trim();
-                        return cCityClean === lCityClean && cProvClean === lProvClean;
-                    });
+                        const matchedLoc = locationsData.find(l => {
+                            const lCityClean = cleanString(l.city || "");
+                            const lProvClean = cleanString(l.province || "");
 
-                    if (matchedLoc) {
-                        const matchedArea = areasData.find(a => a.area_id === matchedLoc.area_id);
-                        if (matchedArea) {
-                            areaName = matchedArea.area_name;
+                            if (!lCityClean && !lProvClean) return false;
+
+                            // Exact match
+                            if (cCityClean === lCityClean && cProvClean === lProvClean) return true;
+
+                            // Flexible match
+                            const cityMatch = lCityClean && cCityClean ? (cCityClean.includes(lCityClean) || lCityClean.includes(cCityClean)) : false;
+                            const provMatch = lProvClean && cProvClean ? (
+                                cProvClean.includes(lProvClean) || 
+                                lProvClean.includes(cProvClean) ||
+                                (cProvClean.includes("NCR") && lProvClean.includes("METRO MANILA")) ||
+                                (cProvClean.includes("METRO MANILA") && lProvClean.includes("NCR"))
+                            ) : false;
+
+                            return cityMatch && provMatch;
+                        });
+
+                        if (matchedLoc) {
+                            const matchedArea = areasData.find(a => a.area_id === matchedLoc.area_id);
+                            if (matchedArea) {
+                                areaName = matchedArea.area_name;
+                            }
                         }
                     }
                 }
@@ -164,13 +233,15 @@ export async function GET(request: NextRequest) {
 
             return {
                 dispatchPlanId: p.id,
+                isExtra: p.isExtra,
+                isNotPayroll: p.is_not_payroll === 1 || p.is_not_payroll === true,
                 dispatchDocNo: p.doc_no,
-                dispatchStatus: p.status,
+                dispatchStatus: p.status || "Posted",
                 deliveryStatus: "Unknown",
                 timeOfDispatch: p.time_of_dispatch,
                 timeOfArrival: p.time_of_arrival,
                 driverId: driverInfo ? driverInfo.userId : p.driver_id,
-                driverName: driverInfo ? driverInfo.name : null,
+                driverName: driverName,
                 vehicleId: p.vehicle_id,
                 vehicleType,
                 invoiceId: invoice?.invoice_id || null,
@@ -212,7 +283,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
     try {
         const body = await request.json();
-        const { dispatchPlanId, driverId, helperIds, timeOfDispatch, vehicleId } = body;
+        const { dispatchPlanId, isExtra, driverId, helperIds, timeOfDispatch, vehicleId, isNotPayroll, area, docNo } = body;
 
         if (!dispatchPlanId) {
             return NextResponse.json({ error: "dispatchPlanId is required" }, { status: 400 });
@@ -222,13 +293,20 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ error: "API base URL not configured" }, { status: 500 });
         }
 
-        // Update time_of_dispatch and/or vehicle_id if provided
-        if (timeOfDispatch !== undefined || vehicleId !== undefined) {
+        const pdpTable = isExtra ? "post_dispatch_plan_extra" : "post_dispatch_plan";
+        const staffTable = isExtra ? "post_dispatch_plan_extra_staff" : "post_dispatch_plan_staff";
+        const staffIdField = isExtra ? "post_dispatch_plan_extra_id" : "post_dispatch_plan_id";
+
+        // Update time_of_dispatch, vehicle_id, and/or is_not_payroll if provided
+        if (timeOfDispatch !== undefined || vehicleId !== undefined || isNotPayroll !== undefined || area !== undefined || docNo !== undefined) {
             const updatePayload: any = {};
             if (timeOfDispatch !== undefined) updatePayload.time_of_dispatch = timeOfDispatch;
             if (vehicleId !== undefined) updatePayload.vehicle_id = vehicleId;
+            if (isNotPayroll !== undefined) updatePayload.is_not_payroll = isNotPayroll;
+            if (area !== undefined && isExtra) updatePayload.area = area;
+            if (docNo !== undefined && isExtra) updatePayload.doc_no = docNo;
 
-            const updateRes = await fetch(`${DIRECTUS_URL}/items/post_dispatch_plan/${dispatchPlanId}`, {
+            const updateRes = await fetch(`${DIRECTUS_URL}/items/${pdpTable}/${dispatchPlanId}`, {
                 method: "PATCH",
                 headers: {
                     "Authorization": `Bearer ${DIRECTUS_TOKEN}`,
@@ -241,12 +319,9 @@ export async function PATCH(request: NextRequest) {
             }
         }
 
-        // Synchronize post_dispatch_plan_staff
-        // Fetch existing staff for this PDP
-        const staffRes = await fetch(`${DIRECTUS_URL}/items/post_dispatch_plan_staff?filter[post_dispatch_plan_id][_eq]=${dispatchPlanId}`, {
-            headers: {
-                "Authorization": `Bearer ${DIRECTUS_TOKEN}`
-            }
+        // Synchronize staff
+        const staffRes = await fetch(`${DIRECTUS_URL}/items/${staffTable}?filter[${staffIdField}][_eq]=${dispatchPlanId}`, {
+            headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}` }
         });
         
         if (!staffRes.ok) {
@@ -256,7 +331,6 @@ export async function PATCH(request: NextRequest) {
         const existingStaffData = await staffRes.json();
         const existingStaff: Array<{ id: number; user_id: number; role: string }> = existingStaffData.data || [];
 
-        // We want the final state to be: 1 Driver (driverId), N Helpers (helperIds)
         const targetStaff: Array<{ user_id: number; role: string }> = [];
         if (driverId) targetStaff.push({ user_id: driverId, role: "Driver" });
         if (helperIds && Array.isArray(helperIds)) {
@@ -264,10 +338,9 @@ export async function PATCH(request: NextRequest) {
         }
 
         const toDelete: number[] = [];
-        const toCreate: Array<{ post_dispatch_plan_id: number; user_id: number; role: string }> = [];
+        const toCreate: Array<any> = [];
 
-        // Determine what to delete and what is already present
-        const presentMap = new Set<string>(); // "user_id-role"
+        const presentMap = new Set<string>();
         existingStaff.forEach(staff => {
             const isTargeted = targetStaff.some(t => t.user_id === staff.user_id && t.role === staff.role);
             if (!isTargeted) {
@@ -277,33 +350,24 @@ export async function PATCH(request: NextRequest) {
             }
         });
 
-        // Determine what to create
         targetStaff.forEach(t => {
             if (!presentMap.has(`${t.user_id}-${t.role}`)) {
-                toCreate.push({ post_dispatch_plan_id: dispatchPlanId, user_id: t.user_id, role: t.role });
+                toCreate.push({ [staffIdField]: dispatchPlanId, user_id: t.user_id, role: t.role, is_present: true });
             }
         });
 
-        // Perform deletions
         if (toDelete.length > 0) {
-            await fetch(`${DIRECTUS_URL}/items/post_dispatch_plan_staff`, {
+            await fetch(`${DIRECTUS_URL}/items/${staffTable}`, {
                 method: "DELETE",
-                headers: {
-                    "Authorization": `Bearer ${DIRECTUS_TOKEN}`,
-                    "Content-Type": "application/json"
-                },
+                headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}`, "Content-Type": "application/json" },
                 body: JSON.stringify(toDelete)
             });
         }
 
-        // Perform creations
         if (toCreate.length > 0) {
-            await fetch(`${DIRECTUS_URL}/items/post_dispatch_plan_staff`, {
+            await fetch(`${DIRECTUS_URL}/items/${staffTable}`, {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${DIRECTUS_TOKEN}`,
-                    "Content-Type": "application/json"
-                },
+                headers: { "Authorization": `Bearer ${DIRECTUS_TOKEN}`, "Content-Type": "application/json" },
                 body: JSON.stringify(toCreate)
             });
         }
@@ -311,9 +375,6 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ success: true });
 
     } catch (error) {
-        return NextResponse.json(
-            { error: "Failed to update dispatch staff", details: error instanceof Error ? error.message : "Unknown error" },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: "Failed to update dispatch staff" }, { status: 500 });
     }
 }

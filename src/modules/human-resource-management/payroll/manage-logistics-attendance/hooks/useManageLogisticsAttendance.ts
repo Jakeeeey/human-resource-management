@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LogisticsReportDateRange,
   LogisticsReportMeta,
@@ -39,6 +39,10 @@ export function useManageLogisticsAttendance() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [driverFilter, setDriverFilter] = useState("");
+  const [helperFilter, setHelperFilter] = useState("");
+  const [dispatchDateFilter, setDispatchDateFilter] = useState("");
+  const [showDisregarded, setShowDisregarded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
@@ -79,7 +83,7 @@ export function useManageLogisticsAttendance() {
     }
   }, [startDate, endDate]);
 
-  const updateDispatchStaff = async (payload: { dispatchPlanId: number; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; }) => {
+  const updateDispatchStaff = async (payload: { dispatchPlanId: number; isExtra?: boolean; driverId: number | null; helperIds: number[]; timeOfDispatch?: string | null; vehicleId?: number | null; isNotPayroll?: boolean; area?: string; docNo?: string; }) => {
     try {
       const response = await fetch("/api/hrm/manage-logistics-attendance", {
         method: "PATCH",
@@ -89,6 +93,26 @@ export function useManageLogisticsAttendance() {
 
       if (!response.ok) {
         throw new Error("Failed to update staff.");
+      }
+
+      await loadReport();
+      return { success: true };
+    } catch (err) {
+        throw err;
+    }
+  };
+
+  const addManualDispatch = async (payload: { docNo: string; timeOfDispatch: string; driverId: number | null; vehicleId: number | null; helperIds: number[]; }) => {
+    try {
+      const response = await fetch("/api/hrm/manage-logistics-attendance/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to add manual dispatch.");
       }
 
       await loadReport();
@@ -109,11 +133,32 @@ export function useManageLogisticsAttendance() {
 
   const filteredDispatches = dispatches
     .filter(
-      (dispatch) =>
-        !searchQuery ||
-        dispatch.dispatchDocNo
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()),
+      (dispatch) => {
+        const matchSearch = !searchQuery || dispatch.dispatchDocNo?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchDriver = !driverFilter || driverFilter === 'all' || 
+          (dispatch.driverName && dispatch.driverName.toLowerCase().includes(driverFilter.toLowerCase())) ||
+          (dispatch.driverId && dispatch.driverId.toString().includes(driverFilter));
+        const matchHelper = !helperFilter || helperFilter === 'all' ||
+          (dispatch.staff && dispatch.staff.some(s => 
+            (s.staffName && s.staffName.toLowerCase().includes(helperFilter.toLowerCase())) ||
+            (s.staffUserId && s.staffUserId.toString().includes(helperFilter))
+          ));
+        
+        let matchDate = true;
+        if (dispatchDateFilter) {
+          if (!dispatch.timeOfDispatch) {
+            matchDate = false;
+          } else {
+            const dDate = new Date(dispatch.timeOfDispatch);
+            const dDateStr = `${dDate.getFullYear()}-${String(dDate.getMonth() + 1).padStart(2, '0')}-${String(dDate.getDate()).padStart(2, '0')}`;
+            matchDate = dDateStr === dispatchDateFilter;
+          }
+        }
+        
+        const matchDisregarded = showDisregarded ? true : !dispatch.isNotPayroll;
+
+        return matchSearch && matchDriver && matchHelper && matchDate && matchDisregarded;
+      }
     )
     .sort((a, b) => {
       const dateA = new Date(a.timeOfDispatch || 0).getTime();
@@ -136,6 +181,24 @@ export function useManageLogisticsAttendance() {
   const endIndex = startIndex + pageSize;
   const paginatedDispatches = filteredDispatches.slice(startIndex, endIndex);
 
+  const uniqueDrivers = useMemo(() => {
+    const drivers = new Set<string>();
+    dispatches.forEach(d => {
+      if (d.driverName) drivers.add(d.driverName);
+    });
+    return Array.from(drivers).sort();
+  }, [dispatches]);
+
+  const uniqueHelpers = useMemo(() => {
+    const helpers = new Set<string>();
+    dispatches.forEach(d => {
+      d.staff?.forEach(s => {
+        if (s.staffName) helpers.add(s.staffName);
+      });
+    });
+    return Array.from(helpers).sort();
+  }, [dispatches]);
+
   return {
     startDate,
     endDate,
@@ -154,9 +217,20 @@ export function useManageLogisticsAttendance() {
     setStartDate,
     setEndDate,
     setSearchQuery,
+    driverFilter,
+    setDriverFilter,
+    helperFilter,
+    setHelperFilter,
+    dispatchDateFilter,
+    setDispatchDateFilter,
+    showDisregarded,
+    setShowDisregarded,
+    uniqueDrivers,
+    uniqueHelpers,
     setCurrentPage,
     setPageSize,
     loadReport,
     updateDispatchStaff,
+    addManualDispatch,
   };
 }

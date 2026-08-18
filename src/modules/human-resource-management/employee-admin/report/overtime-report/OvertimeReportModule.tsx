@@ -1,11 +1,8 @@
 "use client";
 
 import React from "react";
-import { 
-  OvertimeReportFetchProvider,
-  OvertimeReportFilterProvider,
-  OvertimeReportPaginationProvider 
-} from "./contexts";
+import { OvertimeReportFetchProvider } from "./contexts";
+
 import { useOvertimeReport } from "./hooks/useOvertimeReport";
 import { OvertimeReportFilters } from "./components/OvertimeReportFilters";
 import { OvertimeReportTable } from "./components/OvertimeReportTable";
@@ -135,11 +132,7 @@ function OvertimeReportModuleContent() {
 export default function OvertimeReportModule() {
   return (
     <OvertimeReportFetchProvider>
-      <OvertimeReportFilterProvider>
-        <OvertimeReportPaginationProvider>
-          <OvertimeReportModuleContent />
-        </OvertimeReportPaginationProvider>
-      </OvertimeReportFilterProvider>
+      <OvertimeReportModuleContent />
     </OvertimeReportFetchProvider>
   );
 }

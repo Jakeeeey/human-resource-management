@@ -82,6 +82,8 @@ export interface LeaveReportFilterContextType {
   setStatusFilter: (status: string | null) => void;
   resetFilters: () => void;
   filterRequests: (requests: LeaveRequestWithDetails[]) => LeaveRequestWithDetails[];
+  employeeNames: string[];
+  isHRAdmin: boolean;
 }
 
 export interface LeaveReportPaginationContextType {

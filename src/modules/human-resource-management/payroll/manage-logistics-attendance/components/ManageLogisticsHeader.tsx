@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, setDate } from "date-fns";
+import { Plus } from "lucide-react";
 
 interface ManageLogisticsHeaderProps {
   startDate: string;
@@ -14,6 +15,15 @@ interface ManageLogisticsHeaderProps {
   setEndDate: (date: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  driverFilter: string;
+  setDriverFilter: (value: string) => void;
+  helperFilter: string;
+  setHelperFilter: (value: string) => void;
+  dispatchDateFilter: string;
+  setDispatchDateFilter: (value: string) => void;
+  showDisregarded: boolean;
+  setShowDisregarded: (value: boolean) => void;
+  onAddManualDispatch: () => void;
 }
 
 export function ManageLogisticsHeader({
@@ -23,6 +33,15 @@ export function ManageLogisticsHeader({
   setEndDate,
   searchQuery,
   setSearchQuery,
+  driverFilter,
+  setDriverFilter,
+  helperFilter,
+  setHelperFilter,
+  dispatchDateFilter,
+  setDispatchDateFilter,
+  showDisregarded,
+  setShowDisregarded,
+  onAddManualDispatch,
 }: ManageLogisticsHeaderProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
   const [selectedCutoff, setSelectedCutoff] = useState<"11-25" | "26-10">("11-25");
@@ -41,10 +60,10 @@ export function ManageLogisticsHeader({
           start = setDate(date, 11);
           end = setDate(date, 25);
       } else {
-          start = setDate(date, 26);
-          // 26-10 goes to the 10th of the next month
-          const nextMonth = new Date(year, month + 1, 1);
-          end = setDate(nextMonth, 10);
+          // 26-10: 26th of previous month to 10th of selected month
+          const prevMonth = new Date(year, month - 1, 1);
+          start = setDate(prevMonth, 26);
+          end = setDate(date, 10);
       }
 
       const startStr = format(start, "yyyy-MM-dd");
@@ -55,8 +74,8 @@ export function ManageLogisticsHeader({
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-end justify-between mb-6 p-4 bg-white rounded-lg shadow-sm border border-slate-200">
-        <div className="flex flex-row items-end gap-4">
+    <div className="flex flex-col gap-4 items-start justify-between mb-6 p-4 bg-white rounded-lg shadow-sm border border-slate-200">
+        <div className="flex flex-wrap items-end gap-4 w-full">
             <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-slate-700">Month</span>
                 <input 
@@ -83,16 +102,48 @@ export function ManageLogisticsHeader({
             <Button onClick={handleApplyFilter} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] h-10">
                 Apply Filter
             </Button>
+            
+            <Button onClick={onAddManualDispatch} variant="outline" className="h-10 gap-2 border-slate-300 text-slate-700 hover:bg-slate-50">
+                <Plus className="h-4 w-4" /> Add PDP
+            </Button>
         </div>
 
-        <div className="w-full md:w-auto min-w-[250px]">
+        <div className="flex flex-wrap gap-3 w-full">
             <Input
                 type="search"
-                className="h-10"
+                className="h-10 w-full sm:w-[220px]"
                 placeholder="Search by PDP No..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <Input
+                type="search"
+                className="h-10 w-full sm:w-[180px]"
+                placeholder="Filter by Driver..."
+                value={driverFilter}
+                onChange={(e) => setDriverFilter(e.target.value)}
+            />
+            <Input
+                type="search"
+                className="h-10 w-full sm:w-[180px]"
+                placeholder="Filter by Helper..."
+                value={helperFilter}
+                onChange={(e) => setHelperFilter(e.target.value)}
+            />
+            <Input
+                type="date"
+                className="h-10 text-slate-500 w-[150px]"
+                title="Filter by Dispatch Date"
+                value={dispatchDateFilter}
+                onChange={(e) => setDispatchDateFilter(e.target.value)}
+            />
+            <Button
+                variant={showDisregarded ? "default" : "outline"}
+                onClick={() => setShowDisregarded(!showDisregarded)}
+                className="h-10 min-w-[140px]"
+            >
+                {showDisregarded ? "Hide Disregarded" : "Show Disregarded"}
+            </Button>
         </div>
     </div>
   );

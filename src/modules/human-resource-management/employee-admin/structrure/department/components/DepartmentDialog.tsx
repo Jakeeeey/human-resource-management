@@ -24,7 +24,7 @@ import {
     FormLabel,
     FormMessage,
 } from "@/components/ui/form";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { ScrollableSearchableSelect } from "./ScrollableSearchableSelect";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -173,7 +173,7 @@ export function DepartmentDialog({
                                 <FormItem>
                                     <FormLabel>Department Head</FormLabel>
                                     <FormControl>
-                                        <SearchableSelect
+                                        <ScrollableSearchableSelect
                                             options={users.map((user) => ({
                                                 value: user.user_id.toString(),
                                                 label: `${user.user_fname} ${user.user_lname}`,

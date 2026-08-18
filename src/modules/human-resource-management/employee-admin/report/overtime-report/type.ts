@@ -85,6 +85,8 @@ export interface OvertimeReportFilterContextType {
   setStatusFilter: (status: string | null) => void;
   resetFilters: () => void;
   filterRequests: (requests: OvertimeRequestWithDetails[]) => OvertimeRequestWithDetails[];
+  employeeNames: string[];
+  isHRAdmin: boolean;
 }
 
 export interface OvertimeReportPaginationContextType {

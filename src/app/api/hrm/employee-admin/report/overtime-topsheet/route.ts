@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const COOKIE_NAME = "vos_access_token";
 

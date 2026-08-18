@@ -38,3 +38,7 @@ export async function deleteEmployee(id: number): Promise<void> {
 export async function createEmployee(data: Record<string, unknown>): Promise<User> {
   return request<User>("POST", `${PROXY_BASE}/create`, data);
 }
+
+export async function updateEmployeeDirectus(id: number, payload: Record<string, unknown>): Promise<User> {
+  return request<User>("PATCH", `${PROXY_BASE}/employees/${id}`, payload);
+}

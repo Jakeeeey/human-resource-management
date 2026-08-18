@@ -30,6 +30,17 @@ let MODULES_INFO_FETCH_TIME = 0
 const SUBSCRIPTION_TIER_CACHE: Record<number, number | null> = {}
 let SUBSCRIPTION_TIER_CACHE_TIME = 0
 
+interface UserPermissionsCache {
+    bypassModuleAuthorization: boolean;
+    authorizedSubsystemPaths: string[];
+    authorizedModulePaths: string[];
+    allModulePaths: string[];
+}
+
+const USER_PERMISSIONS_CACHE = new Map<string, UserPermissionsCache>();
+const MAX_CACHE_SIZE = 500;
+
+
 function normalizeLockedModuleMode(value?: string | null) {
     const mode = value?.trim().toLowerCase()
     if (mode === "enable" || mode === "enabled") return "enable"
@@ -455,7 +466,13 @@ export async function middleware(req: NextRequest) {
         const directusBase = process.env.NEXT_PUBLIC_API_BASE_URL;
         const directusToken = process.env.DIRECTUS_STATIC_TOKEN;
 
-        if (directusBase && directusToken && payload && payload.sub) {
+        const cachedPerms = USER_PERMISSIONS_CACHE.get(token);
+        if (cachedPerms) {
+            bypassModuleAuthorization = cachedPerms.bypassModuleAuthorization;
+            authorizedSubsystemPaths = cachedPerms.authorizedSubsystemPaths;
+            authorizedModulePaths = cachedPerms.authorizedModulePaths;
+            allModulePaths = cachedPerms.allModulePaths;
+        } else if (directusBase && directusToken && payload && payload.sub) {
             try {
                 // Fetch LIVE permissions from junction tables + User Role
                 const [subRes, modRes, allModsRes, userRes] = await Promise.all([
@@ -477,13 +494,20 @@ export async function middleware(req: NextRequest) {
                     })
                 ]);
 
-                if (subRes.ok && modRes.ok && allModsRes.ok && userRes.ok) {
-                    const [subData, modData, allModsData, userData] = await Promise.all([
+                if (subRes.ok && modRes.ok && allModsRes.ok) {
+                    const [subData, modData, allModsData] = await Promise.all([
                         subRes.json(),
                         modRes.json(),
                         allModsRes.json(),
-                        userRes.json()
                     ]);
+
+                    let userData: { data?: { role?: string; isAdmin?: boolean | number } } = { data: {} };
+                    if (userRes.ok) {
+                        userData = await userRes.json();
+                    } else {
+                        const errorText = await userRes.text().catch(() => "Could not read error text");
+                        console.error("[Middleware] User fetch failed:", userRes.status, errorText);
+                    }
 
                     const u = userData?.data || {};
                     const isAdmin = u.role === "ADMIN" || u.isAdmin === 1 || u.isAdmin === true;
@@ -494,9 +518,25 @@ export async function middleware(req: NextRequest) {
                         authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
                         allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
                     }
+
+                    // Evict oldest entries if cache exceeds max size
+                    if (USER_PERMISSIONS_CACHE.size >= MAX_CACHE_SIZE) {
+                        const firstKey = USER_PERMISSIONS_CACHE.keys().next().value;
+                        if (firstKey !== undefined) {
+                            USER_PERMISSIONS_CACHE.delete(firstKey);
+                        }
+                    }
+
+                    // Save to Cache
+                    USER_PERMISSIONS_CACHE.set(token, {
+                        bypassModuleAuthorization,
+                        authorizedSubsystemPaths,
+                        authorizedModulePaths,
+                        allModulePaths
+                    });
                 } else {
                     // Fail-fast on server errors
-                    const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus" : "Spring Boot";
+                    const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus Permissions" : "Directus User Profile";
                     throw new Error(service);
                 }
             } catch (err) {

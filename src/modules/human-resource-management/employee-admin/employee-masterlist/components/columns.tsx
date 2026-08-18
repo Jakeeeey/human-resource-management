@@ -7,7 +7,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, ScanFace } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -42,6 +42,7 @@ function resolveImageUrl(path?: string | null): string {
 export const createColumns = (
     onViewDetails: (employee: User) => void,
     onDelete: (employee: User) => void,
+    onScanIris: (employee: User) => void,
     departments: Department[] = []
 ): ColumnDef<User>[] => [
     {
@@ -175,6 +176,10 @@ export const createColumns = (
                         <DropdownMenuItem onClick={() => onViewDetails(user)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onScanIris(user)}>
+                            <ScanFace className="mr-2 h-4 w-4" />
+                            Scan Biometrics
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={() => onDelete(user)}
