@@ -14,6 +14,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -66,6 +67,8 @@ export function CompanyProfileForm({ onCancel }: CompanyProfileFormProps) {
             company_logo: "",
             company_tags: "",
             company_department: "",
+            company_mission: "",
+            company_vision: "",
         },
     });
 
@@ -232,6 +235,9 @@ export function CompanyProfileForm({ onCancel }: CompanyProfileFormProps) {
                                             />
                                         </div>
 
+                                        <FormFieldControl form={form} name="company_mission" label="Company Mission" type="textarea" placeholder="Enter company mission..." className="md:col-span-1" />
+                                        <FormFieldControl form={form} name="company_vision" label="Company Vision" type="textarea" placeholder="Enter company vision..." className="md:col-span-1" />
+
                                         <FormFieldControl form={form} name="company_tags" label="Tags (comma separated)" placeholder="Technology, Software, Innovation" className="md:col-span-2" />
                                     </div>
                                 </CardContent>
@@ -369,13 +375,22 @@ function FormFieldControl({
                 <FormItem className={className}>
                     <FormLabel className="text-sm font-semibold text-slate-700">{label}</FormLabel>
                     <FormControl>
-                        <Input
-                            {...field}
-                            type={type}
-                            placeholder={placeholder}
-                            className="bg-slate-50/50 border-slate-200 focus:bg-white transition-all h-11"
-                            value={field.value || ""}
-                        />
+                        {type === "textarea" ? (
+                            <Textarea
+                                {...field}
+                                placeholder={placeholder}
+                                className="bg-slate-50/50 border-slate-200 focus:bg-white transition-all min-h-[100px]"
+                                value={field.value || ""}
+                            />
+                        ) : (
+                            <Input
+                                {...field}
+                                type={type}
+                                placeholder={placeholder}
+                                className="bg-slate-50/50 border-slate-200 focus:bg-white transition-all h-11"
+                                value={field.value || ""}
+                            />
+                        )}
                     </FormControl>
                     <FormMessage />
                 </FormItem>
