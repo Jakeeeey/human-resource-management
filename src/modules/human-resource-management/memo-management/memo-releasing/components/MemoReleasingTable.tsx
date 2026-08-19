@@ -1,0 +1,174 @@
+"use client";
+
+import React from "react";
+import { Paperclip, MoreVertical, Eye, Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Memo, Company } from "../types";
+
+interface MemoReleasingTableProps {
+    data: Memo[];
+    companies: Company[];
+    onRelease: (memoNo: string) => void;
+    onView: (memo: Memo) => void;
+    isLoading: boolean;
+}
+
+export function MemoReleasingTable({
+    data,
+    companies,
+    onRelease,
+    onView,
+    isLoading
+}: MemoReleasingTableProps) {
+    const formatDate = (dateStr: string | null | undefined) => {
+        if (!dateStr) return "-";
+        const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) {
+            const [, y, m, d] = match;
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            return `${months[parseInt(m, 10) - 1]} ${parseInt(d, 10)}, ${y}`;
+        }
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString();
+        } catch {
+            return dateStr;
+        }
+    };
+
+    return (
+        <div className="rounded-2xl border border-slate-200/60 dark:border-slate-800/80 bg-card overflow-hidden shadow-lg shadow-slate-100/30 dark:shadow-none">
+            <Table>
+                <TableHeader>
+                    <TableRow className="bg-slate-50/75 dark:bg-slate-900/60 font-semibold border-b">
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Memo No.</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">From</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Subject</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Active Period</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Sync</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Status</TableHead>
+                        <TableHead className="text-right text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {isLoading ? (
+                        Array.from({ length: 5 }).map((_, idx) => (
+                            <TableRow key={idx} className="border-b border-slate-100/60 dark:border-slate-800/50">
+                                <TableCell className="py-4">
+                                    <div className="h-4 w-24 bg-muted/70 rounded-md animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <div className="h-5 w-14 bg-muted/70 rounded-full animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <div className="h-4 w-40 bg-muted/70 rounded-md animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <div className="h-4 w-32 bg-muted/70 rounded-md animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <div className="h-4 w-12 bg-muted/70 rounded-md animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <div className="h-5 w-16 bg-muted/70 rounded-full animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4 text-right">
+                                    <div className="h-8 w-8 bg-muted/70 rounded-full animate-pulse ml-auto" />
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    ) : data.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={7} className="h-24 text-center">
+                                No approved memos awaiting release.
+                            </TableCell>
+                        </TableRow>
+                    ) : (
+                        data.map((memo) => {
+                            const fromComp = companies.find(c => Number(c.company_id) === Number(memo.from));
+                            const fromLabel = fromComp ? `${fromComp.company_name} (${fromComp.company_code})` : `Company #${memo.from}`;
+                            const hasAttachments = memo.attachments && memo.attachments.length > 0;
+                            const isPartiallyReleased = memo.status === "Partially Released";
+
+                            return (
+                                <TableRow key={memo.id} className="hover:bg-accent/40 transition-colors border-b border-slate-100/60 dark:border-slate-800/50">
+                                    <TableCell className="py-3.5 font-bold text-primary">{memo.memo_no}</TableCell>
+                                    <TableCell className="py-3.5 max-w-[160px] truncate" title={fromLabel}>
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800">
+                                            {fromComp ? `${fromComp.company_code}` : `#${memo.from}`}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="py-3.5 max-w-[240px]" title={memo.subject}>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="truncate font-medium">{memo.subject}</span>
+                                            {hasAttachments && (
+                                                <span title={`${memo.attachments?.length || 0} attachments`}>
+                                                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                </span>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="py-3.5 font-medium text-slate-600 dark:text-slate-400 text-xs">
+                                        {formatDate(memo.start_date)} — {formatDate(memo.end_date)}
+                                    </TableCell>
+                                    <TableCell className="py-3.5 font-medium text-slate-600 dark:text-slate-400 text-xs select-none">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200/40">
+                                            {memo.synced_companies_count ?? 0} / {memo.company_ids?.length || 0}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="py-3.5">
+                                        <div className="inline-flex">
+                                            <StatusBadge 
+                                                tone={isPartiallyReleased ? "warning" : "success"} 
+                                                className="font-semibold shadow-sm"
+                                            >
+                                                {memo.status}
+                                            </StatusBadge>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="py-3.5 text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                                    <span className="sr-only">Open actions menu</span>
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-36 bg-card text-card-foreground border rounded-md shadow-md p-1">
+                                                <DropdownMenuItem onClick={() => onView(memo)} className="gap-2 focus:bg-accent focus:text-accent-foreground cursor-pointer">
+                                                    <Eye className="h-3.5 w-3.5 text-zinc-600 dark:text-zinc-400 shrink-0" />
+                                                    <span className="font-medium">View</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => onRelease(memo.memo_no)} className="gap-2 focus:bg-accent focus:text-accent-foreground cursor-pointer">
+                                                    <Share2 className={`h-3.5 w-3.5 ${isPartiallyReleased ? "text-amber-600" : "text-emerald-600"} shrink-0`} />
+                                                    <span className={`font-medium ${isPartiallyReleased ? "text-amber-600" : "text-emerald-600"}`}>
+                                                        {isPartiallyReleased ? "Retry Sync" : "Release"}
+                                                    </span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })
+                    )}
+                </TableBody>
+            </Table>
+        </div>
+    );
+}
