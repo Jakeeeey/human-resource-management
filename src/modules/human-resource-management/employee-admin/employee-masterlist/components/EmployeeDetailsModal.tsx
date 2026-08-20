@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { User as UserIcon, Files, IdCard, Laptop } from "lucide-react";
-import { User, Department } from "../types";
+import { User, Department, DepartmentPosition } from "../types";
 import { EditProfileTab } from "./EditProfileTab";
 import { EmployeeFilesTab } from "./EmployeeFilesTab";
 import { EmployeeAssetsTab } from "./EmployeeAssetsTab";
@@ -16,7 +16,9 @@ interface EmployeeDetailsModalProps {
   onOpenChange: (open: boolean) => void;
   user: User | null;
   departments: Department[];
+  departmentPositions: DepartmentPosition[];
   onUpdateEmployee: (id: number, data: UpdateEmployeePayload) => Promise<void>;
+  onAddPosition?: (departmentId: number, position: string) => Promise<DepartmentPosition>;
 }
 
 type TabType = "profile" | "files" | "id" | "assets";
@@ -26,7 +28,9 @@ export function EmployeeDetailsModal({
   onOpenChange,
   user,
   departments,
+  departmentPositions,
   onUpdateEmployee,
+  onAddPosition,
 }: EmployeeDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>("profile");
 
@@ -88,7 +92,7 @@ export function EmployeeDetailsModal({
                       Update {user.firstName}&apos;s personal and employment information.
                     </p>
                   </div>
-                  <EditProfileTab user={user} departments={departments} onUpdateEmployee={onUpdateEmployee} />
+                  <EditProfileTab user={user} departments={departments} departmentPositions={departmentPositions} onUpdateEmployee={onUpdateEmployee} onAddPosition={onAddPosition} />
                 </div>
               )}
 

@@ -33,7 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { toast } from "sonner";
-import type { Department, User } from "../types";
+import type { Department, User, DepartmentPosition } from "../types";
 import { UpdateEmployeePayload } from "../providers/springProvider";
 import { AddressSelectors } from "./AddressSelectors";
 
@@ -181,11 +181,15 @@ const inputCls = "h-10 bg-muted/40 border-transparent focus-visible:bg-backgroun
 export function EditProfileTab({ 
   user, 
   departments,
-  onUpdateEmployee 
+  departmentPositions = [],
+  onUpdateEmployee,
+  onAddPosition,
 }: { 
   user: User; 
   departments: Department[];
+  departmentPositions: DepartmentPosition[];
   onUpdateEmployee: (id: number, data: UpdateEmployeePayload) => Promise<void>;
+  onAddPosition?: (departmentId: number, position: string) => Promise<DepartmentPosition>;
 }) {
   const [form, setForm] = useState<EditEmployeeFormData>({
     firstName: user.firstName || "",
@@ -275,6 +279,9 @@ export function EditProfileTab({
   }, [user]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddingPosition, setIsAddingPosition] = useState(false);
+  const [newPositionName, setNewPositionName] = useState("");
+  const [showAddPosition, setShowAddPosition] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -413,7 +420,8 @@ export function EditProfileTab({
         emergencyContactName:   form.emergencyContactName || undefined,
         emergencyContactNumber: form.emergencyContactNumber || undefined,
         department:   form.department ? String(form.department) : undefined,
-        position:     form.position,
+        position_id:  form.position ? Number(form.position) : undefined,
+        position:     form.position ? departmentPositions.find(p => p.id.toString() === form.position)?.position : undefined,
         dateOfHire:   form.dateOfHire,
         tags:         "Employee", // or handle tags
         rfid:         form.rfId || undefined,
@@ -640,7 +648,80 @@ export function EditProfileTab({
             </Select>
           </Field>
           <Field label="Designation / Position" required>
-            <Input className={inputCls} value={form.position} onChange={(e) => set("position", e.target.value)} required />
+            <Select 
+              value={form.position} 
+              onValueChange={(v) => set("position", v)} 
+              required
+              disabled={!form.department}
+            >
+              <SelectTrigger className={cn(inputCls, "data-[placeholder]:text-muted-foreground/50")}>
+                <SelectValue placeholder={form.department ? "Select a position" : "Select a department first"} />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {departmentPositions
+                  .filter((p) => p.department_id.toString() === form.department)
+                  .map((p) => (
+                    <SelectItem key={p.id} value={p.id.toString()}>
+                      {p.position}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {form.department && onAddPosition && (
+              <div className="mt-1">
+                {showAddPosition ? (
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      className="h-8 text-xs" 
+                      placeholder="New position name"
+                      value={newPositionName}
+                      onChange={(e) => setNewPositionName(e.target.value)}
+                    />
+                    <Button 
+                      type="button"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={!newPositionName.trim() || isAddingPosition}
+                      onClick={async () => {
+                        try {
+                          setIsAddingPosition(true);
+                          const newPos = await onAddPosition(Number(form.department), newPositionName.trim());
+                          set("position", newPos.id.toString());
+                          setShowAddPosition(false);
+                          setNewPositionName("");
+                        } catch {
+                          // handled in hook
+                        } finally {
+                          setIsAddingPosition(false);
+                        }
+                      }}
+                    >
+                      {isAddingPosition ? "..." : "Add"}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-8 px-2 text-xs"
+                      onClick={() => {
+                        setShowAddPosition(false);
+                        setNewPositionName("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <button 
+                    type="button" 
+                    className="text-xs text-primary hover:underline font-medium"
+                    onClick={() => setShowAddPosition(true)}
+                  >
+                    + Add New Position
+                  </button>
+                )}
+              </div>
+            )}
           </Field>
           <Field label="Email" required>
             <div className="relative">
