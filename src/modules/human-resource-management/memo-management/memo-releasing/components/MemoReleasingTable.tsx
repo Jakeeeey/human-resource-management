@@ -57,7 +57,8 @@ export function MemoReleasingTable({
                 <TableHeader>
                     <TableRow className="bg-slate-50/75 dark:bg-slate-900/60 font-semibold border-b">
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Memo No.</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">From</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Issued By</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Target Companies</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Subject</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Active Period</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Sync</TableHead>
@@ -74,6 +75,9 @@ export function MemoReleasingTable({
                                 </TableCell>
                                 <TableCell className="py-4">
                                     <div className="h-5 w-14 bg-muted/70 rounded-full animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <div className="h-4 w-32 bg-muted/70 rounded-md animate-pulse" />
                                 </TableCell>
                                 <TableCell className="py-4">
                                     <div className="h-4 w-40 bg-muted/70 rounded-md animate-pulse" />
@@ -94,7 +98,7 @@ export function MemoReleasingTable({
                         ))
                     ) : data.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={7} className="h-24 text-center">
+                            <TableCell colSpan={8} className="h-24 text-center">
                                 No approved memos awaiting release.
                             </TableCell>
                         </TableRow>
@@ -105,6 +109,11 @@ export function MemoReleasingTable({
                             const hasAttachments = memo.attachments && memo.attachments.length > 0;
                             const isPartiallyReleased = memo.status === "Partially Released";
 
+                            const targetCodes = (memo.company_ids || []).map(id => {
+                                const comp = companies.find(c => Number(c.company_id) === id);
+                                return comp ? comp.company_code : id;
+                            });
+
                             return (
                                 <TableRow key={memo.id} className="hover:bg-accent/40 transition-colors border-b border-slate-100/60 dark:border-slate-800/50">
                                     <TableCell className="py-3.5 font-bold text-primary">{memo.memo_no}</TableCell>
@@ -112,6 +121,20 @@ export function MemoReleasingTable({
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800">
                                             {fromComp ? `${fromComp.company_code}` : `#${memo.from}`}
                                         </span>
+                                    </TableCell>
+                                    <TableCell className="py-3.5 max-w-[200px] truncate text-xs text-muted-foreground">
+                                        {targetCodes.length > 0 ? (
+                                            <div className="flex gap-1.5 flex-wrap">
+                                                {targetCodes.slice(0, 2).join(", ")}
+                                                {targetCodes.length > 2 && (
+                                                    <span className="inline-flex items-center justify-center bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border">
+                                                        +{targetCodes.length - 2}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-muted-foreground/50 italic">None</span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="py-3.5 max-w-[240px]" title={memo.subject}>
                                         <div className="flex items-center gap-1.5">

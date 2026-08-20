@@ -29,7 +29,8 @@ export interface CreateEmployeePayload {
   philHealthNumber?: string;
   tinNumber?: string;
   pagibigNumber?: string;
-  position: string;
+  position?: string;
+  position_id?: number;
   dateOfHire: string;
   tags?: string;
   birthday?: string;

@@ -31,12 +31,14 @@ export default function EmployeeMasterlistModule() {
   const {
     employees,
     departments,
+    departmentPositions,
     isLoading,
     isError,
     error,
     refetch,
     removeEmployee,
     updateEmployee,
+    addDepartmentPosition,
   } = useEmployeeMasterlist();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -81,7 +83,8 @@ export default function EmployeeMasterlistModule() {
         emergencyContactNumber: data.emergency_contact_number || undefined,
         // Work
         department: data.user_department ? String(data.user_department) : undefined,
-        position: data.user_position,
+        position_id: data.user_position ? Number(data.user_position) : undefined,
+        position: data.user_position ? departmentPositions.find(p => p.id.toString() === data.user_position)?.position : undefined,
         dateOfHire: data.user_dateOfHire,
         rfid: data.rf_id || undefined,
         biometricId: data.biometric_id || undefined,
@@ -241,7 +244,9 @@ export default function EmployeeMasterlistModule() {
         isOpen={isAddModalOpen}
         onOpenChange={setIsAddModalOpen}
         departments={departments}
+        departmentPositions={departmentPositions}
         onSubmit={handleAddEmployee}
+        onAddPosition={addDepartmentPosition}
       />
 
       <EmployeeDetailsModal
@@ -249,7 +254,9 @@ export default function EmployeeMasterlistModule() {
         onOpenChange={setIsDetailsModalOpen}
         user={selectedEmployee}
         departments={departments}
+        departmentPositions={departmentPositions}
         onUpdateEmployee={updateEmployee}
+        onAddPosition={addDepartmentPosition}
       />
 
       <MasterlistPreviewModal

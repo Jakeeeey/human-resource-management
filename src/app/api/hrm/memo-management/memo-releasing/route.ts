@@ -285,7 +285,12 @@ export async function PATCH(req: NextRequest) {
             );
 
             if (!remoteMemoGet.ok) {
-                return NextResponse.json({ error: `Could not verify remote memo on ${company.company_name}` }, { status: 500 });
+                const errDetail = await remoteMemoGet.json().catch(() => ({}));
+                console.error("GET Remote Memo Error:", errDetail);
+                return NextResponse.json({ 
+                    error: `Could not verify remote memo on ${company.company_name}`,
+                    details: errDetail 
+                }, { status: 500 });
             }
 
             const remoteMemos = (await remoteMemoGet.json()).data;
@@ -312,7 +317,12 @@ export async function PATCH(req: NextRequest) {
                 );
 
                 if (!patchRemoteRes.ok) {
-                    return NextResponse.json({ error: `Failed to update status on ${company.company_name}` }, { status: 500 });
+                    const errDetail = await patchRemoteRes.json().catch(() => ({}));
+                    console.error("PATCH Remote Memo Error:", errDetail);
+                    return NextResponse.json({ 
+                        error: `Failed to update status on ${company.company_name}`,
+                        details: errDetail
+                    }, { status: 500 });
                 }
             } else {
                 // Create remote memo via POST
@@ -338,7 +348,12 @@ export async function PATCH(req: NextRequest) {
                 });
 
                 if (!remoteMemoRes.ok) {
-                    return NextResponse.json({ error: `Failed to insert record on ${company.company_name}` }, { status: 500 });
+                    const errDetail = await remoteMemoRes.json().catch(() => ({}));
+                    console.error("POST Remote Memo Error:", errDetail);
+                    return NextResponse.json({ 
+                        error: `Failed to insert record on ${company.company_name}`,
+                        details: errDetail
+                    }, { status: 500 });
                 }
 
                 const createdRemote = await remoteMemoRes.json();

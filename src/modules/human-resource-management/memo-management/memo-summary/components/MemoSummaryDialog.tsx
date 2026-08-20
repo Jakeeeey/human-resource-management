@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Paperclip, FileText } from "lucide-react";
+import { Paperclip, FileText, Info } from "lucide-react";
 import { Memo, Company, UserRelation } from "../types";
 import {
     Dialog,
@@ -87,6 +87,15 @@ export function MemoSummaryDialog({ open, onOpenChange, memo, companies }: MemoS
                     </DialogHeader>
 
                     <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
+                        {fromCompany?.company_code === "RSM" && (
+                            <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 flex gap-3 items-start dark:bg-blue-950/30 dark:border-blue-800/60 dark:text-blue-400 animate-in fade-in slide-in-from-top-2">
+                                <Info className="h-5 w-5 shrink-0 mt-0.5" />
+                                <div className="text-sm font-medium leading-relaxed">
+                                    Memos originating from Rooch Holdings (RSM) bypass the standard review workflow and are automatically assigned an Approved status upon creation.
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Memo No.</label>
                             <Input disabled value={memo.memo_no} className="bg-muted text-sm font-semibold" />
