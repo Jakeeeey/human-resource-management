@@ -47,9 +47,27 @@ export function HandbookForm() {
     const processFiles = async (files: FileList | File[]) => {
         if (!files || files.length === 0) return;
         
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+        const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+        const validFiles: File[] = [];
+
+        for (const file of Array.from(files)) {
+            if (file.size > MAX_FILE_SIZE) {
+                toast.error(`File "${file.name}" exceeds the 10 MB limit.`);
+                continue;
+            }
+            if (!ALLOWED_TYPES.includes(file.type) && !file.name.match(/\.(pdf|png|jpe?g)$/i)) {
+                toast.error(`File "${file.name}" is not an accepted format (only PDF, PNG, JPEG).`);
+                continue;
+            }
+            validFiles.push(file);
+        }
+
+        if (validFiles.length === 0) return;
+
         setIsUploading(true);
         try {
-            const uploadPromises = Array.from(files).map(async (file) => {
+            const uploadPromises = validFiles.map(async (file) => {
                 const formData = new FormData();
                 formData.append("file", file);
 
@@ -215,7 +233,7 @@ export function HandbookForm() {
                                 className="hidden"
                                 multiple
                                 onChange={handleFileUpload}
-                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                                accept=".pdf,.png,.jpeg,.jpg"
                             />
                             
                             <div className={`p-4 rounded-full mb-4 transition-colors duration-300 ${isDragging ? 'bg-primary/20' : 'bg-primary/10 group-hover:bg-primary/15'}`}>
@@ -226,7 +244,7 @@ export function HandbookForm() {
                                 {isDragging ? "Drop files now" : "Drag & drop files here"}
                             </h3>
                             <p className="text-sm text-muted-foreground mb-5 text-center max-w-[280px]">
-                                PDF, DOC, DOCX, PNG, JPG up to 10MB
+                                PDF, PNG, JPEG up to 10MB
                             </p>
                             <Button
                                 type="button"

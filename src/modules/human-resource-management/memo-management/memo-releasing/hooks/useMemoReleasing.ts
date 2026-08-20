@@ -1,4 +1,4 @@
-import { useContext, useState, useCallback, useRef } from "react";
+import { useContext, useState, useCallback, useRef, useMemo } from "react";
 import { MemoReleasingContext } from "../providers/MemoReleasingProvider";
 import { MemoReleasingService } from "../services/MemoReleasingService";
 import { Memo } from "../types";
@@ -14,6 +14,8 @@ export function useMemoReleasing() {
     const { memos, companies, isLoading, refreshMemos } = context;
 
     const [searchQuery, setSearchQuery] = useState("");
+    const [issuedByFilter, setIssuedByFilter] = useState<string>("all");
+    const [targetCompanyFilter, setTargetCompanyFilter] = useState<string>("all");
     const [selectedMemo, setSelectedMemo] = useState<Memo | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -60,8 +62,25 @@ export function useMemoReleasing() {
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
-        refreshMemos(query);
-    }, [refreshMemos]);
+    }, []);
+
+    const filteredMemos = useMemo(() => {
+        return memos.filter((memo) => {
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const matchNo = memo.memo_no.toLowerCase().includes(q);
+                const matchSubject = memo.subject?.toLowerCase().includes(q);
+                if (!matchNo && !matchSubject) return false;
+            }
+            if (issuedByFilter && issuedByFilter !== "all") {
+                if (String(memo.from) !== issuedByFilter) return false;
+            }
+            if (targetCompanyFilter && targetCompanyFilter !== "all") {
+                if (!memo.company_ids?.includes(Number(targetCompanyFilter))) return false;
+            }
+            return true;
+        });
+    }, [memos, searchQuery, issuedByFilter, targetCompanyFilter]);
 
     const handleViewDetails = useCallback((memo: Memo) => {
         setSelectedMemo(memo);
@@ -124,8 +143,8 @@ export function useMemoReleasing() {
 
         const finalStatus = successCount === targetIds.length ? "Released" : "Partially Released";
         await MemoReleasingService.updateSyncStatus(memoNo, successCount, finalStatus);
-        refreshMemos(searchQuery);
-    }, [memos, companies, searchQuery, refreshMemos, updateSyncItemStatus]);
+        refreshMemos();
+    }, [memos, companies, refreshMemos, updateSyncItemStatus]);
 
     const handleRelease = useCallback((memoNo: string) => {
         const currentMemo = memos.find((m) => m.memo_no === memoNo);
@@ -161,23 +180,27 @@ export function useMemoReleasing() {
         const finalStatus = successCount === totalCount ? "Released" : "Partially Released";
 
         await MemoReleasingService.updateSyncStatus(activeMemoNo, successCount, finalStatus);
-        refreshMemos(searchQuery);
+        refreshMemos();
     };
 
     const handleSyncModalClose = (open: boolean) => {
         setIsSyncModalOpen(open);
         // Refresh memos when checklist closes
-        refreshMemos(searchQuery);
+        refreshMemos();
     };
 
     return {
-        memos,
+        memos: filteredMemos,
         companies,
         isLoading,
         searchQuery,
         selectedMemo,
         isDetailsOpen,
         setIsDetailsOpen,
+        issuedByFilter,
+        setIssuedByFilter,
+        targetCompanyFilter,
+        setTargetCompanyFilter,
         alertDialogConfig,
         setAlertDialogConfig,
         handleSearch,

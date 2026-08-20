@@ -1,4 +1,4 @@
-import { useContext, useState, useCallback } from "react";
+import { useContext, useState, useCallback, useMemo } from "react";
 import { MemoApprovalContext } from "../providers/MemoApprovalProvider";
 import { MemoApprovalService } from "../services/MemoApprovalService";
 import { Memo } from "../types";
@@ -14,6 +14,8 @@ export function useMemoApproval() {
 
     const [selectedMemoNos, setSelectedMemoNos] = useState<string[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
+    const [issuedByFilter, setIssuedByFilter] = useState<string>("all");
+    const [targetCompanyFilter, setTargetCompanyFilter] = useState<string>("all");
     const [selectedMemo, setSelectedMemo] = useState<Memo | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,8 +45,25 @@ export function useMemoApproval() {
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
-        refreshMemos(query);
-    }, [refreshMemos]);
+    }, []);
+
+    const filteredMemos = useMemo(() => {
+        return memos.filter((memo) => {
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const matchNo = memo.memo_no.toLowerCase().includes(q);
+                const matchSubject = memo.subject?.toLowerCase().includes(q);
+                if (!matchNo && !matchSubject) return false;
+            }
+            if (issuedByFilter && issuedByFilter !== "all") {
+                if (String(memo.from) !== issuedByFilter) return false;
+            }
+            if (targetCompanyFilter && targetCompanyFilter !== "all") {
+                if (!memo.company_ids?.includes(Number(targetCompanyFilter))) return false;
+            }
+            return true;
+        });
+    }, [memos, searchQuery, issuedByFilter, targetCompanyFilter]);
 
     const handleSelectRow = useCallback((memoNo: string) => {
         setSelectedMemoNos((prev) =>
@@ -82,7 +101,7 @@ export function useMemoApproval() {
                             toast.success(isBulk ? "Selected memos approved successfully" : "Memo approved successfully");
                         }
                         setSelectedMemoNos([]);
-                        refreshMemos(searchQuery);
+                        refreshMemos();
                     } else {
                         toast.error(res.message || "Failed to approve memo(s)");
                     }
@@ -91,7 +110,7 @@ export function useMemoApproval() {
                 }
             }
         });
-    }, [triggerAlert, refreshMemos, searchQuery]);
+    }, [triggerAlert, refreshMemos]);
 
     const handleReject = useCallback((memoNos: string[]) => {
         const isBulk = memoNos.length > 1;
@@ -106,7 +125,7 @@ export function useMemoApproval() {
                     if (res.success) {
                         toast.success(isBulk ? "Selected memos rejected successfully" : "Memo rejected successfully");
                         setSelectedMemoNos([]);
-                        refreshMemos(searchQuery);
+                        refreshMemos();
                     } else {
                         toast.error(res.message || "Failed to reject memo(s)");
                     }
@@ -115,10 +134,10 @@ export function useMemoApproval() {
                 }
             }
         });
-    }, [triggerAlert, refreshMemos, searchQuery]);
+    }, [triggerAlert, refreshMemos]);
 
     return {
-        memos,
+        memos: filteredMemos,
         companies,
         isLoading,
         selectedMemoNos,
@@ -126,6 +145,10 @@ export function useMemoApproval() {
         selectedMemo,
         isDetailsOpen,
         setIsDetailsOpen,
+        issuedByFilter,
+        setIssuedByFilter,
+        targetCompanyFilter,
+        setTargetCompanyFilter,
         isSubmitting,
         alertDialogConfig,
         setAlertDialogConfig,
