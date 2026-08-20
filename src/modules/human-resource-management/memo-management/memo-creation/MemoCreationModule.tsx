@@ -39,8 +39,6 @@ const MemoCreationContent = () => {
         handleSubmit,
         searchQuery,
         handleSearch,
-        subjectQuery,
-        setSubjectQuery,
         selectedIssuedBy,
         setSelectedIssuedBy,
         selectedTargetCompany,
@@ -48,18 +46,17 @@ const MemoCreationContent = () => {
     } = useMemoCreation();
 
     // Reset all filters helper
-    const hasActiveFilters = searchQuery || subjectQuery || selectedIssuedBy || selectedTargetCompany;
+    const hasActiveFilters = searchQuery || (selectedIssuedBy && selectedIssuedBy !== "all") || (selectedTargetCompany && selectedTargetCompany !== "all");
     const handleClearFilters = () => {
         handleSearch("");
-        setSubjectQuery("");
-        setSelectedIssuedBy("");
-        setSelectedTargetCompany("");
+        setSelectedIssuedBy("all");
+        setSelectedTargetCompany("all");
     };
 
     // Filter Options
     const issuedByOptions = React.useMemo(() => {
         return [
-            { value: "", label: "All Issuers" },
+            { value: "all", label: "All Issuers" },
             ...companies.map(c => ({
                 value: String(c.company_id),
                 label: `${c.company_name} (${c.company_code})`
@@ -69,12 +66,12 @@ const MemoCreationContent = () => {
 
     const targetCompanyOptions = React.useMemo(() => {
         // Exclude the selected issued_by company from target company choices
-        const filteredCompanies = selectedIssuedBy 
+        const filteredCompanies = selectedIssuedBy && selectedIssuedBy !== "all"
             ? companies.filter(c => Number(c.company_id) !== Number(selectedIssuedBy))
             : companies;
 
         return [
-            { value: "", label: "All Target Companies" },
+            { value: "all", label: "All Target Companies" },
             ...filteredCompanies.map(c => ({
                 value: String(c.company_id),
                 label: `${c.company_name} (${c.company_code})`
@@ -98,59 +95,53 @@ const MemoCreationContent = () => {
                 </div>
             </div>
 
-            {/* Filter Section */}
-            <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full items-end">
-                    {/* Search Memo Number */}
-                    <div className="relative w-full">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        <Input
-                            placeholder="Search memo no..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearch(e.target.value)}
-                            className="pl-9 h-10 w-full rounded-xl"
-                        />
-                    </div>
-
-                    {/* Search Subject */}
-                    <div className="relative w-full">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        <Input
-                            placeholder="Search subject..."
-                            value={subjectQuery}
-                            onChange={(e) => setSubjectQuery(e.target.value)}
-                            className="pl-9 h-10 w-full rounded-xl"
-                        />
+            {/* Filter and Action Section */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col md:flex-row gap-3 items-end w-full md:w-auto flex-1">
+                    {/* Search Bar */}
+                    <div className="w-full md:w-64 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Search</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                                placeholder="Search no. or subject..."
+                                value={searchQuery}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                className="pl-9 h-10 w-full bg-card shadow-sm"
+                            />
+                        </div>
                     </div>
 
                     {/* Issued By Dropdown */}
-                    <div className="w-full">
+                    <div className="w-full md:w-56 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Issued By</label>
                         <SearchableSelect
                             options={issuedByOptions}
                             value={selectedIssuedBy}
                             onValueChange={setSelectedIssuedBy}
-                            placeholder="All Issuers"
-                            className="h-10 rounded-xl bg-background"
+                            placeholder="Select Issuer..."
+                            className="h-10 bg-card shadow-sm"
                         />
                     </div>
 
                     {/* Target Companies Dropdown */}
-                    <div className="w-full">
+                    <div className="w-full md:w-56 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Target Companies</label>
                         <SearchableSelect
                             options={targetCompanyOptions}
                             value={selectedTargetCompany}
                             onValueChange={setSelectedTargetCompany}
-                            placeholder="All Target Companies"
-                            className="h-10 rounded-xl bg-background"
+                            placeholder="Select Target..."
+                            className="h-10 bg-card shadow-sm"
                         />
                     </div>
                 </div>
 
                 {hasActiveFilters && (
-                    <div className="flex justify-start">
+                    <div className="flex justify-start md:justify-end shrink-0">
                         <button
                             onClick={handleClearFilters}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/50 transition-all dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/50 transition-all dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30 shadow-sm"
                         >
                             <X className="h-3.5 w-3.5" />
                             Clear All Filters
