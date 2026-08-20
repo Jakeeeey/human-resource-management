@@ -31,6 +31,19 @@ export async function listDepartments(): Promise<Department[]> {
   return request<Department[]>("GET", `${PROXY_BASE}/departments`);
 }
 
+import type { DepartmentPosition } from "../types";
+
+export async function listDepartmentPositions(): Promise<DepartmentPosition[]> {
+  return request<DepartmentPosition[]>("GET", `${PROXY_BASE}/department-positions`);
+}
+
+export async function createDepartmentPosition(departmentId: number, position: string): Promise<DepartmentPosition> {
+  return request<DepartmentPosition>("POST", `${PROXY_BASE}/department-positions`, {
+    department_id: departmentId,
+    position,
+  });
+}
+
 export async function deleteEmployee(id: number): Promise<void> {
   await request("DELETE", `${PROXY_BASE}/delete/${id}`);
 }

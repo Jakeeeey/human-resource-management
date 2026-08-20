@@ -14,6 +14,12 @@ export interface Department {
   date_added?: string;
 }
 
+export interface DepartmentPosition {
+  id: number;
+  department_id: number;
+  position: string;
+}
+
 /** Matches the Spring Boot GET /users response object */
 export interface User {
   id: number;

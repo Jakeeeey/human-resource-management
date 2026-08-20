@@ -3,12 +3,13 @@
 import { useState, useCallback, useEffect } from "react";
 import * as provider from "../providers/fetchProvider";
 import * as spring from "../providers/springProvider";
-import { User, Department } from "../types";
+import { User, Department, DepartmentPosition } from "../types";
 import { toast } from "sonner";
 
 export function useEmployeeMasterlist() {
   const [employees, setEmployees] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentPositions, setDepartmentPositions] = useState<DepartmentPosition[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -54,18 +55,27 @@ export function useEmployeeMasterlist() {
     }
   }, []);
 
+  const fetchDepartmentPositions = useCallback(async () => {
+    try {
+      const data = await provider.listDepartmentPositions();
+      setDepartmentPositions(data);
+    } catch (err) {
+      console.error("Failed to fetch department positions", err);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setIsError(false);
     try {
-      await Promise.all([fetchEmployees(), fetchDepartments()]);
+      await Promise.all([fetchEmployees(), fetchDepartments(), fetchDepartmentPositions()]);
     } catch (err) {
       setIsError(true);
       setError(err instanceof Error ? err : new Error("Failed to fetch data"));
     } finally {
       setIsLoading(false);
     }
-  }, [fetchEmployees, fetchDepartments]);
+  }, [fetchEmployees, fetchDepartments, fetchDepartmentPositions]);
 
   useEffect(() => {
     fetchData();
@@ -106,7 +116,7 @@ export function useEmployeeMasterlist() {
     try {
       await spring.updateEmployeeSpring(id, data);
       await fetchEmployees();
-      toast.success("Employee updated successfully");
+      toast.success("Employee record updated successfully");
     } catch (e) {
       const err = e as Error;
       toast.error(err.message || "Failed to update employee");
@@ -114,9 +124,23 @@ export function useEmployeeMasterlist() {
     }
   };
 
+  const addDepartmentPosition = async (departmentId: number, position: string) => {
+    try {
+      const newPos = await provider.createDepartmentPosition(departmentId, position);
+      setDepartmentPositions(prev => [...prev, newPos]);
+      toast.success("Position added successfully");
+      return newPos;
+    } catch (e) {
+      const err = e as Error;
+      toast.error(err.message || "Failed to add position");
+      throw err;
+    }
+  };
+
   return {
     employees,
     departments,
+    departmentPositions,
     isLoading,
     isError,
     error,
@@ -124,5 +148,6 @@ export function useEmployeeMasterlist() {
     removeEmployee,
     addEmployee,
     updateEmployee,
+    addDepartmentPosition,
   };
 }
