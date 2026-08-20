@@ -25,6 +25,8 @@ export const CompanyProfileSchema = z.object({
     company_logo: z.string().nullable().optional(),
     company_tags: z.string().nullable().optional(),
     company_department: z.string().nullable().optional(),
+    company_mission: z.string().nullable().optional(),
+    company_vision: z.string().nullable().optional(),
 });
 
 export type CompanyProfile = z.infer<typeof CompanyProfileSchema>;
