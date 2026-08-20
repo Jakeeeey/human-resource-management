@@ -111,8 +111,6 @@ export function useMemoCreation() {
         });
     }, [refreshMemos, triggerAlert]);
 
-
-
     const handleSubmit = useCallback(async (
         data: Partial<Memo>,
         attachments: { id?: string | number; file_url: string; file_name: string }[]
