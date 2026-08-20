@@ -17,14 +17,12 @@ export function useMemoCreation() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [subjectQuery, setSubjectQuery] = useState("");
-    const [selectedIssuedBy, setSelectedIssuedBy] = useState("");
-    const [selectedTargetCompany, setSelectedTargetCompany] = useState("");
+    const [selectedIssuedBy, setSelectedIssuedBy] = useState("all");
+    const [selectedTargetCompany, setSelectedTargetCompany] = useState("all");
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
-        refreshMemos(query);
-    }, [refreshMemos]);
+    }, []);
 
     // Shadcn alert dialog state
     const [alertDialogConfig, setAlertDialogConfig] = useState<{
@@ -176,21 +174,23 @@ export function useMemoCreation() {
 
     const filteredMemos = useMemo(() => {
         return memos.filter((memo) => {
-            if (subjectQuery) {
-                const subMatch = memo.subject.toLowerCase().includes(subjectQuery.toLowerCase());
-                if (!subMatch) return false;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const matchNo = memo.memo_no.toLowerCase().includes(q);
+                const matchSubject = memo.subject?.toLowerCase().includes(q);
+                if (!matchNo && !matchSubject) return false;
             }
-            if (selectedIssuedBy) {
+            if (selectedIssuedBy && selectedIssuedBy !== "all") {
                 if (Number(memo.from) !== Number(selectedIssuedBy)) return false;
             }
-            if (selectedTargetCompany) {
+            if (selectedTargetCompany && selectedTargetCompany !== "all") {
                 if (!memo.company_ids || !memo.company_ids.some(id => Number(id) === Number(selectedTargetCompany))) {
                     return false;
                 }
             }
             return true;
         });
-    }, [memos, subjectQuery, selectedIssuedBy, selectedTargetCompany]);
+    }, [memos, searchQuery, selectedIssuedBy, selectedTargetCompany]);
 
     return {
         memos: filteredMemos,
@@ -211,8 +211,6 @@ export function useMemoCreation() {
         handleSubmit,
         searchQuery,
         handleSearch,
-        subjectQuery,
-        setSubjectQuery,
         selectedIssuedBy,
         setSelectedIssuedBy,
         selectedTargetCompany,
