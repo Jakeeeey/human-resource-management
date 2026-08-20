@@ -101,6 +101,7 @@ export class MemoCreationService {
                     start_date: memoData.start_date,
                     end_date: memoData.end_date,
                     status: memoData.status,
+                    company_ids: memoData.company_ids,
                     attachments: attachmentFiles
                 })
             });

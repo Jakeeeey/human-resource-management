@@ -1,4 +1,4 @@
-import { useContext, useState, useCallback } from "react";
+import { useContext, useState, useCallback, useMemo } from "react";
 import { MemoFetchContext } from "../providers/fetchProvider";
 import { MemoCreationService } from "../services/MemoCreationService";
 import { Memo } from "../types";
@@ -17,6 +17,9 @@ export function useMemoCreation() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const [subjectQuery, setSubjectQuery] = useState("");
+    const [selectedIssuedBy, setSelectedIssuedBy] = useState("");
+    const [selectedTargetCompany, setSelectedTargetCompany] = useState("");
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
@@ -171,8 +174,26 @@ export function useMemoCreation() {
         }
     }, [selectedMemo, refreshMemos]);
 
+    const filteredMemos = useMemo(() => {
+        return memos.filter((memo) => {
+            if (subjectQuery) {
+                const subMatch = memo.subject.toLowerCase().includes(subjectQuery.toLowerCase());
+                if (!subMatch) return false;
+            }
+            if (selectedIssuedBy) {
+                if (Number(memo.from) !== Number(selectedIssuedBy)) return false;
+            }
+            if (selectedTargetCompany) {
+                if (!memo.company_ids || !memo.company_ids.some(id => Number(id) === Number(selectedTargetCompany))) {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }, [memos, subjectQuery, selectedIssuedBy, selectedTargetCompany]);
+
     return {
-        memos,
+        memos: filteredMemos,
         companies,
         isLoading,
         isDialogOpen,
@@ -189,6 +210,12 @@ export function useMemoCreation() {
         handleSubmitMemo,
         handleSubmit,
         searchQuery,
-        handleSearch
+        handleSearch,
+        subjectQuery,
+        setSubjectQuery,
+        selectedIssuedBy,
+        setSelectedIssuedBy,
+        selectedTargetCompany,
+        setSelectedTargetCompany
     };
 }
