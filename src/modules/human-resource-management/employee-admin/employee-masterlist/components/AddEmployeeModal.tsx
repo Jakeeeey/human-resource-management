@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import type { Department } from "../types";
+import type { Department, DepartmentPosition } from "../types";
 import { AddressSelectors } from "./AddressSelectors";
 
 const UPLOAD_API = "/api/hrm/employee-admin/employee-master-list/upload";
@@ -138,7 +138,9 @@ export interface AddEmployeeModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   departments: Department[];
+  departmentPositions: DepartmentPosition[];
   onSubmit: (data: NewEmployeeFormData & { _userImageId?: string; _signatureId?: string }) => Promise<void>;
+  onAddPosition?: (departmentId: number, position: string) => Promise<DepartmentPosition>;
 }
 
 // ─── Sub-section header ───────────────────────────────────────────────────────
@@ -237,10 +239,15 @@ export function AddEmployeeModal({
   isOpen,
   onOpenChange,
   departments,
+  departmentPositions = [],
   onSubmit,
+  onAddPosition,
 }: AddEmployeeModalProps) {
   const [form, setForm] = useState<NewEmployeeFormData>(EMPTY_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddingPosition, setIsAddingPosition] = useState(false);
+  const [newPositionName, setNewPositionName] = useState("");
+  const [showAddPosition, setShowAddPosition] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [emergencyPhoneError, setEmergencyPhoneError] = useState<string | null>(null);
@@ -719,13 +726,88 @@ export function AddEmployeeModal({
                   </Select>
                 </Field>
                 <Field label="Designation / Position" required>
-                  <Input
-                    className={inputCls}
+                  <Select
                     value={form.user_position}
-                    onChange={(e) => set("user_position", e.target.value)}
-                    placeholder="e.g. System Developer"
+                    onValueChange={(v) => set("user_position", v)}
                     required
-                  />
+                    disabled={!form.user_department}
+                  >
+                    <SelectTrigger
+                      className={cn(
+                        inputCls,
+                        "data-[placeholder]:text-muted-foreground/50"
+                      )}
+                    >
+                      <SelectValue placeholder={form.user_department ? "Select a position" : "Select a department first"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl">
+                      {departmentPositions
+                        .filter((p) => p.department_id.toString() === form.user_department)
+                        .map((p) => (
+                          <SelectItem
+                            key={p.id}
+                            value={p.id.toString()}
+                          >
+                            {p.position}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {form.user_department && onAddPosition && (
+                    <div className="mt-1">
+                      {showAddPosition ? (
+                        <div className="flex items-center gap-2">
+                          <Input 
+                            className="h-8 text-xs" 
+                            placeholder="New position name"
+                            value={newPositionName}
+                            onChange={(e) => setNewPositionName(e.target.value)}
+                          />
+                          <Button 
+                            type="button"
+                            size="sm"
+                            className="h-8 px-2 text-xs"
+                            disabled={!newPositionName.trim() || isAddingPosition}
+                            onClick={async () => {
+                              try {
+                                setIsAddingPosition(true);
+                                const newPos = await onAddPosition(Number(form.user_department), newPositionName.trim());
+                                set("user_position", newPos.id.toString());
+                                setShowAddPosition(false);
+                                setNewPositionName("");
+                              } catch {
+                                // handled in hook
+                              } finally {
+                                setIsAddingPosition(false);
+                              }
+                            }}
+                          >
+                            {isAddingPosition ? "..." : "Add"}
+                          </Button>
+                          <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="ghost" 
+                            className="h-8 px-2 text-xs"
+                            onClick={() => {
+                              setShowAddPosition(false);
+                              setNewPositionName("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <button 
+                          type="button" 
+                          className="text-xs text-primary hover:underline font-medium"
+                          onClick={() => setShowAddPosition(true)}
+                        >
+                          + Add New Position
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </Field>
                 <Field label="Email" required>
                   <div className="relative">
