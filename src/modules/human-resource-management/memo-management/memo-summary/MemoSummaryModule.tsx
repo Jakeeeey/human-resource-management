@@ -14,6 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 const MemoSummaryContent = () => {
     const {
@@ -34,10 +35,30 @@ const MemoSummaryContent = () => {
         totalFilteredCount,
         handleSearchChange,
         handleStatusFilterChange,
-        handleViewDetails
+        handleViewDetails,
+        issuedByFilter,
+        setIssuedByFilter,
+        targetCompanyFilter,
+        setTargetCompanyFilter
     } = useMemoSummary();
 
     const statuses = ["All", "Draft", "Submitted", "Approved", "Released", "Rejected", "Archived"];
+
+    const issuerOptions = React.useMemo(() => [
+        { value: "all", label: "All Issuers" },
+        ...companies.map(c => ({
+            value: String(c.company_id),
+            label: `${c.company_name} (${c.company_code})`
+        }))
+    ], [companies]);
+
+    const targetOptions = React.useMemo(() => [
+        { value: "all", label: "All Target Companies" },
+        ...companies.map(c => ({
+            value: String(c.company_id),
+            label: `${c.company_name} (${c.company_code})`
+        }))
+    ], [companies]);
 
     return (
         <div className="flex-1 space-y-6 p-6 pt-8 h-full overflow-auto bg-gradient-to-br from-background via-background to-primary/[0.02]">
@@ -57,23 +78,51 @@ const MemoSummaryContent = () => {
             </div>
 
             {/* Filter Section */}
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col xl:flex-row gap-3 items-end w-full">
                     {/* Search Input */}
-                    <div className="relative w-full sm:w-72">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        <Input
-                            placeholder="Search memo number..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearchChange(e.target.value)}
-                            className="pl-9 h-10 w-full"
+                    <div className="w-full xl:w-64 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Search</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                                placeholder="Search no. or subject..."
+                                value={searchQuery}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                className="pl-9 h-10 w-full bg-card shadow-sm"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Issued By Filter */}
+                    <div className="w-full xl:w-56 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Issued By</label>
+                        <SearchableSelect
+                            options={issuerOptions}
+                            value={issuedByFilter}
+                            onValueChange={setIssuedByFilter}
+                            placeholder="Select Issuer..."
+                            className="h-10 bg-card shadow-sm"
+                        />
+                    </div>
+
+                    {/* Target Companies Filter */}
+                    <div className="w-full xl:w-56 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Target Companies</label>
+                        <SearchableSelect
+                            options={targetOptions}
+                            value={targetCompanyFilter}
+                            onValueChange={setTargetCompanyFilter}
+                            placeholder="Select Target..."
+                            className="h-10 bg-card shadow-sm"
                         />
                     </div>
 
                     {/* Status Dropdown Filter */}
-                    <div className="w-full sm:w-44">
+                    <div className="w-full xl:w-44 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Status</label>
                         <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                            <SelectTrigger className="h-10 w-full bg-card">
+                            <SelectTrigger className="h-10 w-full bg-card shadow-sm">
                                 <SelectValue placeholder="Filter by Status" />
                             </SelectTrigger>
                             <SelectContent className="bg-card text-card-foreground border rounded-md shadow-md">

@@ -75,7 +75,8 @@ export function MemoApprovalTable({
                             />
                         </TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Memo No.</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">From</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Issued By</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Target Companies</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Subject</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Active Period</TableHead>
                         <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Status</TableHead>
@@ -91,6 +92,9 @@ export function MemoApprovalTable({
                                 </TableCell>
                                 <TableCell className="py-4">
                                     <div className="h-4 w-24 bg-muted/70 rounded-md animate-pulse" />
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <div className="h-4 w-32 bg-muted/70 rounded-md animate-pulse" />
                                 </TableCell>
                                 <TableCell className="py-4">
                                     <div className="h-5 w-14 bg-muted/70 rounded-full animate-pulse" />
@@ -111,7 +115,7 @@ export function MemoApprovalTable({
                         ))
                     ) : data.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={7} className="h-24 text-center">
+                            <TableCell colSpan={8} className="h-24 text-center">
                                 No submitted memos awaiting approval.
                             </TableCell>
                         </TableRow>
@@ -120,6 +124,15 @@ export function MemoApprovalTable({
                             const isSelected = selectedMemoNos.includes(memo.memo_no);
                             const fromComp = companies.find(c => Number(c.company_id) === Number(memo.from));
                             const fromLabel = fromComp ? `${fromComp.company_name} (${fromComp.company_code})` : `Company #${memo.from}`;
+                            
+                            const targetComps = memo.company_ids?.map(id => {
+                                const c = companies.find(c => Number(c.company_id) === Number(id));
+                                return c ? c.company_code : `#${id}`;
+                            }) || [];
+                            const maxTargets = 2;
+                            const targetDisplay = targetComps.slice(0, maxTargets).join(", ");
+                            const remaining = targetComps.length - maxTargets;
+
                             const hasAttachments = memo.attachments && memo.attachments.length > 0;
 
                             return (
@@ -135,6 +148,24 @@ export function MemoApprovalTable({
                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800">
                                             {fromComp ? `${fromComp.company_code}` : `#${memo.from}`}
                                         </span>
+                                    </TableCell>
+                                    <TableCell className="py-3.5 max-w-[200px] truncate">
+                                        <div className="flex items-center gap-1.5" title={targetComps.join(", ")}>
+                                            {targetComps.length > 0 ? (
+                                                <>
+                                                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                                                        {targetDisplay}
+                                                    </span>
+                                                    {remaining > 0 && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                                            +{remaining}
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span className="text-[11px] text-muted-foreground italic">None</span>
+                                            )}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="py-3.5 max-w-[240px]" title={memo.subject}>
                                         <div className="flex items-center gap-1.5">

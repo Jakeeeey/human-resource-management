@@ -12,6 +12,8 @@ export function useMemoSummary() {
 
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
+    const [issuedByFilter, setIssuedByFilter] = useState<string>("all");
+    const [targetCompanyFilter, setTargetCompanyFilter] = useState<string>("all");
     const [selectedMemo, setSelectedMemo] = useState<Memo | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
@@ -38,14 +40,33 @@ export function useMemoSummary() {
     // Filter logic
     const filteredMemos = useMemo(() => {
         return memos.filter((memo) => {
-            const matchesSearch = memo.memo_no
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase().trim());
-            const matchesStatus =
-                statusFilter === "All" || memo.status === statusFilter;
-            return matchesSearch && matchesStatus;
+            // 1. Search Query
+            let matchesSearch = true;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase().trim();
+                const matchNo = memo.memo_no.toLowerCase().includes(q);
+                const matchSubject = memo.subject?.toLowerCase().includes(q);
+                matchesSearch = matchNo || !!matchSubject;
+            }
+
+            // 2. Status
+            const matchesStatus = statusFilter === "All" || memo.status === statusFilter;
+
+            // 3. Issued By
+            let matchesIssuedBy = true;
+            if (issuedByFilter && issuedByFilter !== "all") {
+                matchesIssuedBy = String(memo.from) === issuedByFilter;
+            }
+
+            // 4. Target Companies
+            let matchesTarget = true;
+            if (targetCompanyFilter && targetCompanyFilter !== "all") {
+                matchesTarget = memo.company_ids?.includes(Number(targetCompanyFilter)) || false;
+            }
+
+            return matchesSearch && matchesStatus && matchesIssuedBy && matchesTarget;
         });
-    }, [memos, searchQuery, statusFilter]);
+    }, [memos, searchQuery, statusFilter, issuedByFilter, targetCompanyFilter]);
 
     // Paginated logic
     const paginatedMemos = useMemo(() => {
@@ -82,6 +103,10 @@ export function useMemoSummary() {
         canNextPage,
         previousPage,
         nextPage,
+        issuedByFilter,
+        setIssuedByFilter,
+        targetCompanyFilter,
+        setTargetCompanyFilter,
         handleSearchChange,
         handleStatusFilterChange,
         handleViewDetails,
