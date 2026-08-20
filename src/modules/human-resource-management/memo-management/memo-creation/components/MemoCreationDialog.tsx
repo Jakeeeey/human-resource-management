@@ -55,6 +55,7 @@ export function MemoCreationDialog({ open, onOpenChange, onSubmit, memo, compani
     
     const [attachments, setAttachments] = useState<{ id?: string | number; file_url: string; file_name: string }[]>([]);
     const [isUploading, setIsUploading] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
 
     useEffect(() => {
         if (open) {
@@ -80,7 +81,7 @@ export function MemoCreationDialog({ open, onOpenChange, onSubmit, memo, compani
     }, [open, memo]);
 
     const handleToggleCompany = (id: number) => {
-        if (isReadOnly || memo) return;
+        if (isReadOnly) return;
         const updated = selectedCompanyIds.includes(id) 
             ? selectedCompanyIds.filter((c) => c !== id) 
             : [...selectedCompanyIds, id];
@@ -89,7 +90,7 @@ export function MemoCreationDialog({ open, onOpenChange, onSubmit, memo, compani
     };
 
     const handleSelectAllCompanies = () => {
-        if (isReadOnly || memo) return;
+        if (isReadOnly) return;
         let updated: number[] = [];
         if (selectedCompanyIds.length !== companies.length) {
             updated = companies.map((c) => Number(c.company_id));
@@ -98,15 +99,45 @@ export function MemoCreationDialog({ open, onOpenChange, onSubmit, memo, compani
         setErrors((prev) => ({ ...prev, company_ids: undefined }));
     };
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files) return;
+    const processFiles = async (filesArray: File[]) => {
+        const allowedExtensions = [".pdf", ".png", ".jpg", ".jpeg"];
+        const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
+        const maxFileSize = 10 * 1024 * 1024; // 10MB
         
+        const invalidFiles: string[] = [];
+        const oversizedFiles: string[] = [];
+        const validFiles: File[] = [];
+        
+        for (const file of filesArray) {
+            const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+            const isValidExt = allowedExtensions.includes(ext);
+            const isValidMime = allowedTypes.includes(file.type);
+            
+            if (!isValidExt && !isValidMime) {
+                invalidFiles.push(file.name);
+            } else if (file.size > maxFileSize) {
+                oversizedFiles.push(file.name);
+            } else {
+                validFiles.push(file);
+            }
+        }
+        
+        if (invalidFiles.length > 0) {
+            toast.error(`Invalid format for: ${invalidFiles.join(", ")}. Only PDF and standard images (PNG, JPG, JPEG) are allowed.`);
+            return false;
+        }
+        
+        if (oversizedFiles.length > 0) {
+            toast.error(`File size exceeds 10MB limit for: ${oversizedFiles.join(", ")}.`);
+            return false;
+        }
+
+        if (validFiles.length === 0) return true;
+
         setIsUploading(true);
-        const filesArray = Array.from(e.target.files);
-        
         try {
             const uploadedList = await Promise.all(
-                filesArray.map(async (file) => {
+                validFiles.map(async (file) => {
                     const result = await MemoCreationService.uploadAttachment(file);
                     return result;
                 })
@@ -114,9 +145,43 @@ export function MemoCreationDialog({ open, onOpenChange, onSubmit, memo, compani
             
             const validUploads = uploadedList.filter((item): item is { file_url: string; file_name: string } => item !== null);
             setAttachments((prev) => [...prev, ...validUploads]);
+            return true;
         } finally {
             setIsUploading(false);
-            e.target.value = ""; // Reset file input
+        }
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return;
+        const filesArray = Array.from(e.target.files);
+        await processFiles(filesArray);
+        e.target.value = ""; // Reset file input
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isReadOnly && !isUploading) {
+            setIsDragging(true);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        if (isReadOnly || isUploading) return;
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const filesArray = Array.from(e.dataTransfer.files);
+            await processFiles(filesArray);
         }
     };
 
@@ -295,18 +360,37 @@ export function MemoCreationDialog({ open, onOpenChange, onSubmit, memo, compani
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-sm font-medium">Attachments</label>
+                            <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium">Attachments</label>
+                                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-wider opacity-60">
+                                    PDF, PNG, JPG, JPEG (Max 10MB)
+                                </span>
+                            </div>
                             <div className="flex flex-col gap-2">
                                  {/* Upload Area */}
                                 {!isReadOnly && (
-                                    <label className="flex flex-col items-center justify-center border-2 border-dashed border-input rounded-md p-4 cursor-pointer hover:bg-accent/30 transition-colors">
-                                        <UploadCloud className="h-8 w-8 text-muted-foreground mb-1" />
+                                    <label
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                        className={`flex flex-col items-center justify-center border-2 border-dashed rounded-md p-4 cursor-pointer transition-colors ${
+                                            isDragging 
+                                                ? "border-primary bg-primary/5 text-primary animate-pulse" 
+                                                : "border-input hover:bg-accent/30"
+                                        }`}
+                                    >
+                                        <UploadCloud className={`h-8 w-8 mb-1 transition-colors ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                                         <span className="text-xs font-semibold text-muted-foreground">
-                                            {isUploading ? "Uploading files..." : "Click to upload multiple files"}
+                                            {isUploading 
+                                                ? "Uploading files..." 
+                                                : isDragging 
+                                                    ? "Drop files here..." 
+                                                    : "Click or drag files here to upload"}
                                         </span>
                                         <input
                                             type="file"
                                             multiple
+                                            accept=".pdf,image/png,image/jpeg,image/jpg"
                                             className="hidden"
                                             onChange={handleFileChange}
                                             disabled={isUploading}

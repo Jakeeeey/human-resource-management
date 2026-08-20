@@ -5,8 +5,9 @@ import { MemoFetchProvider } from "./providers/fetchProvider";
 import { useMemoCreation } from "./hooks/useMemoCreation";
 import { MemoCreationTable } from "./components/MemoCreationTable";
 import { MemoCreationDialog } from "./components/MemoCreationDialog";
-import { Search, FilePlus } from "lucide-react";
+import { Search, FilePlus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -37,8 +38,49 @@ const MemoCreationContent = () => {
         handleSubmitMemo,
         handleSubmit,
         searchQuery,
-        handleSearch
+        handleSearch,
+        subjectQuery,
+        setSubjectQuery,
+        selectedIssuedBy,
+        setSelectedIssuedBy,
+        selectedTargetCompany,
+        setSelectedTargetCompany
     } = useMemoCreation();
+
+    // Reset all filters helper
+    const hasActiveFilters = searchQuery || subjectQuery || selectedIssuedBy || selectedTargetCompany;
+    const handleClearFilters = () => {
+        handleSearch("");
+        setSubjectQuery("");
+        setSelectedIssuedBy("");
+        setSelectedTargetCompany("");
+    };
+
+    // Filter Options
+    const issuedByOptions = React.useMemo(() => {
+        return [
+            { value: "", label: "All Issuers" },
+            ...companies.map(c => ({
+                value: String(c.company_id),
+                label: `${c.company_name} (${c.company_code})`
+            }))
+        ];
+    }, [companies]);
+
+    const targetCompanyOptions = React.useMemo(() => {
+        // Exclude the selected issued_by company from target company choices
+        const filteredCompanies = selectedIssuedBy 
+            ? companies.filter(c => Number(c.company_id) !== Number(selectedIssuedBy))
+            : companies;
+
+        return [
+            { value: "", label: "All Target Companies" },
+            ...filteredCompanies.map(c => ({
+                value: String(c.company_id),
+                label: `${c.company_name} (${c.company_code})`
+            }))
+        ];
+    }, [companies, selectedIssuedBy]);
 
     return (
         <div className="flex-1 space-y-6 p-6 pt-8 h-full overflow-auto bg-gradient-to-br from-background via-background to-primary/[0.02]">
@@ -57,17 +99,64 @@ const MemoCreationContent = () => {
             </div>
 
             {/* Filter Section */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                {/* Search Bar */}
-                <div className="relative w-full max-w-sm">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                        placeholder="Search memo number..."
-                        value={searchQuery}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        className="pl-9 h-10 w-full"
-                    />
+            <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 w-full items-end">
+                    {/* Search Memo Number */}
+                    <div className="relative w-full">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                            placeholder="Search memo no..."
+                            value={searchQuery}
+                            onChange={(e) => handleSearch(e.target.value)}
+                            className="pl-9 h-10 w-full rounded-xl"
+                        />
+                    </div>
+
+                    {/* Search Subject */}
+                    <div className="relative w-full">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                            placeholder="Search subject..."
+                            value={subjectQuery}
+                            onChange={(e) => setSubjectQuery(e.target.value)}
+                            className="pl-9 h-10 w-full rounded-xl"
+                        />
+                    </div>
+
+                    {/* Issued By Dropdown */}
+                    <div className="w-full">
+                        <SearchableSelect
+                            options={issuedByOptions}
+                            value={selectedIssuedBy}
+                            onValueChange={setSelectedIssuedBy}
+                            placeholder="All Issuers"
+                            className="h-10 rounded-xl bg-background"
+                        />
+                    </div>
+
+                    {/* Target Companies Dropdown */}
+                    <div className="w-full">
+                        <SearchableSelect
+                            options={targetCompanyOptions}
+                            value={selectedTargetCompany}
+                            onValueChange={setSelectedTargetCompany}
+                            placeholder="All Target Companies"
+                            className="h-10 rounded-xl bg-background"
+                        />
+                    </div>
                 </div>
+
+                {hasActiveFilters && (
+                    <div className="flex justify-start">
+                        <button
+                            onClick={handleClearFilters}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/50 transition-all dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                            Clear All Filters
+                        </button>
+                    </div>
+                )}
             </div>
 
             <MemoCreationTable
