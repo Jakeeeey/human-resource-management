@@ -12,6 +12,26 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
         }
 
+        const fileName = file.name || "";
+        const fileExt = fileName.substring(fileName.lastIndexOf(".")).toLowerCase();
+        const allowedExtensions = [".pdf", ".png", ".jpg", ".jpeg"];
+        const allowedMimeTypes = ["application/pdf", "image/png", "image/jpeg", "image/jpg"];
+        const maxFileSize = 10 * 1024 * 1024; // 10MB
+
+        if (!allowedExtensions.includes(fileExt) && !allowedMimeTypes.includes(file.type)) {
+            return NextResponse.json(
+                { error: "Only PDF and standard images (PNG, JPG, JPEG) are allowed." },
+                { status: 400 }
+            );
+        }
+
+        if (file.size > maxFileSize) {
+            return NextResponse.json(
+                { error: "File size exceeds 10MB limit." },
+                { status: 400 }
+            );
+        }
+
         const directusFormData = new FormData();
         directusFormData.append("file", file);
 

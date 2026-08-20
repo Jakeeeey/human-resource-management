@@ -156,15 +156,21 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: "Missing memo_no parameter" }, { status: 400 });
         }
 
-        // Get current user ID
+        // Get current user ID and email
         const cookieStore = await cookies();
         const tokenVal = cookieStore.get("vos_access_token")?.value;
         let userId: number | null = null;
+        let userEmail: string | null = null;
         if (tokenVal) {
             const payload = decodeJwtPayload(tokenVal);
-            if (payload && payload.sub) {
-                const parsed = parseInt(String(payload.sub), 10);
-                if (!isNaN(parsed)) userId = parsed;
+            if (payload) {
+                if (payload.sub) {
+                    const parsed = parseInt(String(payload.sub), 10);
+                    if (!isNaN(parsed)) userId = parsed;
+                }
+                if (payload.email) {
+                    userEmail = String(payload.email);
+                }
             }
         }
         const phTime = getPhilippineTime();
@@ -275,6 +281,27 @@ export async function PATCH(req: NextRequest) {
             const directusUrl = company.directus;
             const directusToken = company.directus_token;
 
+            // Resolve remote user ID by email
+            let remoteUserId: number | null = null;
+            if (userEmail) {
+                try {
+                    const userRes = await fetch(
+                        `${directusUrl.replace(/\/+$/, "")}/items/user?filter[user_email][_eq]=${encodeURIComponent(userEmail)}&limit=1`,
+                        {
+                            headers: { "Authorization": `Bearer ${directusToken}` }
+                        }
+                    );
+                    if (userRes.ok) {
+                        const userJson = await userRes.json();
+                        if (userJson && userJson.data && userJson.data.length > 0) {
+                            remoteUserId = Number(userJson.data[0].user_id);
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Failed to resolve remote user for email ${userEmail}:`, e);
+                }
+            }
+
             // Sync to remote
             // Check if remote memo exists by memo_no
             const remoteMemoGet = await fetch(
@@ -308,9 +335,9 @@ export async function PATCH(req: NextRequest) {
                         },
                         body: JSON.stringify({
                             status: "Released",
-                            updated_by: userId,
+                            updated_by: remoteUserId,
                             updated_at: phTime,
-                            released_by: userId,
+                            released_by: remoteUserId,
                             released_at: phTime
                         })
                     }
@@ -340,10 +367,12 @@ export async function PATCH(req: NextRequest) {
                         start_date: memo.start_date,
                         end_date: memo.end_date,
                         status: "Released",
-                        created_by: userId,
+                        created_by: remoteUserId,
                         created_at: phTime,
-                        released_by: userId,
-                        released_at: phTime
+                        released_by: remoteUserId,
+                        released_at: phTime,
+                        updated_by: remoteUserId,
+                        updated_at: phTime
                     })
                 });
 
