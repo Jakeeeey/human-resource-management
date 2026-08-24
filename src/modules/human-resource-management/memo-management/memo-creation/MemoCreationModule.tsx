@@ -95,7 +95,6 @@ const MemoCreationContent = () => {
                 </div>
             </div>
 
-            {/* Filter and Action Section */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-col md:flex-row gap-3 items-end w-full md:w-auto flex-1">
                     {/* Search Bar */}
@@ -120,7 +119,7 @@ const MemoCreationContent = () => {
                             value={selectedIssuedBy}
                             onValueChange={setSelectedIssuedBy}
                             placeholder="Select Issuer..."
-                            className="h-10 bg-card shadow-sm"
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
                         />
                     </div>
 
@@ -132,7 +131,7 @@ const MemoCreationContent = () => {
                             value={selectedTargetCompany}
                             onValueChange={setSelectedTargetCompany}
                             placeholder="Select Target..."
-                            className="h-10 bg-card shadow-sm"
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
                         />
                     </div>
                 </div>

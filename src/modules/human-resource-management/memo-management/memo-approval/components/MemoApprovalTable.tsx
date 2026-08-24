@@ -124,15 +124,6 @@ export function MemoApprovalTable({
                             const isSelected = selectedMemoNos.includes(memo.memo_no);
                             const fromComp = companies.find(c => Number(c.company_id) === Number(memo.from));
                             const fromLabel = fromComp ? `${fromComp.company_name} (${fromComp.company_code})` : `Company #${memo.from}`;
-                            
-                            const targetComps = memo.company_ids?.map(id => {
-                                const c = companies.find(c => Number(c.company_id) === Number(id));
-                                return c ? c.company_code : `#${id}`;
-                            }) || [];
-                            const maxTargets = 2;
-                            const targetDisplay = targetComps.slice(0, maxTargets).join(", ");
-                            const remaining = targetComps.length - maxTargets;
-
                             const hasAttachments = memo.attachments && memo.attachments.length > 0;
 
                             return (
@@ -149,21 +140,27 @@ export function MemoApprovalTable({
                                             {fromComp ? `${fromComp.company_code}` : `#${memo.from}`}
                                         </span>
                                     </TableCell>
-                                    <TableCell className="py-3.5 max-w-[200px] truncate">
-                                        <div className="flex items-center gap-1.5" title={targetComps.join(", ")}>
-                                            {targetComps.length > 0 ? (
-                                                <>
-                                                    <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                                                        {targetDisplay}
-                                                    </span>
-                                                    {remaining > 0 && (
-                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                                                            +{remaining}
+                                    <TableCell className="py-3.5 max-w-[200px]">
+                                        <div className="flex flex-wrap gap-1 items-center">
+                                            {memo.company_ids && memo.company_ids.length > 0 ? (
+                                                memo.company_ids.slice(0, 2).map((id) => {
+                                                    const comp = companies.find(c => Number(c.company_id) === Number(id));
+                                                    return (
+                                                        <span key={id} className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/50 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700" title={comp ? comp.company_name : `Company #${id}`}>
+                                                            {comp ? comp.company_code : `#${id}`}
                                                         </span>
-                                                    )}
-                                                </>
+                                                    );
+                                                })
                                             ) : (
-                                                <span className="text-[11px] text-muted-foreground italic">None</span>
+                                                <span className="text-muted-foreground text-xs">-</span>
+                                            )}
+                                            {memo.company_ids && memo.company_ids.length > 2 && (
+                                                <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 pl-0.5 cursor-help" title={memo.company_ids.map(id => {
+                                                    const comp = companies.find(c => Number(c.company_id) === Number(id));
+                                                    return comp ? comp.company_name : `Company #${id}`;
+                                                }).join(", ")}>
+                                                    +{memo.company_ids.length - 2} more
+                                                </span>
                                             )}
                                         </div>
                                     </TableCell>

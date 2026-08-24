@@ -132,7 +132,7 @@ async function handleGet(req: NextRequest) {
     if (id) {
         upstreamUrl += `/${id}?fields=*,created_by.*`;
     } else {
-        upstreamUrl += `?limit=-1&fields=*,created_by.*&filter[status][_eq]=Draft`;
+        upstreamUrl += `?limit=-1&fields=*,created_by.*&filter[status][_eq]=Draft&filter[is_delete][_eq]=0`;
     }
 
     const queryParams = new URLSearchParams(searchParams);
@@ -192,6 +192,9 @@ async function handleGet(req: NextRequest) {
     };
 
     if (id) {
+        if (!memoData.data || memoData.data.is_delete === 1) {
+            return NextResponse.json({ error: "Memo not found" }, { status: 404 });
+        }
         return NextResponse.json({ data: normalizeItem(memoData.data) });
     } else {
         return NextResponse.json({ data: (memoData.data || []).map(normalizeItem) });
@@ -769,137 +772,51 @@ async function handleDelete(req: NextRequest) {
         return NextResponse.json({ error: "Memo not found locally" }, { status: 404 });
     }
     const memo = mainMemos[0] as RawMemo;
-    const targetCompanyIds = (memo.company_memo_per_companies || []).map((c) => Number(c.company_id));
 
-    const companiesList = await fetchCompaniesList();
-    const failedCompanies: string[] = [];
-
-    // 1. Delete Remotely
-    for (const cId of targetCompanyIds) {
-        const company = companiesList.find(c => Number(c.company_id) === Number(cId));
-
-        if (company && company.directus && company.directus_token) {
-            const directusUrl = company.directus;
-            const directusToken = company.directus_token;
-            try {
-                const remoteMemoGet = await fetch(
-                    `${directusUrl.replace(/\/+$/, "")}/items/company_memo?filter[memo_no][_eq]=${memoNo}&limit=1`,
-                    {
-                        headers: {
-                            "Authorization": `Bearer ${directusToken}`
-                        }
-                    }
-                );
-
-                if (remoteMemoGet.ok) {
-                    const remoteMemos = (await remoteMemoGet.json()).data;
-                    if (remoteMemos && remoteMemos.length > 0) {
-                        const remoteMemo = remoteMemos[0];
-
-                        // Fetch remote attachments
-                        const getRemoteAtts = await fetch(
-                            `${directusUrl.replace(/\/+$/, "")}/items/company_memo_attachments?filter[company_memo_id][_eq]=${remoteMemo.id}&limit=-1`,
-                            {
-                                headers: {
-                                    "Authorization": `Bearer ${directusToken}`
-                                }
-                            }
-                        );
-                        if (getRemoteAtts.ok) {
-                            const atts = (await getRemoteAtts.json()).data as MemoRelationAttachment[];
-                            await Promise.all(atts.map((att) => {
-                                return fetch(`${directusUrl.replace(/\/+$/, "")}/items/company_memo_attachments/${att.id}`, {
-                                    method: "DELETE",
-                                    headers: {
-                                        "Authorization": `Bearer ${directusToken}`
-                                    }
-                                });
-                            }));
-                        }
-
-                        // Delete remote targeted company associations
-                        const getRemotePerCos = await fetch(
-                            `${directusUrl.replace(/\/+$/, "")}/items/company_memo_per_companies?filter[company_memo_id][_eq]=${remoteMemo.id}&limit=-1`,
-                            {
-                                headers: {
-                                    "Authorization": `Bearer ${directusToken}`
-                                }
-                            }
-                        );
-                        if (getRemotePerCos.ok) {
-                            const perCos = (await getRemotePerCos.json()).data as MemoRelationCompany[];
-                            await Promise.all(perCos.map((pc) => {
-                                return fetch(`${directusUrl.replace(/\/+$/, "")}/items/company_memo_per_companies/${pc.id}`, {
-                                    method: "DELETE",
-                                    headers: {
-                                        "Authorization": `Bearer ${directusToken}`
-                                    }
-                                });
-                            }));
-                        }
-
-                        // Delete remote memo row
-                        const deleteRemoteRes = await fetch(
-                            `${directusUrl.replace(/\/+$/, "")}/items/company_memo/${remoteMemo.id}`,
-                            {
-                                method: "DELETE",
-                                headers: {
-                                    "Authorization": `Bearer ${directusToken}`
-                                }
-                            }
-                        );
-
-                        if (!deleteRemoteRes.ok) {
-                            failedCompanies.push(company.company_name);
-                        }
-                    }
-                } else {
-                    failedCompanies.push(company.company_name);
-                }
-            } catch (err) {
-                console.error(`Failed to delete remote Directus for ${company.company_name}:`, err);
-                failedCompanies.push(company.company_name);
-            }
+    // Get current user ID from token
+    const cookieStore = await cookies();
+    const tokenVal = cookieStore.get("vos_access_token")?.value;
+    let userId: number | null = null;
+    if (tokenVal) {
+        const payload = decodeJwtPayload(tokenVal);
+        if (payload && payload.sub) {
+            const parsed = parseInt(String(payload.sub), 10);
+            if (!isNaN(parsed)) userId = parsed;
         }
     }
 
-    // 2. Delete Locally
-    try {
-        // Drop local targeted company mappings first
-        const getLocalPerCos = await fetch(
-            `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo_per_companies?filter[company_memo_id][_eq]=${memo.id}&limit=-1`,
-            {
-                headers: {
-                    "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
-                }
-            }
-        );
-        if (getLocalPerCos.ok) {
-            const perCos = (await getLocalPerCos.json()).data as MemoRelationCompany[];
-            await Promise.all(perCos.map((pc) => {
-                return fetch(`${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo_per_companies/${pc.id}`, {
-                    method: "DELETE",
-                    headers: {
-                        "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
-                    }
-                });
-            }));
-        }
+    const phTime = getPhilippineTime();
 
-        // Delete local memo (attachments cascade automatically since constraint is set on DELETE CASCADE!)
-        await fetch(`${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo/${memo.id}`, {
-            method: "DELETE",
+    // Perform Soft Delete locally by patching is_delete, deleted_by, and deleted_at
+    try {
+        const patchRes = await fetch(`${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo/${memo.id}`, {
+            method: "PATCH",
             headers: {
+                "Content-Type": "application/json",
                 "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
-            }
+            },
+            body: JSON.stringify({
+                status: "Deleted",
+                is_delete: 1,
+                deleted_by: userId,
+                deleted_at: phTime,
+                updated_by: userId,
+                updated_at: phTime
+            })
         });
+
+        if (!patchRes.ok) {
+            const errText = await patchRes.text();
+            console.error("Failed to soft delete memo locally:", errText);
+            return NextResponse.json({ error: "Failed to soft delete memo locally" }, { status: 500 });
+        }
     } catch (e) {
-        console.error("Local delete failed", e);
+        console.error("Local soft delete failed", e);
+        return NextResponse.json({ error: "Local soft delete failed" }, { status: 500 });
     }
 
     return NextResponse.json({
-        success: true,
-        failedCompanies
+        success: true
     });
 }
 

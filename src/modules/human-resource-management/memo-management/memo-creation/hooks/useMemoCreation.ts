@@ -172,6 +172,7 @@ export function useMemoCreation() {
 
     const filteredMemos = useMemo(() => {
         return memos.filter((memo) => {
+            if (memo.status !== "Draft") return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
                 const matchNo = memo.memo_no.toLowerCase().includes(q);

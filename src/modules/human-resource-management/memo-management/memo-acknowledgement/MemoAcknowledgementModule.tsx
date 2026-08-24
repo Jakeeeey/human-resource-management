@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
-import { Search, ClipboardCheck } from "lucide-react";
+import { Search, ClipboardCheck, X } from "lucide-react";
 import { MemoAcknowledgementProvider } from "./providers/MemoAcknowledgementProvider";
 import { useMemoAcknowledgement } from "./hooks/useMemoAcknowledgement";
 import { MemoAcknowledgementTable } from "./components/MemoAcknowledgementTable";
 import { MemoAcknowledgementDialog } from "./components/MemoAcknowledgementDialog";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 const MemoAcknowledgementContent = () => {
     const {
@@ -14,6 +15,10 @@ const MemoAcknowledgementContent = () => {
         companies,
         isLoading,
         searchQuery,
+        selectedIssuedBy,
+        setSelectedIssuedBy,
+        selectedTargetCompany,
+        setSelectedTargetCompany,
         selectedMemo,
         isDetailsOpen,
         setIsDetailsOpen,
@@ -30,6 +35,35 @@ const MemoAcknowledgementContent = () => {
         handleViewDetails,
         handleRetryCompanyLogs
     } = useMemoAcknowledgement();
+
+    // Reset all filters helper
+    const hasActiveFilters = searchQuery || (selectedIssuedBy && selectedIssuedBy !== "all") || (selectedTargetCompany && selectedTargetCompany !== "all");
+    const handleClearFilters = () => {
+        handleSearchChange("");
+        setSelectedIssuedBy("all");
+        setSelectedTargetCompany("all");
+    };
+
+    // Filter Options
+    const issuedByOptions = React.useMemo(() => {
+        return [
+            { value: "all", label: "All Issuers" },
+            ...companies.map(c => ({
+                value: String(c.company_id),
+                label: `${c.company_name} (${c.company_code})`
+            }))
+        ];
+    }, [companies]);
+
+    const targetCompanyOptions = React.useMemo(() => {
+        return [
+            { value: "all", label: "All Target Companies" },
+            ...companies.map(c => ({
+                value: String(c.company_id),
+                label: `${c.company_name} (${c.company_code})`
+            }))
+        ];
+    }, [companies]);
 
     return (
         <div className="flex-1 space-y-6 p-6 pt-8 h-full overflow-auto bg-gradient-to-br from-background via-background to-primary/[0.02]">
@@ -48,20 +82,59 @@ const MemoAcknowledgementContent = () => {
                 </div>
             </div>
 
-            {/* Filter Section */}
-            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                    {/* Search Input */}
-                    <div className="relative w-full sm:w-72">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        <Input
-                            placeholder="Search memo number..."
-                            value={searchQuery}
-                            onChange={(e) => handleSearchChange(e.target.value)}
-                            className="pl-9 h-10 w-full"
+            {/* Filter and Action Section */}
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-end w-full lg:w-auto flex-1">
+                    {/* Search Bar */}
+                    <div className="w-full sm:w-64 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Search</label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                                placeholder="Search no. or subject..."
+                                value={searchQuery}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                className="pl-9 h-10 w-full bg-card shadow-sm"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Issued By Filter */}
+                    <div className="w-full sm:w-56 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Issued By</label>
+                        <SearchableSelect
+                            options={issuedByOptions}
+                            value={selectedIssuedBy}
+                            onValueChange={setSelectedIssuedBy}
+                            placeholder="Select Issuer..."
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
+                        />
+                    </div>
+
+                    {/* Target Companies Filter */}
+                    <div className="w-full sm:w-56 shrink-0 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Target Companies</label>
+                        <SearchableSelect
+                            options={targetCompanyOptions}
+                            value={selectedTargetCompany}
+                            onValueChange={setSelectedTargetCompany}
+                            placeholder="Select Target..."
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
                         />
                     </div>
                 </div>
+
+                {hasActiveFilters && (
+                    <div className="flex justify-start md:justify-end shrink-0">
+                        <button
+                            onClick={handleClearFilters}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/50 transition-all dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30 shadow-sm"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                            Clear All Filters
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Memos Table */}
@@ -100,3 +173,4 @@ export default function MemoAcknowledgementModule() {
         </MemoAcknowledgementProvider>
     );
 }
+
