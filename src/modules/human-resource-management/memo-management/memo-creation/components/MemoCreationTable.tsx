@@ -185,7 +185,7 @@ export function MemoCreationTable({ data, companies, onAdd, onEdit, onView, onDe
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-36 bg-card text-card-foreground border rounded-md shadow-md p-1">
-                                                    {memo.status === "Draft" || memo.status === "Rejected" ? (
+                                                    {memo.status === "Draft" ? (
                                                         <>
                                                             <DropdownMenuItem onClick={() => onSubmitMemo(memo)} className="gap-2 focus:bg-accent focus:text-accent-foreground cursor-pointer">
                                                                 <Send className="h-3.5 w-3.5 text-emerald-600 shrink-0" />

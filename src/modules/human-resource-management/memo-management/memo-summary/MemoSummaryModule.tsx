@@ -42,7 +42,7 @@ const MemoSummaryContent = () => {
         setTargetCompanyFilter
     } = useMemoSummary();
 
-    const statuses = ["All", "Draft", "Submitted", "Approved", "Released", "Rejected", "Archived"];
+    const statuses = ["All", "Draft", "Submitted", "Approved", "Released", "Partially Released", "Rejected", "Archived", "Deleted"];
 
     const issuerOptions = React.useMemo(() => [
         { value: "all", label: "All Issuers" },
@@ -79,9 +79,9 @@ const MemoSummaryContent = () => {
 
             {/* Filter Section */}
             <div className="flex flex-col gap-4">
-                <div className="flex flex-col xl:flex-row gap-3 items-end w-full">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-end w-full">
                     {/* Search Input */}
-                    <div className="w-full xl:w-64 shrink-0 flex flex-col gap-1.5">
+                    <div className="w-full sm:w-64 shrink-0 flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Search</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -95,31 +95,31 @@ const MemoSummaryContent = () => {
                     </div>
 
                     {/* Issued By Filter */}
-                    <div className="w-full xl:w-56 shrink-0 flex flex-col gap-1.5">
+                    <div className="w-full sm:w-56 shrink-0 flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Issued By</label>
                         <SearchableSelect
                             options={issuerOptions}
                             value={issuedByFilter}
                             onValueChange={setIssuedByFilter}
                             placeholder="Select Issuer..."
-                            className="h-10 bg-card shadow-sm"
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
                         />
                     </div>
 
                     {/* Target Companies Filter */}
-                    <div className="w-full xl:w-56 shrink-0 flex flex-col gap-1.5">
+                    <div className="w-full sm:w-56 shrink-0 flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Target Companies</label>
                         <SearchableSelect
                             options={targetOptions}
                             value={targetCompanyFilter}
                             onValueChange={setTargetCompanyFilter}
                             placeholder="Select Target..."
-                            className="h-10 bg-card shadow-sm"
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
                         />
                     </div>
 
                     {/* Status Dropdown Filter */}
-                    <div className="w-full xl:w-44 shrink-0 flex flex-col gap-1.5">
+                    <div className="w-full sm:w-44 shrink-0 flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Status</label>
                         <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                             <SelectTrigger className="h-10 w-full bg-card shadow-sm">

@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     // Action 1: Fetch all Released Memos
     if (action !== "fetch_logs") {
         const memoNo = searchParams.get("memo_no");
-        let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo?filter[status][_eq]=Released&fields=*,created_by.*,released_by.*&sort=-released_at`;
+        let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo?filter[status][_eq]=Released&filter[is_delete][_eq]=0&fields=*,created_by.*,released_by.*&sort=-released_at`;
         if (memoNo) {
             upstreamUrl += `&filter[memo_no][_contains]=${encodeURIComponent(memoNo)}`;
         }

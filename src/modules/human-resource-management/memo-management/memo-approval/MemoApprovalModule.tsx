@@ -78,10 +78,10 @@ const MemoApprovalContent = () => {
             </div>
 
             {/* Filter and Bulk Action Section */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-col md:flex-row gap-3 items-end w-full md:w-auto flex-1">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-end w-full lg:w-auto flex-1">
                     {/* Search Bar */}
-                    <div className="w-full md:w-64 shrink-0 flex flex-col gap-1.5">
+                    <div className="w-full sm:w-64 shrink-0 flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Search</label>
                         <div className="relative">
                             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -95,26 +95,26 @@ const MemoApprovalContent = () => {
                     </div>
 
                     {/* Issued By Filter */}
-                    <div className="w-full md:w-56 shrink-0 flex flex-col gap-1.5">
+                    <div className="w-full sm:w-56 shrink-0 flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Issued By</label>
                         <SearchableSelect
                             options={issuerOptions}
                             value={issuedByFilter}
                             onValueChange={setIssuedByFilter}
                             placeholder="Select Issuer..."
-                            className="h-10 bg-card shadow-sm"
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
                         />
                     </div>
 
                     {/* Target Companies Filter */}
-                    <div className="w-full md:w-56 shrink-0 flex flex-col gap-1.5">
+                    <div className="w-full sm:w-56 shrink-0 flex flex-col gap-1.5">
                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider ml-1">Target Companies</label>
                         <SearchableSelect
                             options={targetOptions}
                             value={targetCompanyFilter}
                             onValueChange={setTargetCompanyFilter}
                             placeholder="Select Target..."
-                            className="h-10 bg-card shadow-sm"
+                            className="h-10 bg-card shadow-sm w-full !block truncate text-left relative pr-8 [&_svg]:absolute [&_svg]:right-2 [&_svg]:top-1/2 [&_svg]:-translate-y-1/2"
                         />
                     </div>
                 </div>
