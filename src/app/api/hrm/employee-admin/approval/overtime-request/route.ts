@@ -75,15 +75,31 @@ export async function GET() {
     );
     
     const currentUserDepartment = userResponse.data?.user_department;
-    const isAdmin = userResponse.data?.isAdmin === 1 || userResponse.data?.isAdmin === true;
+    const isAdmin = userResponse.data?.isAdmin === 1 || userResponse.data?.isAdmin === true || userResponse.data?.role === 'ADMIN';
     const isHR = currentUserDepartment === 2;
 
-    // Build query - only show pending requests from the user's department
+    // Build query - only show pending requests
     let filter = `filter[status][_eq]=pending`;
     
-    // If user has a department and is not HR or Admin, filter by their department
-    if (currentUserDepartment && !isHR && !isAdmin) {
-      filter += `&filter[department_id][_eq]=${currentUserDepartment}`;
+    if (!isHR && !isAdmin) {
+      // Fetch TA draft approvers to see which departments this user is authorized to approve
+      const taApproversRes = await directusFetch(
+        `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id`
+      ).catch(() => ({ data: [] }));
+      
+      const taApprovers = taApproversRes.data || [];
+      const assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
+
+      const allDepartmentIds = new Set<number>();
+      if (currentUserDepartment) allDepartmentIds.add(currentUserDepartment);
+      assignedDepartmentIds.forEach((id: number) => allDepartmentIds.add(id));
+
+      if (allDepartmentIds.size > 0) {
+        const deptIdsString = Array.from(allDepartmentIds).join(',');
+        filter += `&filter[department_id][_in]=${deptIdsString}`;
+      } else {
+        filter += `&filter[department_id][_in]=-1`;
+      }
     }
 
     // Fetch overtime requests with user details

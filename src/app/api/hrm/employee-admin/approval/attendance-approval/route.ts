@@ -144,11 +144,27 @@ export async function GET(req: NextRequest) {
 
     // Department filtering logic:
     // 1. If a specific department is selected, use it.
-    // 2. Otherwise, if the user is NOT an admin, restrict to their department.
+    // 2. Otherwise, if the user is NOT an admin, restrict to their authorized departments.
     if (selectedDepartmentId && selectedDepartmentId !== "all") {
       filterParts.push(`filter[department_id][_eq]=${selectedDepartmentId}`);
-    } else if (currentUserDepartment && !isAdmin) {
-      filterParts.push(`filter[department_id][_eq]=${currentUserDepartment}`);
+    } else if (!isAdmin) {
+      const taApproversRes = await directusFetch(
+        `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id`
+      ).catch(() => ({ data: [] }));
+      
+      const taApprovers = taApproversRes.data || [];
+      const assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
+
+      const allDepartmentIds = new Set<number>();
+      if (currentUserDepartment) allDepartmentIds.add(currentUserDepartment);
+      assignedDepartmentIds.forEach((id: number) => allDepartmentIds.add(id));
+
+      if (allDepartmentIds.size > 0) {
+        const deptIdsString = Array.from(allDepartmentIds).join(',');
+        filterParts.push(`filter[department_id][_in]=${deptIdsString}`);
+      } else {
+        filterParts.push(`filter[department_id][_in]=-1`);
+      }
     }
 
     const filter = filterParts.join("&");
