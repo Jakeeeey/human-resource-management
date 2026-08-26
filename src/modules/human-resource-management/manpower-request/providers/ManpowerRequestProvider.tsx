@@ -24,6 +24,8 @@ interface ManpowerRequestContextType {
     deleteRequest: (id: number) => Promise<boolean>;
     departments: {id: number, name: string}[];
     divisions: {id: number, name: string}[];
+    users: {id: number | string, name: string}[];
+    currentUserDepartmentId: number | null;
 }
 
 const ManpowerRequestContext = createContext<ManpowerRequestContextType | undefined>(undefined);
@@ -32,6 +34,8 @@ export function ManpowerRequestProvider({ children }: { children: React.ReactNod
     const [requests, setRequests] = useState<ManpowerRequest[]>([]);
     const [departments, setDepartments] = useState<{id: number, name: string}[]>([]);
     const [divisions, setDivisions] = useState<{id: number, name: string}[]>([]);
+    const [users, setUsers] = useState<{id: number | string, name: string}[]>([]);
+    const [currentUserDepartmentId, setCurrentUserDepartmentId] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -52,6 +56,8 @@ export function ManpowerRequestProvider({ children }: { children: React.ReactNod
             setRequests(Array.isArray(result.data) ? result.data : []);
             setDepartments(result.departments || []);
             setDivisions(result.divisions || []);
+            setUsers(result.users || []);
+            setCurrentUserDepartmentId(result.currentUserDepartmentId || null);
         } catch (err) {
             const e = err as Error;
             setError(e.message);
@@ -122,10 +128,10 @@ export function ManpowerRequestProvider({ children }: { children: React.ReactNod
     }, [refresh]);
 
     const contextValue = useMemo(() => ({
-        requests, departments, divisions, isLoading, error, isCreateOpen, setIsCreateOpen, 
+        requests, departments, divisions, users, currentUserDepartmentId, isLoading, error, isCreateOpen, setIsCreateOpen, 
         isEditOpen, setIsEditOpen, isViewOpen, setIsViewOpen, selectedRequest, setSelectedRequest,
         refresh, submitRequest, updateRequest, deleteRequest
-    }), [requests, departments, divisions, isLoading, error, isCreateOpen, isEditOpen, isViewOpen, selectedRequest, refresh, submitRequest, updateRequest, deleteRequest]);
+    }), [requests, departments, divisions, users, currentUserDepartmentId, isLoading, error, isCreateOpen, isEditOpen, isViewOpen, selectedRequest, refresh, submitRequest, updateRequest, deleteRequest]);
 
     return (
         <ManpowerRequestContext.Provider value={contextValue}>

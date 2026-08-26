@@ -17,16 +17,16 @@ import { ManpowerRequestSchema } from "../types";
 import { z } from "zod";
 import { Building2, Briefcase, FileText, Users, User, CheckCircle2, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export function ManpowerRequestForm() {
-    const { isCreateOpen, setIsCreateOpen, submitRequest, departments, divisions } = useManpowerRequest();
+    const { isCreateOpen, setIsCreateOpen, submitRequest, departments, divisions, users, currentUserDepartmentId } = useManpowerRequest();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const form = useForm<z.infer<typeof ManpowerRequestSchema>>({
         resolver: zodResolver(ManpowerRequestSchema),
         defaultValues: {
-            request_no: "",
-            requesting_department_id: undefined as unknown as number,
+            requesting_department_id: currentUserDepartmentId || undefined as unknown as number,
             position: "",
             division_id: undefined as unknown as number | undefined,
             no_manpower_needed: 1,
@@ -87,80 +87,17 @@ export function ManpowerRequestForm() {
                                     <h3 className="text-lg font-semibold tracking-tight">Department & Position</h3>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <FormField
-                                        control={form.control}
-                                        name="request_no"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Request ID # <span className="text-destructive">*</span></FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="e.g. MR-2026-001" className="bg-muted/30 focus:bg-background transition-colors" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="requesting_department_id"
-                                        render={({ field }) => (
-                                            <FormItem className="flex flex-col">
-                                                <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">Department <span className="text-destructive">*</span></FormLabel>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <FormControl>
-                                                            <Button
-                                                                variant="outline"
-                                                                role="combobox"
-                                                                className={cn(
-                                                                    "w-full justify-between bg-muted/30 focus:bg-background transition-colors font-normal",
-                                                                    !field.value && "text-muted-foreground"
-                                                                )}
-                                                            >
-                                                                {field.value
-                                                                    ? departments.find(
-                                                                          (d) => d.id === field.value
-                                                                      )?.name
-                                                                    : "Select Department"}
-                                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                            </Button>
-                                                        </FormControl>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-[300px] p-0" align="start">
-                                                        <Command>
-                                                            <CommandInput placeholder="Search department..." />
-                                                            <CommandList>
-                                                                <CommandEmpty>No department found.</CommandEmpty>
-                                                                <CommandGroup>
-                                                                    {departments.map((dept) => (
-                                                                        <CommandItem
-                                                                            value={dept.name}
-                                                                            key={dept.id}
-                                                                            onSelect={() => {
-                                                                                field.onChange(dept.id);
-                                                                                // Optional: close popover logic usually goes here if using controlled state
-                                                                            }}
-                                                                        >
-                                                                            <Check
-                                                                                className={cn(
-                                                                                    "mr-2 h-4 w-4",
-                                                                                    dept.id === field.value
-                                                                                        ? "opacity-100"
-                                                                                        : "opacity-0"
-                                                                                )}
-                                                                            />
-                                                                            {dept.name}
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
-                                                            </CommandList>
-                                                        </Command>
-                                                    </PopoverContent>
-                                                </Popover>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">Department <span className="text-destructive">*</span></FormLabel>
+                                        <Input
+                                            value={currentUserDepartmentId 
+                                                ? departments.find(d => d.id === currentUserDepartmentId)?.name || "Auto-assigned (Your Department)" 
+                                                : "Auto-assigned (Your Department)"}
+                                            readOnly
+                                            disabled
+                                            className="bg-muted/30 font-normal cursor-not-allowed text-muted-foreground opacity-70"
+                                        />
+                                    </FormItem>
                                     <FormField
                                         control={form.control}
                                         name="division_id"
@@ -225,7 +162,7 @@ export function ManpowerRequestForm() {
                                         control={form.control}
                                         name="position"
                                         render={({ field }) => (
-                                            <FormItem className="md:col-span-3">
+                                            <FormItem className="md:col-span-2">
                                                 <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Position Title <span className="text-destructive">*</span></FormLabel>
                                                 <FormControl>
                                                     <Input placeholder="Enter Job Position Title..." className="bg-muted/30 focus:bg-background transition-colors text-lg py-6" {...field} />
@@ -279,7 +216,12 @@ export function ManpowerRequestForm() {
                                             render={({ field }) => (
                                                 <FormItem className="animate-in fade-in slide-in-from-top-2 duration-300 relative z-10">
                                                     <FormControl>
-                                                        <Input placeholder="Enter name of replaced employee..." className="border-primary/30 shadow-sm" {...field} value={field.value || ''} />
+                                                        <SearchableSelect
+                                                            options={Array.from(new Map(users.filter(u => u.name).map(u => [u.name, u])).values()).map(u => ({ label: u.name, value: u.name }))}
+                                                            value={field.value || ""}
+                                                            onValueChange={field.onChange}
+                                                            placeholder="Select replaced employee..."
+                                                        />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>

@@ -74,10 +74,44 @@ export const manpowerRequestService = {
         } catch { return []; }
     },
 
+    async fetchUsers(): Promise<{id: number | string, name: string}[]> {
+        try {
+            const url = `${API_BASE_URL}/items/user?fields=user_id,user_fname,user_lname&limit=-1`;
+            const response = await fetch(url, { headers });
+            if (!response.ok) return [];
+            const result = await response.json();
+            return result.data.map((u: { user_id: number | string; user_fname?: string; user_lname?: string }) => ({ 
+                id: u.user_id, 
+                name: `${u.user_fname ?? ''} ${u.user_lname ?? ''}`.trim() || String(u.user_id)
+            }));
+        } catch { return []; }
+    },
+
     async create(request: ManpowerRequest): Promise<ManpowerRequest> {
         try {
             const body = { ...request };
             
+            if (!body.request_no) {
+                const year = new Date().getFullYear();
+                const prefix = `MR-${year}-`;
+                
+                const url = `${API_BASE_URL}/items/manpower_request?filter[request_no][_starts_with]=${prefix}&sort=-request_no&limit=1&fields=request_no`;
+                const res = await fetch(url, { headers });
+                
+                let nextSequence = 1;
+                if (res.ok) {
+                    const result = await res.json();
+                    if (result.data && result.data.length > 0) {
+                        const lastNo = result.data[0].request_no; // e.g., MR-2026-001
+                        const parts = lastNo.split('-');
+                        if (parts.length === 3) {
+                            nextSequence = parseInt(parts[2], 10) + 1;
+                        }
+                    }
+                }
+                body.request_no = `${prefix}${String(nextSequence).padStart(3, '0')}`;
+            }
+
             const response = await fetch(`${API_BASE_URL}/items/manpower_request`, {
                 method: "POST",
                 headers,

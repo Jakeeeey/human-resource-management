@@ -30,6 +30,19 @@ export function ManpowerRequestList() {
         }
     };
 
+    const getStatus = (req: any) => {
+        return req.status || "Draft";
+    };
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'Approved': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+            case 'Rejected': return 'bg-red-500/10 text-red-600 border-red-500/20';
+            case 'Draft': return 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20';
+            default: return 'bg-primary/10 text-primary border-primary/20';
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Toolbar */}
@@ -62,13 +75,14 @@ export function ManpowerRequestList() {
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Position Title</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Purpose</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">No of manpower needed</TableHead>
+                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Status</TableHead>
                             <TableHead className="w-[50px] pr-6 h-14"></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-48">
+                                <TableCell colSpan={7} className="text-center h-48">
                                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                                         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
                                         <p className="font-medium animate-pulse">Loading requests...</p>
@@ -77,7 +91,7 @@ export function ManpowerRequestList() {
                             </TableRow>
                         ) : requests.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-48">
+                                <TableCell colSpan={7} className="text-center h-48">
                                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                                         <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
                                         <p className="font-medium">No manpower requests found.</p>
@@ -107,6 +121,11 @@ export function ManpowerRequestList() {
                                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted font-bold text-sm text-foreground/80 border">
                                             {req.no_manpower_needed}
                                         </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider ${getStatusColor(getStatus(req))}`}>
+                                            {getStatus(req)}
+                                        </span>
                                     </TableCell>
                                     <TableCell className="pr-6 text-right">
                                         <DropdownMenu>
