@@ -30,7 +30,7 @@ export function ManpowerRequestList() {
         }
     };
 
-    const getStatus = (req: any) => {
+    const getStatus = (req: { status?: string }) => {
         return req.status || "Draft";
     };
 

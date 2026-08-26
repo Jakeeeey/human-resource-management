@@ -61,7 +61,7 @@ export function ManpowerApprovalProvider({ children }: { children: React.ReactNo
         refresh();
     }, [refresh]);
 
-    const handleStatusUpdate = async (id: number, status: 'Approved' | 'Rejected') => {
+    const handleStatusUpdate = useCallback(async (id: number, status: 'Approved' | 'Rejected') => {
         try {
             const response = await fetch(API_PATH, {
                 method: "PATCH",
@@ -86,10 +86,10 @@ export function ManpowerApprovalProvider({ children }: { children: React.ReactNo
             toast.error(e.message);
             return false;
         }
-    };
+    }, [selectedRequest?.id]);
 
-    const approveRequest = async (id: number) => handleStatusUpdate(id, 'Approved');
-    const rejectRequest = async (id: number) => handleStatusUpdate(id, 'Rejected');
+    const approveRequest = useCallback(async (id: number) => handleStatusUpdate(id, 'Approved'), [handleStatusUpdate]);
+    const rejectRequest = useCallback(async (id: number) => handleStatusUpdate(id, 'Rejected'), [handleStatusUpdate]);
 
     const contextValue = useMemo(() => ({
         requests, departments, divisions, users, isLoading, error,

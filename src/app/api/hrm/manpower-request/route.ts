@@ -44,19 +44,20 @@ export async function GET() {
                                  : Number(userData.data.user_department);
                          }
                      }
-                 } catch (err) {}
+                 } catch {}
              }
         }
 
-        let [data, departments, divisions, users] = await Promise.all([
+        const [fetchedData, departments, divisions, users] = await Promise.all([
             manpowerRequestService.fetchAll(),
             manpowerRequestService.fetchDepartments(),
             manpowerRequestService.fetchDivisions(),
             manpowerRequestService.fetchUsers()
         ]);
         
+        let data = fetchedData;
         if (currentUserDepartmentId) {
-            data = data.filter((d: any) => d.requesting_department_id === currentUserDepartmentId);
+            data = data.filter((d: { requesting_department_id?: number }) => d.requesting_department_id === currentUserDepartmentId);
         }
 
         return NextResponse.json({ data, departments, divisions, users, currentUserDepartmentId });
