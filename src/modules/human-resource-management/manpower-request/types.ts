@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 export const ManpowerRequestSchema = z.object({
   id: z.number().optional(),
-  request_no: z.string().min(1, 'Request No is required'),
-  requesting_department_id: z.number({ message: 'Department is required' }),
+  request_no: z.string().optional(),
+  requesting_department_id: z.number().optional(),
   position: z.string().min(1, 'Position is required'),
   division_id: z.number().nullable().optional(),
   no_manpower_needed: z.number().min(1, 'At least 1 is required'),
@@ -24,6 +24,7 @@ export const ManpowerRequestSchema = z.object({
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
   updated_by: z.any().nullable().optional(),
+  status: z.enum(['Draft', 'Approved', 'Rejected']).optional(),
 });
 
 export type ManpowerRequest = z.infer<typeof ManpowerRequestSchema>;
