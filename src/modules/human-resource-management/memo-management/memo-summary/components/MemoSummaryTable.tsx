@@ -63,11 +63,15 @@ export function MemoSummaryTable({
                 return "success";
             case "Released":
                 return "success";
+            case "Partially Released":
+                return "warning";
             case "Submitted":
                 return "info";
             case "Rejected":
                 return "destructive";
             case "Archived":
+                return "destructive";
+            case "Deleted":
                 return "destructive";
             case "Draft":
             default:
@@ -129,12 +133,6 @@ export function MemoSummaryTable({
                                 const fromComp = companies.find(c => Number(c.company_id) === Number(memo.from));
                                 const fromLabel = fromComp ? `${fromComp.company_name} (${fromComp.company_code})` : `Company #${memo.from}`;
                                 const hasAttachments = memo.attachments && memo.attachments.length > 0;
-                                
-                                const targetCodes = (memo.company_ids || []).map(id => {
-                                    const comp = companies.find(c => Number(c.company_id) === id);
-                                    return comp ? comp.company_code : id;
-                                });
-                                
                                 return (
                                     <TableRow key={memo.id} className="hover:bg-accent/40 transition-colors border-b border-slate-100/60 dark:border-slate-800/50">
                                         <TableCell className="py-3.5 font-bold text-primary">{memo.memo_no}</TableCell>
@@ -143,19 +141,29 @@ export function MemoSummaryTable({
                                                 {fromComp ? `${fromComp.company_code}` : `#${memo.from}`}
                                             </span>
                                         </TableCell>
-                                        <TableCell className="py-3.5 max-w-[200px] truncate text-xs text-muted-foreground">
-                                            {targetCodes.length > 0 ? (
-                                                <div className="flex gap-1.5 flex-wrap">
-                                                    {targetCodes.slice(0, 2).join(", ")}
-                                                    {targetCodes.length > 2 && (
-                                                        <span className="inline-flex items-center justify-center bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-border">
-                                                            +{targetCodes.length - 2}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <span className="text-muted-foreground/50 italic">None</span>
-                                            )}
+                                        <TableCell className="py-3.5 max-w-[200px]">
+                                            <div className="flex flex-wrap gap-1 items-center">
+                                                {memo.company_ids && memo.company_ids.length > 0 ? (
+                                                    memo.company_ids.slice(0, 2).map((id) => {
+                                                        const comp = companies.find(c => Number(c.company_id) === Number(id));
+                                                        return (
+                                                            <span key={id} className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/50 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700" title={comp ? comp.company_name : `Company #${id}`}>
+                                                                {comp ? comp.company_code : `#${id}`}
+                                                            </span>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">-</span>
+                                                )}
+                                                {memo.company_ids && memo.company_ids.length > 2 && (
+                                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 pl-0.5 cursor-help" title={memo.company_ids.map(id => {
+                                                        const comp = companies.find(c => Number(c.company_id) === Number(id));
+                                                        return comp ? comp.company_name : `Company #${id}`;
+                                                    }).join(", ")}>
+                                                        +{memo.company_ids.length - 2} more
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="py-3.5 max-w-[240px]" title={memo.subject}>
                                             <div className="flex items-center gap-1.5">

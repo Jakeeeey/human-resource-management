@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const memoNo = searchParams.get("memo_no");
 
-    let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo?filter[status][_eq]=Submitted&fields=*,created_by.*&sort=-created_at`;
+    let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo?filter[status][_eq]=Submitted&filter[is_delete][_eq]=0&fields=*,created_by.*&sort=-created_at`;
     if (memoNo) {
         upstreamUrl += `&filter[memo_no][_contains]=${encodeURIComponent(memoNo)}`;
     }
@@ -166,7 +166,9 @@ export async function PATCH(req: NextRequest) {
                     body: JSON.stringify({
                         status: "Approved",
                         approved_by: userId,
-                        approved_at: phTime
+                        approved_at: phTime,
+                        updated_by: userId,
+                        updated_at: phTime
                     })
                 });
             } else if (action === "reject") {
@@ -180,7 +182,9 @@ export async function PATCH(req: NextRequest) {
                     body: JSON.stringify({
                         status: "Rejected",
                         rejected_by: userId,
-                        rejected_at: phTime
+                        rejected_at: phTime,
+                        updated_by: userId,
+                        updated_at: phTime
                     })
                 });
             }

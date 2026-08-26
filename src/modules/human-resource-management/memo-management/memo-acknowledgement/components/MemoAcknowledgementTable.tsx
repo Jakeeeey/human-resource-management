@@ -71,7 +71,8 @@ export function MemoAcknowledgementTable({
                     <TableHeader>
                         <TableRow className="bg-slate-50/75 dark:bg-slate-900/60 font-semibold border-b">
                             <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4 pl-6">Memo No.</TableHead>
-                            <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">From</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Issued By</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Target Companies</TableHead>
                             <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Subject</TableHead>
                             <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Active Period</TableHead>
                             <TableHead className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 py-4">Status</TableHead>
@@ -89,6 +90,9 @@ export function MemoAcknowledgementTable({
                                         <div className="h-5 w-14 bg-muted/70 rounded-full animate-pulse" />
                                     </TableCell>
                                     <TableCell className="py-4">
+                                        <div className="h-5 w-24 bg-muted/70 rounded-md animate-pulse" />
+                                    </TableCell>
+                                    <TableCell className="py-4">
                                         <div className="h-4 w-40 bg-muted/70 rounded-md animate-pulse" />
                                     </TableCell>
                                     <TableCell className="py-4">
@@ -104,7 +108,7 @@ export function MemoAcknowledgementTable({
                             ))
                         ) : data.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground font-medium">
+                                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground font-medium">
                                     No released memos awaiting acknowledgement.
                                 </TableCell>
                             </TableRow>
@@ -123,6 +127,30 @@ export function MemoAcknowledgementTable({
                                             <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800">
                                                 {fromComp ? `${fromComp.company_code}` : `#${memo.from}`}
                                             </span>
+                                        </TableCell>
+                                        <TableCell className="py-3.5 max-w-[200px]">
+                                            <div className="flex flex-wrap gap-1 items-center">
+                                                {memo.company_ids && memo.company_ids.length > 0 ? (
+                                                    memo.company_ids.slice(0, 2).map((id) => {
+                                                        const comp = companies.find(c => Number(c.company_id) === Number(id));
+                                                        return (
+                                                            <span key={id} className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/50 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700" title={comp ? comp.company_name : `Company #${id}`}>
+                                                                {comp ? comp.company_code : `#${id}`}
+                                                            </span>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">-</span>
+                                                )}
+                                                {memo.company_ids && memo.company_ids.length > 2 && (
+                                                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 pl-0.5 cursor-help" title={memo.company_ids.map(id => {
+                                                        const comp = companies.find(c => Number(c.company_id) === Number(id));
+                                                        return comp ? comp.company_name : `Company #${id}`;
+                                                    }).join(", ")}>
+                                                        +{memo.company_ids.length - 2} more
+                                                    </span>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="py-3.5 max-w-[240px]" title={memo.subject}>
                                             <span className="truncate font-medium text-slate-700 dark:text-slate-300">{memo.subject}</span>

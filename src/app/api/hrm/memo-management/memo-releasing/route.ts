@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const memoNo = searchParams.get("memo_no");
 
-    let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo?filter[status][_in]=Approved,Partially Released&fields=*,created_by.*,approved_by.*&sort=-approved_at`;
+    let upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo?filter[status][_in]=Approved,Partially Released&filter[is_delete][_eq]=0&fields=*,created_by.*,approved_by.*&sort=-approved_at`;
     if (memoNo) {
         upstreamUrl += `&filter[memo_no][_contains]=${encodeURIComponent(memoNo)}`;
     }

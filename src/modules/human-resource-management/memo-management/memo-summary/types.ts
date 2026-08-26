@@ -1,4 +1,4 @@
-export type MemoStatus = "Draft" | "Submitted" | "Approved" | "Released" | "Rejected" | "Archived";
+export type MemoStatus = "Draft" | "Submitted" | "Approved" | "Released" | "Partially Released" | "Rejected" | "Archived" | "Deleted";
 
 export interface CompanyMemoAttachment {
     id?: string | number;

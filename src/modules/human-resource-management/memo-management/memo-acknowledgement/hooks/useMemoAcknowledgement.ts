@@ -12,6 +12,8 @@ export function useMemoAcknowledgement() {
     const { memos, companies, isLoading, refreshMemos } = context;
 
     const [searchQuery, setSearchQuery] = useState("");
+    const [selectedIssuedBy, setSelectedIssuedBy] = useState("all");
+    const [selectedTargetCompany, setSelectedTargetCompany] = useState("all");
     const [selectedMemo, setSelectedMemo] = useState<Memo | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [acknowledgementLogs, setAcknowledgementLogs] = useState<CompanyAcknowledgement[]>([]);
@@ -23,6 +25,16 @@ export function useMemoAcknowledgement() {
 
     const handleSearchChange = useCallback((query: string) => {
         setSearchQuery(query);
+        setPageIndex(0);
+    }, []);
+
+    const handleIssuedByChange = useCallback((value: string) => {
+        setSelectedIssuedBy(value);
+        setPageIndex(0);
+    }, []);
+
+    const handleTargetCompanyChange = useCallback((value: string) => {
+        setSelectedTargetCompany(value);
         setPageIndex(0);
     }, []);
 
@@ -67,11 +79,23 @@ export function useMemoAcknowledgement() {
     // Filter logic
     const filteredMemos = useMemo(() => {
         return memos.filter((memo) => {
-            return memo.memo_no
-                .toLowerCase()
-                .includes(searchQuery.toLowerCase().trim());
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase().trim();
+                const matchNo = memo.memo_no.toLowerCase().includes(q);
+                const matchSubject = memo.subject?.toLowerCase().includes(q);
+                if (!matchNo && !matchSubject) return false;
+            }
+            if (selectedIssuedBy && selectedIssuedBy !== "all") {
+                if (Number(memo.from) !== Number(selectedIssuedBy)) return false;
+            }
+            if (selectedTargetCompany && selectedTargetCompany !== "all") {
+                if (!memo.company_ids || !memo.company_ids.some(id => Number(id) === Number(selectedTargetCompany))) {
+                    return false;
+                }
+            }
+            return true;
         });
-    }, [memos, searchQuery]);
+    }, [memos, searchQuery, selectedIssuedBy, selectedTargetCompany]);
 
     // Paginated logic
     const paginatedMemos = useMemo(() => {
@@ -98,6 +122,10 @@ export function useMemoAcknowledgement() {
         companies,
         isLoading,
         searchQuery,
+        selectedIssuedBy,
+        setSelectedIssuedBy: handleIssuedByChange,
+        selectedTargetCompany,
+        setSelectedTargetCompany: handleTargetCompanyChange,
         selectedMemo,
         isDetailsOpen,
         setIsDetailsOpen,

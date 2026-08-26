@@ -85,6 +85,9 @@ export async function GET(req: NextRequest) {
     };
 
     if (id) {
+        if (!memoData.data || memoData.data.is_delete === 1) {
+            return NextResponse.json({ error: "Memo not found" }, { status: 404 });
+        }
         return NextResponse.json({ data: normalizeItem(memoData.data) });
     } else {
         return NextResponse.json({ data: (memoData.data || []).map(normalizeItem) });
