@@ -24,7 +24,7 @@ export const ManpowerRequestSchema = z.object({
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
   updated_by: z.any().nullable().optional(),
-  status: z.enum(['Draft', 'Approved', 'Rejected']).optional().default('Draft'),
+  status: z.enum(['Draft', 'Approved', 'Rejected']).optional(),
 });
 
 export type ManpowerRequest = z.infer<typeof ManpowerRequestSchema>;
