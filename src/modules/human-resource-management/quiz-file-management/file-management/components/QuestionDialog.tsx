@@ -161,7 +161,9 @@ export function QuestionDialog({
             );
             removeBlank(toRemove);
         }
-    }, [questionType, questionText]);
+        // blankFields.length is included so the effect re-checks after its own
+        // append/remove; appendBlank/removeBlank are stable useFieldArray refs.
+    }, [questionType, questionText, blankFields.length, appendBlank, removeBlank]);
 
     useEffect(() => {
         if (open && question) {

@@ -103,7 +103,6 @@ export default function QuizTakingModule() {
                 setStep("blocked");
             }
         })();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [quizId]);
 
     const handleSubmit = useCallback(async () => {
@@ -136,7 +135,6 @@ export default function QuizTakingModule() {
             setBlockedMessage("Failed to submit the quiz. Please try again.");
             setStep("blocked");
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data, quizId, applicantId, startedAt, answers]);
 
     // Countdown timer -- auto-submits the moment it hits zero.

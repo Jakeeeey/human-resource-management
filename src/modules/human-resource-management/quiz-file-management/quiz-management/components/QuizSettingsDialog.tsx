@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import type { Quiz, QuizFormData, QuizStatus, PassThresholdType } from "../types";
 import {
     Dialog,
@@ -117,7 +117,7 @@ export function QuizSettingsDialog({
         }
     }, [open, quiz, form]);
 
-    const timeLimitEnabled = form.watch("time_limit_enabled");
+    const timeLimitEnabled = useWatch({ control: form.control, name: "time_limit_enabled" });
 
     const handleSubmit = async (data: FormData) => {
         try {
