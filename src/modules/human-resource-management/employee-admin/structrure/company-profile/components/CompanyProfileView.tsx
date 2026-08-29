@@ -130,6 +130,8 @@ export function CompanyProfileView({ onEdit }: CompanyProfileViewProps) {
                         <InfoItem label="Company Type" value={data.company_type} />
                         <InfoItem label="Company Code" value={data.company_code} />
                         <InfoItem label="Department" value={data.company_department} />
+                        <InfoItem label="Company Mission" value={data.company_mission} />
+                        <InfoItem label="Company Vision" value={data.company_vision} />
                     </CardContent>
                 </Card>
 
@@ -237,7 +239,7 @@ function InfoItem({
                         {value}
                     </a>
                 ) : (
-                    <p className="text-sm font-medium text-slate-700">{value || "None"}</p>
+                    <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap break-words">{value || "None"}</p>
                 )}
             </div>
             <div className="h-px w-full bg-slate-50" />
