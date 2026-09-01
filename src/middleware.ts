@@ -321,9 +321,20 @@ export async function middleware(req: NextRequest) {
             const token = req.cookies.get(COOKIE_NAME)?.value;
             if (token) {
                 const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
-                const target = lastVisited || "/main-dashboard";
 
-                // Avoid infinite redirect loop if target is the current page
+                // Validate the saved path: it must start with "/" and must NOT be a known
+                // public/auth route that would trigger another redirect (loop prevention).
+                const UNSAFE_PREFIXES = ["/", "/login", "/forgot-password", "/reset-password", "/api", "/error"];
+                const isSafePath =
+                    lastVisited &&
+                    lastVisited.startsWith("/") &&
+                    !UNSAFE_PREFIXES.some(
+                        (p) => lastVisited === p || lastVisited.startsWith(p + "/")
+                    );
+
+                const target = isSafePath ? lastVisited : "/main-dashboard";
+
+                // Final guard: never redirect to the current page
                 if (target !== pathname) {
                     return NextResponse.redirect(new URL(target, req.url));
                 }
