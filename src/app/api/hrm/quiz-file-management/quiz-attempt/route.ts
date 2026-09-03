@@ -112,10 +112,6 @@ export async function POST(req: NextRequest) {
             grade: outcome,
         });
 
-        // Continuity write-back: the applicant flow (application form -> quiz)
-        // stamps the quiz result onto the application row so the future HR list
-        // view has it without a join. A failure here must not fail the attempt
-        // that was already saved.
         if (application_id) {
             try {
                 await dFetch(`/items/application/${application_id}`, {

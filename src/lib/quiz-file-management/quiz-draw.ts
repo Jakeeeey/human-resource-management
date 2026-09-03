@@ -1,14 +1,3 @@
-// Shared question-draw for a quiz attempt.
-//
-// This is the logic that used to live inline in
-// `src/app/api/hrm/quiz-file-management/quiz-attempt/start/route.ts`; it's a
-// shared helper so any caller that needs to draw a quiz gets the same
-// ordering / shaping behaviour.
-//
-// It does NOT do auth or resolve which quiz to run — the caller passes a
-// concrete quizId. Images come back as bare Directus file UUIDs; the caller
-// builds its own asset URLs.
-
 import { dFetch } from "./directus";
 
 const LIMIT = 1000;
@@ -81,11 +70,6 @@ function shuffleInPlace<T>(arr: T[]): T[] {
     return arr;
 }
 
-/**
- * Fetches the quiz, validates it can run, draws and orders its questions, and
- * returns the payload the taking client expects. Any failure comes back as
- * `{ ok: false, status, error }` with a message safe to show the user.
- */
 export async function drawQuizQuestions(quizId: string | number): Promise<DrawResult> {
     const quizRes = await dFetch(`/items/quiz/${quizId}`);
     const quiz: QuizRecord | undefined = quizRes?.data;

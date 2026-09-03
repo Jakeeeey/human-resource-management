@@ -58,8 +58,6 @@ async function replaceCategoryFilterRows(quizId: number, categories: string[]) {
     );
 }
 
-// Counts the active questions a quiz would draw from, respecting its category
-// filter -- mirrors the pool logic in lib/quiz-file-management/quiz-draw.ts.
 async function countActivePool(categoryFilter: string[]): Promise<number> {
     const res = await dFetch(
         `/items/quiz_question?filter[is_active][_eq]=true&limit=${LIMIT}&fields=category`
@@ -70,9 +68,6 @@ async function countActivePool(categoryFilter: string[]): Promise<number> {
         : rows.length;
 }
 
-// Guards the "mark as the applicant quiz" toggle: only an active quiz whose
-// pool can actually satisfy `number_of_questions` may hold the flag.
-// Returns an error message, or null if it's allowed.
 async function validateApplicantQuizFlag(
     status: string,
     numberOfQuestions: number,
@@ -89,9 +84,6 @@ async function validateApplicantQuizFlag(
     return null;
 }
 
-// Clears the applicant-quiz flag from every quiz except `exceptId` so only one
-// ever holds it. Filters in code -- Directus returns the TINYINT(1) as 0/1 and
-// boolean _eq matching has been unreliable here (lesson 293).
 async function clearApplicantQuizFlagOnOthers(exceptId: number) {
     const res = await dFetch(`/items/quiz?limit=${LIMIT}&fields=id,is_applicant_quiz`);
     const others = ((res?.data || []) as { id: number; is_applicant_quiz: unknown }[]).filter(
@@ -188,14 +180,11 @@ export async function PATCH(req: NextRequest) {
         [key: string]: unknown;
     };
 
-    // A quiz that leaves Active status can't stay the applicant quiz.
     if (rest.status !== undefined && rest.status !== "active") {
         rest.is_applicant_quiz = false;
     }
 
     if (rest.is_applicant_quiz) {
-        // Validate against effective values: use what's in this request, else
-        // fall back to what's already stored.
         const currentRes = await dFetch(
             `/items/quiz/${id}?fields=status,number_of_questions`
         );

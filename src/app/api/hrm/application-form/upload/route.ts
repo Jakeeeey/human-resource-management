@@ -2,19 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// Proxies an application-form file (photo / signature / attachment) up to
-// Directus `/files`, into a per-kind folder, and returns the created file
-// record whose `data.id` is the CHAR(36) UUID stored on the application row
-// (or an application_attachment row). Modeled on
-// src/app/api/hrm/quiz-file-management/file-management/question-image-upload/route.ts.
-
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const KINDS = ["photo", "signature", "attachment"] as const;
 type Kind = (typeof KINDS)[number];
 
-// Attachments cover resume/transcript/ID/certificate uploads, so they also
-// accept PDF; photo/signature stay image-only.
 function allowedTypesFor(kind: Kind): string[] {
     return kind === "attachment" ? [...IMAGE_TYPES, "application/pdf"] : IMAGE_TYPES;
 }

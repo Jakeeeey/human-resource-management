@@ -84,8 +84,6 @@ export function QuizSettingsDialog({
 
     const form = useForm<FormData>({ defaultValues: DEFAULT_FORM });
     const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
-    // Category of every active pool question -- used to size the pool for the
-    // "applicant quiz" guard.
     const [activeQuestionCategories, setActiveQuestionCategories] = useState<(string | null)[]>([]);
 
     useEffect(() => {
@@ -135,8 +133,6 @@ export function QuizSettingsDialog({
     const watchedCategoryFilter = useWatch({ control: form.control, name: "category_filter" });
     const watchedNumberOfQuestions = useWatch({ control: form.control, name: "number_of_questions" });
 
-    // Live count of active questions this quiz would draw from, given its current
-    // category filter -- mirrors the pool logic the draw endpoint uses.
     const poolSize = useMemo(() => {
         const cats = watchedCategoryFilter || [];
         return cats.length

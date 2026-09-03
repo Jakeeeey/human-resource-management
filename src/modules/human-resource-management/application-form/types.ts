@@ -1,11 +1,3 @@
-// ============================================================================
-// Application Form — Type Definitions (Stage 2: the full 9-section form)
-// ============================================================================
-// Schema/data-model reference: playbook-erp-human-resource-management-architecture.md
-// sec 18. All fields added this stage are optional (warn-don't-block, sec 4
-// item 21) -- the Stage-1 required set (first/last name, position, phone,
-// birthdate, sex, certification) is unchanged.
-
 export type Sex = "Male" | "Female";
 
 export type HowHeard =
@@ -50,8 +42,6 @@ export const EDUCATION_LEVEL_OPTIONS: EducationLevel[] = [
     "Post-Graduate",
 ];
 
-// Father/Mother/Spouse are fixed single blocks (not part of this list); the
-// repeating "Children / Other Dependents" list only offers these three.
 export type DependentRelation = "Sibling" | "Child" | "Dependent";
 
 export const DEPENDENT_RELATION_OPTIONS: DependentRelation[] = ["Sibling", "Child", "Dependent"];
@@ -66,11 +56,6 @@ export const ATTACHMENT_TYPE_OPTIONS: AttachmentType[] = [
     "Other",
 ];
 
-// Transcribed verbatim from the paper "Men2 Corporation" application form's own
-// "Applicant's Certification" section. Shown above the certification tick; the
-// exact string is snapshotted onto application.certification_text_snapshot at
-// submit so a later wording change never rewrites what a past applicant agreed
-// to (same reasoning as answer_key_snapshot).
 export const CERTIFICATION_HEADING =
     "Applicant's Certification – Please read this carefully before signing the application!";
 
@@ -82,12 +67,8 @@ export const CERTIFICATION_CLAUSES: string[] = [
     "In consideration of my employment, I agree to adhere to all existing and future instructions, rules and policies of Men2 Corporation. I also understand that Men2 Corporation reserves the right to change wages, hours and working conditions as deemed necessary.",
 ];
 
-// The paper form's own agreement line, doubling as the checkbox label.
 export const CERTIFICATION_AGREEMENT_LINE =
     "I have read, reviewed and explain to me all the above certification statements and other information provided on the application.";
-
-// --- repeating / fixed-block row shapes (form-side: everything is a string,
-// parsed on submit, matching the house pattern used in QuizSettingsDialog) ---
 
 export interface FamilyMemberFields {
     name: string;
@@ -220,24 +201,16 @@ export const EMPTY_TRAINING: TrainingRow = {
 export interface AttachmentRow {
     type: AttachmentType;
     label: string;
-    // Held locally until submit, when it's uploaded and swapped for a UUID.
-    // Excluded from the localStorage autosave draft (File isn't serializable).
     file: File | null;
 }
 
 export const EMPTY_ATTACHMENT: AttachmentRow = { type: "Resume", label: "", file: null };
 
-// ============================================================================
-// The form itself
-// ============================================================================
-
 export interface ApplicationFormValues {
-    // Application Details
     position_applied_for: string;
     how_heard: "" | HowHeard;
     how_heard_other: string;
 
-    // Personal Information
     first_name: string;
     middle_name: string;
     last_name: string;
@@ -245,7 +218,7 @@ export interface ApplicationFormValues {
     address: string;
     phone: string;
     email: string;
-    birthdate: string; // "yyyy-mm-dd"
+    birthdate: string;
     birthplace: string;
     sex: "" | Sex;
     height_cm: string;
@@ -259,44 +232,34 @@ export interface ApplicationFormValues {
     drivers_license_no: string;
     photo_selected: File | null;
 
-    // Family Background
     father: FamilyMemberFields;
     mother: FamilyMemberFields;
     spouse: FamilyMemberFields;
     family_dependents: FamilyDependentRow[];
 
-    // Do you have relatives working at the company?
     has_company_relatives: boolean;
     company_relatives: CompanyRelativeRow[];
 
-    // Educational Background
     education: EducationRow[];
     licensure_exams: LicensureExamRow[];
 
-    // Skills / Other Information
     special_skills: string;
     languages: string;
     organizational_affiliations: string;
     hobbies_interests: string;
 
-    // Work Experience
-    is_fresh_graduate: boolean; // UI-only -- never submitted, just hides the list
+    is_fresh_graduate: boolean;
     work_experience: WorkExperienceRow[];
 
-    // Professional / Business References
     references: ReferenceRow[];
 
-    // Trainings / Seminars Attended
     trainings: TrainingRow[];
 
-    // Attachments
     attachments: AttachmentRow[];
 
-    // Signature: draw pad by default, typed-name fallback via `signature_typed`.
     signature_typed_mode: boolean;
     signature_typed_name: string;
 
-    // Certification
     certification_agreed: boolean;
 }
 
@@ -355,10 +318,6 @@ export const DEFAULT_APPLICATION_FORM: ApplicationFormValues = {
     signature_typed_name: "",
     certification_agreed: false,
 };
-
-// ============================================================================
-// Server-facing submit payload
-// ============================================================================
 
 export interface SubmitFamilyMember {
     relation: "Father" | "Mother" | "Spouse" | DependentRelation;
@@ -424,17 +383,15 @@ export interface SubmitTraining {
 
 export interface SubmitAttachment {
     type: AttachmentType;
-    file: string; // uploaded Directus file UUID
+    file: string;
     label: string | null;
 }
 
 export interface SubmitApplicationPayload {
-    // Application Details
     position_applied_for: string;
     how_heard: HowHeard | null;
     how_heard_other: string | null;
 
-    // Personal Information
     first_name: string;
     middle_name: string | null;
     last_name: string;
@@ -456,34 +413,26 @@ export interface SubmitApplicationPayload {
     drivers_license_no: string | null;
     photo_file: string | null;
 
-    // Family Background
     family_members: SubmitFamilyMember[];
     has_company_relatives: boolean;
     company_relatives: SubmitCompanyRelative[];
 
-    // Educational Background
     education: SubmitEducation[];
     licensure_exams: SubmitLicensureExam[];
 
-    // Skills / Other Information
     special_skills: string | null;
     languages: string | null;
     organizational_affiliations: string | null;
     hobbies_interests: string | null;
 
-    // Work Experience
     work_experience: SubmitWorkExperience[];
 
-    // References
     references: SubmitReference[];
 
-    // Trainings
     trainings: SubmitTraining[];
 
-    // Attachments
     attachments: SubmitAttachment[];
 
-    // Certification
     certification_agreed: true;
     certification_text_snapshot: string;
     signature_file: string | null;

@@ -4,11 +4,6 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-/**
- * Neutral end screen for the applicant flow. The applicant never auto-lands in
- * the HR app -- the HR operator taps "Return to HR" once they have the device
- * back.
- */
 export default function ApplyDonePage() {
     const router = useRouter();
 

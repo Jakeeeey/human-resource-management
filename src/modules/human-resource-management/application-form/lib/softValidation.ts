@@ -1,7 +1,3 @@
-// Soft (warn-don't-block) format hints -- architecture sec 4 item 21. These
-// never wire into react-hook-form's error state and never prevent submit;
-// they're purely an inline nudge rendered via <SoftWarning>.
-
 interface FormatCheck {
     pattern: RegExp;
     hint: string;
@@ -16,7 +12,6 @@ const CHECKS: Record<string, FormatCheck> = {
     email: { pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, hint: "Doesn't look like a valid email address" },
 };
 
-/** Returns a hint message if `value` is non-empty and doesn't match, else null. */
 export function checkFormat(kind: keyof typeof CHECKS, value: string): string | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
