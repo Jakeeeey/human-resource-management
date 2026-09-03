@@ -80,7 +80,6 @@ export function QuestionCard({
                         className="space-y-2"
                     >
                         {question.choices.map((choice, i) => {
-                            // A / B / C / D on multiple choice only -- True/False labels itself.
                             const letter =
                                 question.question_type === "multiple_choice"
                                     ? `${String.fromCharCode(65 + i)}.`

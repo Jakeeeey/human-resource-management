@@ -3,9 +3,6 @@ import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { drawQuizQuestions } from "@/lib/quiz-file-management/quiz-draw";
 
-// HR-desktop flow: an authenticated HR user starts a specific quiz for an
-// applicant. The question-draw itself is shared with the mobile-applicant-quiz
-// route via drawQuizQuestions().
 export async function GET(req: NextRequest) {
     const token = (await cookies()).get(COOKIE_NAME)?.value;
     const payload = token ? decodeJwtPayload(token) : null;

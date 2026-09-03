@@ -5,22 +5,6 @@ import type { SubmitApplicationPayload } from "@/modules/human-resource-manageme
 
 export const runtime = "nodejs";
 
-// POST /api/hrm/application-form
-//
-// The walk-in applicant flow's submit endpoint. Search-or-creates the lean
-// `applicant` identity row (soft name_normalized match -- architecture 18.8),
-// then writes the `application` submission row and its child rows (parent
-// before children -- architecture 18.5). Every child table is optional --
-// only non-empty arrays get inserted, and a completely blank application_*
-// table just stays empty for this application.
-//
-// Not wrapped in a DB transaction (nothing else in this codebase talks to
-// MySQL through a transaction boundary either, since it all goes through
-// Directus's REST API) -- if a later child batch fails, the application row
-// and any earlier-inserted children are left as-is rather than rolled back.
-// Acceptable here: applications are meant to be visible/editable by HR later
-// regardless of how complete they are.
-
 const HOW_HEARD = ["Walk-In", "Advertisement", "Friend/Family", "MEN2 Employee", "Other"];
 const SEX = ["Male", "Female"];
 const CIVIL_STATUS = ["Single", "Married", "Widowed", "Separated", "Divorced"];
@@ -33,7 +17,6 @@ function firstError(res: unknown): string | null {
     return null;
 }
 
-/** Batch-inserts `rows` (each stamped with application_id) into `/items/<table>`; no-op on an empty array. */
 async function insertChildren(
     table: string,
     applicationId: number,
@@ -87,7 +70,6 @@ export async function POST(req: NextRequest) {
         const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
         const normalized = fullName.trim().toLowerCase();
 
-        // --- search-or-create applicant (soft match on the generated column) ---
         const searchRes = await dFetch(
             `/items/applicant?filter[name_normalized][_eq]=${encodeURIComponent(normalized)}&limit=1&fields=id,full_name`
         );
@@ -116,7 +98,6 @@ export async function POST(req: NextRequest) {
             applicantId = createdApplicant.data.id;
         }
 
-        // --- create the application submission row ---
         const nowIso = new Date().toISOString();
         const createdApplication = await dFetch(`/items/application`, {
             method: "POST",
@@ -174,7 +155,6 @@ export async function POST(req: NextRequest) {
         }
         const applicationId: number = createdApplication.data.id;
 
-        // --- child tables (all optional, only non-empty arrays are inserted) ---
         const childInserts: [string, object[]][] = [
             ["application_family_member", body.family_members || []],
             ["application_company_relative", body.company_relatives || []],
@@ -197,9 +177,6 @@ export async function POST(req: NextRequest) {
 
         if (childErrors.length) {
             console.error("[application-form] one or more child inserts failed:", childErrors);
-            // The application itself was created successfully -- surface a
-            // partial-success message rather than a hard failure, since the
-            // applicant is about to be handed into the quiz regardless.
         }
 
         return NextResponse.json({

@@ -1,11 +1,3 @@
-// Shared grading for a submitted quiz attempt.
-//
-// Extracted verbatim from the POST handler of
-// `src/app/api/hrm/quiz-file-management/quiz-attempt/route.ts` so any caller
-// grades, snapshots and persists attempts through one implementation.
-// Correctness of a choice question is keyed on the picked choice's id, never
-// its text.
-
 import { dFetch } from "./directus";
 
 const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
@@ -16,10 +8,8 @@ function normalize(text: string): string {
 
 export interface AnswerInput {
     question_id: number;
-    // text questions
     blank_index?: number;
     answer_given_text?: string;
-    // choice questions
     answer_given_choice_id?: number | null;
     presented_choice_ids?: number[];
 }
@@ -56,11 +46,6 @@ interface ExpectedAnswerRecord {
     [key: string]: unknown;
 }
 
-// Frozen copy of a question's answer key, written per answer row at grading time
-// so the breakdown stays accurate even if the pool question is later edited or
-// deleted -- same reasoning as question_text_snapshot. Choice options are stored
-// in the order the applicant saw them (from presented_choice_ids) so the
-// breakdown's A/B/C/D labels line up.
 export type AnswerKeySnapshot =
     | {
           kind: "choice";
@@ -92,12 +77,6 @@ export type GradeOutcome =
     | ({ ok: true } & GradeResult)
     | { ok: false; status: number; error: string };
 
-/**
- * Grades `answers` against the quiz identified by `quizId`. Fetches the quiz and
- * every referenced question / choice / expected-answer, computes per-row
- * correctness + a frozen answer-key snapshot, then an all-or-nothing per-question
- * score. Returns `{ ok: false, status: 404 }` if the quiz is gone.
- */
 export async function gradeAnswers(
     quizId: number,
     answers: AnswerInput[]
@@ -150,15 +129,11 @@ export async function gradeAnswers(
                 );
                 answerGivenChoiceId = a.answer_given_choice_id ?? null;
 
-                // Correctness is keyed on the picked choice's id -- never on text.
                 const picked =
                     answerGivenChoiceId != null ? byId.get(answerGivenChoiceId) : undefined;
                 isCorrect = Boolean(picked?.is_correct);
-                // Keep answer_given_text as a human-readable label for the DB row.
                 answerGivenText = picked ? picked.option_text ?? "[image]" : null;
 
-                // Freeze options in the order the applicant saw them; fall back
-                // to sort order if the client sent no presented order.
                 const orderIds =
                     a.presented_choice_ids && a.presented_choice_ids.length
                         ? a.presented_choice_ids
@@ -205,8 +180,6 @@ export async function gradeAnswers(
         };
     });
 
-    // All-or-nothing per question: a question scores 1 only if every one of its
-    // answer rows is correct (fill-in-the-blank writes one row per blank).
     const questionAllCorrect = new Map<number, boolean>();
     for (const row of gradedAnswers) {
         const prior = questionAllCorrect.get(row.question_id);
@@ -233,18 +206,12 @@ export async function gradeAnswers(
     };
 }
 
-/**
- * Writes the `quiz_attempt` row and its `quiz_attempt_answer` rows (one batch
- * insert, preserving answer order). Returns the created attempt record.
- */
 export async function persistGradedAttempt(params: {
     quizId: number;
     applicantId: number;
     administeredBy: number | null;
     startedAt: string | null;
     grade: GradeResult;
-    // Set on the application-form continuity flow so the attempt is tied to the
-    // specific application, not just the person. Null on the HR-desktop path.
     applicationId?: number | null;
 }) {
     const { quizId, applicantId, administeredBy, startedAt, grade, applicationId } = params;

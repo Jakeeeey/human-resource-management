@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export interface SignaturePadHandle {
-    /** PNG of the drawing, or null when the pad is empty / in typed mode. */
     exportBlob: () => Promise<Blob | null>;
     isEmpty: () => boolean;
 }

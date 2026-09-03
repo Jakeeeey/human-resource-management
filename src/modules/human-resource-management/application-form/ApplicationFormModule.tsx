@@ -67,12 +67,6 @@ const CERTIFICATION_SNAPSHOT = [CERTIFICATION_HEADING, ...CERTIFICATION_CLAUSES,
     "\n\n"
 );
 
-// ============================================================================
-// Payload assembly -- every mapper drops a row that's missing its anchor field
-// rather than blocking submit (warn-don't-block, architecture sec 4 item 21).
-// A row added-then-left-blank is silently not saved, not an error.
-// ============================================================================
-
 function toNumberOrNull(s: string): number | null {
     const trimmed = s.trim();
     if (!trimmed) return null;
@@ -131,8 +125,6 @@ function buildCompanyRelatives(values: ApplicationFormValues): SubmitCompanyRela
 }
 
 function buildEducation(rows: EducationRow[]): SubmitEducation[] {
-    // application_education.level is NOT NULL -- a row without a level chosen
-    // can't be saved, so it's dropped rather than blocking the whole submit.
     return rows
         .filter((r) => r.level)
         .map((r) => ({
@@ -205,11 +197,6 @@ export function ApplicationFormModule() {
     const form = useForm<ApplicationFormValues>({ defaultValues: DEFAULT_APPLICATION_FORM });
     const sigRef = useRef<SignaturePadHandle | null>(null);
 
-    // Quiz Management's "Start" button on a specific quiz row opens this form
-    // with ?quiz_id=<that row>. When present it's the continuity target
-    // directly (as long as it's still active); when absent (e.g. reached via
-    // the sidebar with no quiz in mind), fall back to whichever quiz is
-    // flagged "Applicant Quiz" -- see resolveTargetQuizId.
     const quizIdOverride = (() => {
         const raw = searchParams.get("quiz_id");
         const n = raw ? Number(raw) : NaN;
@@ -225,16 +212,9 @@ export function ApplicationFormModule() {
         resolveTargetQuizId(quizIdOverride)
             .then(setQuizId)
             .finally(() => setQuizChecked(true));
-        // quizIdOverride is derived fresh from searchParams every render, not a
-        // stable dep -- re-resolving on searchParams change is what we want.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
-    // localStorage doesn't exist during SSR, so `draftPrompt` must start at
-    // `null` on both server and client and only pick up the real draft AFTER
-    // hydration -- reading it eagerly (e.g. in a useState lazy initializer)
-    // renders the "Resume draft?" banner on the client but not the
-    // server-rendered HTML, which is exactly a hydration mismatch.
     useEffect(() => {
         setDraftPrompt(loadDraft());
     }, []);
@@ -243,9 +223,6 @@ export function ApplicationFormModule() {
         saveDraft(values);
     }, 800);
 
-    // Whole-form reactive read (not form.watch()'s imperative subscription --
-    // that form isn't React-Compiler-safe) so the debounced save just follows
-    // along whenever anything changes.
     const watchedValues = useWatch({ control: form.control }) as ApplicationFormValues;
     useEffect(() => {
         debouncedSave(watchedValues);
@@ -293,8 +270,6 @@ export function ApplicationFormModule() {
 
         setSubmitting(true);
         try {
-            // Upload every file BEFORE creating any DB row, so a failed upload
-            // never leaves a half-created application behind.
             let signatureFile: string | null = null;
             if (!values.signature_typed_mode) {
                 const blob = await sigRef.current?.exportBlob();

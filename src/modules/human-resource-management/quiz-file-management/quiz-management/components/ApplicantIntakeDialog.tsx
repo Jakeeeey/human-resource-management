@@ -22,12 +22,6 @@ interface ApplicantIntakeDialogProps {
     quiz: Quiz | null;
 }
 
-// "search": look up an existing applicant -- the quick-retake shortcut, still
-// goes straight to the quiz, no form. "placeholder": confirm + hand over the
-// device. A brand-new applicant is NOT created here anymore -- "New Applicant"
-// routes into the full Application Form instead (architecture sec 18 decision
-// 2: the form is the normal front door; this dialog's own quick-create stays
-// retired, this search-and-select path is the one still-alive fallback).
 type Step = "search" | "placeholder";
 
 export function ApplicantIntakeDialog({ open, onOpenChange, quiz }: ApplicantIntakeDialogProps) {

@@ -6,10 +6,6 @@ import type {
     UploadKind,
 } from "../types";
 
-// Thin client helpers for the application-form flow. Not a React context -- the
-// form is a single submit, not a CRUD list.
-
-/** Uploads one file to Directus via the server proxy; returns its UUID. */
 export async function uploadApplicationFile(
     file: Blob,
     kind: UploadKind,
@@ -32,7 +28,6 @@ export async function uploadApplicationFile(
     return id as string;
 }
 
-/** Submits the application; returns the new applicant + application ids. */
 export async function submitApplication(
     payload: SubmitApplicationPayload
 ): Promise<SubmitApplicationResult> {
@@ -48,14 +43,6 @@ export async function submitApplication(
     return body as SubmitApplicationResult;
 }
 
-/**
- * The quiz this form should continue into. If `overrideQuizId` is given (the
- * Quiz Management "Start" button opened this form via ?quiz_id=<that row>'s
- * id), it's used directly -- as long as that quiz still exists and is active.
- * Otherwise falls back to the single active quiz flagged `is_applicant_quiz`
- * (the walk-in-off-the-sidebar case, where no specific quiz was picked).
- * Resolves the TINYINT(1) flag in code (lesson 352).
- */
 export async function resolveTargetQuizId(overrideQuizId: number | null): Promise<number | null> {
     const res = await fetch("/api/hrm/quiz-file-management/quiz-management", {
         cache: "no-store",

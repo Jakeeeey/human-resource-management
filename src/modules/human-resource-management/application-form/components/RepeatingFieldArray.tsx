@@ -4,10 +4,6 @@ import React from "react";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// A presentational wrapper around a react-hook-form field array (the
-// useFieldArray call itself stays in the section component, which passes its
-// `fields`/append/remove down here -- this just standardizes the add/remove
-// row chrome so the 6+ repeating sections don't each redraw it).
 interface RepeatingFieldArrayProps<T extends { id: string }> {
     title: string;
     description?: string;

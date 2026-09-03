@@ -32,7 +32,6 @@ function buildSubmitAnswers(
     for (const q of questions) {
         const given = answers[q.id] || [];
         if (CHOICE_TYPES.has(q.question_type)) {
-            // given[0] holds the picked choice id as a string.
             const picked = given[0] ? Number(given[0]) : null;
             payload.push({
                 question_id: q.id,
@@ -50,10 +49,6 @@ function buildSubmitAnswers(
 }
 
 interface QuizTakingModuleProps {
-    // Where "back"/"next candidate"/blocked-state buttons return to. The
-    // HR-desktop mount keeps the default; the chrome-less /apply/quiz mount
-    // passes a neutral completion route so the applicant never lands in the
-    // HR app.
     returnHref?: string;
 }
 
@@ -76,8 +71,6 @@ export default function QuizTakingModule({
     const [result, setResult] = useState<QuizAttempt | null>(null);
     const isSubmittingRef = useRef(false);
 
-    // Navigation guard: intercepted sidebar/link clicks and the Back button
-    // stash their target here and raise the in-app confirm dialog.
     const [pendingNav, setPendingNav] = useState<
         { kind: "link"; href: string } | { kind: "back" } | null
     >(null);
@@ -149,7 +142,6 @@ export default function QuizTakingModule({
         }
     }, [data, quizId, applicantId, applicationId, startedAt, answers]);
 
-    // Countdown timer -- auto-submits the moment it hits zero.
     useEffect(() => {
         if (step !== "in-progress" || secondsRemaining == null) return;
         if (secondsRemaining <= 0) {
@@ -195,13 +187,11 @@ export default function QuizTakingModule({
         }
         document.addEventListener("click", handleClick, { capture: true });
 
-        // Trap the Back button: seed an extra history entry, and on each
-        // popstate re-seed it (staying put) while the proctor is asked.
         window.history.pushState(null, "", window.location.href);
         function handlePopState() {
             if (bypassPopRef.current) {
                 bypassPopRef.current = false;
-                return; // proctor chose "End attempt" -- let this navigation through
+                return;
             }
             window.history.pushState(null, "", window.location.href);
             setPendingNav({ kind: "back" });

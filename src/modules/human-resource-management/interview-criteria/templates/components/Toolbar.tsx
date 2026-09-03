@@ -12,27 +12,26 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Search, X } from "lucide-react";
-import { useQuizHistoryFilterContext } from "../providers/filterProvider";
-import type { QuizAttempt } from "../types";
+import { useTemplateFilterContext } from "../providers/filterProvider";
+import type { Stage, TemplateStatus } from "../types";
 
-interface ToolbarProps {
-    attempts: QuizAttempt[];
-}
+const STAGE_LABELS: Record<Stage, string> = {
+    Initial: "Initial",
+    Final: "Final",
+};
 
-export function Toolbar({ attempts }: ToolbarProps) {
-    const { filters, updateSearch, updateQuizId, updatePassed, resetFilters } =
-        useQuizHistoryFilterContext();
+const STATUS_LABELS: Record<TemplateStatus, string> = {
+    draft: "Draft",
+    active: "Active",
+    archived: "Archived",
+};
+
+export function Toolbar() {
+    const { filters, updateSearch, updateStage, updateStatus, resetFilters } =
+        useTemplateFilterContext();
 
     const hasActiveFilters =
-        filters.search || filters.quizId != null || filters.passed != null;
-
-    const quizOptions = React.useMemo(() => {
-        const map = new Map<number, string>();
-        attempts.forEach((a) => {
-            if (a.quiz) map.set(a.quiz.id, a.quiz.name);
-        });
-        return Array.from(map.entries());
-    }, [attempts]);
+        filters.search || filters.stage != null || filters.status != null;
 
     return (
         <div className="flex flex-col gap-4">
@@ -41,7 +40,7 @@ export function Toolbar({ attempts }: ToolbarProps) {
                     <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search applicant name..."
+                            placeholder="Search templates..."
                             value={filters.search}
                             onChange={(e) => updateSearch(e.target.value)}
                             className="pl-8"
@@ -50,35 +49,40 @@ export function Toolbar({ attempts }: ToolbarProps) {
                 </div>
 
                 <Select
-                    value={filters.quizId != null ? String(filters.quizId) : "all"}
-                    onValueChange={(val) => updateQuizId(val === "all" ? null : Number(val))}
+                    value={filters.stage ?? "all"}
+                    onValueChange={(val) =>
+                        updateStage(val === "all" ? null : (val as Stage))
+                    }
                 >
-                    <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="All quizzes" />
+                    <SelectTrigger className="w-[160px]">
+                        <SelectValue placeholder="All stages" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">All quizzes</SelectItem>
-                        {quizOptions.map(([id, name]) => (
-                            <SelectItem key={id} value={String(id)}>
-                                {name}
+                        <SelectItem value="all">All stages</SelectItem>
+                        {Object.entries(STAGE_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                                {label}
                             </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
 
                 <Select
-                    value={filters.passed === null ? "all" : filters.passed ? "passed" : "failed"}
+                    value={filters.status ?? "all"}
                     onValueChange={(val) =>
-                        updatePassed(val === "all" ? null : val === "passed")
+                        updateStatus(val === "all" ? null : (val as TemplateStatus))
                     }
                 >
-                    <SelectTrigger className="w-[160px]">
-                        <SelectValue placeholder="All results" />
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">All results</SelectItem>
-                        <SelectItem value="passed">Passed</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                                {label}
+                            </SelectItem>
+                        ))}
                     </SelectContent>
                 </Select>
 
@@ -104,11 +108,22 @@ export function Toolbar({ attempts }: ToolbarProps) {
                             </button>
                         </Badge>
                     )}
-                    {filters.passed != null && (
+                    {filters.stage != null && (
                         <Badge variant="secondary">
-                            Result: {filters.passed ? "Passed" : "Failed"}
+                            Stage: {STAGE_LABELS[filters.stage]}
                             <button
-                                onClick={() => updatePassed(null)}
+                                onClick={() => updateStage(null)}
+                                className="ml-1 rounded-full hover:bg-secondary-foreground/20"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </Badge>
+                    )}
+                    {filters.status != null && (
+                        <Badge variant="secondary">
+                            Status: {STATUS_LABELS[filters.status]}
+                            <button
+                                onClick={() => updateStatus(null)}
                                 className="ml-1 rounded-full hover:bg-secondary-foreground/20"
                             >
                                 <X className="h-3 w-3" />

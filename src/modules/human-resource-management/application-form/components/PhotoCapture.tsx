@@ -10,12 +10,8 @@ interface PhotoCaptureProps {
     onChange: (file: File | null) => void;
 }
 
-/** The paper form's 2x2 ID photo box. Optional -- a cameraless PC can't
- * produce one live (architecture sec 4 item 15), so this never blocks submit. */
 export function PhotoCapture({ value, onChange }: PhotoCaptureProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
-    // Derived, not state -- avoids a setState-in-effect; the effect below only
-    // ever does cleanup (revoking the previous blob URL).
     const previewUrl = useMemo(() => (value ? URL.createObjectURL(value) : null), [value]);
 
     useEffect(() => {
