@@ -82,18 +82,9 @@ export async function GET() {
     );
     
     const approvedDepartments: number[] = taApproversResponse.data?.map((a: { department_id: number }) => a.department_id) || [];
+    const skipFilter = isAdmin && approvedDepartments.length === 0;
 
-    // Build query - only show pending requests
-    let filter = `filter[status][_eq]=pending`;
-
-    if (isAdmin) {
-      // Admins see all pending requests, no department filter needed
-    } else if (approvedDepartments.length > 0) {
-      // Filter by departments the user is an approver for
-      const deptFilter = approvedDepartments.join(',');
-      filter += `&filter[department_id][_in]=${deptFilter}`;
-    } else {
-      // User is not an approver for any department and not an admin
+    if (!skipFilter && approvedDepartments.length === 0) {
       return NextResponse.json({
         data: [],
         total: 0,
@@ -101,12 +92,13 @@ export async function GET() {
       });
     }
 
-    // Fetch leave requests with user details
+    // Fetch ALL pending leave requests
+    const filter = `filter[status][_eq]=pending`;
     const leaveResponse = await directusFetch(
       `/items/leave_request?${filter}&sort=-filed_at&limit=1000&fields=*`
     );
 
-    const requests = leaveResponse.data || [];
+    let requests = leaveResponse.data || [];
 
     // Fetch user details for each request
     const userIds = [...new Set(requests.map((r: { user_id: number }) => r.user_id))] as number[];
@@ -121,8 +113,24 @@ export async function GET() {
         .map((u) => [u.data.user_id, u.data])
     );
 
-    // Fetch department details
-    const deptIds = [...new Set(requests.map((r: { department_id?: number }) => r.department_id).filter(Boolean))] as number[];
+    // Filter requests in JS based on the actual user's department
+    if (!skipFilter) {
+      requests = requests.filter((req: { user_id: number }) => {
+        const user = usersMap.get(req.user_id);
+        if (!user) return false;
+        return approvedDepartments.includes(user.user_department);
+      });
+    }
+
+    // Fetch department details for the filtered requests
+    const deptIdsToFetch = new Set<number>();
+    requests.forEach((req: { user_id: number; department_id?: number }) => {
+      const user = usersMap.get(req.user_id);
+      if (req.department_id) deptIdsToFetch.add(req.department_id);
+      if (user?.user_department) deptIdsToFetch.add(user.user_department);
+    });
+
+    const deptIds = Array.from(deptIdsToFetch);
     const deptsPromises = deptIds.map((id) =>
       directusFetch(`/items/department/${id}?fields=department_id,department_name`)
         .catch(() => null)
@@ -137,7 +145,8 @@ export async function GET() {
     // Combine data
     const enrichedRequests = requests.map((req: { user_id: number; department_id?: number; [key: string]: unknown }) => {
       const user = usersMap.get(req.user_id);
-      const dept = req.department_id ? deptsMap.get(req.department_id) : null;
+      const actualDeptId = req.department_id || user?.user_department;
+      const dept = actualDeptId ? deptsMap.get(actualDeptId) : null;
 
       return {
         ...req,
@@ -145,6 +154,7 @@ export async function GET() {
         user_lname: user?.user_lname || "",
         user_mname: user?.user_mname || null,
         department_name: dept?.department_name || null,
+        department_id: actualDeptId
       };
     });
 
