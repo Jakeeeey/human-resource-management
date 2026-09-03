@@ -78,36 +78,31 @@ export async function GET() {
     const isAdmin = userResponse.data?.isAdmin === 1 || userResponse.data?.isAdmin === true || userResponse.data?.role === 'ADMIN';
     const isHR = currentUserDepartment === 2;
 
-    // Build query - only show pending requests
-    let filter = `filter[status][_eq]=pending`;
+    // Fetch TA draft approvers
+    const taApproversRes = await directusFetch(
+      `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id`
+    ).catch(() => ({ data: [] }));
     
-    if (!isHR && !isAdmin) {
-      // Fetch TA draft approvers to see which departments this user is authorized to approve
-      const taApproversRes = await directusFetch(
-        `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id`
-      ).catch(() => ({ data: [] }));
-      
-      const taApprovers = taApproversRes.data || [];
-      const assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
+    const taApprovers = taApproversRes.data || [];
+    const assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
 
-      const allDepartmentIds = new Set<number>();
-      if (currentUserDepartment) allDepartmentIds.add(currentUserDepartment);
-      assignedDepartmentIds.forEach((id: number) => allDepartmentIds.add(id));
+    const skipFilter = (isAdmin || isHR) && assignedDepartmentIds.length === 0;
 
-      if (allDepartmentIds.size > 0) {
-        const deptIdsString = Array.from(allDepartmentIds).join(',');
-        filter += `&filter[department_id][_in]=${deptIdsString}`;
-      } else {
-        filter += `&filter[department_id][_in]=-1`;
-      }
+    if (!skipFilter && assignedDepartmentIds.length === 0) {
+      return NextResponse.json({
+        data: [],
+        total: 0,
+        message: "You are not an assigned approver for any department."
+      });
     }
 
-    // Fetch overtime requests with user details
+    // Fetch ALL pending overtime requests
+    const filter = `filter[status][_eq]=pending`;
     const overtimeResponse = await directusFetch(
       `/items/overtime_request?${filter}&sort=-filed_at&limit=-1&fields=*`
     );
 
-    const requests = overtimeResponse.data || [];
+    let requests = overtimeResponse.data || [];
 
     // Fetch user details for each request
     const userIds = [...new Set(requests.map((r: { user_id: number }) => r.user_id))] as number[];
@@ -122,8 +117,24 @@ export async function GET() {
         .map((u) => [u.data.user_id, u.data])
     );
 
-    // Fetch department details
-    const deptIds = [...new Set(requests.map((r: { department_id?: number }) => r.department_id).filter(Boolean))] as number[];
+    // Filter requests in JS based on the actual user's department
+    if (!skipFilter) {
+      requests = requests.filter((req: { user_id: number }) => {
+        const user = usersMap.get(req.user_id);
+        if (!user) return false;
+        return assignedDepartmentIds.includes(user.user_department);
+      });
+    }
+
+    // Fetch department details for the filtered requests
+    const deptIdsToFetch = new Set<number>();
+    requests.forEach((req: { user_id: number; department_id?: number }) => {
+      const user = usersMap.get(req.user_id);
+      if (req.department_id) deptIdsToFetch.add(req.department_id);
+      if (user?.user_department) deptIdsToFetch.add(user.user_department);
+    });
+
+    const deptIds = Array.from(deptIdsToFetch);
     const deptsPromises = deptIds.map((id) =>
       directusFetch(`/items/department/${id}?fields=department_id,department_name`)
         .catch(() => null)
@@ -138,7 +149,8 @@ export async function GET() {
     // Combine data
     const enrichedRequests = requests.map((req: { user_id: number; department_id?: number; [key: string]: unknown }) => {
       const user = usersMap.get(req.user_id);
-      const dept = req.department_id ? deptsMap.get(req.department_id) : null;
+      const actualDeptId = req.department_id || user?.user_department;
+      const dept = actualDeptId ? deptsMap.get(actualDeptId) : null;
 
       return {
         ...req,
@@ -146,6 +158,7 @@ export async function GET() {
         user_lname: user?.user_lname || "",
         user_mname: user?.user_mname || null,
         department_name: dept?.department_name || null,
+        department_id: actualDeptId
       };
     });
 

@@ -396,7 +396,6 @@ export async function middleware(req: NextRequest) {
                     },
                     cache: "no-store",
                 });
-
                 if (refreshRes.ok) {
                     const data = await refreshRes.json();
                     const newToken = pickTokenFromPayload(data);
@@ -422,6 +421,18 @@ export async function middleware(req: NextRequest) {
                                 : `${COOKIE_NAME}=${newToken}`;
                         }
                         requestHeaders.set("cookie", updatedCookieHeader);
+                    } else {
+                        // Backend returned 200 but no usable token in response body.
+                        // Clear the stale expired cookie immediately and redirect to login
+                        // to prevent an infinite refresh loop on the next request.
+                        console.error("[Middleware] Refresh returned 200 but no valid token was found in the response. Clearing session.");
+                        const loginUrl = req.nextUrl.clone();
+                        loginUrl.pathname = "/login";
+                        loginUrl.searchParams.set("next", pathname);
+                        const clearResponse = NextResponse.redirect(loginUrl);
+                        clearResponse.cookies.delete(COOKIE_NAME);
+                        clearResponse.cookies.delete(REFRESH_COOKIE_NAME);
+                        return clearResponse;
                     }
                 } else if (refreshRes.status >= 500) {
                     console.error(`[Middleware] Spring Boot returned ${refreshRes.status} during refresh.`);
@@ -429,6 +440,18 @@ export async function middleware(req: NextRequest) {
                     url.pathname = "/error/service-down";
                     url.searchParams.set("service", `Spring Boot (Refresh Status ${refreshRes.status})`);
                     return NextResponse.redirect(url);
+                } else {
+                    // Refresh token is expired or invalid (401, 403, etc.).
+                    // Clear both cookies immediately so the middleware won't keep retrying
+                    // on the next request and cause an infinite redirect loop.
+                    console.warn(`[Middleware] Refresh token rejected by backend (status ${refreshRes.status}). Clearing session and redirecting to login.`);
+                    const loginUrl = req.nextUrl.clone();
+                    loginUrl.pathname = "/login";
+                    loginUrl.searchParams.set("next", pathname);
+                    const clearResponse = NextResponse.redirect(loginUrl);
+                    clearResponse.cookies.delete(COOKIE_NAME);
+                    clearResponse.cookies.delete(REFRESH_COOKIE_NAME);
+                    return clearResponse;
                 }
             } catch (err) {
                 console.error("[Middleware] Refresh failed (Server Outage):", err);
