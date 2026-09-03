@@ -73,8 +73,30 @@ export async function GET(req: NextRequest) {
             fetchAssetDataUrl(application["signature_file"]),
         ]);
 
+        // Attachments are Directus file UUIDs too. Inline each as a data URL
+        // with its stored filename so HR can view/download read-only files
+        // (same token reasoning as photo/signature above).
+        const attachmentRows = (children.find(([t]) => t === "application_attachment")?.[1] ?? []) as Record<string, unknown>[];
+        const attachment_files = await Promise.all(
+            attachmentRows.map(async (row) => {
+                const fileId = row["file"];
+                const meta =
+                    typeof fileId === "string" && fileId
+                        ? ((await dFetch(`/files/${fileId}?fields=filename_download`)) as {
+                              data?: { filename_download?: string };
+                          })
+                        : null;
+                return {
+                    type: typeof row["type"] === "string" ? row["type"] : "Other",
+                    label: typeof row["label"] === "string" ? row["label"] : "",
+                    filename: meta?.data?.filename_download ?? "attachment",
+                    file_url: await fetchAssetDataUrl(fileId),
+                };
+            })
+        );
+
         return NextResponse.json({
-            data: { application, ...Object.fromEntries(children), photo_image, signature_image },
+            data: { application, ...Object.fromEntries(children), photo_image, signature_image, attachment_files },
         });
     } catch (err) {
         console.error("[applications/by-applicant]", err);

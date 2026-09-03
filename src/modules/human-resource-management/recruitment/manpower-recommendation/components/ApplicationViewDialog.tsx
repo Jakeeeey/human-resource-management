@@ -30,7 +30,6 @@ import { SkillsSection } from "@/modules/human-resource-management/application-f
 import { WorkExperienceSection } from "@/modules/human-resource-management/application-form/components/sections/WorkExperienceSection";
 import { ReferencesSection } from "@/modules/human-resource-management/application-form/components/sections/ReferencesSection";
 import { TrainingsSection } from "@/modules/human-resource-management/application-form/components/sections/TrainingsSection";
-import { AttachmentsSection } from "@/modules/human-resource-management/application-form/components/sections/AttachmentsSection";
 import {
     mapApplicationToFormValues,
     type ApplicationBundle,
@@ -49,6 +48,8 @@ interface ApplicationViewDialogProps {
  * layout, zero edits to the source module. The certification section is
  * intentionally omitted (signature renders as a plain image block instead);
  * the stored photo UUID is converted to a File so the capture box shows it.
+ * Attachments render as their own read-only file list (outside the inert
+ * fieldset so Download links stay clickable) instead of the form section.
  */
 export function ApplicationViewDialog({ applicantId, applicantName, open, onOpenChange }: ApplicationViewDialogProps) {
     const form = useForm<ApplicationFormValues>({ defaultValues: DEFAULT_APPLICATION_FORM });
@@ -56,6 +57,7 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
     const [loadError, setLoadError] = useState<string | null>(null);
     const [submittedAt, setSubmittedAt] = useState<string>("");
     const [signatureImage, setSignatureImage] = useState<string | null>(null);
+    const [attachmentFiles, setAttachmentFiles] = useState<{ type: string; label: string; filename: string; file_url: string | null }[]>([]);
 
     useEffect(() => {
         if (!open || applicantId === null) return;
@@ -82,6 +84,19 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                 }
                 const sigUrl = (body.data as { signature_image?: unknown }).signature_image;
                 setSignatureImage(typeof sigUrl === "string" && sigUrl.startsWith("data:") ? sigUrl : null);
+                const files = (body.data as { attachment_files?: unknown }).attachment_files;
+                setAttachmentFiles(
+                    Array.isArray(files)
+                        ? files
+                              .filter((f): f is Record<string, unknown> => typeof f === "object" && f !== null)
+                              .map((f) => ({
+                                  type: typeof f["type"] === "string" ? f["type"] : "Other",
+                                  label: typeof f["label"] === "string" ? f["label"] : "",
+                                  filename: typeof f["filename"] === "string" ? f["filename"] : "attachment",
+                                  file_url: typeof f["file_url"] === "string" ? f["file_url"] : null,
+                              }))
+                        : []
+                );
                 const raw = body.data.application["submitted_at"];
                 setSubmittedAt(typeof raw === "string" ? raw.slice(0, 10) : "");
             })
@@ -138,7 +153,6 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                                 <WorkExperienceSection form={form} />
                                 <ReferencesSection form={form} />
                                 <TrainingsSection form={form} />
-                                <AttachmentsSection form={form} />
                                 {signatureImage ? (
                                     <div className="space-y-1.5">
                                         <p className="text-sm font-medium">Applicant Signature</p>
@@ -149,6 +163,31 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                                     </div>
                                 ) : null}
                             </fieldset>
+                            <div className="space-y-4 pt-8">
+                                <h2 className="text-base font-semibold">Attachments</h2>
+                                {attachmentFiles.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No attachments.</p>
+                                ) : (
+                                    <ul className="space-y-2">
+                                        {attachmentFiles.map((f, i) => (
+                                            <li key={`${f.filename}-${i}`} className="flex items-center gap-3 p-3 bg-muted/30 rounded-md border border-border/50">
+                                                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-medium truncate" title={f.filename}>{f.filename}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">{f.type}{f.label ? ` — ${f.label}` : ""}</p>
+                                                </div>
+                                                {f.file_url ? (
+                                                    <a href={f.file_url} download={f.filename} className="text-sm font-medium text-primary hover:underline shrink-0">
+                                                        Download
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground shrink-0">Unavailable</span>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                         </Form>
                     )}
                 </div>
