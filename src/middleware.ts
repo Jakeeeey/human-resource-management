@@ -309,14 +309,32 @@ export async function middleware(req: NextRequest) {
         pathname.startsWith("/forgot-password") ||
         pathname.startsWith("/reset-password")
     ) {
+        if (pathname.startsWith("/api/auth/logout")) {
+            const token = req.cookies.get(COOKIE_NAME)?.value;
+            if (token) {
+                USER_PERMISSIONS_CACHE.delete(token);
+            }
+        }
+
         // If the user is already logged in and tries to go to root / or /login, take them to their last visited subsystem
         if (pathname === "/" || pathname === "/login") {
             const token = req.cookies.get(COOKIE_NAME)?.value;
             if (token) {
                 const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
-                const target = lastVisited || "/main-dashboard";
 
-                // Avoid infinite redirect loop if target is the current page
+                // Validate the saved path: it must start with "/" and must NOT be a known
+                // public/auth route that would trigger another redirect (loop prevention).
+                const UNSAFE_PREFIXES = ["/", "/login", "/forgot-password", "/reset-password", "/api", "/error"];
+                const isSafePath =
+                    lastVisited &&
+                    lastVisited.startsWith("/") &&
+                    !UNSAFE_PREFIXES.some(
+                        (p) => lastVisited === p || lastVisited.startsWith(p + "/")
+                    );
+
+                const target = isSafePath ? lastVisited : "/main-dashboard";
+
+                // Final guard: never redirect to the current page
                 if (target !== pathname) {
                     return NextResponse.redirect(new URL(target, req.url));
                 }
@@ -385,6 +403,9 @@ export async function middleware(req: NextRequest) {
 
                     if (newToken) {
                         console.log("[Middleware] Refresh successful.");
+                        if (currentToken) {
+                            USER_PERMISSIONS_CACHE.delete(currentToken);
+                        }
                         token = newToken;
 
                         // Propagate new token to downstream request headers
@@ -475,11 +496,7 @@ export async function middleware(req: NextRequest) {
         } else if (directusBase && directusToken && payload && payload.sub) {
             try {
                 // Fetch LIVE permissions from junction tables + User Role
-                const [subRes, modRes, allModsRes, userRes] = await Promise.all([
-                    fetch(`${directusBase}/items/user_access_subsystems?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=subsystem_id.base_path`, {
-                        headers: { "Authorization": `Bearer ${directusToken}` },
-                        cache: 'no-store'
-                    }),
+                const [modRes, allModsRes, userRes] = await Promise.all([
                     fetch(`${directusBase}/items/user_access_modules?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=module_id.base_path`, {
                         headers: { "Authorization": `Bearer ${directusToken}` },
                         cache: 'no-store'
@@ -494,9 +511,8 @@ export async function middleware(req: NextRequest) {
                     })
                 ]);
 
-                if (subRes.ok && modRes.ok && allModsRes.ok) {
-                    const [subData, modData, allModsData] = await Promise.all([
-                        subRes.json(),
+                if (modRes.ok && allModsRes.ok) {
+                    const [modData, allModsData] = await Promise.all([
                         modRes.json(),
                         allModsRes.json(),
                     ]);
@@ -514,7 +530,9 @@ export async function middleware(req: NextRequest) {
                     if (isAdmin) {
                         bypassModuleAuthorization = true;
                     } else {
-                        authorizedSubsystemPaths = (subData.data || []).map((row: { subsystem_id?: { base_path?: string } }) => row.subsystem_id?.base_path?.trim()).filter(Boolean) as string[];
+                        // Derive authorized subsystem paths directly from the JWT payload
+                        authorizedSubsystemPaths = userSubsystems.map(id => `/${id}`);
+
                         authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
                         allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
                     }
@@ -536,7 +554,7 @@ export async function middleware(req: NextRequest) {
                     });
                 } else {
                     // Fail-fast on server errors
-                    const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus Permissions" : "Directus User Profile";
+                    const service = !modRes.ok || !allModsRes.ok ? "Directus Permissions" : "Directus User Profile";
                     throw new Error(service);
                 }
             } catch (err) {
