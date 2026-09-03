@@ -1,6 +1,6 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from "next/server"
-import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, LAST_VISITED_PATH_COOKIE, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
+import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
 
 const PUBLIC_FILE = /\.(.*)$/
 const BASELINE_PREFIXES = ["/main-dashboard"]
@@ -246,7 +246,7 @@ async function isSubscriptionLocked(pathname: string): Promise<boolean> {
     return false
 }
 
-function applyCommonCookies(response: NextResponse, req: NextRequest, token: string, pathname: string) {
+function applyCommonCookies(response: NextResponse, req: NextRequest, token: string) {
     const currentToken = req.cookies.get(COOKIE_NAME)?.value;
     if (token && token !== currentToken) {
         response.cookies.set({
@@ -260,22 +260,7 @@ function applyCommonCookies(response: NextResponse, req: NextRequest, token: str
         });
     }
 
-    const isNavigation = req.method === "GET" &&
-        !pathname.startsWith("/api") &&
-        !pathname.startsWith("/error") &&
-        !pathname.startsWith("/_next") &&
-        pathname !== "/favicon.ico";
-
-    if (token && isNavigation) {
-        response.cookies.set({
-            name: LAST_VISITED_PATH_COOKIE,
-            value: pathname,
-            maxAge: 60 * 60 * 24 * 7,
-            path: "/",
-            sameSite: "lax",
-            secure: IS_SECURE_COOKIE
-        });
-    }
+    // Last visited path tracking removed
 }
 
 export async function middleware(req: NextRequest) {
@@ -316,28 +301,26 @@ export async function middleware(req: NextRequest) {
             }
         }
 
-        // If the user is already logged in and tries to go to root / or /login, take them to their last visited subsystem
+        // If the user is already logged in (with a VALID token) and tries to go to root / or /login, take them to their last visited subsystem
         if (pathname === "/" || pathname === "/login") {
             const token = req.cookies.get(COOKIE_NAME)?.value;
+            let isValid = false;
+            
             if (token) {
-                const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
-
-                // Validate the saved path: it must start with "/" and must NOT be a known
-                // public/auth route that would trigger another redirect (loop prevention).
-                const UNSAFE_PREFIXES = ["/", "/login", "/forgot-password", "/reset-password", "/api", "/error"];
-                const isSafePath =
-                    lastVisited &&
-                    lastVisited.startsWith("/") &&
-                    !UNSAFE_PREFIXES.some(
-                        (p) => lastVisited === p || lastVisited.startsWith(p + "/")
-                    );
-
-                const target = isSafePath ? lastVisited : "/main-dashboard";
-
-                // Final guard: never redirect to the current page
-                if (target !== pathname) {
-                    return NextResponse.redirect(new URL(target, req.url));
+                const payload = decodeJwtPayload(token);
+                if (payload && payload.exp) {
+                    const now = Math.floor(Date.now() / 1000);
+                    if (payload.exp > now + 10) {
+                        isValid = true;
+                    }
                 }
+            }
+
+            if (isValid) {
+                return NextResponse.redirect(new URL("/main-dashboard", req.url));
+            } else if (token) {
+                 // If token exists but is invalid/expired, we should let them stay on /login
+                 // (We don't need to clear it here, the login process or subsequent requests will overwrite it)
             }
         }
         return NextResponse.next()
@@ -467,7 +450,10 @@ export async function middleware(req: NextRequest) {
         const url = req.nextUrl.clone()
         url.pathname = "/login"
         url.searchParams.set("next", pathname)
-        return NextResponse.redirect(url)
+        const redirectResponse = NextResponse.redirect(url)
+        // Ensure the stale access token is cleared so it doesn't cause loops
+        redirectResponse.cookies.delete(COOKIE_NAME)
+        return redirectResponse
     }
     const payload = decodeJwtPayload(token);
 
@@ -487,7 +473,7 @@ export async function middleware(req: NextRequest) {
                 }
             });
             response.cookies.delete("x-locked-module");
-            applyCommonCookies(response, req, token, pathname);
+            applyCommonCookies(response, req, token);
             return response;
         }
 
@@ -643,7 +629,7 @@ export async function middleware(req: NextRequest) {
             }
         });
         response.cookies.set("x-locked-module", "true", { path: "/" });
-        applyCommonCookies(response, req, token, pathname);
+        applyCommonCookies(response, req, token);
         return response;
     }
 
@@ -655,7 +641,7 @@ export async function middleware(req: NextRequest) {
     });
     response.cookies.delete("x-locked-module");
 
-    applyCommonCookies(response, req, token, pathname);
+    applyCommonCookies(response, req, token);
     return response;
 }
 
