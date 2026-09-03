@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { gradeAnswers, persistGradedAttempt, type AnswerInput } from "@/lib/quiz-file-management/grading";
+import { gradeAnswers, persistGradedAttempt, type AnswerInput } from "@/modules/human-resource-management/quiz-file-management/utils/grading";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;

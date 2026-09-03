@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { drawQuizQuestions } from "@/lib/quiz-file-management/quiz-draw";
+import { drawQuizQuestions } from "@/modules/human-resource-management/quiz-file-management/utils/quiz-draw";
 
 export async function GET(req: NextRequest) {
     const token = (await cookies()).get(COOKIE_NAME)?.value;

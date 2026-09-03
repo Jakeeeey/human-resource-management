@@ -56,16 +56,15 @@ export function ManpowerRequestDetail() {
                                         <span className="font-medium truncate max-w-[160px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
                                             {applicant?.full_name ?? `Applicant #${rec.applicant_id}`}
                                         </span>
-                                        <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider ${getStatusColor(rec.status ?? "Recommended")}`}>
-                                            {rec.status ?? "Recommended"}
-                                        </Badge>
-                                        <span className="text-sm text-muted-foreground truncate max-w-[160px]" title={rec.recommended_at ?? "-"}>
-                                            {rec.recommended_at ?? "-"}
-                                        </span>
-                                        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
-                                            <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
-                                            View
-                                        </Button>
+                                        <div className="ml-auto flex items-center gap-3 shrink-0">
+                                            <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider w-[130px] justify-center shrink-0 ${getStatusColor(rec.status ?? "Recommended")}`}>
+                                                {rec.status ?? "Recommended"}
+                                            </Badge>
+                                            <Button variant="ghost" size="sm" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
+                                                <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                View
+                                            </Button>
+                                        </div>
                                     </div>
                                 );
                             })}

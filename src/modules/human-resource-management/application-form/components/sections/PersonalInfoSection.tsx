@@ -5,7 +5,6 @@ import type { UseFormReturn } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import {
     FormControl,
-    FormDescription,
     FormField,
     FormItem,
     FormLabel,
@@ -156,21 +155,28 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
-                <FormField
-                    control={form.control}
-                    name="birthdate"
-                    rules={{ required: "Required" }}
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Birthdate</FormLabel>
-                            <FormControl>
-                                <Input type="date" {...field} />
-                            </FormControl>
-                            <FormDescription>{age != null ? `Age: ${age}` : ""}</FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                <div className="grid grid-cols-[minmax(0,1fr)_64px] items-end content-start gap-2">
+                    <FormField
+                        control={form.control}
+                        name="birthdate"
+                        rules={{ required: "Required" }}
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Birthdate</FormLabel>
+                                <FormControl>
+                                    <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormItem>
+                        <FormLabel>Age</FormLabel>
+                        <FormControl>
+                            <Input value={age != null ? String(age) : ""} disabled placeholder="—" className="px-2 text-center" />
+                        </FormControl>
+                    </FormItem>
+                </div>
                 <FormField
                     control={form.control}
                     name="birthplace"

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -12,13 +12,20 @@ interface PhotoCaptureProps {
 
 export function PhotoCapture({ value, onChange }: PhotoCaptureProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
-    const previewUrl = useMemo(() => (value ? URL.createObjectURL(value) : null), [value]);
+    // Object URL is created inside the effect (not useMemo): the URL created
+    // in one effect run is revoked only by that same run's cleanup, so a
+    // remount or a rapid value swap can never revoke the URL on screen.
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
+        const url = value ? URL.createObjectURL(value) : null;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- object URLs live in the browser URL registry (external system); recreating per value keeps remounts from showing a revoked URL
+        setPreviewUrl(url);
+        if (!url) return;
         return () => {
-            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            URL.revokeObjectURL(url);
         };
-    }, [previewUrl]);
+    }, [value]);
 
     return (
         <div className="space-y-1.5">

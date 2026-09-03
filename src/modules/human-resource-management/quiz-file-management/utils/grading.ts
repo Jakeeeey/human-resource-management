@@ -1,4 +1,4 @@
-import { dFetch } from "./directus";
+import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
 

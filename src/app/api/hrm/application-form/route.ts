@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { dFetch } from "@/lib/quiz-file-management/directus";
+import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import type { SubmitApplicationPayload } from "@/modules/human-resource-management/application-form/types";
 
 export const runtime = "nodejs";
