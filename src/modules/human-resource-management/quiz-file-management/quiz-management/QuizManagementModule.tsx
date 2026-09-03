@@ -28,9 +28,9 @@ function QuizManagementModuleContent() {
         try {
             await createQuiz(data);
             toast.success("Quiz created successfully");
-        } catch {
-            toast.error("Failed to create quiz");
-            throw new Error("Create failed");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to create quiz");
+            throw error;
         }
     };
 
@@ -38,9 +38,9 @@ function QuizManagementModuleContent() {
         try {
             await updateQuiz(id, data);
             toast.success("Quiz updated successfully");
-        } catch {
-            toast.error("Failed to update quiz");
-            throw new Error("Update failed");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to update quiz");
+            throw error;
         }
     };
 

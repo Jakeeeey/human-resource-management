@@ -1,7 +1,3 @@
-// ============================================================================
-// Quiz File Management — Quiz Management — Type Definitions
-// ============================================================================
-
 export type QuizStatus = "draft" | "active" | "archived";
 export type PassThresholdType = "percentage";
 
@@ -17,14 +13,10 @@ export interface Quiz {
     number_of_questions: number;
     shuffle_questions: boolean;
     shuffle_answers: boolean;
-    // Empty array = draw from every active category (no restriction).
     category_filter: string[];
+    is_applicant_quiz: boolean;
     created_at: string;
 }
-
-// ============================================================================
-// APPLICANT INTAKE TYPES
-// ============================================================================
 
 export interface Applicant {
     id: number;
@@ -33,18 +25,10 @@ export interface Applicant {
     created_at: string;
 }
 
-// ============================================================================
-// FILTER TYPES
-// ============================================================================
-
 export interface QuizManagementFilters {
     search: string;
     status: QuizStatus | null;
 }
-
-// ============================================================================
-// FORM TYPES
-// ============================================================================
 
 export interface QuizFormData {
     name: string;
@@ -58,4 +42,5 @@ export interface QuizFormData {
     shuffle_questions: boolean;
     shuffle_answers: boolean;
     category_filter: string[];
+    is_applicant_quiz: boolean;
 }
