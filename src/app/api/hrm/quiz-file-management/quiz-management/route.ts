@@ -58,6 +58,55 @@ async function replaceCategoryFilterRows(quizId: number, categories: string[]) {
     );
 }
 
+// Counts the active questions a quiz would draw from, respecting its category
+// filter -- mirrors the pool logic in lib/quiz-file-management/quiz-draw.ts.
+async function countActivePool(categoryFilter: string[]): Promise<number> {
+    const res = await dFetch(
+        `/items/quiz_question?filter[is_active][_eq]=true&limit=${LIMIT}&fields=category`
+    );
+    const rows: { category: string | null }[] = res?.data || [];
+    return categoryFilter.length
+        ? rows.filter((r) => r.category != null && categoryFilter.includes(r.category)).length
+        : rows.length;
+}
+
+// Guards the "mark as the applicant quiz" toggle: only an active quiz whose
+// pool can actually satisfy `number_of_questions` may hold the flag.
+// Returns an error message, or null if it's allowed.
+async function validateApplicantQuizFlag(
+    status: string,
+    numberOfQuestions: number,
+    categoryFilter: string[]
+): Promise<string | null> {
+    if (status !== "active") {
+        return "Only an Active quiz can be the applicant quiz. Set this quiz's status to Active first.";
+    }
+    const poolSize = await countActivePool(categoryFilter);
+    if (poolSize < numberOfQuestions) {
+        const scope = categoryFilter.length ? " in the selected categories" : "";
+        return `This quiz draws ${numberOfQuestions} questions but only ${poolSize} active question(s)${scope} are available. Add more questions or lower "Number of Questions to Draw" before making it the applicant quiz.`;
+    }
+    return null;
+}
+
+// Clears the applicant-quiz flag from every quiz except `exceptId` so only one
+// ever holds it. Filters in code -- Directus returns the TINYINT(1) as 0/1 and
+// boolean _eq matching has been unreliable here (lesson 293).
+async function clearApplicantQuizFlagOnOthers(exceptId: number) {
+    const res = await dFetch(`/items/quiz?limit=${LIMIT}&fields=id,is_applicant_quiz`);
+    const others = ((res?.data || []) as { id: number; is_applicant_quiz: unknown }[]).filter(
+        (q) => q.id !== exceptId && (q.is_applicant_quiz === true || q.is_applicant_quiz === 1)
+    );
+    await Promise.all(
+        others.map((q) =>
+            dFetch(`/items/quiz/${q.id}`, {
+                method: "PATCH",
+                body: JSON.stringify({ is_applicant_quiz: false }),
+            })
+        )
+    );
+}
+
 export async function GET() {
     try {
         const quizzesRes = await dFetch(`/items/quiz?limit=${LIMIT}&sort=-created_at`);
@@ -103,6 +152,17 @@ export async function POST(req: NextRequest) {
         [key: string]: unknown;
     };
 
+    if (quizData.is_applicant_quiz) {
+        const err = await validateApplicantQuizFlag(
+            String(quizData.status ?? ""),
+            Number(quizData.number_of_questions ?? 0),
+            category_filter ?? []
+        );
+        if (err) {
+            return NextResponse.json({ error: err }, { status: 400 });
+        }
+    }
+
     const created = await dFetch(`/items/quiz`, {
         method: "POST",
         body: JSON.stringify(quizData),
@@ -111,6 +171,10 @@ export async function POST(req: NextRequest) {
     const quizId = created?.data?.id;
     if (quizId && Array.isArray(category_filter) && category_filter.length) {
         await replaceCategoryFilterRows(quizId, category_filter);
+    }
+
+    if (quizId && quizData.is_applicant_quiz) {
+        await clearApplicantQuizFlagOnOthers(quizId);
     }
 
     return NextResponse.json({ success: true, data: created?.data });
@@ -124,6 +188,41 @@ export async function PATCH(req: NextRequest) {
         [key: string]: unknown;
     };
 
+    // A quiz that leaves Active status can't stay the applicant quiz.
+    if (rest.status !== undefined && rest.status !== "active") {
+        rest.is_applicant_quiz = false;
+    }
+
+    if (rest.is_applicant_quiz) {
+        // Validate against effective values: use what's in this request, else
+        // fall back to what's already stored.
+        const currentRes = await dFetch(
+            `/items/quiz/${id}?fields=status,number_of_questions`
+        );
+        const current = currentRes?.data || {};
+        const effectiveStatus = String(rest.status ?? current.status ?? "");
+        const effectiveCount = Number(
+            rest.number_of_questions ?? current.number_of_questions ?? 0
+        );
+        let effectiveCategories = category_filter;
+        if (!Array.isArray(effectiveCategories)) {
+            const catRes = await dFetch(
+                `/items/quiz_category_filter?filter[quiz_id][_eq]=${id}&limit=${LIMIT}&fields=category`
+            );
+            effectiveCategories = (catRes?.data || []).map(
+                (r: { category: string }) => r.category
+            );
+        }
+        const err = await validateApplicantQuizFlag(
+            effectiveStatus,
+            effectiveCount,
+            effectiveCategories ?? []
+        );
+        if (err) {
+            return NextResponse.json({ error: err }, { status: 400 });
+        }
+    }
+
     await dFetch(`/items/quiz/${id}`, {
         method: "PATCH",
         body: JSON.stringify(rest),
@@ -131,6 +230,10 @@ export async function PATCH(req: NextRequest) {
 
     if (Array.isArray(category_filter)) {
         await replaceCategoryFilterRows(id, category_filter);
+    }
+
+    if (rest.is_applicant_quiz) {
+        await clearApplicantQuizFlagOnOthers(id);
     }
 
     return NextResponse.json({ success: true });

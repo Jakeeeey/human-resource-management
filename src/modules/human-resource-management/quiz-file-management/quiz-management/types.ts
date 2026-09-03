@@ -19,6 +19,10 @@ export interface Quiz {
     shuffle_answers: boolean;
     // Empty array = draw from every active category (no restriction).
     category_filter: string[];
+    // True on the single quiz used in the applicant flow (application form ->
+    // quiz). Only one quiz can hold this at a time (enforced server-side), and
+    // only an active quiz can.
+    is_applicant_quiz: boolean;
     created_at: string;
 }
 
@@ -58,4 +62,5 @@ export interface QuizFormData {
     shuffle_questions: boolean;
     shuffle_answers: boolean;
     category_filter: string[];
+    is_applicant_quiz: boolean;
 }
