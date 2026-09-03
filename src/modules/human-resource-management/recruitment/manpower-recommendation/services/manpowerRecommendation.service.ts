@@ -8,6 +8,16 @@ const headers = {
     "Content-Type": "application/json",
 };
 
+/**
+ * Current Philippine wall time as MySQL-compatible 'YYYY-MM-DD HH:mm:ss' (no offset).
+ * Single producer for ALL timestamp writes in this module — never rely on DB
+ * CURRENT_TIMESTAMP (see conventions §6 Timestamp convention).
+ * @returns PH wall time string.
+ */
+export function nowPH(): string {
+    return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
+}
+
 export const manpowerRecommendationService = {
     /**
      * Fetch all manpower recommendations, newest first.
@@ -105,13 +115,14 @@ export const manpowerRecommendationService = {
     },
 
     /**
-     * Create a new manpower recommendation, auto-filling recommended_at.
+     * Create a new manpower recommendation, auto-filling recommended_at plus
+     * explicit PH created_at/updated_at (never DB CURRENT_TIMESTAMP).
      * @param data - Recommendation create input.
      * @returns The created recommendation record.
      */
     async create(data: ManpowerRecommendationCreateInput): Promise<ManpowerRecommendation> {
         try {
-            const body = { ...data, recommended_by: data.recommended_by ?? null, recommended_at: data.recommended_at ?? new Date().toISOString() };
+            const body = { ...data, recommended_by: data.recommended_by ?? null, recommended_at: data.recommended_at ?? nowPH(), created_at: nowPH(), updated_at: nowPH() };
 
             const response = await fetch(`${API_BASE_URL}/items/manpower_recommendation`, {
                 method: "POST",
@@ -133,7 +144,8 @@ export const manpowerRecommendationService = {
     },
 
     /**
-     * Update a manpower recommendation by ID.
+     * Update a manpower recommendation by ID, always stamping explicit PH updated_at
+     * (never DB ON UPDATE CURRENT_TIMESTAMP).
      * @param id - Recommendation record ID.
      * @param data - Partial recommendation fields to update.
      * @returns The updated recommendation record.
@@ -143,7 +155,7 @@ export const manpowerRecommendationService = {
             const response = await fetch(`${API_BASE_URL}/items/manpower_recommendation/${id}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify(data),
+                body: JSON.stringify({ ...data, updated_at: nowPH() }),
             });
 
             if (!response.ok) {
@@ -182,13 +194,47 @@ export const manpowerRecommendationService = {
     },
 
     /**
-     * Fetch the status of a manpower request (Draft guard for create).
-     * @param requestId - Manpower request record ID.
-     * @returns The request status string.
-     */
-    async fetchRequestStatus(requestId: number): Promise<string> {
+      * Fetch a request's slot capacity: need vs active (Approved/Hired) fill.
+      * @param requestId - Manpower request record ID.
+      * @returns Slot need and active fill count.
+      */
+    async fetchRequestCapacity(requestId: number): Promise<{ need: number; active: number; request_no: string }> {
         try {
-            const url = `${API_BASE_URL}/items/manpower_request/${requestId}?fields=status`;
+            const reqRes = await fetch(`${API_BASE_URL}/items/manpower_request/${requestId}?fields=no_manpower_needed,request_no`, { headers });
+            if (!reqRes.ok) {
+                const errorText = await reqRes.text();
+                console.error(`DIRECTUS ERROR [fetchRequestCapacity:${requestId}]:`, errorText);
+                throw new Error(`HTTP error! status: ${reqRes.status}`);
+            }
+            const reqJson = await reqRes.json();
+            const need = (reqJson.data?.no_manpower_needed ?? 0) as number;
+            const request_no = (reqJson.data?.request_no ?? `#${requestId}`) as string;
+            const recRes = await fetch(
+                `${API_BASE_URL}/items/manpower_recommendation` +
+                `?filter[manpower_request_id][_eq]=${requestId}&filter[status][_in]=Approved,Hired&fields=id&limit=-1`,
+                { headers }
+            );
+            if (!recRes.ok) {
+                const errorText = await recRes.text();
+                console.error(`DIRECTUS ERROR [fetchRequestCapacity recs:${requestId}]:`, errorText);
+                throw new Error(`HTTP error! status: ${recRes.status}`);
+            }
+            const recJson = await recRes.json();
+            return { need, active: (recJson.data as unknown[]).length, request_no };
+        } catch (e) {
+            console.error("Error fetching manpower request capacity:", e);
+            throw new Error("INTERNAL_FAIL: Failed to fetch manpower request capacity");
+        }
+    },
+
+    /**
+      * Fetch the status of a manpower request (Draft guard for create).
+      * @param requestId - Manpower request record ID.
+      * @returns The request status string.
+      */
+    async fetchRequestStatus(requestId: number): Promise<{ status: string; request_no: string }> {
+        try {
+            const url = `${API_BASE_URL}/items/manpower_request/${requestId}?fields=status,request_no`;
             const response = await fetch(url, { headers });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -196,7 +242,7 @@ export const manpowerRecommendationService = {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const result = await response.json();
-            return result.data.status as string;
+            return { status: result.data.status as string, request_no: (result.data.request_no ?? `#${requestId}`) as string };
         } catch (e) {
             console.error("Error fetching manpower request status:", e);
             throw new Error("INTERNAL_FAIL: Failed to fetch manpower request status");

@@ -25,8 +25,9 @@ const ManpowerRecommendationFormSchema = z.object({
 type ManpowerRecommendationFormValues = z.infer<typeof ManpowerRecommendationFormSchema>;
 
 export function ManpowerRecommendationForm() {
-    const { isCreateOpen, setIsCreateOpen, submitRecommendation, openRequests, applicants, pendingRequestId, setPendingRequestId } = useManpowerRecommendation();
+    const { isCreateOpen, setIsCreateOpen, submitRecommendation, openRequests, applicants, recommendations, pendingRequestId, setPendingRequestId } = useManpowerRecommendation();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [applicantOpen, setApplicantOpen] = useState(false);
 
     const form = useForm<ManpowerRecommendationFormValues>({
         resolver: zodResolver(ManpowerRecommendationFormSchema),
@@ -89,7 +90,7 @@ export function ManpowerRecommendationForm() {
                             Recommend Applicant
                         </DialogTitle>
                         <DialogDescription className="text-sm mt-2">
-                            Select an open manpower request and an applicant to recommend.
+                            Select an applicant to recommend for this manpower request.
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -100,68 +101,20 @@ export function ManpowerRecommendationForm() {
                             <FormField
                                 control={form.control}
                                 name="manpower_request_id"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                        <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">Manpower Request <span className="text-destructive">*</span></FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <FormControl>
-                                                    <Button
-                                                        variant="outline"
-                                                        role="combobox"
-                                                        aria-expanded={false}
-                                                        className={cn(
-                                                            "w-full justify-between bg-muted/30 focus:bg-background transition-colors font-normal",
-                                                            !field.value && "text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        <span className="truncate">
-                                                            {field.value
-                                                                ? (() => {
-                                                                    const selected = openRequests.filter((r) => r.status === 'Approved').find((r) => r.id === field.value);
-                                                                    return selected ? `${selected.request_no} — ${selected.position}` : "Select manpower request";
-                                                                })()
-                                                                : "Select manpower request"}
-                                                        </span>
-                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                    </Button>
-                                                </FormControl>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                                                <Command>
-                                                    <CommandInput placeholder="Search manpower request..." />
-                                                    <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
-                                                        <CommandEmpty>No manpower request found.</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {openRequests.filter((req) => req.status === 'Approved').map((req) => (
-                                                                <CommandItem
-                                                                    value={`${req.request_no} ${req.position}`}
-                                                                    key={req.id}
-                                                                    onSelect={() => {
-                                                                        field.onChange(req.id);
-                                                                    }}
-                                                                >
-                                                                    <Check
-                                                                        className={cn(
-                                                                            "mr-2 h-4 w-4",
-                                                                            req.id === field.value
-                                                                                ? "opacity-100"
-                                                                                : "opacity-0"
-                                                                        )}
-                                                                    />
-                                                                    <span className="truncate" title={`${req.request_no} — ${req.position}`}>
-                                                                        {req.request_no} — {req.position}
-                                                                    </span>
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                render={() => {
+                                    const selected = openRequests.find((r) => r.id === pendingRequestId);
+                                    return (
+                                        <FormItem className="flex flex-col">
+                                            <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">Manpower Request</FormLabel>
+                                            <div className="w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm font-medium min-h-10 flex items-center">
+                                                <span className="truncate" title={selected ? `${selected.request_no} — ${selected.position}` : undefined}>
+                                                    {selected ? `${selected.request_no} — ${selected.position}` : "Unknown request"}
+                                                </span>
+                                            </div>
+                                            <FormMessage />
+                                        </FormItem>
+                                    );
+                                }}
                             />
                             <FormField
                                 control={form.control}
@@ -169,13 +122,13 @@ export function ManpowerRecommendationForm() {
                                 render={({ field }) => (
                                     <FormItem className="flex flex-col">
                                         <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">Applicant <span className="text-destructive">*</span></FormLabel>
-                                        <Popover>
+                                        <Popover open={applicantOpen} onOpenChange={setApplicantOpen}>
                                             <PopoverTrigger asChild>
                                                 <FormControl>
                                                     <Button
                                                         variant="outline"
                                                         role="combobox"
-                                                        aria-expanded={false}
+                                                        aria-expanded={applicantOpen}
                                                         className={cn(
                                                             "w-full justify-between bg-muted/30 focus:bg-background transition-colors font-normal",
                                                             !field.value && "text-muted-foreground"
@@ -196,12 +149,13 @@ export function ManpowerRecommendationForm() {
                                                     <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
                                                         <CommandEmpty>No applicant found.</CommandEmpty>
                                                         <CommandGroup>
-                                                            {applicants.map((applicant) => (
+                                                            {applicants.filter((applicant) => !recommendations.some((r) => r.manpower_request_id === pendingRequestId && r.applicant_id === applicant.id) && !recommendations.some((r) => r.applicant_id === applicant.id && (r.status === "Approved" || r.status === "Hired"))).map((applicant) => (
                                                                 <CommandItem
-                                                                    value={applicant.full_name}
+                                                                    value={`${applicant.full_name} ${applicant.id}`}
                                                                     key={applicant.id}
                                                                     onSelect={() => {
                                                                         field.onChange(applicant.id);
+                                                                        setApplicantOpen(false);
                                                                     }}
                                                                 >
                                                                     <Check

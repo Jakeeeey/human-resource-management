@@ -95,7 +95,7 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
             });
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.error || "Failed to submit recommendation");
+                throw new Error(errData.message || errData.error || "Failed to submit recommendation");
             }
             toast.success("Manpower Recommendation created successfully!");
             await refresh();
@@ -115,7 +115,7 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
             });
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.error || "Failed to update recommendation");
+                throw new Error(errData.message || errData.error || "Failed to update recommendation");
             }
             toast.success("Manpower Recommendation updated!");
             await refresh();
@@ -131,7 +131,7 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
             const response = await fetch(`${API_PATH}/${id}`, { method: "DELETE" });
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.error || "Failed to delete recommendation");
+                throw new Error(errData.message || errData.error || "Failed to delete recommendation");
             }
             toast.success("Manpower Recommendation deleted");
             await refresh();

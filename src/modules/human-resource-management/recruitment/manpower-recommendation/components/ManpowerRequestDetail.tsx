@@ -25,8 +25,7 @@ export function ManpowerRequestDetail() {
 
     const applicantMap = new Map(applicants.map((a) => [a.id, a]));
     const related = recommendations.filter((r) => r.manpower_request_id === selectedRequest.id);
-    const filled = related.length;
-    const total = selectedRequest.no_manpower_needed ?? 0;
+
 
     return (
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
@@ -38,7 +37,6 @@ export function ManpowerRequestDetail() {
                         </DialogTitle>
                         <DialogDescription className="text-sm mt-2">
                             <span className="truncate block" title={selectedRequest.position}>{selectedRequest.position}</span>
-                            <span className="font-medium">Slots {filled}/{total}</span>
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -64,7 +62,7 @@ export function ManpowerRequestDetail() {
                                         <span className="text-sm text-muted-foreground truncate max-w-[160px]" title={rec.recommended_at ?? "-"}>
                                             {rec.recommended_at ?? "-"}
                                         </span>
-                                        <Button variant="ghost" size="sm" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
+                                        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
                                             <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                             View
                                         </Button>
@@ -77,7 +75,9 @@ export function ManpowerRequestDetail() {
 
                 <div className="p-4 md:p-6 bg-muted/20 border-t border-border/40">
                     <DialogFooter className="flex w-full sm:justify-end gap-3 items-center">
-                        {selectedRequest.status === 'Approved' ? (
+                        {selectedRequest.status !== 'Approved' ? (
+                            <span className="text-muted-foreground text-xs mr-auto">Awaiting approval — recommendations open after approval.</span>
+                        ) : (
                             <Button
                                 type="button"
                                 onClick={() => { setIsDetailOpen(false); openRecommendForm(selectedRequest.id); }}
@@ -85,8 +85,6 @@ export function ManpowerRequestDetail() {
                             >
                                 Recommend
                             </Button>
-                        ) : (
-                            <span className="text-muted-foreground text-xs mr-auto">Awaiting approval — recommendations open after approval.</span>
                         )}
                         <DialogClose asChild>
                             <Button type="button" variant="outline" className="rounded-full px-6">
