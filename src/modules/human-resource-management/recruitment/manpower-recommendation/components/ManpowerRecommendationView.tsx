@@ -31,7 +31,7 @@ function getStatusColor(status: string) {
 }
 
 export function ManpowerRecommendationView() {
-    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests } = useManpowerRecommendationContext();
+    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests, users } = useManpowerRecommendationContext();
 
     const [newStatus, setNewStatus] = useState<StatusOption>("Recommended");
     const [decisionNotes, setDecisionNotes] = useState<string>("");
@@ -58,6 +58,12 @@ export function ManpowerRecommendationView() {
     const requestNo = matchedRequest?.request_no || String(selectedRecommendation.manpower_request_id);
     const position = matchedRequest?.position || `Request #${selectedRecommendation.manpower_request_id}`;
     const applicantName = applicants.find(a => a.id === selectedRecommendation.applicant_id)?.full_name || `Applicant #${selectedRecommendation.applicant_id}`;
+    // recommended_by/decision_by are plain INT (no Directus relation) — join full
+    // names from the users lookup, falling back to the raw id (never blank).
+    const userName = (id: number | null | undefined) =>
+        id == null ? "-" : users.find(u => Number(u.id) === id)?.name || `User #${id}`;
+    const recommendedByName = userName(selectedRecommendation.recommended_by);
+    const decisionByName = userName(selectedRecommendation.decision_by);
 
     const handleUpdateStatus = async () => {
         if (selectedRecommendation.id == null) return;
@@ -139,7 +145,7 @@ export function ManpowerRecommendationView() {
                                     <Button variant="outline"               size="lg"
               className="ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
                                         <FileText className="mr-2 h-4 w-4" />
-                                        Resume
+                                        Application Form
                                     </Button>
                                 </div>
                             </div>
@@ -158,8 +164,8 @@ export function ManpowerRecommendationView() {
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 whitespace-pre-wrap min-h-[100px] max-h-[400px] overflow-y-auto">{selectedRecommendation.recommendation_notes || "-"}</div>
                             </div>
                             <div>
-                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommended By (User ID)</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.recommended_by ?? "-"}</div>
+                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommended By</label>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{recommendedByName}</div>
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommended At</label>
@@ -176,8 +182,8 @@ export function ManpowerRecommendationView() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Decision By (User ID)</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.decision_by ?? "-"}</div>
+                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Decision By</label>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{decisionByName}</div>
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Decision At</label>

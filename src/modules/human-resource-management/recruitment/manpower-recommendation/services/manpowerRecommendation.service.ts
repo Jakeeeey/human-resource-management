@@ -115,6 +115,25 @@ export const manpowerRecommendationService = {
     },
 
     /**
+     * Fetch users for resolving recommended_by / decision_by ids to full names.
+     * recommended_by/decision_by are plain INT (no Directus relation), so rows
+     * carry ids only — the client joins names from this lookup.
+     * @returns Typed user lookup rows ({ id, name }).
+     */
+    async fetchUsers(): Promise<{ id: number | string; name: string }[]> {
+        try {
+            const url = `${API_BASE_URL}/items/user?fields=user_id,user_fname,user_lname&limit=-1`;
+            const response = await fetch(url, { headers });
+            if (!response.ok) return [];
+            const result = await response.json();
+            return result.data.map((u: { user_id: number | string; user_fname?: string; user_lname?: string }) => ({
+                id: u.user_id,
+                name: `${u.user_fname ?? ''} ${u.user_lname ?? ''}`.trim() || String(u.user_id),
+            }));
+        } catch { return []; }
+    },
+
+    /**
      * Create a new manpower recommendation, auto-filling recommended_at plus
      * explicit PH created_at/updated_at (never DB CURRENT_TIMESTAMP).
      * @param data - Recommendation create input.

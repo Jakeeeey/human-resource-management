@@ -10,6 +10,7 @@ interface ManpowerRecommendationContextType {
     recommendations: ManpowerRecommendation[];
     applicants: { id: number; full_name: string; position_applied_for: string }[];
     openRequests: { id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[];
+    users: { id: number | string; name: string }[];
     isLoading: boolean;
     error: string | null;
     isCreateOpen: boolean;
@@ -42,6 +43,7 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
     const [recommendations, setRecommendations] = useState<ManpowerRecommendation[]>([]);
     const [applicants, setApplicants] = useState<{ id: number; full_name: string; position_applied_for: string }[]>([]);
     const [openRequests, setOpenRequests] = useState<{ id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[]>([]);
+    const [users, setUsers] = useState<{ id: number | string; name: string }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -73,6 +75,7 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
             setRecommendations(Array.isArray(result.data) ? result.data : []);
             setApplicants(Array.isArray(result.applicants) ? result.applicants : []);
             setOpenRequests(Array.isArray(result.openRequests) ? result.openRequests : []);
+            setUsers(Array.isArray(result.users) ? result.users : []);
         } catch (err) {
             const e = err as Error;
             setError(e.message);
@@ -143,11 +146,11 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
     }, [refresh]);
 
     const contextValue = useMemo(() => ({
-        recommendations, applicants, openRequests, isLoading, error, isCreateOpen, setIsCreateOpen,
+        recommendations, applicants, openRequests, users, isLoading, error, isCreateOpen, setIsCreateOpen,
         selectedRecommendation, setSelectedRecommendation, isViewOpen, setIsViewOpen,
         pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen,
         refresh, submitRecommendation, updateRecommendation, deleteRecommendation
-    }), [recommendations, applicants, openRequests, isLoading, error, isCreateOpen, selectedRecommendation, isViewOpen, pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen, refresh, submitRecommendation, updateRecommendation, deleteRecommendation]);
+    }), [recommendations, applicants, openRequests, users, isLoading, error, isCreateOpen, selectedRecommendation, isViewOpen, pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen, refresh, submitRecommendation, updateRecommendation, deleteRecommendation]);
 
     return (
         <ManpowerRecommendationContext.Provider value={contextValue}>

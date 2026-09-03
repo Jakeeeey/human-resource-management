@@ -197,8 +197,8 @@ export function mapApplicationToFormValues(bundle: ApplicationBundle): Applicati
 
         trainings: (bundle.application_training ?? []).map(toTraining),
 
-        // Stored file UUIDs can't rehydrate File objects — rows show type +
-        // label with an empty (disabled) file slot.
+        // Stored file UUIDs can't rehydrate File objects — the viewer renders
+        // its own read-only file list from attachment_files instead of this section.
         attachments: (bundle.application_attachment ?? []).map((r) => ({
             type: (ATTACHMENT_TYPES.includes(r["type"] as AttachmentType)
                 ? r["type"]
