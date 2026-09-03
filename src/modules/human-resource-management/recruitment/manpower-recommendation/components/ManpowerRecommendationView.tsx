@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Building2, FileText, UserCheck, Loader2, Pencil } from "lucide-react";
+import { ApplicationViewDialog } from "./ApplicationViewDialog";
 
 const STATUS_OPTIONS = ["Recommended", "Approved", "Hired", "Rejected", "Withdrawn"] as const;
 
@@ -37,6 +38,7 @@ export function ManpowerRecommendationView() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isEditingStatus, setIsEditingStatus] = useState(false);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
+    const [isResumeOpen, setIsResumeOpen] = useState(false);
 
     useEffect(() => {
         if (selectedRecommendation) {
@@ -44,6 +46,7 @@ export function ManpowerRecommendationView() {
             setDecisionNotes(selectedRecommendation.decision_notes || "");
             setIsEditingStatus(false);
             setIsEditingNotes(false);
+            setIsResumeOpen(false);
         }
     }, [selectedRecommendation]);
 
@@ -74,6 +77,7 @@ export function ManpowerRecommendationView() {
     };
 
     return (
+        <>
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
             <DialogContent className="sm:max-w-[85vw] lg:max-w-[1000px] w-full p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
                 <div className="p-6 md:p-8 border-b border-border/40 bg-card">
@@ -108,7 +112,7 @@ export function ManpowerRecommendationView() {
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Applicant Name</label>
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{applicantName}</div>
                             </div>
-                            <div>
+                            <div className="md:col-span-3">
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
                                 <div className="flex items-center gap-2">
                                     {isEditingStatus ? (
@@ -131,6 +135,11 @@ export function ManpowerRecommendationView() {
                                     )}
                                     <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
                                         <Pencil className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                    <Button variant="outline"               size="lg"
+              className="ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        Resume
                                     </Button>
                                 </div>
                             </div>
@@ -210,5 +219,12 @@ export function ManpowerRecommendationView() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        <ApplicationViewDialog
+            applicantId={selectedRecommendation.applicant_id}
+            applicantName={applicantName}
+            open={isResumeOpen}
+            onOpenChange={setIsResumeOpen}
+        />
+        </>
     );
 }

@@ -93,7 +93,7 @@ export function OpenManpowerRequestsList() {
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Position</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Recommended</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Approved</TableHead>
-                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-right">Status</TableHead>
+                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Status</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-right pr-6">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -138,17 +138,17 @@ export function OpenManpowerRequestsList() {
                                         <TableCell className="font-medium text-muted-foreground/80 text-center">
                                             {approved}/{total}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-center">
                                             {isClosed ? (
-                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 border-blue-500/20">
+                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 border-blue-500/20 inline-block w-[110px] text-center">
                                                     Closed
                                                 </span>
                                             ) : req.status === "Approved" ? (
-                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20 inline-block w-[110px] text-center">
                                                     Approved
                                                 </span>
                                             ) : (
-                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 border-amber-500/20">
+                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 border-amber-500/20 inline-block w-[110px] text-center">
                                                     Pending
                                                 </span>
                                             )}

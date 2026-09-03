@@ -87,7 +87,8 @@ export function QuestionCard({
                             return (
                                 <div
                                     key={choice.id}
-                                    className="flex items-center gap-3 rounded-md border p-3"
+                                    onClick={() => onChange([String(choice.id)])}
+                                    className="flex cursor-pointer items-center gap-3 rounded-md border p-3"
                                 >
                                     <RadioGroupItem
                                         value={String(choice.id)}

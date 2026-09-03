@@ -16,11 +16,9 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { QuestionCard } from "./components/QuestionCard";
-import { ResultScreen } from "./components/ResultScreen";
 import type { AnswersByQuestionId, StartQuizResponse, SubmitAnswerPayload } from "./types";
-import type { QuizAttempt, QuizAttemptDetail } from "@/modules/human-resource-management/quiz-file-management/quiz-history/types";
 
-type Step = "loading" | "blocked" | "in-progress" | "submitting" | "result";
+type Step = "loading" | "blocked" | "in-progress" | "submitting";
 
 const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
 
@@ -68,7 +66,6 @@ export default function QuizTakingModule({
     const [answers, setAnswers] = useState<AnswersByQuestionId>({});
     const [startedAt, setStartedAt] = useState<string | null>(null);
     const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
-    const [result, setResult] = useState<QuizAttempt | null>(null);
     const isSubmittingRef = useRef(false);
 
     const [pendingNav, setPendingNav] = useState<
@@ -129,18 +126,24 @@ export default function QuizTakingModule({
             const submitBody = await submitRes.json();
             if (!submitRes.ok) throw new Error(submitBody.error || "Submit failed");
 
-            const attemptId = submitBody.data.id;
-            const detailRes = await fetch(`/api/hrm/quiz-file-management/quiz-attempt/${attemptId}`);
-            const detail: QuizAttemptDetail = await detailRes.json();
-
-            setResult(detail.attempt);
-            setStep("result");
+            // NOTE: attempt detail is deliberately NOT fetched here — it carries
+            // correct answers, which must never reach the applicant's browser.
+            // Only display-safe scalars travel on as query params to the done
+            // screen (score, pass flag, quiz name, totals) — never answers.
+            const params = new URLSearchParams({
+                score: String(submitBody.data?.score ?? submitBody.data?.percentage_score ?? ""),
+                passed: String(submitBody.data?.passed ?? ""),
+                quiz: data.quiz.name,
+                total: String(data.questions.length),
+                threshold: String(data.quiz.pass_threshold_value),
+            });
+            router.push(`${returnHref}?${params.toString()}`);
         } catch {
             isSubmittingRef.current = false;
             setBlockedMessage("Failed to submit the quiz. Please try again.");
             setStep("blocked");
         }
-    }, [data, quizId, applicantId, applicationId, startedAt, answers]);
+    }, [data, quizId, applicantId, applicationId, startedAt, answers, router, returnHref]);
 
     useEffect(() => {
         if (step !== "in-progress" || secondsRemaining == null) return;
@@ -229,15 +232,6 @@ export default function QuizTakingModule({
 
     if (step === "submitting") {
         return <div className="text-sm text-muted-foreground">Submitting your answers...</div>;
-    }
-
-    if (step === "result" && result) {
-        return (
-            <ResultScreen
-                attempt={result}
-                onNextCandidate={() => router.push(returnHref)}
-            />
-        );
     }
 
     if (!data) return null;
