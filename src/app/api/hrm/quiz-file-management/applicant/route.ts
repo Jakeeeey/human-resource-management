@@ -68,7 +68,10 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST -- the quick-create fallback used when intake search finds no match.
+// POST -- generic applicant creation. No longer called by
+// ApplicantIntakeDialog (its "New Applicant" path now routes into the full
+// Application Form instead of quick-creating here); left in place as a plain
+// create endpoint in case something else needs one.
 export async function POST(req: NextRequest) {
     const body = await req.json();
     const { full_name, position_applied_for } = body as {

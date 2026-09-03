@@ -49,11 +49,22 @@ function buildSubmitAnswers(
     return payload;
 }
 
-export default function QuizTakingModule() {
+interface QuizTakingModuleProps {
+    // Where "back"/"next candidate"/blocked-state buttons return to. The
+    // HR-desktop mount keeps the default; the chrome-less /apply/quiz mount
+    // passes a neutral completion route so the applicant never lands in the
+    // HR app.
+    returnHref?: string;
+}
+
+export default function QuizTakingModule({
+    returnHref = "/hrm/quiz-file-management/quiz-management",
+}: QuizTakingModuleProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const quizId = searchParams.get("quiz_id");
     const applicantId = searchParams.get("applicant_id");
+    const applicationId = searchParams.get("application_id");
 
     const [step, setStep] = useState<Step>("loading");
     const [blockedMessage, setBlockedMessage] = useState("");
@@ -117,6 +128,7 @@ export default function QuizTakingModule() {
                 body: JSON.stringify({
                     quiz_id: Number(quizId),
                     applicant_id: Number(applicantId),
+                    application_id: applicationId ? Number(applicationId) : null,
                     started_at: startedAt,
                     answers: buildSubmitAnswers(data.questions, answers),
                 }),
@@ -135,7 +147,7 @@ export default function QuizTakingModule() {
             setBlockedMessage("Failed to submit the quiz. Please try again.");
             setStep("blocked");
         }
-    }, [data, quizId, applicantId, startedAt, answers]);
+    }, [data, quizId, applicantId, applicationId, startedAt, answers]);
 
     // Countdown timer -- auto-submits the moment it hits zero.
     useEffect(() => {
@@ -217,9 +229,9 @@ export default function QuizTakingModule() {
                 <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => router.push("/hrm/quiz-file-management/quiz-management")}
+                    onClick={() => router.push(returnHref)}
                 >
-                    Back to Quiz Management
+                    Done
                 </Button>
             </div>
         );
@@ -233,7 +245,7 @@ export default function QuizTakingModule() {
         return (
             <ResultScreen
                 attempt={result}
-                onNextCandidate={() => router.push("/hrm/quiz-file-management/quiz-management")}
+                onNextCandidate={() => router.push(returnHref)}
             />
         );
     }
