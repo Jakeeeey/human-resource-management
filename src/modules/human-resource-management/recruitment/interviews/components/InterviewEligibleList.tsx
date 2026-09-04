@@ -21,9 +21,9 @@ import { Eye, FileText, Pencil } from "lucide-react";
  *
  * Search filters through the hook joined-text lists (filteredInitial /
  * filteredFinal); the Awaiting-verdict chip toggles a Pending-verdict-only
- * filter on the active tab. Applicant/request display joins defensively: the
- * T4 envelope carries FK ids only (no names), so userDisplay() resolves when
- * the id exists in users and falls back to `#id` labels otherwise.
+ * filter on the active tab. Applicant names arrive as full_name per row from
+ * the T4 envelope applicant lookup, with `Applicant #id` fallback only
+ * when the name is truly missing.
  */
 export function InterviewEligibleList() {
     const {
@@ -40,7 +40,6 @@ export function InterviewEligibleList() {
         setIsGradeOpen,
         handleView,
         latestPerApplication,
-        userDisplay,
     } = useInterview();
     const [pendingOnly, setPendingOnly] = useState(false);
 
@@ -162,10 +161,7 @@ export function InterviewEligibleList() {
                                     <TableRow key={row.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                         <TableCell className="pl-6 h-16">
                                             <div className="font-bold text-foreground group-hover:text-primary transition-colors">
-                                                {userDisplay(row.applicant_id)}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground/70">
-                                                Application #{row.id}
+                                                {row.full_name || `Applicant #${row.applicant_id}`}
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-medium text-muted-foreground/80 text-center">
@@ -250,7 +246,7 @@ export function InterviewEligibleList() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-medium text-muted-foreground/80">
-                                            {row.applicant_id != null ? userDisplay(row.applicant_id) : `Rec #${row.id}`}
+                                            {row.full_name}
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20 inline-block w-[110px] text-center">

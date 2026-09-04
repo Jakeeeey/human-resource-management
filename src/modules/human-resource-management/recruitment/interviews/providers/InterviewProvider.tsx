@@ -32,6 +32,7 @@ export interface EligibleInitialRow {
     quiz_score: number | null;
     quiz_passed: boolean | null;
     submitted_at: string | null;
+    full_name: string;
     latestInitialVerdict: string | null;
 }
 
@@ -44,6 +45,7 @@ export interface EligibleFinalRow {
     applicant_id: number | null;
     manpower_request_id: number | null;
     status: string;
+    full_name: string;
     latestFinalVerdict: string | null;
 }
 

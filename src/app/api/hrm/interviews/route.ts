@@ -59,12 +59,15 @@ export async function GET() {
         const interviews = list.interviews;
 
         // Eligible Initial: every quiz-completed application, annotated with its
-        // latest Initial-stage verdict (null when never graded).
+        // latest Initial-stage verdict (null when never graded). full_name
+        // arrives from the service applicant lookup; defensively coerce to a
+        // real string so the UI never receives null/undefined (Applicant #id
+        // fallback only when the name is truly missing).
         const eligibleInitial = quizApps.map((app) => {
             const initials = interviews
                 .filter((i) => i.stage === "Initial" && i.application_id === app.id)
                 .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-            return { ...app, latestInitialVerdict: initials[0]?.verdict ?? null };
+            return { ...app, full_name: app.full_name || `Applicant #${app.applicant_id}`, latestInitialVerdict: initials[0]?.verdict ?? null };
         });
 
         // Eligible Final: Approved recs on Approved requests MINUS recs that
@@ -81,7 +84,7 @@ export async function GET() {
                 const finals = interviews
                     .filter((i) => i.stage === "Final" && i.recommendation_id === rec.id)
                     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
-                return { ...rec, latestFinalVerdict: finals[0]?.verdict ?? null };
+                return { ...rec, full_name: rec.full_name ?? "Unknown applicant", latestFinalVerdict: finals[0]?.verdict ?? null };
             });
 
         return NextResponse.json({ data: interviews, eligibleInitial, eligibleFinal, users });

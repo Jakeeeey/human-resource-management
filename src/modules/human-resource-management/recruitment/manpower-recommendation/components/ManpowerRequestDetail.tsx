@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Eye, FileText } from "lucide-react";
 
 export function ManpowerRequestDetail() {
-    const { recommendations, applicants, isDetailOpen, setIsDetailOpen, selectedRequest, openRecommendForm, handleView, interviews, interviewInitialRows } = useManpowerRecommendation();
+    const { recommendations, applicants, isDetailOpen, setIsDetailOpen, selectedRequest, openRecommendForm, handleView } = useManpowerRecommendation();
 
     if (!selectedRequest) return null;
 
@@ -24,18 +24,6 @@ export function ManpowerRequestDetail() {
     };
 
     const applicantMap = new Map(applicants.map((a) => [a.id, a]));
-    const getInitialVerdictColor = (verdict: string | null) => {
-        switch (verdict) {
-            case 'Passed': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
-            case 'Failed': return 'bg-red-500/10 text-red-600 border-red-500/20';
-            case 'Pending': return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
-            default: return 'bg-zinc-500/10 text-zinc-600 border-zinc-500/20';
-        }
-    };
-    const latestInitialForApplicant = (applicantId: number) => {
-        const applicationIds = interviewInitialRows.filter((row) => row.applicant_id === applicantId).map((row) => row.id);
-        return interviews.find((interview) => interview.stage === "Initial" && applicationIds.includes(interview.application_id)) ?? null;
-    };
     const related = recommendations.filter((r) => r.manpower_request_id === selectedRequest.id);
     const approvedCount = related.filter((r) => r.status === 'Approved' || r.status === 'Hired').length;
     const hiredCount = related.filter((r) => r.status === 'Hired').length;
@@ -68,16 +56,12 @@ export function ManpowerRequestDetail() {
                         <div className="space-y-3">
                             {related.map((rec) => {
                                 const applicant = applicantMap.get(rec.applicant_id);
-                                const latestInitial = latestInitialForApplicant(rec.applicant_id);
                                 return (
                                     <div key={rec.id} className="flex items-center gap-3 p-3 border border-border/50 rounded-xl bg-card">
                                         <span className="font-medium truncate max-w-[160px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
                                             {applicant?.full_name ?? `Applicant #${rec.applicant_id}`}
                                         </span>
                                         <div className="ml-auto flex items-center gap-3 shrink-0">
-                                            <span title={`Latest initial interview verdict${latestInitial ? ` (${latestInitial.stage} #${latestInitial.id})` : ""}`} className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider shrink-0 ${getInitialVerdictColor(latestInitial?.verdict ?? null)}`}>
-                                                {latestInitial?.verdict ?? "Not graded"}
-                                            </span>
                                             <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider w-[130px] justify-center shrink-0 ${getStatusColor(rec.status ?? "Recommended")}`}>
                                                 {rec.status ?? "Recommended"}
                                             </Badge>

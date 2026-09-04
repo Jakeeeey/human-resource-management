@@ -27,6 +27,7 @@ export type QuizCompletedApplication = {
     quiz_score: number | null;
     quiz_passed: boolean | null;
     submitted_at: string | null;
+    full_name: string;
 };
 
 /**
@@ -37,6 +38,7 @@ export type ApprovedRecommendation = {
     applicant_id: number | null;
     manpower_request_id: number | null;
     status: string;
+    full_name: string;
 };
 
 /**
@@ -163,7 +165,10 @@ export const interviewService = {
 
     /**
      * Fetch quiz-completed applications for the Initial-tab eligible list.
-     * @returns Typed quiz-completed application lookup rows.
+     * Each row carries the applicant full_name resolved via the applicant
+     * table by applicant_id (Directus items/applicant?fields=id,full_name),
+     * falling back to `Applicant #id` when missing — never null into UI.
+     * @returns Typed quiz-completed application lookup rows with full_name.
      */
     async fetchQuizCompletedApplications(): Promise<QuizCompletedApplication[]> {
         try {
@@ -175,21 +180,35 @@ export const interviewService = {
             const response = await fetch(url, { headers });
             if (!response.ok) return [];
             const result = await response.json();
-            return result.data.map((a: { id: number; applicant_id: number; quiz_score: number | null; quiz_passed: boolean | null; submitted_at: string | null }) => ({
+            const apps = result.data.map((a: { id: number; applicant_id: number; quiz_score: number | null; quiz_passed: boolean | null; submitted_at: string | null }) => ({
                 id: a.id,
                 applicant_id: a.applicant_id,
                 quiz_score: a.quiz_score,
                 quiz_passed: a.quiz_passed,
                 submitted_at: a.submitted_at,
             }));
+            if (apps.length === 0) return [];
+            try {
+                const applicantRes = await fetch(`${API_BASE_URL}/items/applicant?fields=id,full_name&limit=-1`, { headers });
+                if (!applicantRes.ok) return apps.map((a: { id: number; applicant_id: number; quiz_score: number | null; quiz_passed: boolean | null; submitted_at: string | null }) => ({ ...a, full_name: `Applicant #${a.applicant_id}` }));
+                const applicantJson = await applicantRes.json();
+                const nameMap = new Map((applicantJson.data as { id: number; full_name: string }[]).map((row) => [row.id, row.full_name]));
+                return apps.map((a: { id: number; applicant_id: number; quiz_score: number | null; quiz_passed: boolean | null; submitted_at: string | null }) => ({
+                    ...a,
+                    full_name: nameMap.get(a.applicant_id) || `Applicant #${a.applicant_id}`,
+                }));
+            } catch { return apps.map((a: { id: number; applicant_id: number; quiz_score: number | null; quiz_passed: boolean | null; submitted_at: string | null }) => ({ ...a, full_name: `Applicant #${a.applicant_id}` })); }
         } catch { return []; }
     },
 
     /**
      * Fetch Approved recommendations on Approved requests for the Final-tab
      * eligible list (mirrors the openRequests pattern: open requests first,
-     * then recs scoped to those request ids).
-     * @returns Typed approved recommendation lookup rows.
+     * then recs scoped to those request ids). Each row carries the applicant
+     * full_name resolved via the applicant table by applicant_id (Directus
+     * items/applicant?fields=id,full_name), falling back to
+     * "Unknown applicant" when missing — never null into UI.
+     * @returns Typed approved recommendation lookup rows with full_name.
      */
     async fetchApprovedRecommendations(): Promise<ApprovedRecommendation[]> {
         try {
@@ -213,12 +232,23 @@ export const interviewService = {
             );
             if (!recRes.ok) return [];
             const recJson = await recRes.json();
-            return recJson.data.map((r: { id: number; applicant_id: number | null; manpower_request_id: number | null; status: string }) => ({
+            const recs = recJson.data.map((r: { id: number; applicant_id: number | null; manpower_request_id: number | null; status: string }) => ({
                 id: r.id,
                 applicant_id: r.applicant_id,
                 manpower_request_id: r.manpower_request_id,
                 status: r.status,
             }));
+            if (recs.length === 0) return [];
+            try {
+                const applicantRes = await fetch(`${API_BASE_URL}/items/applicant?fields=id,full_name&limit=-1`, { headers });
+                if (!applicantRes.ok) return recs.map((r: { id: number; applicant_id: number | null; manpower_request_id: number | null; status: string }) => ({ ...r, full_name: "Unknown applicant" }));
+                const applicantJson = await applicantRes.json();
+                const nameMap = new Map((applicantJson.data as { id: number; full_name: string }[]).map((row) => [row.id, row.full_name]));
+                return recs.map((r: { id: number; applicant_id: number | null; manpower_request_id: number | null; status: string }) => ({
+                    ...r,
+                    full_name: (r.applicant_id != null ? nameMap.get(r.applicant_id) : undefined) ?? "Unknown applicant",
+                }));
+            } catch { return recs.map((r: { id: number; applicant_id: number | null; manpower_request_id: number | null; status: string }) => ({ ...r, full_name: "Unknown applicant" })); }
         } catch { return []; }
     },
 

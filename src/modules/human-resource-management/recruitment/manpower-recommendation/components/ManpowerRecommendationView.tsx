@@ -31,7 +31,7 @@ function getStatusColor(status: string) {
 }
 
 export function ManpowerRecommendationView() {
-    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests, recommendations, users, interviews, interviewInitialRows } = useManpowerRecommendationContext();
+    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests, recommendations, users } = useManpowerRecommendationContext();
 
     const [newStatus, setNewStatus] = useState<StatusOption>("Recommended");
     const [decisionNotes, setDecisionNotes] = useState<string>("");
@@ -69,16 +69,6 @@ export function ManpowerRecommendationView() {
         id == null ? "-" : users.find(u => Number(u.id) === id)?.name || `User #${id}`;
     const recommendedByName = userName(selectedRecommendation.recommended_by);
     const decisionByName = userName(selectedRecommendation.decision_by);
-    const getInitialVerdictColor = (verdict: string | null) => {
-        switch (verdict) {
-            case "Passed": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-            case "Failed": return "bg-red-500/10 text-red-600 border-red-500/20";
-            case "Pending": return "bg-amber-500/10 text-amber-600 border-amber-500/20";
-            default: return "bg-zinc-500/10 text-zinc-600 border-zinc-500/20";
-        }
-    };
-    const applicationIds = interviewInitialRows.filter((row) => row.applicant_id === selectedRecommendation.applicant_id).map((row) => row.id);
-    const latestInitial = interviews.find((interview) => interview.stage === "Initial" && applicationIds.includes(interview.application_id)) ?? null;
 
     const handleUpdateStatus = async () => {
         if (selectedRecommendation.id == null) return;
@@ -164,14 +154,6 @@ export function ManpowerRecommendationView() {
                                         <FileText className="mr-2 h-4 w-4" />
                                         Application Form
                                     </Button>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Initial Verdict</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">
-                                    <span title={`Latest initial interview verdict${latestInitial ? ` (${latestInitial.stage} #${latestInitial.id})` : ""}`} className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider ${getInitialVerdictColor(latestInitial?.verdict ?? null)}`}>
-                                        {latestInitial?.verdict ?? "Not graded"}
-                                    </span>
                                 </div>
                             </div>
                         </div>
