@@ -78,16 +78,10 @@ export async function GET() {
             return { ...app, full_name: app.full_name || `Applicant #${app.applicant_id}`, latestInitialVerdict: initials[0]?.verdict ?? null, quiz_attempt_id: latestAttempt?.id ?? null, quiz_attempt_percentage: latestAttempt?.percentage_score ?? null, quiz_attempt_passed: latestAttempt?.passed ?? null };
         });
 
-        // Eligible Final: Approved recs on Approved requests MINUS recs that
-        // already have a graded (Passed/Failed) final — REC-SCOPED, never
-        // applicant-scoped. Pending finals stay eligible (awaiting verdict).
-        const gradedFinalRecIds = new Set(
-            interviews
-                .filter((i) => i.stage === "Final" && i.verdict !== "Pending" && i.recommendation_id != null)
-                .map((i) => i.recommendation_id as number)
-        );
+        // Eligible Final: ALL Approved recs on Approved requests — every final
+        // (Passed, Failed, Pending) stays displayed for transparent records.
+        // REC-SCOPED, never applicant-scoped.
         const eligibleFinal = approvedRecs
-            .filter((r) => !gradedFinalRecIds.has(r.id))
             .map((rec) => {
                 const finals = interviews
                     .filter((i) => i.stage === "Final" && i.recommendation_id === rec.id)
