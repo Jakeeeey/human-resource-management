@@ -43,6 +43,8 @@ export type ApprovedRecommendation = {
 
 /**
  * Interview score-sheet item row (criterion snapshot + score).
+ * quiz_attempt_id links the quiz-criterion row to its real quiz_attempt
+ * row (INT UNSIGNED to match quiz_attempt.id); null on all other rows.
  */
 export type SheetItem = {
     id: number;
@@ -51,18 +53,22 @@ export type SheetItem = {
     criterion_name_snapshot: string;
     weight_percentage_snapshot: number;
     is_quiz_criterion: boolean;
+    quiz_attempt_id: number | null;
     score: number;
     sort: number;
 };
 
 /**
  * Single criterion score input for the interview create flow.
+ * The caller sets quiz_attempt_id on the quiz-criterion row only
+ * (null elsewhere); the service persists it verbatim.
  */
 export type InterviewFlowItemInput = {
     criterion_id: number | null;
     criterion_name_snapshot: string;
     weight_percentage_snapshot: number;
     is_quiz_criterion: boolean;
+    quiz_attempt_id: number | null;
     score: number;
     sort: number;
 };
@@ -258,17 +264,50 @@ export const interviewService = {
      * @returns Latest percentage score, or null when no attempt exists.
      */
     async fetchLatestQuizPercentage(applicationId: number): Promise<number | null> {
+        const attempt = await interviewService.fetchLatestQuizAttempt(applicationId);
+        return attempt?.percentage_score ?? null;
+    },
+
+    /**
+     * Fetch the latest quiz_attempt id + percentage + passed flag for an
+     * application, with applicant-id fallback (older attempts predate the
+     * nullable application_id link, so an application-scoped lookup alone
+     * misses them). Application-scoped match wins; applicant fallback only
+     * when the application lookup is empty.
+     * @param applicationId - Application record ID.
+     * @param applicantId - Applicant record ID for the fallback lookup.
+     * @returns Latest attempt id + percentage + passed, or null when none exists.
+     */
+    async fetchLatestQuizAttempt(
+        applicationId: number,
+        applicantId?: number | null,
+    ): Promise<{ id: number; percentage_score: number | null; passed: boolean | null } | null> {
         try {
-            const url =
+            const byAppUrl =
                 `${API_BASE_URL}/items/quiz_attempt` +
                 `?filter[application_id][_eq]=${applicationId}` +
-                `&fields=percentage_score&sort=-completed_at&limit=1`;
-            const response = await fetch(url, { headers });
-            if (!response.ok) return null;
-            const result = await response.json();
-            const rows = result.data as { percentage_score: number | null }[];
-            if (rows.length === 0) return null;
-            return rows[0].percentage_score;
+                `&fields=id,percentage_score,passed&sort=-completed_at&limit=1`;
+            const byAppRes = await fetch(byAppUrl, { headers });
+            if (byAppRes.ok) {
+                const byAppJson = await byAppRes.json();
+                const byAppRows = byAppJson.data as { id: number; percentage_score: number | null; passed: boolean | number | null }[];
+                if (byAppRows.length > 0) {
+                    const row = byAppRows[0];
+                    return { id: row.id, percentage_score: row.percentage_score, passed: row.passed == null ? null : Boolean(row.passed) };
+                }
+            }
+            if (applicantId == null) return null;
+            const byApplicantUrl =
+                `${API_BASE_URL}/items/quiz_attempt` +
+                `?filter[applicant_id][_eq]=${applicantId}` +
+                `&fields=id,percentage_score,passed&sort=-completed_at&limit=1`;
+            const byApplicantRes = await fetch(byApplicantUrl, { headers });
+            if (!byApplicantRes.ok) return null;
+            const byApplicantJson = await byApplicantRes.json();
+            const byApplicantRows = byApplicantJson.data as { id: number; percentage_score: number | null; passed: boolean | number | null }[];
+            if (byApplicantRows.length === 0) return null;
+            const row = byApplicantRows[0];
+            return { id: row.id, percentage_score: row.percentage_score, passed: row.passed == null ? null : Boolean(row.passed) };
         } catch { return null; }
     },
 
@@ -282,18 +321,19 @@ export const interviewService = {
             const url =
                 `${API_BASE_URL}/items/interview_score_sheet_item` +
                 `?filter[sheet_id][_eq]=${sheetId}` +
-                `&fields=id,sheet_id,criterion_id,criterion_name_snapshot,weight_percentage_snapshot,is_quiz_criterion,score,sort` +
+                `&fields=id,sheet_id,criterion_id,criterion_name_snapshot,weight_percentage_snapshot,is_quiz_criterion,quiz_attempt_id,score,sort` +
                 `&sort=sort&limit=-1`;
             const response = await fetch(url, { headers });
             if (!response.ok) return [];
             const result = await response.json();
-            return result.data.map((i: { id: number; sheet_id: number; criterion_id: number | null; criterion_name_snapshot: string; weight_percentage_snapshot: number; is_quiz_criterion: boolean; score: number; sort: number }) => ({
+            return result.data.map((i: { id: number; sheet_id: number; criterion_id: number | null; criterion_name_snapshot: string; weight_percentage_snapshot: number; is_quiz_criterion: boolean; quiz_attempt_id: number | null; score: number; sort: number }) => ({
                 id: i.id,
                 sheet_id: i.sheet_id,
                 criterion_id: i.criterion_id,
                 criterion_name_snapshot: i.criterion_name_snapshot,
                 weight_percentage_snapshot: i.weight_percentage_snapshot,
                 is_quiz_criterion: i.is_quiz_criterion,
+                quiz_attempt_id: i.quiz_attempt_id ?? null,
                 score: i.score,
                 sort: i.sort,
             }));
@@ -338,6 +378,7 @@ export const interviewService = {
                 criterion_name_snapshot: item.criterion_name_snapshot,
                 weight_percentage_snapshot: item.weight_percentage_snapshot,
                 is_quiz_criterion: item.is_quiz_criterion,
+                quiz_attempt_id: item.is_quiz_criterion ? (item.quiz_attempt_id ?? null) : null,
                 score: item.score,
                 sort: item.sort,
             }));
@@ -383,6 +424,155 @@ export const interviewService = {
             return normalizeInterview(interviewJson.data);
         } catch (e) {
             console.error("Error creating interview flow:", e);
+            throw new Error("VALIDATION_FAILED: Failed to submit interview grading");
+        }
+    },
+
+    /**
+     * Create a schedule-only interview row: stage + application link (+ Final
+     * rec/request link), verdict Pending, score_sheet_id/template_id and
+     * interviewed_by/at all NULL. Sheet creation stays in grading only — the
+     * grade page fills those via gradeScheduledInterview.
+     * @param input - Stage, application id, and Final linkage ids.
+     * @returns The created Pending interview record.
+     */
+    async createScheduledInterview(input: {
+        stage: "Initial" | "Final";
+        application_id: number;
+        manpower_request_id: number | null;
+        recommendation_id: number | null;
+    }): Promise<Interview> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/items/interview`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    stage: input.stage,
+                    application_id: input.application_id,
+                    manpower_request_id: input.manpower_request_id,
+                    recommendation_id: input.recommendation_id,
+                    template_id: null,
+                    score_sheet_id: null,
+                    verdict: "Pending",
+                    interviewed_by: null,
+                    interviewed_at: null,
+                    notes: null,
+                    created_at: nowPH(),
+                    updated_at: nowPH(),
+                }),
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`DIRECTUS ERROR [createScheduledInterview]:`, errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            return normalizeInterview(result.data);
+        } catch (e) {
+            console.error("Error creating scheduled interview:", e);
+            throw new Error("VALIDATION_FAILED: Failed to schedule interview");
+        }
+    },
+
+    /**
+     * Grade an already-scheduled Pending row: create sheet row → create items
+     * (criterion snapshots) → PATCH sheet composite_score (guideline
+     * SUM(score*weight)/100) → PATCH the interview row with score_sheet_id,
+     * template_id, manual verdict, and interviewer stamps.
+     * @param id - Scheduled interview record ID.
+     * @param input - Template, manual verdict, date, notes, criterion items.
+     * @returns The updated (graded) interview record.
+     */
+    async gradeScheduledInterview(
+        id: number,
+        input: {
+            stage: "Initial" | "Final";
+            application_id: number;
+            template_id: number;
+            verdict: "Pending" | "Passed" | "Failed";
+            interviewed_by: number | null;
+            interviewed_at: string;
+            notes: string | null;
+            recorded_by?: number | null;
+            items: InterviewFlowItemInput[];
+        },
+    ): Promise<Interview> {
+        try {
+            const sheetRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    application_id: input.application_id,
+                    template_id: input.template_id,
+                    stage: input.stage,
+                    composite_score: 0,
+                    recorded_by: input.recorded_by ?? input.interviewed_by ?? null,
+                    recorded_at: nowPH(),
+                }),
+            });
+            if (!sheetRes.ok) {
+                const errorText = await sheetRes.text();
+                console.error(`DIRECTUS ERROR [gradeScheduledInterview sheet]:`, errorText);
+                throw new Error(`HTTP error! status: ${sheetRes.status}`);
+            }
+            const sheetJson = await sheetRes.json();
+            const sheetId = sheetJson.data.id as number;
+
+            const itemRows = input.items.map((item) => ({
+                sheet_id: sheetId,
+                criterion_id: item.criterion_id,
+                criterion_name_snapshot: item.criterion_name_snapshot,
+                weight_percentage_snapshot: item.weight_percentage_snapshot,
+                is_quiz_criterion: item.is_quiz_criterion,
+                quiz_attempt_id: item.is_quiz_criterion ? (item.quiz_attempt_id ?? null) : null,
+                score: item.score,
+                sort: item.sort,
+            }));
+            const itemsRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet_item`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(itemRows),
+            });
+            if (!itemsRes.ok) {
+                const errorText = await itemsRes.text();
+                console.error(`DIRECTUS ERROR [gradeScheduledInterview items:${sheetId}]:`, errorText);
+                throw new Error(`HTTP error! status: ${itemsRes.status}`);
+            }
+
+            const composite = computeComposite(input.items);
+            const sheetPatchRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet/${sheetId}`, {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify({ composite_score: composite }),
+            });
+            if (!sheetPatchRes.ok) {
+                const errorText = await sheetPatchRes.text();
+                console.error(`DIRECTUS ERROR [gradeScheduledInterview sheet patch:${sheetId}]:`, errorText);
+                throw new Error(`HTTP error! status: ${sheetPatchRes.status}`);
+            }
+
+            const interviewRes = await fetch(`${API_BASE_URL}/items/interview/${id}`, {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify({
+                    score_sheet_id: sheetId,
+                    template_id: input.template_id,
+                    verdict: input.verdict,
+                    interviewed_by: input.interviewed_by,
+                    interviewed_at: input.interviewed_at,
+                    notes: input.notes,
+                    updated_at: nowPH(),
+                }),
+            });
+            if (!interviewRes.ok) {
+                const errorText = await interviewRes.text();
+                console.error(`DIRECTUS ERROR [gradeScheduledInterview interview:${id}]:`, errorText);
+                throw new Error(`HTTP error! status: ${interviewRes.status}`);
+            }
+            const interviewJson = await interviewRes.json();
+            return normalizeInterview(interviewJson.data);
+        } catch (e) {
+            console.error("Error grading scheduled interview:", e);
             throw new Error("VALIDATION_FAILED: Failed to submit interview grading");
         }
     },

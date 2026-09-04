@@ -1,23 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useInterview } from "../hooks/useInterview";
+import { InterviewScheduleDialog } from "./InterviewScheduleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { Eye, FileText, Pencil } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, Filter, Pencil } from "lucide-react";
 
 /**
  * Tabbed eligible list for applicant interview grading.
  *
  * Initial tab rows quiz-completed applications (applicant, quiz score +
  * passed/failed badge, latest initial verdict chip); Final tab rows approved
- * recommendations (request ref, applicant, rec status, latest final verdict
- * chip). Grade wires gradeContext per stage and opens the score entry dialog
- * (T7); History selects the latest interview via handleView — the detail
- * dialog itself lands in T8, so History is selection-only for now.
+ * recommendations (request ref, applicant, latest final verdict
+ * chip). Scheduling opens the schedule dialog (header button), which creates
+ * a Pending row and routes to its grade page. Grade renders as a link to
+ * `/hrm/interviews/grade/[id]` ONLY when an ungraded (sheet-less) interview
+ * exists for that row — otherwise the actions cell shows History only.
+ * History selects the latest
+ * interview via handleView for the detail dialog.
  *
  * Search filters through the hook joined-text lists (filteredInitial /
  * filteredFinal); the Awaiting-verdict chip toggles a Pending-verdict-only
@@ -36,12 +41,13 @@ export function InterviewEligibleList() {
         setStageTab,
         searchQuery,
         setSearchQuery,
-        setGradeContext,
-        setIsGradeOpen,
         handleView,
         latestPerApplication,
     } = useInterview();
     const [pendingOnly, setPendingOnly] = useState(false);
+    const [scheduleOpen, setScheduleOpen] = useState(false);
+    const [pageInitial, setPageInitial] = useState(1);
+    const [pageFinal, setPageFinal] = useState(1);
 
     if (error) {
         return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
@@ -59,15 +65,37 @@ export function InterviewEligibleList() {
 
     const pendingCount = stageTab === "Initial" ? initialPendingCount : finalPendingCount;
 
-    const handleGradeInitial = (applicationId: number) => {
-        setGradeContext({ stage: "Initial", applicationId });
-        setIsGradeOpen(true);
-    };
+    const PAGE_SIZE = 10;
+    const totalPagesInitial = Math.max(1, Math.ceil(visibleInitial.length / PAGE_SIZE));
+    const totalPagesFinal = Math.max(1, Math.ceil(visibleFinal.length / PAGE_SIZE));
+    const safePageInitial = Math.min(pageInitial, totalPagesInitial);
+    const safePageFinal = Math.min(pageFinal, totalPagesFinal);
+    const pagedInitial = visibleInitial.slice((safePageInitial - 1) * PAGE_SIZE, safePageInitial * PAGE_SIZE);
+    const pagedFinal = visibleFinal.slice((safePageFinal - 1) * PAGE_SIZE, safePageFinal * PAGE_SIZE);
 
-    const handleGradeFinal = (recommendationId: number, applicationId?: number) => {
-        setGradeContext({ stage: "Final", recommendationId, applicationId });
-        setIsGradeOpen(true);
-    };
+    /**
+     * Ungraded (sheet-less) Initial interview for an application — the only
+     * state that renders a Grade link on the Initial tab.
+     */
+    const ungradedInitialFor = (applicationId: number) =>
+        interviews.find(
+            (interview) =>
+                interview.application_id === applicationId &&
+                interview.stage === "Initial" &&
+                interview.score_sheet_id == null,
+        ) ?? null;
+
+    /**
+     * Ungraded (sheet-less) Final interview for a recommendation — the only
+     * state that renders a Grade link on the Final tab.
+     */
+    const ungradedFinalFor = (recommendationId: number) =>
+        interviews.find(
+            (interview) =>
+                interview.stage === "Final" &&
+                interview.recommendation_id === recommendationId &&
+                interview.score_sheet_id == null,
+        ) ?? null;
 
     const handleHistoryInitial = (applicationId: number) => {
         const latest = latestPerApplication(applicationId);
@@ -85,45 +113,63 @@ export function InterviewEligibleList() {
                 <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold text-foreground">Interviews</h2>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setPendingOnly((prev) => !prev)}
-                        aria-pressed={pendingOnly}
-                        title="Show only rows awaiting an explicit verdict"
-                        className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider inline-block text-center transition-colors ${pendingOnly ? "bg-amber-500/20 text-amber-700 border-amber-500/40" : "bg-amber-500/10 text-amber-600 border-amber-500/20"}`}
-                    >
-                        Awaiting verdict: {pendingCount}
-                    </button>
-                    <Input
-                        placeholder="Search applicant, score, verdict..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-64"
-                    />
-                </div>
+                <Button size="sm" onClick={() => setScheduleOpen(true)} aria-label="Schedule interview">
+                    <CalendarPlus className="mr-2 h-4 w-4" />
+                    Schedule
+                </Button>
             </div>
             <Tabs
                 value={stageTab}
                 onValueChange={(value) => {
                     setStageTab(value as "Initial" | "Final");
                     setPendingOnly(false);
+                    setPageInitial(1);
+                    setPageFinal(1);
                 }}
             >
-                <TabsList aria-label="Interview stage">
-                    <TabsTrigger value="Initial">
-                        Initial
-                        <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
-                            {filteredInitial.length}
-                        </span>
-                    </TabsTrigger>
-                    <TabsTrigger value="Final">
-                        Final
-                        <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
-                            {filteredFinal.length}
-                        </span>
-                    </TabsTrigger>
-                </TabsList>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <TabsList aria-label="Interview stage">
+                        <TabsTrigger value="Initial">
+                            Initial
+                            <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
+                                {filteredInitial.length}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger value="Final">
+                            Final
+                            <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
+                                {filteredFinal.length}
+                            </span>
+                        </TabsTrigger>
+                    </TabsList>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant={pendingOnly ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                                setPendingOnly((prev) => !prev);
+                                setPageInitial(1);
+                                setPageFinal(1);
+                            }}
+                            aria-pressed={pendingOnly}
+                            title="Show only rows awaiting an explicit verdict"
+                        >
+                            <Filter className="mr-2 h-4 w-4" />
+                            Awaiting verdict: {pendingCount}
+                        </Button>
+                        <Input
+                            placeholder="Search applicant, score, verdict..."
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setPageInitial(1);
+                                setPageFinal(1);
+                            }}
+                            className="w-64"
+                        />
+                    </div>
+                </div>
             </Tabs>
             {stageTab === "Initial" ? (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
@@ -157,7 +203,14 @@ export function InterviewEligibleList() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                visibleInitial.map((row) => (
+                                pagedInitial.map((row) => {
+                                    const ungraded = ungradedInitialFor(row.id);
+                                    // Attempt-derived quiz result: the live attempt row wins; the
+                                    // application columns are its synced mirror (quiz-attempt
+                                    // write-back), used only when no attempt exists.
+                                    const quizScore = row.quiz_attempt_percentage ?? row.quiz_score;
+                                    const quizPassed = row.quiz_attempt_id != null ? row.quiz_attempt_passed : row.quiz_passed;
+                                    return (
                                     <TableRow key={row.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                         <TableCell className="pl-6 h-16">
                                             <div className="font-bold text-foreground group-hover:text-primary transition-colors">
@@ -165,14 +218,14 @@ export function InterviewEligibleList() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-medium text-muted-foreground/80 text-center">
-                                            {row.quiz_score ?? "—"}
+                                            {quizScore ?? "—"}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            {row.quiz_passed === true ? (
+                                            {quizPassed === true ? (
                                                 <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20 inline-block w-[110px] text-center">
                                                     Passed
                                                 </span>
-                                            ) : row.quiz_passed === false ? (
+                                            ) : quizPassed === false ? (
                                                 <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-red-500/10 text-red-600 border-red-500/20 inline-block w-[110px] text-center">
                                                     Failed
                                                 </span>
@@ -187,10 +240,14 @@ export function InterviewEligibleList() {
                                         </TableCell>
                                         <TableCell className="pr-6 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <Button variant="ghost" size="sm" onClick={() => handleGradeInitial(row.id)} aria-label={`Grade application ${row.id}`}>
-                                                    <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
-                                                    Grade
-                                                </Button>
+                                                {ungraded && (
+                                                    <Button variant="ghost" size="sm" asChild>
+                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade application ${row.id}`}>
+                                                            <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                            Grade
+                                                        </Link>
+                                                    </Button>
+                                                )}
                                                 <Button variant="ghost" size="sm" onClick={() => handleHistoryInitial(row.id)} aria-label={`View history for application ${row.id}`}>
                                                     <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                                     History
@@ -198,19 +255,25 @@ export function InterviewEligibleList() {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>
+                    <Pager
+                        page={safePageInitial}
+                        totalPages={totalPagesInitial}
+                        total={visibleInitial.length}
+                        onChange={setPageInitial}
+                    />
                 </div>
             ) : (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
                     <Table>
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent border-border/50">
-                                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Request</TableHead>
+                                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Position</TableHead>
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Applicant</TableHead>
-                                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Rec Status</TableHead>
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Final Verdict</TableHead>
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-right pr-6">Actions</TableHead>
                             </TableRow>
@@ -218,16 +281,15 @@ export function InterviewEligibleList() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-48">
+                                    <TableCell colSpan={4} className="text-center h-48">
                                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                                             <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
-                                            <p className="font-medium animate-pulse">Loading eligible recommendations...</p>
-                                        </div>
+                                            <p className="font-medium animate-pulse">Loading eligible recommendations...</p>                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ) : visibleFinal.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-48">
+                                    <TableCell colSpan={4} className="text-center h-48">
                                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                                             <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
                                             <p className="font-medium">No approved recommendations awaiting final.</p>
@@ -235,38 +297,31 @@ export function InterviewEligibleList() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                visibleFinal.map((row) => (
+                                pagedFinal.map((row) => {
+                                    const ungraded = ungradedFinalFor(row.id);
+                                    return (
                                     <TableRow key={row.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                         <TableCell className="pl-6 h-16">
                                             <div className="font-bold text-foreground group-hover:text-primary transition-colors">
-                                                {row.manpower_request_id != null ? `Request #${row.manpower_request_id}` : "—"}
-                                            </div>
-                                            <div className="text-xs text-muted-foreground/70">
-                                                Rec #{row.id}
+                                                {row.position ?? (row.manpower_request_id != null ? `#${row.manpower_request_id}` : "—")}
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-medium text-muted-foreground/80">
                                             {row.full_name}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20 inline-block w-[110px] text-center">
-                                                {row.status}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="text-center">
                                             <VerdictChip verdict={row.latestFinalVerdict} />
                                         </TableCell>
                                         <TableCell className="pr-6 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleGradeFinal(row.id, row.applicant_id ?? undefined)}
-                                                    aria-label={`Grade recommendation ${row.id}`}
-                                                >
-                                                    <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
-                                                    Grade
-                                                </Button>
+                                                {ungraded && (
+                                                    <Button variant="ghost" size="sm" asChild>
+                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade recommendation ${row.id}`}>
+                                                            <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                            Grade
+                                                        </Link>
+                                                    </Button>
+                                                )}
                                                 <Button variant="ghost" size="sm" onClick={() => handleHistoryFinal(row.id)} aria-label={`View history for recommendation ${row.id}`}>
                                                     <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                                     History
@@ -274,12 +329,20 @@ export function InterviewEligibleList() {
                                             </div>
                                         </TableCell>
                                     </TableRow>
-                                ))
+                                    );
+                                })
                             )}
                         </TableBody>
                     </Table>
+                    <Pager
+                        page={safePageFinal}
+                        totalPages={totalPagesFinal}
+                        total={visibleFinal.length}
+                        onChange={setPageFinal}
+                    />
                 </div>
             )}
+            <InterviewScheduleDialog open={scheduleOpen} onOpenChange={setScheduleOpen} />
         </div>
     );
 }
@@ -290,6 +353,60 @@ export function InterviewEligibleList() {
  * @param verdict - Latest stage verdict, or null when never graded.
  * @returns Colored pill chip for the verdict.
  */
+function Pager({ page, totalPages, total, onChange }: { page: number; totalPages: number; total: number; onChange: (page: number) => void }) {
+    if (totalPages <= 1) return null;
+    return (
+        <div className="flex items-center justify-between px-2 border-t border-border/50 py-2">
+            <div className="flex-1 text-sm text-muted-foreground">
+                {total} total rows
+            </div>
+            <div className="flex items-center space-x-6 lg:space-x-8">
+                <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+                    Page {page} of {totalPages}
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Button
+                        variant="outline"
+                        className="hidden h-8 w-8 p-0 lg:flex"
+                        onClick={() => onChange(1)}
+                        disabled={page <= 1}
+                        aria-label="Go to first page"
+                    >
+                        <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => onChange(page - 1)}
+                        disabled={page <= 1}
+                        aria-label="Go to previous page"
+                    >
+                        <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => onChange(page + 1)}
+                        disabled={page >= totalPages}
+                        aria-label="Go to next page"
+                    >
+                        <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="hidden h-8 w-8 p-0 lg:flex"
+                        onClick={() => onChange(totalPages)}
+                        disabled={page >= totalPages}
+                        aria-label="Go to last page"
+                    >
+                        <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function VerdictChip({ verdict }: { verdict: string | null }) {
     if (verdict === "Pending") {
         return (

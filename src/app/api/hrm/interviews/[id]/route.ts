@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +61,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const body = await req.json();
 
         body.updated_by = userId;
+
+        // Grade path for a scheduled row: items present means the grade page
+        // is submitting criteria scores, so the server creates the sheet +
+        // items + composite first, then links them onto the interview row with
+        // the manual verdict and interviewer stamps.
+        if (Array.isArray(body.items) && body.items.length > 0) {
+            const stage = body.stage === "Final" ? "Final" : "Initial";
+            const template_id = body.template_id;
+            if (typeof template_id !== "number" || typeof body.application_id !== "number") {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: "A scoring template and application are required to submit interview grading." }, { status: 400 });
+            }
+            const verdict = body.verdict === "Passed" || body.verdict === "Failed" ? body.verdict : "Pending";
+            const data = await interviewService.gradeScheduledInterview(id, {
+                stage,
+                application_id: body.application_id,
+                template_id,
+                verdict,
+                interviewed_by: typeof userId === "number" ? userId : null,
+                interviewed_at: typeof body.interviewed_at === "string" && body.interviewed_at ? body.interviewed_at : nowPH(),
+                notes: typeof body.notes === "string" && body.notes ? body.notes : null,
+                items: body.items,
+            });
+            return NextResponse.json({ data });
+        }
 
         // The client sends only { verdict, notes, interviewed_by } — it has no
         // userId in scope. NEVER trust client-supplied updated_by; always

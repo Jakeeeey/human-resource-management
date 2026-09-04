@@ -3,7 +3,6 @@
 import React from 'react';
 import { InterviewProvider } from "./providers/InterviewProvider";
 import { InterviewEligibleList } from "./components/InterviewEligibleList";
-import { ScoreEntryDialog } from "./components/ScoreEntryDialog";
 import { InterviewDetail } from "./components/InterviewDetail";
 
 import { ClipboardList } from "lucide-react";
@@ -30,7 +29,6 @@ function InterviewsContent() {
             <div className="relative z-10">
                 <InterviewEligibleList />
             </div>
-            <ScoreEntryDialog />
             <InterviewDetail />
         </div>
     );

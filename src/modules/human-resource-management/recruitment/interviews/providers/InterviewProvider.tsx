@@ -7,20 +7,9 @@ import { Interview, InterviewCreateInput } from "../types";
 const API_PATH = "/api/hrm/interviews";
 
 /**
- * Grading stage tab shared by the eligible list and the score entry dialog.
+ * Grading stage tab shared by the eligible list tabs.
  */
 export type InterviewStageTab = "Initial" | "Final";
-
-/**
- * Which eligible row the score entry dialog is grading.
- * Initial grades carry an applicationId; Final grades carry a recommendationId
- * (plus the applicationId for display joins).
- */
-export interface InterviewGradeContext {
-    stage: "Initial" | "Final";
-    applicationId?: number;
-    recommendationId?: number;
-}
 
 /**
  * Quiz-completed application row from the GET envelope, annotated with its
@@ -34,6 +23,9 @@ export interface EligibleInitialRow {
     submitted_at: string | null;
     full_name: string;
     latestInitialVerdict: string | null;
+    quiz_attempt_id: number | null;
+    quiz_attempt_percentage: number | null;
+    quiz_attempt_passed: boolean | null;
 }
 
 /**
@@ -47,6 +39,7 @@ export interface EligibleFinalRow {
     status: string;
     full_name: string;
     latestFinalVerdict: string | null;
+    position: string | null;
 }
 
 /**
@@ -59,6 +52,7 @@ export interface InterviewScoreItemInput {
     criterion_name_snapshot: string;
     weight_percentage_snapshot: number;
     is_quiz_criterion: boolean;
+    quiz_attempt_id: number | null;
     score: number;
     sort: number;
 }
@@ -74,10 +68,6 @@ interface InterviewContextType {
     setStageTab: (tab: InterviewStageTab) => void;
     selectedInterview: Interview | null;
     setSelectedInterview: (interview: Interview | null) => void;
-    isGradeOpen: boolean;
-    setIsGradeOpen: (isOpen: boolean) => void;
-    gradeContext: InterviewGradeContext;
-    setGradeContext: (context: InterviewGradeContext) => void;
     refresh: () => Promise<void>;
     submitInterview: (data: InterviewCreateInput & { items: InterviewScoreItemInput[] }) => Promise<boolean>;
     updateInterview: (id: number, data: Partial<Interview>) => Promise<boolean>;
@@ -89,7 +79,10 @@ const InterviewContext = createContext<InterviewContextType | undefined>(undefin
 /**
  * Client-side provider for applicant interview grading.
  * Fetches the T4 GET envelope ({ data, eligibleInitial, eligibleFinal, users })
- * and exposes list state plus stage-tab / grade-dialog state and mutations.
+ * and exposes list state plus stage-tab / detail-selection state and
+ * mutations. Grading lives on the dedicated grade page
+ * (`/hrm/interviews/grade/[id]`), which fetches and submits directly —
+ * the provider carries no grade-dialog state.
  * Client sends no timestamps — the server injects interviewed_at/created_at
  * via nowPH() and interviewed_by/updated_by from the JWT.
  */
@@ -102,8 +95,6 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
     const [error, setError] = useState<string | null>(null);
     const [stageTab, setStageTab] = useState<InterviewStageTab>("Initial");
     const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
-    const [isGradeOpen, setIsGradeOpen] = useState(false);
-    const [gradeContext, setGradeContext] = useState<InterviewGradeContext>({ stage: "Initial" });
 
     const refresh = useCallback(async () => {
         setIsLoading(true);
@@ -191,9 +182,8 @@ export function InterviewProvider({ children }: { children: React.ReactNode }) {
     const contextValue = useMemo(() => ({
         interviews, eligibleInitial, eligibleFinal, users, isLoading, error,
         stageTab, setStageTab, selectedInterview, setSelectedInterview,
-        isGradeOpen, setIsGradeOpen, gradeContext, setGradeContext,
         refresh, submitInterview, updateInterview, deleteInterview
-    }), [interviews, eligibleInitial, eligibleFinal, users, isLoading, error, stageTab, selectedInterview, isGradeOpen, gradeContext, refresh, submitInterview, updateInterview, deleteInterview]);
+    }), [interviews, eligibleInitial, eligibleFinal, users, isLoading, error, stageTab, selectedInterview, refresh, submitInterview, updateInterview, deleteInterview]);
 
     return (
         <InterviewContext.Provider value={contextValue}>

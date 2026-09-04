@@ -51,7 +51,7 @@ export function useInterview() {
         const query = searchQuery.trim().toLowerCase();
         if (!query) return context.eligibleInitial;
         return context.eligibleInitial.filter((row) => {
-            const joined = `${row.id} ${row.quiz_score ?? ""} ${row.latestInitialVerdict ?? ""}`.toLowerCase();
+            const joined = `${row.id} ${row.quiz_attempt_percentage ?? row.quiz_score ?? ""} ${row.latestInitialVerdict ?? ""}`.toLowerCase();
             return joined.includes(query);
         });
     }, [context.eligibleInitial, searchQuery]);
