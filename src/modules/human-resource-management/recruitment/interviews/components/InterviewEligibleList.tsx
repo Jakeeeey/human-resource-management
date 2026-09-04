@@ -98,7 +98,19 @@ export function InterviewEligibleList() {
 
     const handleHistoryFinal = (recommendationId: number) => {
         const latest = interviews.find((interview) => interview.recommendation_id === recommendationId) ?? null;
-        if (latest) handleView(latest);
+        if (latest) {
+            handleView(latest);
+            return;
+        }
+        // Unscheduled rec: no Final exists yet — fall back to the applicant's
+        // Initial history so History never dead-ends on "Not scheduled" rows.
+        const finalRow = filteredFinal.find((row) => row.id === recommendationId) ?? null;
+        const app =
+            finalRow?.applicant_id != null
+                ? (filteredInitial.find((row) => row.applicant_id === finalRow.applicant_id) ?? null)
+                : null;
+        const initial = app ? latestPerApplication(app.id) : null;
+        if (initial) handleView(initial);
     };
 
     return (
