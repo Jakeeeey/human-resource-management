@@ -11,9 +11,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
-import { Suspense } from "react";
 
-import { QuizTakingModule } from "@/modules/human-resource-management/quiz-file-management/quiz-taking";
+import { InterviewCriteriaTemplatesModule } from "@/modules/human-resource-management/interview-criteria/templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,12 +80,12 @@ export default async function Page() {
                         <Breadcrumb>
                             <BreadcrumbList className="min-w-0 overflow-hidden">
                                 <BreadcrumbItem className="hidden md:block shrink-0">
-                                    <BreadcrumbLink href="#">Quiz File Management</BreadcrumbLink>
+                                    <BreadcrumbLink href="#">Interview Criteria</BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Take Quiz
+                                        Templates
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -100,9 +99,7 @@ export default async function Page() {
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
-                <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
-                    <QuizTakingModule />
-                </Suspense>
+                <InterviewCriteriaTemplatesModule />
             </main>
         </div>
     );

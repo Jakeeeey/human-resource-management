@@ -64,7 +64,10 @@ export function QuizManagementFetchProvider({
                     body: JSON.stringify(data),
                 }
             );
-            if (!res.ok) throw new Error("Create failed");
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.error || "Create failed");
+            }
             await fetchData();
         },
         [fetchData]
@@ -80,7 +83,10 @@ export function QuizManagementFetchProvider({
                     body: JSON.stringify({ id, ...data }),
                 }
             );
-            if (!res.ok) throw new Error("Update failed");
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.error || "Update failed");
+            }
             await fetchData();
         },
         [fetchData]

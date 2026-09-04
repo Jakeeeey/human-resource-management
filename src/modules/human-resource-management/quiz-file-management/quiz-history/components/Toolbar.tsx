@@ -26,7 +26,6 @@ export function Toolbar({ attempts }: ToolbarProps) {
     const hasActiveFilters =
         filters.search || filters.quizId != null || filters.passed != null;
 
-
     const quizOptions = React.useMemo(() => {
         const map = new Map<number, string>();
         attempts.forEach((a) => {
