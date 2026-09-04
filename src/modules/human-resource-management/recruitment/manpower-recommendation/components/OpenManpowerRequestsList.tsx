@@ -43,10 +43,13 @@ export function OpenManpowerRequestsList() {
         requestRecs(requestId).filter((r) => r.status === "Recommended").length;
     const approvedCount = (requestId: number) =>
         requestRecs(requestId).filter((r) => r.status === "Approved" || r.status === "Hired").length;
+    const hiredCount = (requestId: number) =>
+        requestRecs(requestId).filter((r) => r.status === "Hired").length;
     const getDisplayStatus = (req: OpenRequestRow) => {
         const total = (req.no_manpower_needed ?? 0);
-        if (total > 0 && approvedCount(req.id) >= total) return "Closed";
-        return req.status === "Approved" ? "Approved" : "Pending";
+        if (total > 0 && hiredCount(req.id) >= total) return "Closed";
+        if (total > 0 && approvedCount(req.id) >= total) return "Full";
+        return req.status;
     };
 
     const query = search.trim().toLowerCase();
@@ -79,7 +82,7 @@ export function OpenManpowerRequestsList() {
                         <SelectContent>
                             <SelectItem value="All">All statuses</SelectItem>
                             <SelectItem value="Approved">Approved</SelectItem>
-                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Full">Full</SelectItem>
                             <SelectItem value="Closed">Closed</SelectItem>
                         </SelectContent>
                     </Select>
@@ -120,8 +123,10 @@ export function OpenManpowerRequestsList() {
                             filteredRequests.map((req) => {
                                 const recommended = recommendedCount(req.id);
                                 const approved = approvedCount(req.id);
+                                const hired = hiredCount(req.id);
                                 const total = (req.no_manpower_needed ?? 0);
-                                const isClosed = total > 0 && approved >= total;
+                                const isClosed = total > 0 && hired >= total;
+                                const isFull = total > 0 && approved >= total && !isClosed;
                                 return (
                                     <TableRow key={req.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                         <TableCell className="pl-6 h-16">
@@ -143,13 +148,17 @@ export function OpenManpowerRequestsList() {
                                                 <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 border-blue-500/20 inline-block w-[110px] text-center">
                                                     Closed
                                                 </span>
+                                            ) : isFull ? (
+                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 border-amber-500/20 inline-block w-[110px] text-center">
+                                                    Full
+                                                </span>
                                             ) : req.status === "Approved" ? (
                                                 <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20 inline-block w-[110px] text-center">
                                                     Approved
                                                 </span>
                                             ) : (
-                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 border-amber-500/20 inline-block w-[110px] text-center">
-                                                    Pending
+                                                <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-zinc-500/10 text-zinc-600 border-zinc-500/20 inline-block w-[110px] text-center">
+                                                    {req.status}
                                                 </span>
                                             )}
                                         </TableCell>

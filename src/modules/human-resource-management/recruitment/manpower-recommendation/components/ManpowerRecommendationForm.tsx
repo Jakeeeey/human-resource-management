@@ -25,7 +25,7 @@ const ManpowerRecommendationFormSchema = z.object({
 type ManpowerRecommendationFormValues = z.infer<typeof ManpowerRecommendationFormSchema>;
 
 export function ManpowerRecommendationForm() {
-    const { isCreateOpen, setIsCreateOpen, submitRecommendation, openRequests, applicants, recommendations, pendingRequestId, setPendingRequestId } = useManpowerRecommendation();
+    const { isCreateOpen, setIsCreateOpen, submitRecommendation, openRequests, applicants, recommendations, pendingRequestId, setPendingRequestId, interviewInitialRows } = useManpowerRecommendation();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [applicantOpen, setApplicantOpen] = useState(false);
 
@@ -149,7 +149,7 @@ export function ManpowerRecommendationForm() {
                                                     <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
                                                         <CommandEmpty>No applicant found.</CommandEmpty>
                                                         <CommandGroup>
-                                                            {applicants.filter((applicant) => !recommendations.some((r) => r.manpower_request_id === pendingRequestId && r.applicant_id === applicant.id) && !recommendations.some((r) => r.applicant_id === applicant.id && (r.status === "Approved" || r.status === "Hired"))).map((applicant) => (
+                                                            {applicants.filter((applicant) => !recommendations.some((r) => r.manpower_request_id === pendingRequestId && r.applicant_id === applicant.id) && !recommendations.some((r) => r.applicant_id === applicant.id && (r.status === "Approved" || r.status === "Hired")) && interviewInitialRows.some((row) => row.applicant_id === applicant.id && row.latestInitialVerdict === "Passed")).map((applicant) => (
                                                                 <CommandItem
                                                                     value={`${applicant.full_name} ${applicant.id}`}
                                                                     key={applicant.id}

@@ -25,6 +25,11 @@ export function ManpowerRequestDetail() {
 
     const applicantMap = new Map(applicants.map((a) => [a.id, a]));
     const related = recommendations.filter((r) => r.manpower_request_id === selectedRequest.id);
+    const approvedCount = related.filter((r) => r.status === 'Approved' || r.status === 'Hired').length;
+    const hiredCount = related.filter((r) => r.status === 'Hired').length;
+    const totalSlots = selectedRequest.no_manpower_needed ?? 0;
+    const isClosed = totalSlots > 0 && hiredCount >= totalSlots;
+    const isFull = totalSlots > 0 && approvedCount >= totalSlots && !isClosed;
 
 
     return (
@@ -76,6 +81,10 @@ export function ManpowerRequestDetail() {
                     <DialogFooter className="flex w-full sm:justify-end gap-3 items-center">
                         {selectedRequest.status !== 'Approved' ? (
                             <span className="text-muted-foreground text-xs mr-auto">Awaiting approval — recommendations open after approval.</span>
+                        ) : isClosed ? (
+                            <span className="text-muted-foreground text-xs mr-auto">Hiring complete.</span>
+                        ) : isFull ? (
+                            <span className="text-muted-foreground text-xs mr-auto">All slots filled.</span>
                         ) : (
                             <Button
                                 type="button"
