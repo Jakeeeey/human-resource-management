@@ -156,7 +156,7 @@ export function InterviewEligibleList() {
                             </SelectContent>
                         </Select>
                         <Input
-                            placeholder="Search applicant, score, verdict..."
+                            placeholder={stageTab === "Initial" ? "Search by applicant name..." : "Search by name or position..."}
                             value={searchQuery}
                             onChange={(e) => {
                                 setSearchQuery(e.target.value);
