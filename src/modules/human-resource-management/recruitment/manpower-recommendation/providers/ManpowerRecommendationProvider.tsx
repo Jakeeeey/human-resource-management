@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { ManpowerRecommendation, ManpowerRecommendationCreateInput } from "../types";
+import { Interview } from "../../interviews/types";
 
 const API_PATH = "/api/hrm/manpower-recommendation";
 
@@ -11,6 +12,8 @@ interface ManpowerRecommendationContextType {
     applicants: { id: number; full_name: string; position_applied_for: string }[];
     openRequests: { id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[];
     users: { id: number | string; name: string }[];
+    interviews: Interview[];
+    interviewInitialRows: { id: number; applicant_id: number; latestInitialVerdict: string | null }[];
     isLoading: boolean;
     error: string | null;
     isCreateOpen: boolean;
@@ -44,6 +47,8 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
     const [applicants, setApplicants] = useState<{ id: number; full_name: string; position_applied_for: string }[]>([]);
     const [openRequests, setOpenRequests] = useState<{ id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[]>([]);
     const [users, setUsers] = useState<{ id: number | string; name: string }[]>([]);
+    const [interviews, setInterviews] = useState<Interview[]>([]);
+    const [interviewInitialRows, setInterviewInitialRows] = useState<{ id: number; applicant_id: number; latestInitialVerdict: string | null }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -76,6 +81,20 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
             setApplicants(Array.isArray(result.applicants) ? result.applicants : []);
             setOpenRequests(Array.isArray(result.openRequests) ? result.openRequests : []);
             setUsers(Array.isArray(result.users) ? result.users : []);
+            try {
+                const interviewResponse = await fetch("/api/hrm/interviews");
+                if (interviewResponse.ok) {
+                    const interviewResult = await interviewResponse.json();
+                    setInterviews(Array.isArray(interviewResult.data) ? interviewResult.data : []);
+                    setInterviewInitialRows(Array.isArray(interviewResult.eligibleInitial) ? interviewResult.eligibleInitial : []);
+                } else {
+                    setInterviews([]);
+                    setInterviewInitialRows([]);
+                }
+            } catch {
+                setInterviews([]);
+                setInterviewInitialRows([]);
+            }
         } catch (err) {
             const e = err as Error;
             setError(e.message);
@@ -146,11 +165,11 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
     }, [refresh]);
 
     const contextValue = useMemo(() => ({
-        recommendations, applicants, openRequests, users, isLoading, error, isCreateOpen, setIsCreateOpen,
+        recommendations, applicants, openRequests, users, interviews, interviewInitialRows, isLoading, error, isCreateOpen, setIsCreateOpen,
         selectedRecommendation, setSelectedRecommendation, isViewOpen, setIsViewOpen,
         pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen,
         refresh, submitRecommendation, updateRecommendation, deleteRecommendation
-    }), [recommendations, applicants, openRequests, users, isLoading, error, isCreateOpen, selectedRecommendation, isViewOpen, pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen, refresh, submitRecommendation, updateRecommendation, deleteRecommendation]);
+    }), [recommendations, applicants, openRequests, users, interviews, interviewInitialRows, isLoading, error, isCreateOpen, selectedRecommendation, isViewOpen, pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen, refresh, submitRecommendation, updateRecommendation, deleteRecommendation]);
 
     return (
         <ManpowerRecommendationContext.Provider value={contextValue}>
