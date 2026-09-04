@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH, maybeAutoApproveRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +62,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         body.updated_by = userId;
 
+        // Passed verdicts are final: once set, the verdict cannot be changed.
+        const existing = (await interviewService.fetchInterviews()).interviews.find((i) => i.id === id) ?? null;
+        if (existing?.verdict === "Passed" && typeof body.verdict === "string" && body.verdict !== "Passed") {
+            return NextResponse.json({ error: "VALIDATION_FAILED", message: "This interview already has a Passed verdict and can no longer be changed." }, { status: 400 });
+        }
+
         // Grade path for a scheduled row: items present means the grade page
         // is submitting criteria scores, so the server creates the sheet +
         // items + composite first, then links them onto the interview row with
@@ -83,7 +89,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 notes: typeof body.notes === "string" && body.notes ? body.notes : null,
                 items: body.items,
             });
-            return NextResponse.json({ data });
+            const autoApproved =
+                data.stage === "Final" && data.verdict === "Passed"
+                    ? await maybeAutoApproveRecommendation(data.recommendation_id)
+                    : false;
+            return NextResponse.json({ data, autoApproved });
         }
 
         // The client sends only { verdict, notes, interviewed_by } — it has no
@@ -92,7 +102,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const validated = InterviewSchema.omit({ id: true }).partial().parse(body);
 
         const data = await interviewService.updateInterview(id, validated);
-        return NextResponse.json({ data });
+        const autoApproved =
+            data.stage === "Final" && data.verdict === "Passed" && existing?.verdict !== "Passed"
+                ? await maybeAutoApproveRecommendation(data.recommendation_id)
+                : false;
+        return NextResponse.json({ data, autoApproved });
     } catch (e: unknown) {
         console.error("Error in PATCH /api/hrm/interviews/[id]:", e);
         const rawMessage = (e as Error).message || "INTERNAL_FAIL";

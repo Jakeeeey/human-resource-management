@@ -81,7 +81,7 @@ export function OpenManpowerRequestsList() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="All">All statuses</SelectItem>
-                            <SelectItem value="Approved">Approved</SelectItem>
+                            <SelectItem value="Approved">Open</SelectItem>
                             <SelectItem value="Full">Full</SelectItem>
                             <SelectItem value="Closed">Closed</SelectItem>
                         </SelectContent>
@@ -154,7 +154,7 @@ export function OpenManpowerRequestsList() {
                                                 </span>
                                             ) : req.status === "Approved" ? (
                                                 <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 border-emerald-500/20 inline-block w-[110px] text-center">
-                                                    Approved
+                                                    Open
                                                 </span>
                                             ) : (
                                                 <span className="px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider bg-zinc-500/10 text-zinc-600 border-zinc-500/20 inline-block w-[110px] text-center">

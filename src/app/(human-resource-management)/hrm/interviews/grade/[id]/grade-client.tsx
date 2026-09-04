@@ -90,8 +90,8 @@ function verdictPill(verdict: string): string {
 
 /**
  * Grade page client for a scheduled interview: all template criteria on one
- * page (score inputs 0–100, quiz row prefilled from the latest quiz attempt
- * percentage with an editable override), live composite SUM(score*weight)/100
+ * page (score inputs 0–100, quiz row read-only auto-filled from the latest
+ * quiz attempt percentage), live composite SUM(score*weight)/100
  * as a guideline display only, MANUAL-ONLY verdict Select (never derived —
  * HR may Pass a subpar grade at their discretion), and an interview date
  * input. Submit creates the sheet + items + composite server-side, then links
@@ -126,17 +126,21 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
 
     /**
      * Initial scores for a template: the quiz-criterion row is auto-filled
-     * from the latest quiz attempt percentage (editable override afterwards);
+     * from the latest quiz attempt percentage (read-only);
      * every other criterion starts empty so the grader types each score
      * deliberately. Empty boxes fail submit validation until filled.
      */
     const buildScores = (template: ScoreTemplate | null, quiz: number | null): (number | undefined)[] => {
         if (!template) return [];
+        // Directus returns decimal(5,2) as a string ("100.00") — coerce before
+        // the finite check, otherwise Number.isFinite rejects it and the
+        // quiz row wrongly renders empty.
+        const quizValue = typeof quiz === "string" ? Number(quiz) : quiz;
         return [...template.criteria]
             .sort((a, b) => a.sort - b.sort)
             .map((c) => {
-                if (c.is_quiz_criterion && quiz != null && Number.isFinite(quiz)) {
-                    return Math.min(100, Math.max(0, Math.round(quiz * 100) / 100));
+                if (c.is_quiz_criterion && quizValue != null && Number.isFinite(quizValue)) {
+                    return Math.min(100, Math.max(0, Math.round(quizValue * 100) / 100));
                 }
                 return undefined;
             });
@@ -440,7 +444,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                         <span className="text-destructive">*</span>
                                                         {!!criterion.is_quiz_criterion && (
                                                             <span className="font-normal normal-case text-muted-foreground">
-                                                                — auto-filled from quiz, editable
+                                                                — auto-filled from quiz
                                                             </span>
                                                         )}
                                                     </FormLabel>
@@ -449,6 +453,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                             type="number"
                                                             min={0}
                                                             max={100}
+                                                            disabled={!!criterion.is_quiz_criterion}
                                                             className="bg-muted/30 focus:bg-background transition-colors"
                                                             value={field.value ?? ""}
                                                             onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}

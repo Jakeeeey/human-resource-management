@@ -93,12 +93,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'VALIDATION_FAILED', message: `Request ${request_no} is still pending approval. Recommendations open after approval.` }, { status: 400 });
         }
 
-        // Capacity guard: block new recommendations once slots are filled.
-        const capacity = await manpowerRecommendationService.fetchRequestCapacity(validated.manpower_request_id);
-        if (capacity.need > 0 && capacity.active >= capacity.need) {
-            return NextResponse.json({ error: 'VALIDATION_FAILED', message: `All ${capacity.need} slots for request ${capacity.request_no} are already filled.` }, { status: 400 });
-        }
-
         const created = await manpowerRecommendationService.create(validated);
         return NextResponse.json({ data: created }, { status: 201 });
     } catch (e: unknown) {

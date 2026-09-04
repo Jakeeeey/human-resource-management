@@ -29,7 +29,7 @@ export interface EligibleInitialRow {
 }
 
 /**
- * Approved recommendation row from the GET envelope, annotated with its
+ * Recommended recommendation row from the GET envelope, annotated with its
  * latest Final-stage verdict (null when never graded).
  */
 export interface EligibleFinalRow {

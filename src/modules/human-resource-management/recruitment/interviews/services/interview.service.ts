@@ -1,4 +1,5 @@
 import { Interview, InterviewCreateInput } from "../types";
+import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -31,9 +32,9 @@ export type QuizCompletedApplication = {
 };
 
 /**
- * Approved recommendation lookup row for the Final-tab eligible list.
+ * Recommended recommendation lookup row for the Final-tab eligible list.
  */
-export type ApprovedRecommendation = {
+export type RecommendedRecommendation = {
     id: number;
     applicant_id: number | null;
     manpower_request_id: number | null;
@@ -208,15 +209,15 @@ export const interviewService = {
     },
 
     /**
-     * Fetch Approved recommendations on Approved requests for the Final-tab
+     * Fetch Recommended recommendations on Approved requests for the Final-tab
      * eligible list (mirrors the openRequests pattern: open requests first,
      * then recs scoped to those request ids). Each row carries the applicant
      * full_name resolved via the applicant table by applicant_id (Directus
      * items/applicant?fields=id,full_name), falling back to
      * "Unknown applicant" when missing — never null into UI.
-     * @returns Typed approved recommendation lookup rows with full_name.
+     * @returns Typed recommended recommendation lookup rows with full_name.
      */
-    async fetchApprovedRecommendations(): Promise<ApprovedRecommendation[]> {
+    async fetchRecommendedRecommendations(): Promise<RecommendedRecommendation[]> {
         try {
             const openRes = await fetch(
                 `${API_BASE_URL}/items/manpower_request` +
@@ -231,7 +232,7 @@ export const interviewService = {
             const recRes = await fetch(
                 `${API_BASE_URL}/items/manpower_recommendation` +
                 `?fields=id,applicant_id,manpower_request_id,status` +
-                `&filter[status][_eq]=Approved` +
+                `&filter[status][_eq]=Recommended` +
                 `&filter[manpower_request_id][_in]=${openIds.join(",")}` +
                 `&sort=-created_at&limit=-1`,
                 { headers }
@@ -667,4 +668,29 @@ export const interviewService = {
  */
 export function normalizeInterview(row: Record<string, unknown>): Interview {
     return row as unknown as Interview;
+}
+
+/**
+ * Auto-approve the linked recommendation when a Final interview lands Passed.
+ * The interviews module owns this promotion: a Passed final IS the selection,
+ * so the rec flips to Approved (slot reservation) without HR touching the
+ * recommendations module. Skips when there is no linked rec, the rec already
+ * left Recommended, or request slots are full (overflow stays Recommended as
+ * backup). Never throws — grading success must not fail on a rec-side error.
+ * @param recommendationId - Linked manpower_recommendation ID (may be null).
+ * @returns True when the rec was flipped to Approved.
+ */
+export async function maybeAutoApproveRecommendation(recommendationId: number | null | undefined): Promise<boolean> {
+    try {
+        if (!recommendationId) return false;
+        const rec = await manpowerRecommendationService.fetchById(recommendationId);
+        if (!rec || rec.status !== "Recommended") return false;
+        const cap = await manpowerRecommendationService.fetchRequestCapacity(rec.manpower_request_id);
+        if (cap.need > 0 && cap.active >= cap.need) return false;
+        await manpowerRecommendationService.update(recommendationId, { status: "Approved" });
+        return true;
+    } catch (e) {
+        console.error("Error auto-approving recommendation for passed final:", e);
+        return false;
+    }
 }

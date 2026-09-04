@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useInterview } from "../hooks/useInterview";
 import { Interview } from "../types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -76,7 +75,7 @@ function computeComposite(items: Pick<ClientSheetItem, "score" | "weight_percent
  * badge + verdict badge (manpower-family pills), composite, interviewer
  * (users map with `User #id` fallback), date, per-criterion breakdown
  * (sheet items fetched per score_sheet_id), and notes. The newest interview
- * is ring-emphasized with a Latest badge. The verdict change control below
+ * is ring-emphasized (blue outline). The verdict change control below
  * it is MANUAL-ONLY (mirrors the View inline Select pattern: badge preview
  * + save via PATCH) — HR may Pass a subpar grade, so the verdict is never
  * derived from the composite.
@@ -184,7 +183,6 @@ export function InterviewDetail() {
                                 return (
                                     <div key={interview.id} className={`p-4 border rounded-xl bg-card space-y-3 ${isLatest ? "border-primary/40 ring-1 ring-primary/20" : "border-border/50"}`}>
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            {isLatest && <Badge variant="outline" className="px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider bg-primary/10 text-primary border-primary/20">Latest</Badge>}
                                             <span className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider ${getStageColor(interview.stage)}`}>
                                                 {interview.stage}
                                             </span>
@@ -230,7 +228,8 @@ export function InterviewDetail() {
                                             <span className="text-xs font-bold uppercase text-muted-foreground block mb-1">Notes</span>
                                             <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50 whitespace-pre-wrap text-sm">{interview.notes || "-"}</div>
                                         </div>
-                                        {isLatest && (
+                                        {/* Passed verdicts are final and can no longer be changed. */}
+                                        {isLatest && latest?.verdict !== "Passed" && (
                                             <div className="flex items-center gap-2 pt-1 border-t border-border/50">
                                                 <span className="text-xs font-bold uppercase text-muted-foreground">Verdict</span>
                                                 <Select value={newVerdict} onValueChange={(v) => setNewVerdict(v as InterviewVerdict)}>

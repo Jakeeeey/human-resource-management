@@ -16,7 +16,7 @@ import { CalendarPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, E
  * Tabbed eligible list for applicant interview grading.
  *
  * Initial tab rows quiz-completed applications (applicant, quiz score +
- * passed/failed badge, latest initial verdict chip); Final tab rows approved
+ * passed/failed badge, latest initial verdict chip); Final tab rows recommended
  * recommendations (request ref, applicant, latest final verdict
  * chip). Scheduling opens the schedule dialog (header button), which creates
  * a Pending row and routes to its grade page. Grade renders as a link to
@@ -301,7 +301,7 @@ export function InterviewEligibleList() {
                                     <TableCell colSpan={4} className="text-center h-48">
                                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                                             <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                                            <p className="font-medium">No approved recommendations awaiting final.</p>
+                                            <p className="font-medium">No recommended applicants awaiting final.</p>
                                         </div>
                                     </TableCell>
                                 </TableRow>
