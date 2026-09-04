@@ -31,7 +31,7 @@ function getStatusColor(status: string) {
 }
 
 export function ManpowerRecommendationView() {
-    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests, users } = useManpowerRecommendationContext();
+    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests, recommendations, users } = useManpowerRecommendationContext();
 
     const [newStatus, setNewStatus] = useState<StatusOption>("Recommended");
     const [decisionNotes, setDecisionNotes] = useState<string>("");
@@ -52,11 +52,16 @@ export function ManpowerRecommendationView() {
 
     if (!selectedRecommendation) return null;
 
-    // openRequests only holds Draft rows — a recommendation whose request later
-    // left Draft won't be in the list, so fall back to the raw id (never blank).
+    // openRequests only holds Approved rows — a recommendation whose request later
+    // changed status won't be in the list, so fall back to the raw id (never blank).
     const matchedRequest = openRequests.find(r => r.id === selectedRecommendation.manpower_request_id);
     const requestNo = matchedRequest?.request_no || String(selectedRecommendation.manpower_request_id);
     const position = matchedRequest?.position || `Request #${selectedRecommendation.manpower_request_id}`;
+    // Fully closed request (every slot hired): status is immutable here — a hired
+    // employee leaving goes through job exit, never by flipping this record back.
+    const hiredForRequest = recommendations.filter((r) => r.manpower_request_id === selectedRecommendation.manpower_request_id && r.status === "Hired").length;
+    const requestNeed = matchedRequest?.no_manpower_needed ?? 0;
+    const isRequestClosed = requestNeed > 0 && hiredForRequest >= requestNeed;
     const applicantName = applicants.find(a => a.id === selectedRecommendation.applicant_id)?.full_name || `Applicant #${selectedRecommendation.applicant_id}`;
     // recommended_by/decision_by are plain INT (no Directus relation) — join full
     // names from the users lookup, falling back to the raw id (never blank).
@@ -73,8 +78,8 @@ export function ManpowerRecommendationView() {
             // are injected server-side by the Task 5 PATCH route (no userId exists
             // in client scope; mirrors the updated_by injection pattern).
             const ok = await updateRecommendation(selectedRecommendation.id, {
-                status: newStatus,
-                decision_notes: decisionNotes.trim() ? decisionNotes : null,
+                status: isRequestClosed ? toStatusOption(selectedRecommendation.status) : newStatus,
+                decision_notes: isRequestClosed ? selectedRecommendation.decision_notes : decisionNotes.trim() ? decisionNotes : null,
             });
             if (ok) setIsViewOpen(false);
         } finally {
@@ -139,9 +144,11 @@ export function ManpowerRecommendationView() {
                                             {newStatus}
                                         </span>
                                     )}
-                                    <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
-                                        <Pencil className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
+                                    {!isRequestClosed && (
+                                        <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
+                                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                    )}
                                     <Button variant="outline"               size="lg"
               className="ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
                                         <FileText className="mr-2 h-4 w-4" />
@@ -192,9 +199,9 @@ export function ManpowerRecommendationView() {
                             <div className="md:col-span-2">
                                 <div className="flex items-center gap-1 mb-1">
                                     <label className="text-xs font-bold uppercase text-muted-foreground block">Decision Notes</label>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIsEditingNotes((v) => !v)} aria-label="Edit decision notes">
+                                    {!isRequestClosed && (<Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIsEditingNotes((v) => !v)} aria-label="Edit decision notes">
                                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </Button>
+                                    </Button>)}
                                 </div>
                                 {isEditingNotes ? (
                                     <Textarea

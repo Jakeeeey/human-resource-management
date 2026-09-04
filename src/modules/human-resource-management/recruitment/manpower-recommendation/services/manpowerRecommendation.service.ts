@@ -91,7 +91,7 @@ export const manpowerRecommendationService = {
     },
 
     /**
-     * Fetch open (Draft + Approved) manpower requests for the recommendation form dropdown.
+     * Fetch open (Approved) manpower requests for the recommendation landing table.
      * @returns Typed open manpower request lookup rows.
      */
     async fetchOpenManpowerRequests(): Promise<{ id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[]> {
@@ -99,7 +99,7 @@ export const manpowerRecommendationService = {
             const url =
                 `${API_BASE_URL}/items/manpower_request` +
                 `?fields=id,request_no,position,no_manpower_needed,status` +
-                `&filter[status][_in]=Draft,Approved` +
+                `&filter[status][_eq]=Approved` +
                 `&sort=-created_at&limit=-1`;
             const response = await fetch(url, { headers });
             if (!response.ok) return [];
