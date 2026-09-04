@@ -7,7 +7,7 @@ import { CalendarPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { ScrollableSearchableSelect } from "./ScrollableSearchableSelect";
 import { useInterview } from "../hooks/useInterview";
 import { deriveScheduleStage } from "../utils/schedule-stage";
 
@@ -104,7 +104,7 @@ export function InterviewScheduleDialog({ open, onOpenChange }: { open: boolean;
                         <p className="text-xs font-bold uppercase text-muted-foreground">
                             Applicant <span className="text-destructive">*</span>
                         </p>
-                        <SearchableSelect
+                        <ScrollableSearchableSelect
                             options={options}
                             value={applicationId}
                             onValueChange={setApplicationId}
