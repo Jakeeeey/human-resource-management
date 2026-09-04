@@ -7,9 +7,10 @@ import { InterviewScheduleDialog } from "./InterviewScheduleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { CalendarPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, Filter, Pencil } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, Pencil } from "lucide-react";
 
 /**
  * Tabbed eligible list for applicant interview grading.
@@ -25,8 +26,8 @@ import { CalendarPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, E
  * interview via handleView for the detail dialog.
  *
  * Search filters through the hook joined-text lists (filteredInitial /
- * filteredFinal); the Awaiting-verdict chip toggles a Pending-verdict-only
- * filter on the active tab. Applicant names arrive as full_name per row from
+ * filteredFinal); the verdict dropdown filters the active tab by verdict
+ * (All, Pending, Passed, Failed). Applicant names arrive as full_name per row from
  * the T4 envelope applicant lookup, with `Applicant #id` fallback only
  * when the name is truly missing.
  */
@@ -44,7 +45,7 @@ export function InterviewEligibleList() {
         handleView,
         latestPerApplication,
     } = useInterview();
-    const [pendingOnly, setPendingOnly] = useState(false);
+    const [verdictFilter, setVerdictFilter] = useState<"All" | "Pending" | "Passed" | "Failed">("All");
     const [scheduleOpen, setScheduleOpen] = useState(false);
     const [pageInitial, setPageInitial] = useState(1);
     const [pageFinal, setPageFinal] = useState(1);
@@ -53,17 +54,10 @@ export function InterviewEligibleList() {
         return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
     }
 
-    const initialPendingCount = filteredInitial.filter((row) => row.latestInitialVerdict === "Pending").length;
-    const finalPendingCount = filteredFinal.filter((row) => row.latestFinalVerdict === "Pending").length;
-
-    const visibleInitial = pendingOnly
-        ? filteredInitial.filter((row) => row.latestInitialVerdict === "Pending")
-        : filteredInitial;
-    const visibleFinal = pendingOnly
-        ? filteredFinal.filter((row) => row.latestFinalVerdict === "Pending")
-        : filteredFinal;
-
-    const pendingCount = stageTab === "Initial" ? initialPendingCount : finalPendingCount;
+    const visibleInitial =
+        verdictFilter === "All" ? filteredInitial : filteredInitial.filter((row) => row.latestInitialVerdict === verdictFilter);
+    const visibleFinal =
+        verdictFilter === "All" ? filteredFinal : filteredFinal.filter((row) => row.latestFinalVerdict === verdictFilter);
 
     const PAGE_SIZE = 10;
     const totalPagesInitial = Math.max(1, Math.ceil(visibleInitial.length / PAGE_SIZE));
@@ -122,7 +116,7 @@ export function InterviewEligibleList() {
                 value={stageTab}
                 onValueChange={(value) => {
                     setStageTab(value as "Initial" | "Final");
-                    setPendingOnly(false);
+                    setVerdictFilter("All");
                     setPageInitial(1);
                     setPageFinal(1);
                 }}
@@ -143,21 +137,24 @@ export function InterviewEligibleList() {
                         </TabsTrigger>
                     </TabsList>
                     <div className="flex items-center gap-2">
-                        <Button
-                            type="button"
-                            variant={pendingOnly ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => {
-                                setPendingOnly((prev) => !prev);
+                        <Select
+                            value={verdictFilter}
+                            onValueChange={(value) => {
+                                setVerdictFilter(value as "All" | "Pending" | "Passed" | "Failed");
                                 setPageInitial(1);
                                 setPageFinal(1);
                             }}
-                            aria-pressed={pendingOnly}
-                            title="Show only rows awaiting an explicit verdict"
                         >
-                            <Filter className="mr-2 h-4 w-4" />
-                            Awaiting verdict: {pendingCount}
-                        </Button>
+                            <SelectTrigger className="w-40" aria-label="Filter by verdict">
+                                <SelectValue placeholder="All verdicts" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All verdicts</SelectItem>
+                                <SelectItem value="Pending">Pending</SelectItem>
+                                <SelectItem value="Passed">Passed</SelectItem>
+                                <SelectItem value="Failed">Failed</SelectItem>
+                            </SelectContent>
+                        </Select>
                         <Input
                             placeholder="Search applicant, score, verdict..."
                             value={searchQuery}
