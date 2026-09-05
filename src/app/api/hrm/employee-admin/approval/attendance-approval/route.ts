@@ -120,7 +120,6 @@ export async function GET(req: NextRequest) {
       `/items/user/${userId}?fields=user_id,user_department,isAdmin,role`
     );
 
-    const currentUserDepartment = userResponse.data?.user_department;
     const isAdmin = userResponse.data?.isAdmin || userResponse.data?.role === 'ADMIN';
 
     // Build query - only show logs based on approval status and user department
@@ -147,7 +146,7 @@ export async function GET(req: NextRequest) {
     // 2. Otherwise, if the user is NOT an admin, restrict to their authorized departments.
     if (selectedDepartmentId && selectedDepartmentId !== "all") {
       filterParts.push(`filter[department_id][_eq]=${selectedDepartmentId}`);
-    } else if (!isAdmin) {
+    } else {
       const taApproversRes = await directusFetch(
         `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id`
       ).catch(() => ({ data: [] }));
@@ -155,15 +154,15 @@ export async function GET(req: NextRequest) {
       const taApprovers = taApproversRes.data || [];
       const assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
 
-      const allDepartmentIds = new Set<number>();
-      if (currentUserDepartment) allDepartmentIds.add(currentUserDepartment);
-      assignedDepartmentIds.forEach((id: number) => allDepartmentIds.add(id));
+      const skipFilter = isAdmin && assignedDepartmentIds.length === 0;
 
-      if (allDepartmentIds.size > 0) {
-        const deptIdsString = Array.from(allDepartmentIds).join(',');
-        filterParts.push(`filter[department_id][_in]=${deptIdsString}`);
-      } else {
-        filterParts.push(`filter[department_id][_in]=-1`);
+      if (!skipFilter) {
+        if (assignedDepartmentIds.length > 0) {
+          const deptIdsString = assignedDepartmentIds.join(',');
+          filterParts.push(`filter[department_id][_in]=${deptIdsString}`);
+        } else {
+          filterParts.push(`filter[department_id][_in]=-1`);
+        }
       }
     }
 

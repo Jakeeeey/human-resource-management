@@ -81,8 +81,8 @@ export function QuizHistoryTable({ data, isLoading = false }: QuizHistoryTablePr
                 {table.getFilteredRowModel().rows.length} attempt(s) found
             </div>
 
-            <div className="rounded-md border">
-                <UiTable>
+            <div className="rounded-md border overflow-x-auto">
+                <UiTable className="min-w-[640px]">
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
@@ -127,7 +127,7 @@ export function QuizHistoryTable({ data, isLoading = false }: QuizHistoryTablePr
                 </UiTable>
             </div>
 
-            <div className="flex items-center justify-end space-x-2">
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
                 <div className="flex-1 text-sm text-muted-foreground">
                     {table.getFilteredRowModel().rows.length} attempt(s)
                 </div>

@@ -1,6 +1,6 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from "next/server"
-import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, LAST_VISITED_PATH_COOKIE, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
+import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
 
 const PUBLIC_FILE = /\.(.*)$/
 const BASELINE_PREFIXES = ["/main-dashboard"]
@@ -246,7 +246,7 @@ async function isSubscriptionLocked(pathname: string): Promise<boolean> {
     return false
 }
 
-function applyCommonCookies(response: NextResponse, req: NextRequest, token: string, pathname: string) {
+function applyCommonCookies(response: NextResponse, req: NextRequest, token: string) {
     const currentToken = req.cookies.get(COOKIE_NAME)?.value;
     if (token && token !== currentToken) {
         response.cookies.set({
@@ -260,22 +260,7 @@ function applyCommonCookies(response: NextResponse, req: NextRequest, token: str
         });
     }
 
-    const isNavigation = req.method === "GET" &&
-        !pathname.startsWith("/api") &&
-        !pathname.startsWith("/error") &&
-        !pathname.startsWith("/_next") &&
-        pathname !== "/favicon.ico";
-
-    if (token && isNavigation) {
-        response.cookies.set({
-            name: LAST_VISITED_PATH_COOKIE,
-            value: pathname,
-            maxAge: 60 * 60 * 24 * 7,
-            path: "/",
-            sameSite: "lax",
-            secure: IS_SECURE_COOKIE
-        });
-    }
+    // Last visited path tracking removed
 }
 
 export async function middleware(req: NextRequest) {
@@ -309,17 +294,33 @@ export async function middleware(req: NextRequest) {
         pathname.startsWith("/forgot-password") ||
         pathname.startsWith("/reset-password")
     ) {
-        // If the user is already logged in and tries to go to root / or /login, take them to their last visited subsystem
-        if (pathname === "/" || pathname === "/login") {
+        if (pathname.startsWith("/api/auth/logout")) {
             const token = req.cookies.get(COOKIE_NAME)?.value;
             if (token) {
-                const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
-                const target = lastVisited || "/main-dashboard";
+                USER_PERMISSIONS_CACHE.delete(token);
+            }
+        }
 
-                // Avoid infinite redirect loop if target is the current page
-                if (target !== pathname) {
-                    return NextResponse.redirect(new URL(target, req.url));
+        // If the user is already logged in (with a VALID token) and tries to go to root / or /login, take them to their last visited subsystem
+        if (pathname === "/" || pathname === "/login") {
+            const token = req.cookies.get(COOKIE_NAME)?.value;
+            let isValid = false;
+            
+            if (token) {
+                const payload = decodeJwtPayload(token);
+                if (payload && payload.exp) {
+                    const now = Math.floor(Date.now() / 1000);
+                    if (payload.exp > now + 10) {
+                        isValid = true;
+                    }
                 }
+            }
+
+            if (isValid) {
+                return NextResponse.redirect(new URL("/main-dashboard", req.url));
+            } else if (token) {
+                 // If token exists but is invalid/expired, we should let them stay on /login
+                 // (We don't need to clear it here, the login process or subsequent requests will overwrite it)
             }
         }
         return NextResponse.next()
@@ -378,13 +379,15 @@ export async function middleware(req: NextRequest) {
                     },
                     cache: "no-store",
                 });
-
                 if (refreshRes.ok) {
                     const data = await refreshRes.json();
                     const newToken = pickTokenFromPayload(data);
 
                     if (newToken) {
                         console.log("[Middleware] Refresh successful.");
+                        if (currentToken) {
+                            USER_PERMISSIONS_CACHE.delete(currentToken);
+                        }
                         token = newToken;
 
                         // Propagate new token to downstream request headers
@@ -401,6 +404,18 @@ export async function middleware(req: NextRequest) {
                                 : `${COOKIE_NAME}=${newToken}`;
                         }
                         requestHeaders.set("cookie", updatedCookieHeader);
+                    } else {
+                        // Backend returned 200 but no usable token in response body.
+                        // Clear the stale expired cookie immediately and redirect to login
+                        // to prevent an infinite refresh loop on the next request.
+                        console.error("[Middleware] Refresh returned 200 but no valid token was found in the response. Clearing session.");
+                        const loginUrl = req.nextUrl.clone();
+                        loginUrl.pathname = "/login";
+                        loginUrl.searchParams.set("next", pathname);
+                        const clearResponse = NextResponse.redirect(loginUrl);
+                        clearResponse.cookies.delete(COOKIE_NAME);
+                        clearResponse.cookies.delete(REFRESH_COOKIE_NAME);
+                        return clearResponse;
                     }
                 } else if (refreshRes.status >= 500) {
                     console.error(`[Middleware] Spring Boot returned ${refreshRes.status} during refresh.`);
@@ -408,6 +423,18 @@ export async function middleware(req: NextRequest) {
                     url.pathname = "/error/service-down";
                     url.searchParams.set("service", `Spring Boot (Refresh Status ${refreshRes.status})`);
                     return NextResponse.redirect(url);
+                } else {
+                    // Refresh token is expired or invalid (401, 403, etc.).
+                    // Clear both cookies immediately so the middleware won't keep retrying
+                    // on the next request and cause an infinite redirect loop.
+                    console.warn(`[Middleware] Refresh token rejected by backend (status ${refreshRes.status}). Clearing session and redirecting to login.`);
+                    const loginUrl = req.nextUrl.clone();
+                    loginUrl.pathname = "/login";
+                    loginUrl.searchParams.set("next", pathname);
+                    const clearResponse = NextResponse.redirect(loginUrl);
+                    clearResponse.cookies.delete(COOKIE_NAME);
+                    clearResponse.cookies.delete(REFRESH_COOKIE_NAME);
+                    return clearResponse;
                 }
             } catch (err) {
                 console.error("[Middleware] Refresh failed (Server Outage):", err);
@@ -423,7 +450,10 @@ export async function middleware(req: NextRequest) {
         const url = req.nextUrl.clone()
         url.pathname = "/login"
         url.searchParams.set("next", pathname)
-        return NextResponse.redirect(url)
+        const redirectResponse = NextResponse.redirect(url)
+        // Ensure the stale access token is cleared so it doesn't cause loops
+        redirectResponse.cookies.delete(COOKIE_NAME)
+        return redirectResponse
     }
     const payload = decodeJwtPayload(token);
 
@@ -443,7 +473,7 @@ export async function middleware(req: NextRequest) {
                 }
             });
             response.cookies.delete("x-locked-module");
-            applyCommonCookies(response, req, token, pathname);
+            applyCommonCookies(response, req, token);
             return response;
         }
 
@@ -475,11 +505,7 @@ export async function middleware(req: NextRequest) {
         } else if (directusBase && directusToken && payload && payload.sub) {
             try {
                 // Fetch LIVE permissions from junction tables + User Role
-                const [subRes, modRes, allModsRes, userRes] = await Promise.all([
-                    fetch(`${directusBase}/items/user_access_subsystems?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=subsystem_id.base_path`, {
-                        headers: { "Authorization": `Bearer ${directusToken}` },
-                        cache: 'no-store'
-                    }),
+                const [modRes, allModsRes, userRes] = await Promise.all([
                     fetch(`${directusBase}/items/user_access_modules?filter=${encodeURIComponent(JSON.stringify({ user_id: { _eq: payload.sub } }))}&limit=-1&fields=module_id.base_path`, {
                         headers: { "Authorization": `Bearer ${directusToken}` },
                         cache: 'no-store'
@@ -494,9 +520,8 @@ export async function middleware(req: NextRequest) {
                     })
                 ]);
 
-                if (subRes.ok && modRes.ok && allModsRes.ok) {
-                    const [subData, modData, allModsData] = await Promise.all([
-                        subRes.json(),
+                if (modRes.ok && allModsRes.ok) {
+                    const [modData, allModsData] = await Promise.all([
                         modRes.json(),
                         allModsRes.json(),
                     ]);
@@ -514,7 +539,9 @@ export async function middleware(req: NextRequest) {
                     if (isAdmin) {
                         bypassModuleAuthorization = true;
                     } else {
-                        authorizedSubsystemPaths = (subData.data || []).map((row: { subsystem_id?: { base_path?: string } }) => row.subsystem_id?.base_path?.trim()).filter(Boolean) as string[];
+                        // Derive authorized subsystem paths directly from the JWT payload
+                        authorizedSubsystemPaths = userSubsystems.map(id => `/${id}`);
+
                         authorizedModulePaths = (modData.data || []).map((row: { module_id?: { base_path?: string } }) => row.module_id?.base_path?.trim()).filter(Boolean) as string[];
                         allModulePaths = (allModsData.data || []).map((row: { base_path?: string }) => row.base_path?.trim()).filter(Boolean) as string[];
                     }
@@ -536,7 +563,7 @@ export async function middleware(req: NextRequest) {
                     });
                 } else {
                     // Fail-fast on server errors
-                    const service = !subRes.ok || !modRes.ok || !allModsRes.ok ? "Directus Permissions" : "Directus User Profile";
+                    const service = !modRes.ok || !allModsRes.ok ? "Directus Permissions" : "Directus User Profile";
                     throw new Error(service);
                 }
             } catch (err) {
@@ -602,7 +629,7 @@ export async function middleware(req: NextRequest) {
             }
         });
         response.cookies.set("x-locked-module", "true", { path: "/" });
-        applyCommonCookies(response, req, token, pathname);
+        applyCommonCookies(response, req, token);
         return response;
     }
 
@@ -614,7 +641,7 @@ export async function middleware(req: NextRequest) {
     });
     response.cookies.delete("x-locked-module");
 
-    applyCommonCookies(response, req, token, pathname);
+    applyCommonCookies(response, req, token);
     return response;
 }
 

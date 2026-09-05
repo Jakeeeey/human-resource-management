@@ -62,7 +62,7 @@ export function Toolbar() {
                         updateQuestionType(val === "all" ? null : (val as QuestionType))
                     }
                 >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="All types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -80,7 +80,7 @@ export function Toolbar() {
                     onValueChange={(val) => updateCategory(val === "all" ? null : val)}
                     disabled={categoryOptions.length === 0}
                 >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="All categories" />
                     </SelectTrigger>
                     <SelectContent>

@@ -57,8 +57,6 @@ function formatDateTime(value: string | null): string {
     }
 }
 
-// A real MySQL JSON column comes back from Directus either already parsed or as
-// a raw string depending on field config -- accept both, fail soft to null.
 function parseSnapshot(
     raw: AnswerKeySnapshot | string | null
 ): AnswerKeySnapshot | null {
@@ -80,8 +78,6 @@ interface QuestionGroup {
     rows: QuizAttemptAnswer[];
 }
 
-// Fill-in-the-blank stores one row per blank -- collapse every row for a
-// question into a single card, keeping first-seen question order.
 function groupByQuestion(answers: QuizAttemptAnswer[]): QuestionGroup[] {
     const order: number[] = [];
     const byId = new Map<number, QuestionGroup>();
@@ -110,8 +106,6 @@ function CorrectnessIcon({ correct }: { correct: boolean }) {
     );
 }
 
-// Plain line for rows with no usable snapshot: attempts graded before the
-// answer_key_snapshot column existed, or a question that has left the pool.
 function FallbackAnswer({ row }: { row: QuizAttemptAnswer }) {
     return (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -123,8 +117,6 @@ function FallbackAnswer({ row }: { row: QuizAttemptAnswer }) {
     );
 }
 
-// true_false / multiple_choice -- show every option (as a pill or a thumbnail),
-// mark the correct one(s) and the one the applicant chose.
 function ChoiceBody({ row }: { row: QuizAttemptAnswer }) {
     const snap = parseSnapshot(row.answer_key_snapshot);
     if (!snap || snap.kind !== "choice" || snap.options.length === 0) {
@@ -132,7 +124,6 @@ function ChoiceBody({ row }: { row: QuizAttemptAnswer }) {
     }
 
     const showLetters = row.question_type === "multiple_choice";
-    // Newer snapshots identify the pick by choice id; older ones only by text.
     const isById = snap.options.some((o) => o.id != null);
     const givenChoiceId = isById
         ? snap.given_choice_id ?? row.answer_given_choice_id ?? null
@@ -148,7 +139,6 @@ function ChoiceBody({ row }: { row: QuizAttemptAnswer }) {
     return (
         <div className="space-y-1.5">
             {snap.options.map((opt, i) => {
-                // is_correct can arrive as a real boolean or a MySQL 0/1.
                 const isCorrect = Boolean(opt.is_correct);
                 const isGiven = isById
                     ? opt.id != null && opt.id === givenChoiceId
@@ -215,8 +205,6 @@ function ChoiceBody({ row }: { row: QuizAttemptAnswer }) {
     );
 }
 
-// One "Given / Accepted" pair -- used for identification and for each blank of
-// a fill-in-the-blank question.
 function TextRow({
     label,
     given,
@@ -260,8 +248,6 @@ function IdentificationBody({ row }: { row: QuizAttemptAnswer }) {
 }
 
 function FillInTheBlankBody({ rows }: { rows: QuizAttemptAnswer[] }) {
-    // Order by the snapshot's blank_index; fall back to stored order for a row
-    // that has no snapshot.
     const ordered = rows
         .map((row, idx) => {
             const snap = parseSnapshot(row.answer_key_snapshot);
@@ -337,8 +323,6 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
         if (!open || !attemptId) return;
 
         let cancelled = false;
-        // Standard fetch-on-open: the spinner has to be raised before the
-        // request goes out, so this sync setState in the effect body is fine.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsLoading(true);
         fetch(`/api/hrm/quiz-file-management/quiz-attempt/${attemptId}`)
@@ -350,7 +334,6 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
                 if (!cancelled) setIsLoading(false);
             });
 
-        // Clear on close / attempt change so a reopen never flashes stale data.
         return () => {
             cancelled = true;
             setDetail(null);
@@ -365,7 +348,7 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Answer Breakdown</DialogTitle>
                     <DialogDescription>
@@ -377,7 +360,7 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
 
                 {!isLoading && attempt && (
                     <div className="space-y-4">
-                        <div className="rounded-lg border p-4 grid grid-cols-2 gap-2 text-sm">
+                        <div className="rounded-lg border p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                             <div>
                                 <span className="text-muted-foreground">Applicant: </span>
                                 <span className="font-medium">{attempt.applicant?.full_name || "—"}</span>
@@ -399,7 +382,7 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
                                     {attempt.passed ? "Passed" : "Failed"}
                                 </Badge>
                             </div>
-                            <div className="col-span-2">
+                            <div className="sm:col-span-2">
                                 <span className="text-muted-foreground">Completed: </span>
                                 <span className="font-medium">{formatDateTime(attempt.completed_at)}</span>
                             </div>
