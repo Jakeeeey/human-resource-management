@@ -191,13 +191,13 @@ export function QuizSettingsDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{isEdit ? "Edit Quiz Settings" : "Create Quiz"}</DialogTitle>
                     <DialogDescription>
                         {isEdit
                             ? "Update this quiz's configuration."
-                            : "Configure a new quiz. Questions are drawn from the shared File Management pool once quiz-taking is built."}
+                            : "Configure a new quiz. Questions are drawn from the shared Question Pool."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -353,7 +353,7 @@ export function QuizSettingsDialog({
                                     )}
                                     <FormDescription>
                                         Leave empty to draw from every active category. Categories come
-                                        from File Management&apos;s own Category tag.
+                                        from the Question Pool&apos;s own Category tag.
                                     </FormDescription>
                                 </FormItem>
                             )}

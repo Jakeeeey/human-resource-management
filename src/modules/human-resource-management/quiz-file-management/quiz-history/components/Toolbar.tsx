@@ -53,7 +53,7 @@ export function Toolbar({ attempts }: ToolbarProps) {
                     value={filters.quizId != null ? String(filters.quizId) : "all"}
                     onValueChange={(val) => updateQuizId(val === "all" ? null : Number(val))}
                 >
-                    <SelectTrigger className="w-[200px]">
+                    <SelectTrigger className="w-full sm:w-[200px]">
                         <SelectValue placeholder="All quizzes" />
                     </SelectTrigger>
                     <SelectContent>
@@ -72,7 +72,7 @@ export function Toolbar({ attempts }: ToolbarProps) {
                         updatePassed(val === "all" ? null : val === "passed")
                     }
                 >
-                    <SelectTrigger className="w-[160px]">
+                    <SelectTrigger className="w-full sm:w-[160px]">
                         <SelectValue placeholder="All results" />
                     </SelectTrigger>
                     <SelectContent>
