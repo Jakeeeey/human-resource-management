@@ -30,6 +30,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
+import { ChangePasswordModal } from "@/modules/shared/change-password/components/ChangePasswordModal"
 
 type NavUserProps = {
     user: {
@@ -50,6 +51,7 @@ export function NavUser({ user, onLogout, subsystemSlug }: NavUserProps) {
     const router = useRouter()
     const pathname = usePathname()
     const [loggingOut, setLoggingOut] = React.useState(false)
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false)
 
     const currentSlug = subsystemSlug || pathname.split("/")[1] || "hrm"
 
@@ -151,11 +153,15 @@ export function NavUser({ user, onLogout, subsystemSlug }: NavUserProps) {
                                 </Link>
                             </DropdownMenuItem>
 
-                            <DropdownMenuItem asChild>
-                                <Link href={`/${currentSlug}/change-password`} className="cursor-pointer">
-                                    <KeyRound className="mr-2 size-4" />
-                                    Change Password
-                                </Link>
+                            <DropdownMenuItem 
+                                className="cursor-pointer"
+                                onSelect={(e) => {
+                                    e.preventDefault()
+                                    setIsPasswordModalOpen(true)
+                                }}
+                            >
+                                <KeyRound className="mr-2 size-4" />
+                                Change Password
                             </DropdownMenuItem>
 
                             <DropdownMenuItem asChild>
@@ -191,6 +197,10 @@ export function NavUser({ user, onLogout, subsystemSlug }: NavUserProps) {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
+            <ChangePasswordModal 
+                open={isPasswordModalOpen} 
+                onOpenChange={setIsPasswordModalOpen} 
+            />
         </SidebarMenu>
     )
 }
