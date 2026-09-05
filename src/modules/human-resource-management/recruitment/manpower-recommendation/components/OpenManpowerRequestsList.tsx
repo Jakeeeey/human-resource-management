@@ -68,15 +68,15 @@ export function OpenManpowerRequestsList() {
                         {filteredRequests.length}
                     </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <Input
                         placeholder="Search request no or position..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-64"
+                        className="w-full sm:w-64"
                     />
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-36 truncate" aria-label="Filter by status">
+                        <SelectTrigger className="w-full sm:w-36 truncate" aria-label="Filter by status">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
                         <SelectContent>
@@ -89,7 +89,8 @@ export function OpenManpowerRequestsList() {
                 </div>
             </div>
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                <Table>
+                <div className="overflow-x-auto">
+                <Table className="min-w-[680px]">
                     <TableHeader className="bg-muted/30">
                         <TableRow className="hover:bg-transparent border-border/50">
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Request No</TableHead>
@@ -176,6 +177,7 @@ export function OpenManpowerRequestsList() {
                         )}
                     </TableBody>
                 </Table>
+                </div>
             </div>
         </div>
     );

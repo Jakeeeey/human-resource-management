@@ -18,10 +18,10 @@ function ManpowerRecommendationContent() {
                         <Users className="w-8 h-8 text-primary" />
                     </div>
                     <div>
-                        <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+                        <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
                             Manpower Recommendations
                         </h1>
-                        <p className="text-muted-foreground/80 font-medium mt-1 text-lg">
+                        <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
                             Recommend applicants to open manpower requests.
                         </p>
                     </div>

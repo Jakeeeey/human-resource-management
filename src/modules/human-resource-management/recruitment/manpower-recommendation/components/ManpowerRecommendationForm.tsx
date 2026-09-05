@@ -206,11 +206,11 @@ export function ManpowerRecommendationForm() {
                 <div className="p-4 md:p-6 bg-muted/20 border-t border-border/40">
                     <DialogFooter className="flex w-full sm:justify-end gap-3">
                         <DialogClose asChild>
-                            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} className="rounded-full px-6">
+                            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} className="w-full rounded-full px-6 sm:w-auto">
                                 Cancel
                             </Button>
                         </DialogClose>
-                        <Button type="submit" disabled={isSubmitting} onClick={form.handleSubmit(onSubmit)} className="rounded-full px-8 shadow-sm hover:shadow-md transition-all">
+                        <Button type="submit" disabled={isSubmitting} onClick={form.handleSubmit(onSubmit)} className="w-full rounded-full px-8 shadow-sm hover:shadow-md transition-all sm:w-auto">
                             {isSubmitting ? (
                                 <>
                                     <div className="w-4 h-4 mr-2 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div>

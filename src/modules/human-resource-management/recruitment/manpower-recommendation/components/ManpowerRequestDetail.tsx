@@ -57,15 +57,15 @@ export function ManpowerRequestDetail() {
                             {related.map((rec) => {
                                 const applicant = applicantMap.get(rec.applicant_id);
                                 return (
-                                    <div key={rec.id} className="flex items-center gap-3 p-3 border border-border/50 rounded-xl bg-card">
-                                        <span className="font-medium truncate max-w-[160px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
+                                    <div key={rec.id} className="flex flex-col gap-3 p-3 border border-border/50 rounded-xl bg-card sm:flex-row sm:items-center">
+                                        <span className="font-medium truncate max-w-full sm:max-w-[160px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
                                             {applicant?.full_name ?? `Applicant #${rec.applicant_id}`}
                                         </span>
-                                        <div className="ml-auto flex items-center gap-3 shrink-0">
+                                        <div className="flex w-full items-center gap-3 shrink-0 sm:ml-auto sm:w-auto">
                                             <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider w-[130px] justify-center shrink-0 ${getStatusColor(rec.status ?? "Recommended")}`}>
                                                 {rec.status ?? "Recommended"}
                                             </Badge>
-                                            <Button variant="ghost" size="sm" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
+                                            <Button variant="ghost" size="sm" className="flex-1 sm:flex-none" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
                                                 <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                                 View
                                             </Button>
@@ -89,13 +89,13 @@ export function ManpowerRequestDetail() {
                             <Button
                                 type="button"
                                 onClick={() => { setIsDetailOpen(false); openRecommendForm(selectedRequest.id); }}
-                                className="rounded-full px-8 shadow-sm hover:shadow-md transition-all"
+                                className="w-full rounded-full px-8 shadow-sm hover:shadow-md transition-all sm:w-auto"
                             >
                                 Recommend
                             </Button>
                         )}
                         <DialogClose asChild>
-                            <Button type="button" variant="outline" className="rounded-full px-6">
+                            <Button type="button" variant="outline" className="w-full rounded-full px-6 sm:w-auto">
                                 Close
                             </Button>
                         </DialogClose>

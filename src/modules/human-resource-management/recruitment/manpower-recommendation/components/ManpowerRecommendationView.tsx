@@ -99,10 +99,10 @@ export function ManpowerRecommendationView() {
     return (
         <>
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-            <DialogContent className="sm:max-w-[85vw] lg:max-w-[1000px] w-full p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
+            <DialogContent className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
                 <div className="p-6 md:p-8 border-b border-border/40 bg-card">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
+                        <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-extrabold flex items-center gap-3">
                             <FileText className="w-8 h-8 text-primary" />
                             MANPOWER RECOMMENDATION DETAILS
                         </DialogTitle>
@@ -134,7 +134,7 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div className="md:col-span-3">
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     {isEditingStatus ? (
                                         <Select value={newStatus} onValueChange={(v) => setNewStatus(toStatusOption(v))}>
                                             <SelectTrigger className="truncate">
@@ -159,7 +159,7 @@ export function ManpowerRecommendationView() {
                                         </Button>
                                     )}
                                     <Button variant="outline"               size="lg"
-              className="ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
+              className="w-full sm:w-auto sm:ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         Application Form
                                     </Button>
