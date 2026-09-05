@@ -34,7 +34,7 @@ export function ManpowerRequestDetail() {
 
     return (
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-            <DialogContent className="w-[95vw] sm:max-w-[700px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[700px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
@@ -58,7 +58,7 @@ export function ManpowerRequestDetail() {
                                 const applicant = applicantMap.get(rec.applicant_id);
                                 return (
                                     <div key={rec.id} className="flex flex-col gap-3 p-3 border border-border/50 rounded-xl bg-card sm:flex-row sm:items-center">
-                                        <span className="font-medium truncate max-w-full sm:max-w-[160px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
+                                        <span className="font-medium truncate max-w-full sm:max-w-[280px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
                                             {applicant?.full_name ?? `Applicant #${rec.applicant_id}`}
                                         </span>
                                         <div className="flex w-full items-center justify-between gap-3 shrink-0 sm:ml-auto sm:w-auto sm:justify-start">

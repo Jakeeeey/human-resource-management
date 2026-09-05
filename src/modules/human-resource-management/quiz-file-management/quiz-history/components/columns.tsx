@@ -35,7 +35,7 @@ export const createColumns = (
             const a = row.original;
             return (
                 <div className="min-w-0">
-                    <div className="font-medium truncate max-w-[200px]">{a.applicant?.full_name || "—"}</div>
+                    <div className="font-medium truncate max-w-[300px]">{a.applicant?.full_name || "—"}</div>
                     {a.applicant?.position_applied_for && (
                         <div className="text-xs text-muted-foreground truncate max-w-[200px]">
                             {a.applicant.position_applied_for}

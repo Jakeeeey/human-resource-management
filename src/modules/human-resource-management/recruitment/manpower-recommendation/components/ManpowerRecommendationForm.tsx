@@ -87,7 +87,7 @@ export function ManpowerRecommendationForm() {
 
     return (
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogContent className="w-[95vw] sm:max-w-[500px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[500px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-extrabold flex items-center gap-3">

@@ -204,7 +204,7 @@ export function InterviewEligibleList() {
                                     return (
                                     <TableRow key={row.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                         <TableCell className="pl-6 h-16">
-                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors max-w-[220px] truncate" title={row.full_name || `Applicant #${row.applicant_id}`}>
+                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors max-w-[300px] truncate" title={row.full_name || `Applicant #${row.applicant_id}`}>
                                                 {row.full_name || `Applicant #${row.applicant_id}`}
                                             </div>
                                         </TableCell>
@@ -300,7 +300,7 @@ export function InterviewEligibleList() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-medium text-muted-foreground/80">
-                                            <div className="max-w-[220px] truncate" title={row.full_name ?? undefined}>
+                                            <div className="max-w-[300px] truncate" title={row.full_name ?? undefined}>
                                             {row.full_name}
                                             </div>
                                         </TableCell>

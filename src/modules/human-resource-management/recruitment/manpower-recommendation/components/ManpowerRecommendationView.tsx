@@ -99,7 +99,7 @@ export function ManpowerRecommendationView() {
     return (
         <>
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-            <DialogContent className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
                 <div className="p-6 md:p-8 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-extrabold flex items-center gap-3">

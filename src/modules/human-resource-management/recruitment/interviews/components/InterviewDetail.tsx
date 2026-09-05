@@ -158,7 +158,7 @@ export function InterviewDetail() {
 
     return (
         <Dialog open={selectedInterview != null} onOpenChange={(open) => { if (!open) setSelectedInterview(null); }}>
-            <DialogContent className="w-[95vw] sm:max-w-[750px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[750px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
