@@ -3,16 +3,9 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import {
-    LogOut,
-    User,
-    Settings,
-    Moon,
-    Key,
-    Activity,
-    ChevronDown,
-} from "lucide-react";
+import { Activity, ChevronDown, Key, LogOut, Moon, Settings, User } from "lucide-react";
 import { useThemeTransition } from "@/components/theme/ThemeTransitionOverlay";
+import { ChangePasswordModal } from "@/modules/shared/change-password/components/ChangePasswordModal";
 
 import {
     DropdownMenu,
@@ -38,6 +31,7 @@ export function UserMenu({ fullName, email }: UserMenuProps) {
     const router = useRouter();
     const { theme } = useTheme();
     const { triggerTransition } = useThemeTransition();
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = React.useState(false);
 
     const initials = fullName
         .split(" ")
@@ -143,13 +137,17 @@ export function UserMenu({ fullName, email }: UserMenuProps) {
                     
                     {[
                         { icon: User, label: "Profile Blueprint", sub: "Settings" },
-                        { icon: Key, label: "Security Access", sub: "Auth" },
+                        { icon: Key, label: "Change Password", sub: "Auth" },
                         { icon: Activity, label: "Ops Activity", sub: "Log" },
                         { icon: Settings, label: "System Config", sub: "Prefs" },
                     ].map((item, i) => (
                         <DropdownMenuItem 
                             key={i}
                             className="group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 cursor-pointer transition-all hover:bg-slate-900/5 dark:hover:bg-white/5 mt-0.5 focus:bg-slate-900/5 dark:focus:bg-white/5"
+                            onSelect={item.label === "Change Password" ? (e) => {
+                                e.preventDefault();
+                                setIsPasswordModalOpen(true);
+                            } : undefined}
                         >
                             <div className="p-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-900/5 dark:border-white/10 group-hover:border-slate-900/20 dark:group-hover:border-white/20 transition-colors">
                                 <item.icon className="h-3 w-3 text-slate-500 dark:text-slate-400" />
@@ -174,6 +172,11 @@ export function UserMenu({ fullName, email }: UserMenuProps) {
                     <span className="text-[10px] font-black uppercase tracking-widest">Terminate Session</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
+            
+            <ChangePasswordModal 
+                open={isPasswordModalOpen} 
+                onOpenChange={setIsPasswordModalOpen} 
+            />
         </DropdownMenu>
     );
 }
