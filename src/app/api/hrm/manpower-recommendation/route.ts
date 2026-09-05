@@ -1,11 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { manpowerRecommendationService, nowPH } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
+import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
 
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
+const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
+
+async function dFetch(path: string, options?: RequestInit) {
+    const res = await fetch(`${DIRECTUS_URL}${path}`, {
+        ...options,
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${STATIC_TOKEN}`,
+            ...(options?.headers || {}),
+        },
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+}
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
@@ -93,13 +113,33 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'VALIDATION_FAILED', message: `Request ${request_no} is still pending approval. Recommendations open after approval.` }, { status: 400 });
         }
 
-        // Capacity guard: block new recommendations once slots are filled.
-        const capacity = await manpowerRecommendationService.fetchRequestCapacity(validated.manpower_request_id);
-        if (capacity.need > 0 && capacity.active >= capacity.need) {
-            return NextResponse.json({ error: 'VALIDATION_FAILED', message: `All ${capacity.need} slots for request ${capacity.request_no} are already filled.` }, { status: 400 });
-        }
-
         const created = await manpowerRecommendationService.create(validated);
+        try {
+            const existingRes = await dFetch(
+                `/items/interview?filter[recommendation_id][_eq]=${created.id}&filter[stage][_eq]=Final&filter[score_sheet_id][_null]=true&limit=1&fields=id`
+            );
+            const hasUngraded = Array.isArray(existingRes?.data) && existingRes.data.length > 0;
+            if (!hasUngraded && created.applicant_id != null) {
+                const appRes = await dFetch(
+                    `/items/application?filter[applicant_id][_eq]=${created.applicant_id}&fields=id&sort=-id&limit=1`
+                );
+                const applicationId = Array.isArray(appRes?.data) && appRes.data.length > 0 ? appRes.data[0].id as number : null;
+                if (typeof applicationId === "number") {
+                    await interviewService.createScheduledInterview({
+                        stage: "Final",
+                        application_id: applicationId,
+                        manpower_request_id: created.manpower_request_id ?? null,
+                        recommendation_id: created.id ?? null,
+                    });
+                }
+            }
+        } catch (materializeErr) {
+            console.error(
+                "[manpower-recommendation] pending Final materialize failed for recommendation_id",
+                created.id,
+                materializeErr
+            );
+        }
         return NextResponse.json({ data: created }, { status: 201 });
     } catch (e: unknown) {
         const err = e as Error;

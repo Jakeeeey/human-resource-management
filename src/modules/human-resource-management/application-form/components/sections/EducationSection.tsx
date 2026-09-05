@@ -2,7 +2,7 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import { useFieldArray } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -17,6 +17,7 @@ import {
     type ApplicationFormValues,
 } from "../../types";
 import { RepeatingFieldArray } from "../RepeatingFieldArray";
+import { checkDateOrder } from "../../lib/softValidation";
 
 export function EducationSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
     const { fields, append, remove } = useFieldArray({ control: form.control, name: "education" });
@@ -89,7 +90,14 @@ export function EducationSection({ form }: { form: UseFormReturn<ApplicationForm
                                     <FormItem>
                                         <FormLabel>From</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="e.g. 2018" {...field} />
+                                            <Input
+                                                placeholder="e.g. 2018"
+                                                {...field}
+                                                onBlur={() => {
+                                                    field.onBlur();
+                                                    form.trigger(`education.${index}.date_to`);
+                                                }}
+                                            />
                                         </FormControl>
                                     </FormItem>
                                 )}
@@ -97,12 +105,20 @@ export function EducationSection({ form }: { form: UseFormReturn<ApplicationForm
                             <FormField
                                 control={form.control}
                                 name={`education.${index}.date_to`}
+                                rules={{
+                                    validate: (v) =>
+                                        checkDateOrder(
+                                            form.getValues(`education.${index}.date_from`) ?? "",
+                                            v ?? ""
+                                        ) ?? true,
+                                }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>To</FormLabel>
                                         <FormControl>
                                             <Input placeholder="e.g. 2022" {...field} />
                                         </FormControl>
+                                        <FormMessage />
                                     </FormItem>
                                 )}
                             />

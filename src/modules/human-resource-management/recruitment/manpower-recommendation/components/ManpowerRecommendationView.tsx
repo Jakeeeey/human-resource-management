@@ -8,8 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Building2, FileText, UserCheck, Loader2, Pencil } from "lucide-react";
 import { ApplicationViewDialog } from "./ApplicationViewDialog";
+import { formatDateTime } from "@/lib/utils";
 
 const STATUS_OPTIONS = ["Recommended", "Approved", "Hired", "Rejected", "Withdrawn"] as const;
+
+// Manual edit set only — Approved/Hired are written by other modules (final
+// selection flow) and surface here via refresh; they keep full badge styles.
+const EDITABLE_STATUSES = ["Recommended", "Rejected", "Withdrawn"] as const;
 
 type StatusOption = (typeof STATUS_OPTIONS)[number];
 
@@ -62,6 +67,10 @@ export function ManpowerRecommendationView() {
     const hiredForRequest = recommendations.filter((r) => r.manpower_request_id === selectedRecommendation.manpower_request_id && r.status === "Hired").length;
     const requestNeed = matchedRequest?.no_manpower_needed ?? 0;
     const isRequestClosed = requestNeed > 0 && hiredForRequest >= requestNeed;
+    const isStatusEditable =
+        !isRequestClosed && toStatusOption(selectedRecommendation.status) === "Recommended";
+    // Status dropdown only on lower-stage (Recommended) records of open requests —
+    // Approved/Hired are selection outcomes owned by the interviews flow, never edited here.
     const applicantName = applicants.find(a => a.id === selectedRecommendation.applicant_id)?.full_name || `Applicant #${selectedRecommendation.applicant_id}`;
     // recommended_by/decision_by are plain INT (no Directus relation) — join full
     // names from the users lookup, falling back to the raw id (never blank).
@@ -78,7 +87,7 @@ export function ManpowerRecommendationView() {
             // are injected server-side by the Task 5 PATCH route (no userId exists
             // in client scope; mirrors the updated_by injection pattern).
             const ok = await updateRecommendation(selectedRecommendation.id, {
-                status: isRequestClosed ? toStatusOption(selectedRecommendation.status) : newStatus,
+                status: isStatusEditable ? newStatus : toStatusOption(selectedRecommendation.status),
                 decision_notes: isRequestClosed ? selectedRecommendation.decision_notes : decisionNotes.trim() ? decisionNotes : null,
             });
             if (ok) setIsViewOpen(false);
@@ -90,10 +99,10 @@ export function ManpowerRecommendationView() {
     return (
         <>
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-            <DialogContent className="sm:max-w-[85vw] lg:max-w-[1000px] w-full p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
                 <div className="p-6 md:p-8 border-b border-border/40 bg-card">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
+                        <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-extrabold flex items-center gap-3">
                             <FileText className="w-8 h-8 text-primary" />
                             MANPOWER RECOMMENDATION DETAILS
                         </DialogTitle>
@@ -121,18 +130,18 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Applicant Name</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{applicantName}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 break-words">{applicantName}</div>
                             </div>
                             <div className="md:col-span-3">
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     {isEditingStatus ? (
                                         <Select value={newStatus} onValueChange={(v) => setNewStatus(toStatusOption(v))}>
                                             <SelectTrigger className="truncate">
                                                 <SelectValue placeholder="Select status" className="truncate" />
                                             </SelectTrigger>
                                             <SelectContent className="max-h-60">
-                                                {STATUS_OPTIONS.map((option) => (
+                                                {EDITABLE_STATUSES.map((option) => (
                                                     <SelectItem key={option} value={option}>
                                                         {option}
                                                     </SelectItem>
@@ -144,13 +153,13 @@ export function ManpowerRecommendationView() {
                                             {newStatus}
                                         </span>
                                     )}
-                                    {!isRequestClosed && (
-                                        <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
+                {isStatusEditable && (
+                <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
                                             <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>
                                     )}
                                     <Button variant="outline"               size="lg"
-              className="ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
+              className="w-full sm:w-auto sm:ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         Application Form
                                     </Button>
@@ -176,7 +185,7 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommended At</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.recommended_at || "-"}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.recommended_at ? formatDateTime(new Date(selectedRecommendation.recommended_at)) : "-"}</div>
                             </div>
                         </div>
                     </div>
@@ -194,7 +203,7 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Decision At</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.decision_at || "-"}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.decision_at ? formatDateTime(new Date(selectedRecommendation.decision_at)) : "-"}</div>
                             </div>
                             <div className="md:col-span-2">
                                 <div className="flex items-center gap-1 mb-1">

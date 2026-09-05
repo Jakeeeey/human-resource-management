@@ -29,7 +29,7 @@ export interface EligibleInitialRow {
 }
 
 /**
- * Approved recommendation row from the GET envelope, annotated with its
+ * Recommended recommendation row from the GET envelope, annotated with its
  * latest Final-stage verdict (null when never graded).
  */
 export interface EligibleFinalRow {
@@ -86,14 +86,16 @@ const InterviewContext = createContext<InterviewContextType | undefined>(undefin
  * Client sends no timestamps — the server injects interviewed_at/created_at
  * via nowPH() and interviewed_by/updated_by from the JWT.
  */
-export function InterviewProvider({ children }: { children: React.ReactNode }) {
+export function InterviewProvider({ children, initialStage = "Initial" }: { children: React.ReactNode; initialStage?: InterviewStageTab }) {
     const [interviews, setInterviews] = useState<Interview[]>([]);
     const [eligibleInitial, setEligibleInitial] = useState<EligibleInitialRow[]>([]);
     const [eligibleFinal, setEligibleFinal] = useState<EligibleFinalRow[]>([]);
     const [users, setUsers] = useState<{ id: number | string; name: string }[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [stageTab, setStageTab] = useState<InterviewStageTab>("Initial");
+    // Initial tab comes from the server (?stage= via page searchParams),
+    // so the redirect lands on Final even on client-side navigation.
+    const [stageTab, setStageTab] = useState<InterviewStageTab>(initialStage);
     const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
 
     const refresh = useCallback(async () => {

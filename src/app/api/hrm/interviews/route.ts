@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH, maybeAutoApproveRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
-import { deriveScheduleStage, findUngradedInterview } from "@/modules/human-resource-management/recruitment/interviews/utils/schedule-stage";
 
 export const dynamic = "force-dynamic";
 
@@ -51,26 +50,30 @@ export async function GET() {
             return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
         }
 
-        const [list, quizApps, approvedRecs, users] = await Promise.all([
+        const [list, quizApps, recommendedRecs, users] = await Promise.all([
             interviewService.fetchInterviews(),
             interviewService.fetchQuizCompletedApplications(),
-            interviewService.fetchApprovedRecommendations(),
+            interviewService.fetchRecommendedRecommendations(),
             manpowerRecommendationService.fetchUsers(),
         ]);
         const interviews = list.interviews;
 
-        // Eligible Initial: every quiz-completed application, annotated with its
-        // latest Initial-stage verdict (null when never graded) plus its
-        // latest quiz_attempt id + percentage (application-scoped lookup with
-        // applicant-id fallback — older attempts predate the nullable
-        // application_id link). full_name arrives from the service applicant
-        // lookup; defensively coerce to a real string so the UI never receives
-        // null/undefined (Applicant #id fallback only when the name is truly
-        // missing).
+        const initialAppIds = new Set<number>();
+        for (const i of interviews) {
+            if (i.stage === "Initial") initialAppIds.add(i.application_id);
+        }
+        const appById = new Map(quizApps.map((a) => [a.id, a]));
+        const finalApplicantIds = new Set<number>();
+        for (const i of interviews) {
+            if (i.stage !== "Final") continue;
+            const owner = appById.get(i.application_id);
+            if (owner) finalApplicantIds.add(owner.applicant_id);
+        }
+        const initialApps = quizApps.filter((app) => initialAppIds.has(app.id) && !finalApplicantIds.has(app.applicant_id));
         const latestAttempts = await Promise.all(
-            quizApps.map((app) => interviewService.fetchLatestQuizAttempt(app.id, app.applicant_id)),
+            initialApps.map((app) => interviewService.fetchLatestQuizAttempt(app.id, app.applicant_id)),
         );
-        const eligibleInitial = quizApps.map((app, index) => {
+        const eligibleInitial = initialApps.map((app, index) => {
             const initials = interviews
                 .filter((i) => i.stage === "Initial" && i.application_id === app.id)
                 .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
@@ -78,10 +81,12 @@ export async function GET() {
             return { ...app, full_name: app.full_name || `Applicant #${app.applicant_id}`, latestInitialVerdict: initials[0]?.verdict ?? null, quiz_attempt_id: latestAttempt?.id ?? null, quiz_attempt_percentage: latestAttempt?.percentage_score ?? null, quiz_attempt_passed: latestAttempt?.passed ?? null };
         });
 
-        // Eligible Final: ALL Approved recs on Approved requests — every final
-        // (Passed, Failed, Pending) stays displayed for transparent records.
-        // REC-SCOPED, never applicant-scoped.
-        const eligibleFinal = approvedRecs
+        const finalRecIds = new Set<number>();
+        for (const i of interviews) {
+            if (i.stage === "Final" && i.recommendation_id != null) finalRecIds.add(i.recommendation_id);
+        }
+        const eligibleFinal = recommendedRecs
+            .filter((rec) => finalRecIds.has(rec.id))
             .map((rec) => {
                 const finals = interviews
                     .filter((i) => i.stage === "Final" && i.recommendation_id === rec.id)
@@ -113,56 +118,6 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
 
-        // Schedule-only path: creates a Pending interview row with no sheet
-        // (stage derived server-side via the shared helper, never trusted
-        // from the client). Sheet creation stays in grading only. Dedupe: an
-        // ungraded row for the derived app + stage is returned with
-        // reused:true instead of creating a duplicate.
-        if (body.schedule === true) {
-            const applicationId = body.application_id;
-            if (typeof applicationId !== "number") {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: "Please select an applicant to schedule." }, { status: 400 });
-            }
-            const [list, quizApps, approvedRecs] = await Promise.all([
-                interviewService.fetchInterviews(),
-                interviewService.fetchQuizCompletedApplications(),
-                interviewService.fetchApprovedRecommendations(),
-            ]);
-            const quizApp = quizApps.find((a) => a.id === applicationId);
-            if (!quizApp) {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Application #${applicationId} has not completed the quiz. Interviews open after quiz completion.` }, { status: 400 });
-            }
-            const stage = deriveScheduleStage(applicationId, list.interviews);
-            if (stage === null) {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: "This applicant already passed the final interview and cannot be scheduled again." }, { status: 400 });
-            }
-            const existing = findUngradedInterview(applicationId, stage, list.interviews);
-            if (existing) {
-                return NextResponse.json({ data: existing, reused: true }, { status: 200 });
-            }
-            let recommendation_id: number | null = null;
-            let manpower_request_id: number | null = null;
-            if (stage === "Final") {
-                // Latest Approved recommendation for the applicant (list is
-                // newest-first, so the first match wins). The lookup is
-                // already scoped to Approved recs on Approved requests, which
-                // is the Final guard by construction.
-                const rec = approvedRecs.find((r) => r.applicant_id === quizApp.applicant_id) ?? null;
-                if (!rec) {
-                    return NextResponse.json({ error: "VALIDATION_FAILED", message: "No approved recommendation found for this applicant. Final interviews open after approval." }, { status: 400 });
-                }
-                recommendation_id = rec.id;
-                manpower_request_id = rec.manpower_request_id;
-            }
-            const created = await interviewService.createScheduledInterview({
-                stage,
-                application_id: applicationId,
-                manpower_request_id,
-                recommendation_id,
-            });
-            return NextResponse.json({ data: created, reused: false }, { status: 201 });
-        }
-
         body.interviewed_by = userId;
         body.interviewed_at = nowPH();
 
@@ -176,13 +131,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Final guard: only Approved recommendations on Approved requests are accepted.
+        // Final guard: only Recommended recommendations on Approved requests are accepted.
         if (validated.stage === "Final") {
             const rec = validated.recommendation_id
                 ? await manpowerRecommendationService.fetchById(validated.recommendation_id)
                 : null;
-            if (!rec || rec.status !== "Approved") {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Recommendation #${validated.recommendation_id ?? "?"} is not approved. Final interviews open after approval.` }, { status: 400 });
+            if (!rec || rec.status !== "Recommended") {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Recommendation #${validated.recommendation_id ?? "?"} is not a pending recommendation. Final interviews open after recommendation.` }, { status: 400 });
             }
             const { status, request_no } = await manpowerRecommendationService.fetchRequestStatus(rec.manpower_request_id);
             if (status !== "Approved") {
@@ -196,7 +151,11 @@ export async function POST(req: NextRequest) {
         }
 
         const created = await interviewService.createInterviewFlow({ ...validated, items });
-        return NextResponse.json({ data: created }, { status: 201 });
+        const autoApproved =
+            created.stage === "Final" && created.verdict === "Passed"
+                ? await maybeAutoApproveRecommendation(created.recommendation_id)
+                : false;
+        return NextResponse.json({ data: created, autoApproved }, { status: 201 });
     } catch (e: unknown) {
         const err = e as Error;
         if (err && typeof err === "object" && "issues" in err) {

@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useInterview } from "../hooks/useInterview";
 import { Interview } from "../types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { FileText, Loader2 } from "lucide-react";
+import { formatDateLong } from "@/lib/utils";
 
 type InterviewVerdict = "Pending" | "Passed" | "Failed";
 
@@ -76,13 +77,14 @@ function computeComposite(items: Pick<ClientSheetItem, "score" | "weight_percent
  * badge + verdict badge (manpower-family pills), composite, interviewer
  * (users map with `User #id` fallback), date, per-criterion breakdown
  * (sheet items fetched per score_sheet_id), and notes. The newest interview
- * is ring-emphasized with a Latest badge. The verdict change control below
+ * is ring-emphasized (blue outline). The verdict change control below
  * it is MANUAL-ONLY (mirrors the View inline Select pattern: badge preview
  * + save via PATCH) — HR may Pass a subpar grade, so the verdict is never
  * derived from the composite.
  */
 export function InterviewDetail() {
     const { selectedInterview, setSelectedInterview, interviews, updateInterview, userDisplay } = useInterview();
+    const router = useRouter();
     const applicationId = selectedInterview?.application_id ?? null;
 
     const history: Interview[] = useMemo(() => {
@@ -138,12 +140,15 @@ export function InterviewDetail() {
      * Save the manually chosen verdict for the latest interview via PATCH.
      * Sends ONLY { verdict } — updated_at/updated_by are stamped server-side
      * (nowPH + JWT), the client stamps no timestamps.
+     * A Passed Initial verdict continues the hiring chain in manpower
+     * recommendation — do not remove this navigation (mirrors grade page).
      */
     const handleSaveVerdict = async () => {
         if (latest?.id == null) return;
         setIsSaving(true);
         try {
             await updateInterview(latest.id, { verdict: newVerdict });
+            if (latest.stage === "Initial" && newVerdict === "Passed") router.push("/hrm/manpower-recommendation");
         } finally {
             setIsSaving(false);
         }
@@ -153,7 +158,7 @@ export function InterviewDetail() {
 
     return (
         <Dialog open={selectedInterview != null} onOpenChange={(open) => { if (!open) setSelectedInterview(null); }}>
-            <DialogContent className="w-[95vw] sm:max-w-[750px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[750px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
@@ -184,15 +189,11 @@ export function InterviewDetail() {
                                 return (
                                     <div key={interview.id} className={`p-4 border rounded-xl bg-card space-y-3 ${isLatest ? "border-primary/40 ring-1 ring-primary/20" : "border-border/50"}`}>
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            {isLatest && <Badge variant="outline" className="px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider bg-primary/10 text-primary border-primary/20">Latest</Badge>}
                                             <span className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider ${getStageColor(interview.stage)}`}>
                                                 {interview.stage}
                                             </span>
                                             <span className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider ${getVerdictColor(interview.verdict)}`}>
                                                 {interview.verdict}
-                                            </span>
-                                            <span className="ml-auto text-sm text-muted-foreground">
-                                                Composite: <span className="font-bold text-foreground">{composite != null ? composite.toFixed(2) : itemsLoading ? "…" : "-"}</span>
                                             </span>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
@@ -202,7 +203,7 @@ export function InterviewDetail() {
                                             </div>
                                             <div>
                                                 <span className="text-xs font-bold uppercase text-muted-foreground block mb-1">Date</span>
-                                                <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50">{interview.interviewed_at ?? interview.created_at ?? "-"}</div>
+                                                <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50">{(() => { const raw = interview.interviewed_at ?? interview.created_at; return raw ? formatDateLong(new Date(raw)) : "-"; })()}</div>
                                             </div>
                                         </div>
                                         <div>
@@ -223,15 +224,20 @@ export function InterviewDetail() {
                                                             <span className="font-bold shrink-0 w-14 text-right">{item.score}</span>
                                                         </div>
                                                     ))}
+                                                    <div className="flex items-center gap-2 px-3 py-2 text-sm bg-muted/40 border-t border-border/50 font-bold">
+                                                        <span className="flex-1">Total</span>
+                                                        <span className="shrink-0 w-14 text-right">{composite != null ? composite.toFixed(2) : "-"}</span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                         <div>
                                             <span className="text-xs font-bold uppercase text-muted-foreground block mb-1">Notes</span>
-                                            <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50 whitespace-pre-wrap text-sm">{interview.notes || "-"}</div>
+                                            <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50 whitespace-pre-wrap break-words text-sm">{interview.notes || "-"}</div>
                                         </div>
-                                        {isLatest && (
-                                            <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                                        {/* Passed verdicts are final and can no longer be changed. */}
+                                        {isLatest && latest?.verdict !== "Passed" && (
+                                            <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-border/50">
                                                 <span className="text-xs font-bold uppercase text-muted-foreground">Verdict</span>
                                                 <Select value={newVerdict} onValueChange={(v) => setNewVerdict(v as InterviewVerdict)}>
                                                     <SelectTrigger className="truncate w-[160px]">
@@ -261,7 +267,7 @@ export function InterviewDetail() {
                 <div className="p-4 md:p-6 bg-muted/20 border-t border-border/40">
                     <DialogFooter className="flex w-full sm:justify-end gap-3 items-center">
                         <DialogClose asChild>
-                            <Button type="button" variant="outline" className="rounded-full px-6">
+                            <Button type="button" variant="outline" className="rounded-full px-6 w-full sm:w-auto">
                                 Close
                             </Button>
                         </DialogClose>

@@ -2,10 +2,11 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import { useFieldArray } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { EMPTY_LICENSURE_EXAM, type ApplicationFormValues } from "../../types";
 import { RepeatingFieldArray } from "../RepeatingFieldArray";
+import { checkPastDate } from "../../lib/softValidation";
 
 export function LicensureExamSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
     const { fields, append, remove } = useFieldArray({
@@ -41,12 +42,22 @@ export function LicensureExamSection({ form }: { form: UseFormReturn<Application
                         <FormField
                             control={form.control}
                             name={`licensure_exams.${index}.date_taken`}
+                            rules={{
+                                validate: (v) => {
+                                    const exam = form.getValues(
+                                        `licensure_exams.${index}.examination`
+                                    );
+                                    if (!exam?.trim()) return true;
+                                    return checkPastDate(v ?? "", "Date taken") ?? true;
+                                },
+                            }}
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Date Taken</FormLabel>
                                     <FormControl>
                                         <Input placeholder="e.g. March 2021" {...field} />
                                     </FormControl>
+                                    <FormMessage />
                                 </FormItem>
                             )}
                         />

@@ -3,23 +3,21 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useInterview } from "../hooks/useInterview";
-import { InterviewScheduleDialog } from "./InterviewScheduleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { CalendarPlus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, Pencil } from "lucide-react";
 
 /**
  * Tabbed eligible list for applicant interview grading.
  *
  * Initial tab rows quiz-completed applications (applicant, quiz score +
- * passed/failed badge, latest initial verdict chip); Final tab rows approved
+ * passed/failed badge, latest initial verdict chip); Final tab rows recommended
  * recommendations (request ref, applicant, latest final verdict
- * chip). Scheduling opens the schedule dialog (header button), which creates
- * a Pending row and routes to its grade page. Grade renders as a link to
+ * chip). Grade renders as a link to
  * `/hrm/interviews/grade/[id]` ONLY when an ungraded (sheet-less) interview
  * exists for that row — otherwise the actions cell shows History only.
  * History selects the latest
@@ -46,7 +44,6 @@ export function InterviewEligibleList() {
         latestPerApplication,
     } = useInterview();
     const [verdictFilter, setVerdictFilter] = useState<"All" | "Pending" | "Passed" | "Failed">("All");
-    const [scheduleOpen, setScheduleOpen] = useState(false);
     const [pageInitial, setPageInitial] = useState(1);
     const [pageFinal, setPageFinal] = useState(1);
 
@@ -107,10 +104,6 @@ export function InterviewEligibleList() {
                 <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold text-foreground">Interviews</h2>
                 </div>
-                <Button size="sm" onClick={() => setScheduleOpen(true)} aria-label="Schedule interview">
-                    <CalendarPlus className="mr-2 h-4 w-4" />
-                    Schedule
-                </Button>
             </div>
             <Tabs
                 value={stageTab}
@@ -122,21 +115,31 @@ export function InterviewEligibleList() {
                 }}
             >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <TabsList aria-label="Interview stage">
-                        <TabsTrigger value="Initial">
+                    <TabsList aria-label="Interview stage" className="w-full sm:w-auto">
+                        <TabsTrigger value="Initial" className="flex-1 sm:flex-none">
                             Initial
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
                                 {filteredInitial.length}
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="Final">
+                        <TabsTrigger value="Final" className="flex-1 sm:flex-none">
                             Final
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
                                 {filteredFinal.length}
                             </span>
                         </TabsTrigger>
                     </TabsList>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <Input
+                            placeholder={stageTab === "Initial" ? "Search by applicant name..." : "Search by name or position..."}
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setPageInitial(1);
+                                setPageFinal(1);
+                            }}
+                            className="w-full sm:w-64"
+                        />
                         <Select
                             value={verdictFilter}
                             onValueChange={(value) => {
@@ -145,7 +148,7 @@ export function InterviewEligibleList() {
                                 setPageFinal(1);
                             }}
                         >
-                            <SelectTrigger className="w-40" aria-label="Filter by verdict">
+                            <SelectTrigger className="w-full sm:w-40" aria-label="Filter by verdict">
                                 <SelectValue placeholder="All verdicts" />
                             </SelectTrigger>
                             <SelectContent>
@@ -155,22 +158,13 @@ export function InterviewEligibleList() {
                                 <SelectItem value="Failed">Failed</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Input
-                            placeholder={stageTab === "Initial" ? "Search by applicant name..." : "Search by name or position..."}
-                            value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setPageInitial(1);
-                                setPageFinal(1);
-                            }}
-                            className="w-64"
-                        />
                     </div>
                 </div>
             </Tabs>
             {stageTab === "Initial" ? (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                    <Table>
+                    <div className="overflow-x-auto">
+                    <Table className="min-w-[680px]">
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent border-border/50">
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Applicant</TableHead>
@@ -210,7 +204,7 @@ export function InterviewEligibleList() {
                                     return (
                                     <TableRow key={row.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                         <TableCell className="pl-6 h-16">
-                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors">
+                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors max-w-[300px] truncate" title={row.full_name || `Applicant #${row.applicant_id}`}>
                                                 {row.full_name || `Applicant #${row.applicant_id}`}
                                             </div>
                                         </TableCell>
@@ -257,6 +251,7 @@ export function InterviewEligibleList() {
                             )}
                         </TableBody>
                     </Table>
+                    </div>
                     <Pager
                         page={safePageInitial}
                         totalPages={totalPagesInitial}
@@ -266,7 +261,8 @@ export function InterviewEligibleList() {
                 </div>
             ) : (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                    <Table>
+                    <div className="overflow-x-auto">
+                    <Table className="min-w-[560px]">
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent border-border/50">
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Position</TableHead>
@@ -289,7 +285,7 @@ export function InterviewEligibleList() {
                                     <TableCell colSpan={4} className="text-center h-48">
                                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                                             <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                                            <p className="font-medium">No approved recommendations awaiting final.</p>
+                                            <p className="font-medium">No recommended applicants awaiting final.</p>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -299,12 +295,14 @@ export function InterviewEligibleList() {
                                     return (
                                     <TableRow key={row.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                         <TableCell className="pl-6 h-16">
-                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors">
+                                            <div className="font-bold text-foreground group-hover:text-primary transition-colors max-w-[220px] truncate" title={row.position ?? (row.manpower_request_id != null ? `#${row.manpower_request_id}` : "—")}>
                                                 {row.position ?? (row.manpower_request_id != null ? `#${row.manpower_request_id}` : "—")}
                                             </div>
                                         </TableCell>
                                         <TableCell className="font-medium text-muted-foreground/80">
+                                            <div className="max-w-[300px] truncate" title={row.full_name ?? undefined}>
                                             {row.full_name}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <VerdictChip verdict={row.latestFinalVerdict} />
@@ -331,6 +329,7 @@ export function InterviewEligibleList() {
                             )}
                         </TableBody>
                     </Table>
+                    </div>
                     <Pager
                         page={safePageFinal}
                         totalPages={totalPagesFinal}
@@ -339,7 +338,6 @@ export function InterviewEligibleList() {
                     />
                 </div>
             )}
-            <InterviewScheduleDialog open={scheduleOpen} onOpenChange={setScheduleOpen} />
         </div>
     );
 }

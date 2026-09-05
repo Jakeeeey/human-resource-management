@@ -2,12 +2,13 @@
 
 import type { UseFormReturn } from "react-hook-form";
 import { useFieldArray, useWatch } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { EMPTY_WORK_EXPERIENCE, type ApplicationFormValues } from "../../types";
 import { RepeatingFieldArray } from "../RepeatingFieldArray";
+import { checkDateOrder } from "../../lib/softValidation";
 
 export function WorkExperienceSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
     const isFreshGraduate = useWatch({ control: form.control, name: "is_fresh_graduate" });
@@ -95,7 +96,14 @@ export function WorkExperienceSection({ form }: { form: UseFormReturn<Applicatio
                                         <FormItem>
                                             <FormLabel>From</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="e.g. Jan 2022" {...field} />
+                                                <Input
+                                                    placeholder="e.g. Jan 2022"
+                                                    {...field}
+                                                    onBlur={() => {
+                                                        field.onBlur();
+                                                        form.trigger(`work_experience.${index}.date_to`);
+                                                    }}
+                                                />
                                             </FormControl>
                                         </FormItem>
                                     )}
@@ -103,12 +111,24 @@ export function WorkExperienceSection({ form }: { form: UseFormReturn<Applicatio
                                 <FormField
                                     control={form.control}
                                     name={`work_experience.${index}.date_to`}
+                                    rules={{
+                                        validate: (v) => {
+                                            if (form.getValues("is_fresh_graduate")) return true;
+                                            return (
+                                                checkDateOrder(
+                                                    form.getValues(`work_experience.${index}.date_from`) ?? "",
+                                                    v ?? ""
+                                                ) ?? true
+                                            );
+                                        },
+                                    }}
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>To</FormLabel>
                                             <FormControl>
                                                 <Input placeholder="e.g. Present" {...field} />
                                             </FormControl>
+                                            <FormMessage />
                                         </FormItem>
                                     )}
                                 />

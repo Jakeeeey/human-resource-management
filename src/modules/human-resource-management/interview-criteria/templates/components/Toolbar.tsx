@@ -54,7 +54,7 @@ export function Toolbar() {
                         updateStage(val === "all" ? null : (val as Stage))
                     }
                 >
-                    <SelectTrigger className="w-[160px]">
+                    <SelectTrigger className="w-full sm:w-[160px]">
                         <SelectValue placeholder="All stages" />
                     </SelectTrigger>
                     <SelectContent>
@@ -73,7 +73,7 @@ export function Toolbar() {
                         updateStatus(val === "all" ? null : (val as TemplateStatus))
                     }
                 >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>

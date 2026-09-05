@@ -49,6 +49,7 @@ import {
     uploadApplicationFile,
 } from "./providers/fetchProvider";
 import { loadDraft, saveDraft, clearDraft, type StoredDraft } from "./lib/autosave";
+import { checkBirthdate, checkDateOrder, checkPastDate } from "./lib/softValidation";
 import type { SignaturePadHandle } from "./components/SignaturePad";
 import { ApplicationDetailsSection } from "./components/sections/ApplicationDetailsSection";
 import { PersonalInfoSection } from "./components/sections/PersonalInfoSection";
@@ -191,10 +192,32 @@ function buildTrainings(rows: TrainingRow[]): SubmitTraining[] {
         }));
 }
 
+function checkSectionDateRanges(values: ApplicationFormValues): string | null {
+    const ranged: { label: string; rows: { date_from: string; date_to: string }[] }[] = [
+        { label: "Education", rows: values.education },
+        ...(values.is_fresh_graduate ? [] : [{ label: "Work experience", rows: values.work_experience }]),
+        { label: "Trainings", rows: values.trainings },
+    ];
+    for (const section of ranged) {
+        for (let i = 0; i < section.rows.length; i++) {
+            const row = section.rows[i];
+            const orderErr = checkDateOrder(row.date_from, row.date_to);
+            if (orderErr) return `${section.label} entry #${i + 1}: ${orderErr}`;
+        }
+    }
+    for (let i = 0; i < values.licensure_exams.length; i++) {
+        const row = values.licensure_exams[i];
+        if (!row.examination.trim()) continue;
+        const pastErr = checkPastDate(row.date_taken, "Date taken");
+        if (pastErr) return `Licensure exam entry #${i + 1}: ${pastErr}`;
+    }
+    return null;
+}
+
 export function ApplicationFormModule() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const form = useForm<ApplicationFormValues>({ defaultValues: DEFAULT_APPLICATION_FORM });
+    const form = useForm<ApplicationFormValues>({ defaultValues: DEFAULT_APPLICATION_FORM, mode: "onTouched" });
     const sigRef = useRef<SignaturePadHandle | null>(null);
 
     const quizIdOverride = (() => {
@@ -249,6 +272,16 @@ export function ApplicationFormModule() {
     const onValid = async (values: ApplicationFormValues) => {
         if (!quizId) {
             toast.error("No applicant quiz is configured. Ask HR to set one before continuing.");
+            return;
+        }
+        const birthdateErr = checkBirthdate(values.birthdate);
+        if (birthdateErr) {
+            form.setError("birthdate", { message: birthdateErr });
+            return;
+        }
+        const rangeErr = checkSectionDateRanges(values);
+        if (rangeErr) {
+            toast.error(rangeErr);
             return;
         }
         if (!values.certification_agreed) {

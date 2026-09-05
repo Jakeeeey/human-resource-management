@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { gradeAnswers, persistGradedAttempt, type AnswerInput } from "@/modules/human-resource-management/quiz-file-management/utils/grading";
+import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -127,6 +128,29 @@ export async function POST(req: NextRequest) {
                     "[quiz-attempt] application write-back failed for application_id",
                     application_id,
                     writeBackErr
+                );
+            }
+            // Linear flow: auto-materialize a Pending Initial row (sheetless)
+            // so Grade always links to a real row. Guard: skip when an
+            // ungraded Initial already exists for the app (double-submit safe).
+            try {
+                const existingRes = await dFetch(
+                    `/items/interview?filter[application_id][_eq]=${application_id}&filter[stage][_eq]=Initial&filter[score_sheet_id][_null]=true&limit=1&fields=id`
+                );
+                const hasUngraded = Array.isArray(existingRes?.data) && existingRes.data.length > 0;
+                if (!hasUngraded) {
+                    await interviewService.createScheduledInterview({
+                        stage: "Initial",
+                        application_id,
+                        manpower_request_id: null,
+                        recommendation_id: null,
+                    });
+                }
+            } catch (materializeErr) {
+                console.error(
+                    "[quiz-attempt] pending Initial materialize failed for application_id",
+                    application_id,
+                    materializeErr
                 );
             }
         }

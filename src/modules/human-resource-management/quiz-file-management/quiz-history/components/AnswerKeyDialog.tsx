@@ -348,7 +348,7 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Answer Breakdown</DialogTitle>
                     <DialogDescription>
@@ -360,7 +360,7 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
 
                 {!isLoading && attempt && (
                     <div className="space-y-4">
-                        <div className="rounded-lg border p-4 grid grid-cols-2 gap-2 text-sm">
+                        <div className="rounded-lg border p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                             <div>
                                 <span className="text-muted-foreground">Applicant: </span>
                                 <span className="font-medium">{attempt.applicant?.full_name || "—"}</span>
@@ -382,7 +382,7 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
                                     {attempt.passed ? "Passed" : "Failed"}
                                 </Badge>
                             </div>
-                            <div className="col-span-2">
+                            <div className="sm:col-span-2">
                                 <span className="text-muted-foreground">Completed: </span>
                                 <span className="font-medium">{formatDateTime(attempt.completed_at)}</span>
                             </div>

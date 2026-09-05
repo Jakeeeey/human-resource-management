@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -90,8 +91,8 @@ function verdictPill(verdict: string): string {
 
 /**
  * Grade page client for a scheduled interview: all template criteria on one
- * page (score inputs 0–100, quiz row prefilled from the latest quiz attempt
- * percentage with an editable override), live composite SUM(score*weight)/100
+ * page (score inputs 0–100, quiz row read-only auto-filled from the latest
+ * quiz attempt percentage), live composite SUM(score*weight)/100
  * as a guideline display only, MANUAL-ONLY verdict Select (never derived —
  * HR may Pass a subpar grade at their discretion), and an interview date
  * input. Submit creates the sheet + items + composite server-side, then links
@@ -100,6 +101,7 @@ function verdictPill(verdict: string): string {
  * stay on the detail dialog's verdict control.
  */
 export function GradeInterviewClient({ interviewId }: { interviewId: number | null }) {
+    const router = useRouter();
     const [interview, setInterview] = useState<ScheduledInterview | null>(null);
     const [templates, setTemplates] = useState<ScoreTemplate[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<ScoreTemplate | null>(null);
@@ -113,6 +115,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
 
     const form = useForm<GradeFormValues>({
         resolver: zodResolver(GradeFormSchema),
+        mode: "onTouched",
         defaultValues: {
             template_id: undefined as unknown as number,
             verdict: "Pending",
@@ -126,17 +129,21 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
 
     /**
      * Initial scores for a template: the quiz-criterion row is auto-filled
-     * from the latest quiz attempt percentage (editable override afterwards);
+     * from the latest quiz attempt percentage (read-only);
      * every other criterion starts empty so the grader types each score
      * deliberately. Empty boxes fail submit validation until filled.
      */
     const buildScores = (template: ScoreTemplate | null, quiz: number | null): (number | undefined)[] => {
         if (!template) return [];
+        // Directus returns decimal(5,2) as a string ("100.00") — coerce before
+        // the finite check, otherwise Number.isFinite rejects it and the
+        // quiz row wrongly renders empty.
+        const quizValue = typeof quiz === "string" ? Number(quiz) : quiz;
         return [...template.criteria]
             .sort((a, b) => a.sort - b.sort)
             .map((c) => {
-                if (c.is_quiz_criterion && quiz != null && Number.isFinite(quiz)) {
-                    return Math.min(100, Math.max(0, Math.round(quiz * 100) / 100));
+                if (c.is_quiz_criterion && quizValue != null && Number.isFinite(quizValue)) {
+                    return Math.min(100, Math.max(0, Math.round(quizValue * 100) / 100));
                 }
                 return undefined;
             });
@@ -285,6 +292,12 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
             setGradedVerdict(values.verdict);
             setGradedComposite(composite);
             toast.success("Interview graded successfully!");
+            // Passed Initials flow straight into recommending: the next
+            // workflow step lives in manpower-recommendation, so navigate
+            // there instead of parking on the confirmation screen.
+            if (interview.stage === "Initial" && values.verdict === "Passed") {
+                router.push("/hrm/manpower-recommendation");
+            }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Could not submit interview grading.");
         } finally {
@@ -368,10 +381,10 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                     <ClipboardCheck className="w-8 h-8 text-primary" />
                 </div>
                 <div className="min-w-0">
-                    <h1 className="text-4xl font-extrabold tracking-tight text-foreground truncate">
+                    <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground truncate">
                         Grade {interview.stage} Interview
                     </h1>
-                    <p className="text-muted-foreground/80 font-medium mt-1 text-lg">
+                    <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
                         Score each criterion from 0 to 100.
                     </p>
                 </div>
@@ -428,6 +441,14 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                             key={criterion.id ?? `${criterion.name}-${index}`}
                                             control={form.control}
                                             name={`scores.${index}` as const}
+                                            rules={{
+                                                validate: (value) => {
+                                                    if (criterion.is_quiz_criterion) return true;
+                                                    if (typeof value !== "number" || !Number.isFinite(value)) return "Score is required";
+                                                    if (value < 0 || value > 100) return "Score must be between 0 and 100";
+                                                    return true;
+                                                },
+                                            }}
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
@@ -440,7 +461,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                         <span className="text-destructive">*</span>
                                                         {!!criterion.is_quiz_criterion && (
                                                             <span className="font-normal normal-case text-muted-foreground">
-                                                                — auto-filled from quiz, editable
+                                                                — auto-filled from quiz
                                                             </span>
                                                         )}
                                                     </FormLabel>
@@ -449,11 +470,17 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                             type="number"
                                                             min={0}
                                                             max={100}
+                                                            disabled={!!criterion.is_quiz_criterion}
                                                             className="bg-muted/30 focus:bg-background transition-colors"
                                                             value={field.value ?? ""}
                                                             onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                                                         />
                                                     </FormControl>
+                                                    {!!criterion.is_quiz_criterion && field.value == null && (
+                                                        <p className="text-sm text-muted-foreground">
+                                                            No quiz attempt found for this applicant — grading cannot proceed until a quiz score exists.
+                                                        </p>
+                                                    )}
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
@@ -490,6 +517,12 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                             <FormField
                                 control={form.control}
                                 name="interview_date"
+                                rules={{
+                                    validate: (value) =>
+                                        value != null && value !== "" && value > todayInputValue()
+                                            ? "Interview date cannot be in the future"
+                                            : true,
+                                }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">
@@ -498,6 +531,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                         <FormControl>
                                             <Input
                                                 type="date"
+                                                max={todayInputValue()}
                                                 className="bg-muted/30 focus:bg-background transition-colors"
                                                 {...field}
                                             />

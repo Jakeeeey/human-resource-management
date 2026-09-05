@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import type { QuizQuestionWithOptions, QuizQuestionFormData } from "../types";
 import {
     flexRender,
     getCoreRowModel,
@@ -22,73 +21,34 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { createColumns } from "./columns";
 import { Toolbar } from "./Toolbar";
-import { QuestionDialog } from "./QuestionDialog";
-import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+import { useApplicants } from "../hooks/useApplicants";
+import type { ApplicantRow } from "../types";
 
-interface FileManagementTableProps {
-    data: QuizQuestionWithOptions[];
-    isLoading?: boolean;
-    onCreateQuestion: (data: QuizQuestionFormData) => Promise<void>;
-    onUpdateQuestion: (id: number, data: QuizQuestionFormData) => Promise<void>;
-    onDeleteQuestion: (id: number) => Promise<void>;
-    onReactivateQuestion: (id: number) => Promise<void>;
+interface ApplicantsTableProps {
+    onSelect?: (row: ApplicantRow) => void;
 }
 
-export function FileManagementTable({
-    data,
-    isLoading = false,
-    onCreateQuestion,
-    onUpdateQuestion,
-    onDeleteQuestion,
-    onReactivateQuestion,
-}: FileManagementTableProps) {
+export function ApplicantsTable({ onSelect }: ApplicantsTableProps) {
+    const { applicants, isLoading } = useApplicants();
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
     const [rowSelection, setRowSelection] = React.useState({});
 
-    const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
-    const [editDialogOpen, setEditDialogOpen] = React.useState(false);
-    const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-    const [selectedQuestion, setSelectedQuestion] =
-        React.useState<QuizQuestionWithOptions | null>(null);
-
-    const handleEdit = React.useCallback((question: QuizQuestionWithOptions) => {
-        setSelectedQuestion(question);
-        setEditDialogOpen(true);
-    }, []);
-
-    const handleDeleteRequest = React.useCallback((question: QuizQuestionWithOptions) => {
-        setSelectedQuestion(question);
-        setDeleteDialogOpen(true);
-    }, []);
-
-    const handleConfirmDelete = async () => {
-        if (selectedQuestion) {
-            await onDeleteQuestion(selectedQuestion.id);
-            setDeleteDialogOpen(false);
-            setSelectedQuestion(null);
-        }
-    };
-
-    const handleReactivate = React.useCallback(
-        (question: QuizQuestionWithOptions) => {
-            onReactivateQuestion(question.id);
+    const handleSelect = React.useCallback(
+        (row: ApplicantRow) => {
+            onSelect?.(row);
         },
-        [onReactivateQuestion]
+        [onSelect]
     );
 
-    const columns = React.useMemo(
-        () => createColumns(handleEdit, handleDeleteRequest, handleReactivate),
-        [handleEdit, handleDeleteRequest, handleReactivate]
-    );
+    const columns = React.useMemo(() => createColumns(handleSelect), [handleSelect]);
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
-        data,
+        data: applicants,
         columns,
         onSortingChange: setSorting,
         onColumnFiltersChange: setColumnFilters,
@@ -113,21 +73,11 @@ export function FileManagementTable({
     }
 
     return (
-        <div className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Toolbar />
-                <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Question
-                </Button>
-            </div>
+        <div className="bg-card shadow-sm border border-border/50 rounded-xl p-6 space-y-4">
+            <Toolbar />
 
-            <div className="text-sm text-muted-foreground">
-                {table.getFilteredRowModel().rows.length} question(s) found
-            </div>
-
-            <div className="rounded-md border overflow-x-auto">
-                <UiTable className="min-w-[720px]">
+            <div className="rounded-xl border overflow-x-auto">
+                <UiTable className="min-w-[640px]">
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
@@ -164,7 +114,7 @@ export function FileManagementTable({
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    No questions found.
+                                    No applicants found.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -172,11 +122,7 @@ export function FileManagementTable({
                 </UiTable>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
-                <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                    {table.getFilteredRowModel().rows.length} row(s) selected.
-                </div>
+            <div className="flex items-center justify-end gap-2">
                 <div className="space-x-2">
                     <Button
                         variant="outline"
@@ -196,30 +142,6 @@ export function FileManagementTable({
                     </Button>
                 </div>
             </div>
-
-            <QuestionDialog
-                open={createDialogOpen}
-                onOpenChange={setCreateDialogOpen}
-                onSubmit={onCreateQuestion}
-            />
-
-            <QuestionDialog
-                open={editDialogOpen}
-                onOpenChange={setEditDialogOpen}
-                question={selectedQuestion}
-                onSubmit={async (data) => {
-                    if (selectedQuestion) {
-                        await onUpdateQuestion(selectedQuestion.id, data);
-                    }
-                }}
-            />
-
-            <DeleteConfirmDialog
-                open={deleteDialogOpen}
-                onOpenChange={setDeleteDialogOpen}
-                question={selectedQuestion}
-                onConfirm={handleConfirmDelete}
-            />
         </div>
     );
 }

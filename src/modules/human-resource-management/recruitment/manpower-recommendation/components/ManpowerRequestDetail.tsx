@@ -34,7 +34,7 @@ export function ManpowerRequestDetail() {
 
     return (
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-            <DialogContent className="w-[95vw] sm:max-w-[700px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[700px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
@@ -57,15 +57,15 @@ export function ManpowerRequestDetail() {
                             {related.map((rec) => {
                                 const applicant = applicantMap.get(rec.applicant_id);
                                 return (
-                                    <div key={rec.id} className="flex items-center gap-3 p-3 border border-border/50 rounded-xl bg-card">
-                                        <span className="font-medium truncate max-w-[160px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
+                                    <div key={rec.id} className="flex flex-col gap-3 p-3 border border-border/50 rounded-xl bg-card sm:flex-row sm:items-center">
+                                        <span className="font-medium truncate max-w-full sm:max-w-[280px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
                                             {applicant?.full_name ?? `Applicant #${rec.applicant_id}`}
                                         </span>
-                                        <div className="ml-auto flex items-center gap-3 shrink-0">
+                                        <div className="flex w-full items-center justify-between gap-3 shrink-0 sm:ml-auto sm:w-auto sm:justify-start">
                                             <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider w-[130px] justify-center shrink-0 ${getStatusColor(rec.status ?? "Recommended")}`}>
                                                 {rec.status ?? "Recommended"}
                                             </Badge>
-                                            <Button variant="ghost" size="sm" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
+                                            <Button variant="ghost" size="sm" className="flex-none shrink-0" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
                                                 <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                                 View
                                             </Button>
@@ -89,13 +89,13 @@ export function ManpowerRequestDetail() {
                             <Button
                                 type="button"
                                 onClick={() => { setIsDetailOpen(false); openRecommendForm(selectedRequest.id); }}
-                                className="rounded-full px-8 shadow-sm hover:shadow-md transition-all"
+                                className="w-full rounded-full px-8 shadow-sm hover:shadow-md transition-all sm:w-auto"
                             >
                                 Recommend
                             </Button>
                         )}
                         <DialogClose asChild>
-                            <Button type="button" variant="outline" className="rounded-full px-6">
+                            <Button type="button" variant="outline" className="w-full rounded-full px-6 sm:w-auto">
                                 Close
                             </Button>
                         </DialogClose>
