@@ -12,7 +12,8 @@ import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserCheck, Check, ChevronsUpDown } from "lucide-react";
+import { UserCheck, ChevronsUpDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { ManpowerRecommendationCreateInput } from "../types";
 
@@ -28,6 +29,7 @@ export function ManpowerRecommendationForm() {
     const { isCreateOpen, setIsCreateOpen, submitRecommendation, openRequests, applicants, recommendations, pendingRequestId, setPendingRequestId, interviewInitialRows } = useManpowerRecommendation();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [applicantOpen, setApplicantOpen] = useState(false);
+    const router = useRouter();
 
     const form = useForm<ManpowerRecommendationFormValues>({
         resolver: zodResolver(ManpowerRecommendationFormSchema),
@@ -71,6 +73,9 @@ export function ManpowerRecommendationForm() {
             if (success) {
                 setIsCreateOpen(false);
                 form.reset();
+                // Workflow: a recommendation auto-creates the Pending Final row
+                // server-side, so hand off to the Final tab to continue grading.
+                router.push("/hrm/interviews?stage=Final");
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : "Failed to submit recommendation.";
@@ -143,7 +148,7 @@ export function ManpowerRecommendationForm() {
                                                     </Button>
                                                 </FormControl>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                            <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                                                 <Command>
                                                     <CommandInput placeholder="Search applicant..." />
                                                     <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
@@ -158,16 +163,11 @@ export function ManpowerRecommendationForm() {
                                                                         setApplicantOpen(false);
                                                                     }}
                                                                 >
-                                                                    <Check
-                                                                        className={cn(
-                                                                            "mr-2 h-4 w-4",
-                                                                            applicant.id === field.value
-                                                                                ? "opacity-100"
-                                                                                : "opacity-0"
-                                                                        )}
-                                                                    />
-                                                                    <span className="truncate" title={applicant.full_name}>
+                                                                    <span className="min-w-0 flex-[55] truncate" title={applicant.full_name}>
                                                                         {applicant.full_name}
+                                                                    </span>
+                                                                    <span className="flex-[45] shrink-0 truncate pl-4 text-xs text-muted-foreground" title={applicant.position_applied_for || undefined}>
+                                                                        {applicant.position_applied_for || "—"}
                                                                     </span>
                                                                 </CommandItem>
                                                             ))}

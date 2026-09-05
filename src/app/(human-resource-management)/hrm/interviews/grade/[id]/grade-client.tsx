@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -100,6 +101,7 @@ function verdictPill(verdict: string): string {
  * stay on the detail dialog's verdict control.
  */
 export function GradeInterviewClient({ interviewId }: { interviewId: number | null }) {
+    const router = useRouter();
     const [interview, setInterview] = useState<ScheduledInterview | null>(null);
     const [templates, setTemplates] = useState<ScoreTemplate[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<ScoreTemplate | null>(null);
@@ -289,6 +291,12 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
             setGradedVerdict(values.verdict);
             setGradedComposite(composite);
             toast.success("Interview graded successfully!");
+            // Passed Initials flow straight into recommending: the next
+            // workflow step lives in manpower-recommendation, so navigate
+            // there instead of parking on the confirmation screen.
+            if (interview.stage === "Initial" && values.verdict === "Passed") {
+                router.push("/hrm/manpower-recommendation");
+            }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Could not submit interview grading.");
         } finally {

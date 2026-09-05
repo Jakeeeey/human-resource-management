@@ -74,10 +74,16 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
     };
 }
 
-export default async function InterviewsServerPage() {
+export default async function InterviewsServerPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ stage?: string | string[] }>;
+}) {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
     const headerUser = buildHeaderUserFromToken(token);
+    const sp = await searchParams;
+    const initialStage = sp?.stage === "Final" ? "Final" : "Initial";
 
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -108,7 +114,7 @@ export default async function InterviewsServerPage() {
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-hidden p-6 md:p-8 overflow-y-auto">
-                <InterviewsModule />
+                <InterviewsModule key={initialStage} initialStage={initialStage} />
             </main>
         </div>
     );

@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { InterviewProvider } from "./providers/InterviewProvider";
+import { InterviewProvider, type InterviewStageTab } from "./providers/InterviewProvider";
 import { InterviewEligibleList } from "./components/InterviewEligibleList";
 import { InterviewDetail } from "./components/InterviewDetail";
 
@@ -34,9 +34,9 @@ function InterviewsContent() {
     );
 }
 
-export function InterviewsModule() {
+export function InterviewsModule({ initialStage = "Initial" }: { initialStage?: InterviewStageTab }) {
     return (
-        <InterviewProvider>
+        <InterviewProvider initialStage={initialStage}>
             <InterviewsContent />
         </InterviewProvider>
     );

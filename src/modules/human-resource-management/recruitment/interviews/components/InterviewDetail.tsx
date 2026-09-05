@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useInterview } from "../hooks/useInterview";
 import { Interview } from "../types";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { FileText, Loader2 } from "lucide-react";
+import { formatDateLong } from "@/lib/utils";
 
 type InterviewVerdict = "Pending" | "Passed" | "Failed";
 
@@ -82,6 +84,7 @@ function computeComposite(items: Pick<ClientSheetItem, "score" | "weight_percent
  */
 export function InterviewDetail() {
     const { selectedInterview, setSelectedInterview, interviews, updateInterview, userDisplay } = useInterview();
+    const router = useRouter();
     const applicationId = selectedInterview?.application_id ?? null;
 
     const history: Interview[] = useMemo(() => {
@@ -137,12 +140,15 @@ export function InterviewDetail() {
      * Save the manually chosen verdict for the latest interview via PATCH.
      * Sends ONLY { verdict } — updated_at/updated_by are stamped server-side
      * (nowPH + JWT), the client stamps no timestamps.
+     * A Passed Initial verdict continues the hiring chain in manpower
+     * recommendation — do not remove this navigation (mirrors grade page).
      */
     const handleSaveVerdict = async () => {
         if (latest?.id == null) return;
         setIsSaving(true);
         try {
             await updateInterview(latest.id, { verdict: newVerdict });
+            if (latest.stage === "Initial" && newVerdict === "Passed") router.push("/hrm/manpower-recommendation");
         } finally {
             setIsSaving(false);
         }
@@ -200,7 +206,7 @@ export function InterviewDetail() {
                                             </div>
                                             <div>
                                                 <span className="text-xs font-bold uppercase text-muted-foreground block mb-1">Date</span>
-                                                <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50">{interview.interviewed_at ?? interview.created_at ?? "-"}</div>
+                                                <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50">{(() => { const raw = interview.interviewed_at ?? interview.created_at; return raw ? formatDateLong(new Date(raw)) : "-"; })()}</div>
                                             </div>
                                         </div>
                                         <div>
@@ -221,12 +227,16 @@ export function InterviewDetail() {
                                                             <span className="font-bold shrink-0 w-14 text-right">{item.score}</span>
                                                         </div>
                                                     ))}
+                                                    <div className="flex items-center gap-2 px-3 py-2 text-sm bg-muted/40 border-t border-border/50 font-bold">
+                                                        <span className="flex-1">Total</span>
+                                                        <span className="shrink-0 w-14 text-right">{composite != null ? composite.toFixed(2) : "-"}</span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                         <div>
                                             <span className="text-xs font-bold uppercase text-muted-foreground block mb-1">Notes</span>
-                                            <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50 whitespace-pre-wrap text-sm">{interview.notes || "-"}</div>
+                                            <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50 whitespace-pre-wrap break-words text-sm">{interview.notes || "-"}</div>
                                         </div>
                                         {/* Passed verdicts are final and can no longer be changed. */}
                                         {isLatest && latest?.verdict !== "Passed" && (
