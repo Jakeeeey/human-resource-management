@@ -33,13 +33,13 @@ export const createColumns = (
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                 >
-                    ID
+                    No
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             );
         },
         cell: ({ row }) => {
-            return <div className="font-mono">#{row.getValue("division_id")}</div>;
+            return <div className="font-mono">{row.getValue("division_id")}</div>;
         },
     },
     {
@@ -50,7 +50,7 @@ export const createColumns = (
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                 >
-                    {divisionNameSetting} Name
+                    Name
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             );
@@ -93,7 +93,7 @@ export const createColumns = (
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                 >
-                    {divisionNameSetting} Head
+                    Head
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             );
