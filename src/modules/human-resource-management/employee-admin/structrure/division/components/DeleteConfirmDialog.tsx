@@ -22,6 +22,7 @@ interface DeleteConfirmDialogProps {
     onOpenChange: (open: boolean) => void;
     division: DivisionWithRelations | null;
     onConfirm: () => Promise<void>;
+    divisionNameSetting?: string;
 }
 
 export function DeleteConfirmDialog({
@@ -29,6 +30,7 @@ export function DeleteConfirmDialog({
     onOpenChange,
     division,
     onConfirm,
+    divisionNameSetting = "Division",
 }: DeleteConfirmDialogProps) {
     const [isDeleting, setIsDeleting] = React.useState(false);
 
@@ -52,7 +54,7 @@ export function DeleteConfirmDialog({
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This will permanently delete the division{" "}
+                        This will permanently delete the {divisionNameSetting.toLowerCase()}{" "}
                         <span className="font-semibold">
                             &quot;{division?.division_name}&quot;
                         </span>

@@ -22,7 +22,8 @@ import { getUserFullName, formatDepartmentList } from "../types";
 
 export const createColumns = (
     onEdit: (division: DivisionWithRelations) => void,
-    onDelete: (division: DivisionWithRelations) => void
+    onDelete: (division: DivisionWithRelations) => void,
+    divisionNameSetting: string
 ): ColumnDef<DivisionWithRelations>[] => [
     {
         accessorKey: "division_id",
@@ -32,13 +33,13 @@ export const createColumns = (
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                 >
-                    ID
+                    No
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             );
         },
         cell: ({ row }) => {
-            return <div className="font-mono">#{row.getValue("division_id")}</div>;
+            return <div className="font-mono">{row.getValue("division_id")}</div>;
         },
     },
     {
@@ -49,7 +50,7 @@ export const createColumns = (
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                 >
-                    Division Name
+                    Name
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             );
@@ -92,7 +93,7 @@ export const createColumns = (
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                 >
-                    Division Head
+                    Head
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             );
@@ -189,19 +190,19 @@ export const createColumns = (
                                 )
                             }
                         >
-                            Copy division ID
+                            Copy {divisionNameSetting.toLowerCase()} ID
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => onEdit(division)}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Edit division
+                            Edit {divisionNameSetting.toLowerCase()}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onClick={() => onDelete(division)}
                             className="text-red-600"
                         >
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Delete division
+                            Delete {divisionNameSetting.toLowerCase()}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

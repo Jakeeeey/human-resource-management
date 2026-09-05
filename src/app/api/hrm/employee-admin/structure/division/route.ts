@@ -161,7 +161,28 @@ async function buildDivisionRelations() {
         department_count: (divisionDepartmentsMap.get(div.division_id) || []).length,
     }));
 
-    return { enriched, users, departments, bankAccounts };
+    // Fetch division_name from general_setting
+    let divisionNameSetting = "Division"; // Default
+    try {
+        const settingsUrl = `${DIRECTUS_URL}/items/general_setting?filter[setting_key][_eq]=division_name`;
+        const settingsRes = await fetch(settingsUrl, {
+            cache: "no-store",
+            headers: {
+                "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
+            }
+        });
+        if (settingsRes.ok) {
+            const settingsJson = await settingsRes.json();
+            const setting = settingsJson.data?.[0];
+            if (setting?.setting_value) {
+                divisionNameSetting = setting.setting_value;
+            }
+        }
+    } catch (e) {
+        console.error("Failed to fetch division_name setting:", e);
+    }
+
+    return { enriched, users, departments, bankAccounts, divisionNameSetting };
 }
 
 // ============================================================================
@@ -170,13 +191,14 @@ async function buildDivisionRelations() {
 
 export async function GET() {
     try {
-        const { enriched, users, departments, bankAccounts } = await buildDivisionRelations();
+        const { enriched, users, departments, bankAccounts, divisionNameSetting } = await buildDivisionRelations();
 
         return NextResponse.json({
             divisions: enriched,
             users,
             departments,
             bank_accounts: bankAccounts,
+            division_name_setting: divisionNameSetting,
             metadata: {
                 total: enriched.length,
                 lastUpdated: new Date().toISOString(),
