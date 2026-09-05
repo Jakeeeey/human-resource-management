@@ -18,6 +18,7 @@ import {
   Cell,
   PaginationState,
   Updater,
+  getExpandedRowModel,
 } from "@tanstack/react-table";
 
 import {
@@ -187,6 +188,8 @@ export function DataTable<TData, TValue>({
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getSubRows: (row) => (row as { subRows?: TData[] }).subRows,
+    getExpandedRowModel: getExpandedRowModel(),
     onSortingChange: (updater: Updater<SortingState>) => {
       const nextSorting =
         typeof updater === "function" ? updater(actualSorting) : updater;
@@ -245,18 +248,27 @@ export function DataTable<TData, TValue>({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        {searchKey && (
-          <div className="max-w-sm w-full">
-            <SearchInput
-              placeholder={`Search ${searchKey.replace(/_/g, " ")}...`}
-              initialValue={
-                (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
-              }
-              isLoading={isLoading}
-              onSearch={handleSearchWrapper}
-            />
-          </div>
-        )}
+        {searchKey && (() => {
+          const formattedKey = searchKey
+            .replace(/_/g, " ")
+            .replace(/([A-Z])/g, " $1")
+            .trim()
+            .toLowerCase();
+          const titleCaseKey = formattedKey.replace(/\b\w/g, c => c.toUpperCase());
+
+          return (
+            <div className="max-w-sm w-full">
+              <SearchInput
+                placeholder={`Search ${titleCaseKey}...`}
+                initialValue={
+                  (table.getColumn(searchKey)?.getFilterValue() as string) ?? ""
+                }
+                isLoading={isLoading}
+                onSearch={handleSearchWrapper}
+              />
+            </div>
+          );
+        })()}
 
         <div className="flex items-center gap-2 ml-auto">
           {actionComponent}
@@ -335,7 +347,7 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="group hover:bg-muted/10 transition-colors"
+                  className={`group hover:bg-muted/10 transition-colors ${row.depth > 0 ? "bg-muted/10 dark:bg-muted/5 text-muted-foreground" : ""}`}
                 >
                   {row.getVisibleCells().map((cell: Cell<TData, unknown>) => (
                     <TableCell key={cell.id} className="py-3">

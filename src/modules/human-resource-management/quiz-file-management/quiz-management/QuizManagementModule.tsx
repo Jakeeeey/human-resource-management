@@ -28,9 +28,9 @@ function QuizManagementModuleContent() {
         try {
             await createQuiz(data);
             toast.success("Quiz created successfully");
-        } catch {
-            toast.error("Failed to create quiz");
-            throw new Error("Create failed");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to create quiz");
+            throw error;
         }
     };
 
@@ -38,9 +38,9 @@ function QuizManagementModuleContent() {
         try {
             await updateQuiz(id, data);
             toast.success("Quiz updated successfully");
-        } catch {
-            toast.error("Failed to update quiz");
-            throw new Error("Update failed");
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Failed to update quiz");
+            throw error;
         }
     };
 
@@ -87,14 +87,14 @@ function QuizManagementModuleContent() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Quiz Management</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Quiz Management</h1>
                     <p className="text-muted-foreground">
                         Configure quiz settings and policies
                     </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <Button variant="outline" size="sm" onClick={() => refetch()} className="w-full sm:w-auto">
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Refresh
                 </Button>

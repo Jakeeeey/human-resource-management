@@ -26,7 +26,6 @@ export function Toolbar({ attempts }: ToolbarProps) {
     const hasActiveFilters =
         filters.search || filters.quizId != null || filters.passed != null;
 
-
     const quizOptions = React.useMemo(() => {
         const map = new Map<number, string>();
         attempts.forEach((a) => {
@@ -38,7 +37,7 @@ export function Toolbar({ attempts }: ToolbarProps) {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                <div className="flex-1 min-w-[200px]">
+                <div className="flex-1 min-w-[200px] max-w-full sm:max-w-sm">
                     <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -54,7 +53,7 @@ export function Toolbar({ attempts }: ToolbarProps) {
                     value={filters.quizId != null ? String(filters.quizId) : "all"}
                     onValueChange={(val) => updateQuizId(val === "all" ? null : Number(val))}
                 >
-                    <SelectTrigger className="w-[200px]">
+                    <SelectTrigger className="w-full sm:w-[200px] sm:ml-auto">
                         <SelectValue placeholder="All quizzes" />
                     </SelectTrigger>
                     <SelectContent>
@@ -73,7 +72,7 @@ export function Toolbar({ attempts }: ToolbarProps) {
                         updatePassed(val === "all" ? null : val === "passed")
                     }
                 >
-                    <SelectTrigger className="w-[160px]">
+                    <SelectTrigger className="w-full sm:w-[160px]">
                         <SelectValue placeholder="All results" />
                     </SelectTrigger>
                     <SelectContent>
