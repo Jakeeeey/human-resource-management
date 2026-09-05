@@ -680,6 +680,28 @@ export function normalizeInterview(row: Record<string, unknown>): Interview {
  * @param recommendationId - Linked manpower_recommendation ID (may be null).
  * @returns True when the rec was flipped to Approved.
  */
+/**
+ * Auto-reject the linked recommendation when a Final interview lands Failed.
+ * Mirror of maybeAutoApproveRecommendation: a Failed final ends the candidacy,
+ * so the rec flips to Rejected without HR touching the recommendations
+ * module. Skips when there is no linked rec or the rec already left
+ * Recommended (never overwrites a manual Approved/Hired/Rejected/Withdrawn
+ * decision). Never throws — grading success must not fail on a rec-side error.
+ * @param recommendationId - Linked manpower_recommendation ID (may be null).
+ * @returns True when the rec was flipped to Rejected.
+ */
+export async function maybeAutoRejectRecommendation(recommendationId: number | null | undefined): Promise<boolean> {
+    try {
+        if (!recommendationId) return false;
+        const rec = await manpowerRecommendationService.fetchById(recommendationId);
+        if (!rec || rec.status !== "Recommended") return false;
+        await manpowerRecommendationService.update(recommendationId, { status: "Rejected" });
+        return true;
+    } catch (e) {
+        console.error("Error auto-rejecting recommendation for failed final:", e);
+        return false;
+    }
+}
 export async function maybeAutoApproveRecommendation(recommendationId: number | null | undefined): Promise<boolean> {
     try {
         if (!recommendationId) return false;

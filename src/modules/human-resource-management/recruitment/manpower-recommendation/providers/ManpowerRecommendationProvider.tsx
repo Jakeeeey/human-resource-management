@@ -10,7 +10,8 @@ const API_PATH = "/api/hrm/manpower-recommendation";
 interface ManpowerRecommendationContextType {
     recommendations: ManpowerRecommendation[];
     applicants: { id: number; full_name: string; position_applied_for: string }[];
-    openRequests: { id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[];
+    openRequests: { id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string }[];
+    divisions: { id: number; name: string }[];
     users: { id: number | string; name: string }[];
     interviews: Interview[];
     interviewInitialRows: { id: number; applicant_id: number; latestInitialVerdict: string | null }[];
@@ -25,8 +26,8 @@ interface ManpowerRecommendationContextType {
     pendingRequestId: number | null;
     setPendingRequestId: (id: number | null) => void;
     openRecommendForm: (requestId: number) => void;
-    selectedRequest: { id: number; request_no: string; position: string; no_manpower_needed: number; status: string } | null;
-    setSelectedRequest: (request: { id: number; request_no: string; position: string; no_manpower_needed: number; status: string } | null) => void;
+    selectedRequest: { id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string } | null;
+    setSelectedRequest: (request: { id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string } | null) => void;
     isDetailOpen: boolean;
     setIsDetailOpen: (isOpen: boolean) => void;
     refresh: () => Promise<void>;
@@ -45,7 +46,8 @@ const ManpowerRecommendationContext = createContext<ManpowerRecommendationContex
 export function ManpowerRecommendationProvider({ children }: { children: React.ReactNode }) {
     const [recommendations, setRecommendations] = useState<ManpowerRecommendation[]>([]);
     const [applicants, setApplicants] = useState<{ id: number; full_name: string; position_applied_for: string }[]>([]);
-    const [openRequests, setOpenRequests] = useState<{ id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[]>([]);
+    const [openRequests, setOpenRequests] = useState<{ id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string }[]>([]);
+    const [divisions, setDivisions] = useState<{ id: number; name: string }[]>([]);
     const [users, setUsers] = useState<{ id: number | string; name: string }[]>([]);
     const [interviews, setInterviews] = useState<Interview[]>([]);
     const [interviewInitialRows, setInterviewInitialRows] = useState<{ id: number; applicant_id: number; latestInitialVerdict: string | null }[]>([]);
@@ -55,7 +57,7 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
     const [selectedRecommendation, setSelectedRecommendation] = useState<ManpowerRecommendation | null>(null);
     const [isViewOpen, setIsViewOpen] = useState(false);
     const [pendingRequestId, setPendingRequestId] = useState<number | null>(null);
-    const [selectedRequest, setSelectedRequest] = useState<{ id: number; request_no: string; position: string; no_manpower_needed: number; status: string } | null>(null);
+    const [selectedRequest, setSelectedRequest] = useState<{ id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string } | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
 
     /**
@@ -80,6 +82,7 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
             setRecommendations(Array.isArray(result.data) ? result.data : []);
             setApplicants(Array.isArray(result.applicants) ? result.applicants : []);
             setOpenRequests(Array.isArray(result.openRequests) ? result.openRequests : []);
+            setDivisions(Array.isArray(result.divisions) ? result.divisions : []);
             setUsers(Array.isArray(result.users) ? result.users : []);
             try {
                 const interviewResponse = await fetch("/api/hrm/interviews");
@@ -165,11 +168,11 @@ export function ManpowerRecommendationProvider({ children }: { children: React.R
     }, [refresh]);
 
     const contextValue = useMemo(() => ({
-        recommendations, applicants, openRequests, users, interviews, interviewInitialRows, isLoading, error, isCreateOpen, setIsCreateOpen,
+        recommendations, applicants, openRequests, divisions, users, interviews, interviewInitialRows, isLoading, error, isCreateOpen, setIsCreateOpen,
         selectedRecommendation, setSelectedRecommendation, isViewOpen, setIsViewOpen,
         pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen,
         refresh, submitRecommendation, updateRecommendation, deleteRecommendation
-    }), [recommendations, applicants, openRequests, users, interviews, interviewInitialRows, isLoading, error, isCreateOpen, selectedRecommendation, isViewOpen, pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen, refresh, submitRecommendation, updateRecommendation, deleteRecommendation]);
+    }), [recommendations, applicants, openRequests, divisions, users, interviews, interviewInitialRows, isLoading, error, isCreateOpen, selectedRecommendation, isViewOpen, pendingRequestId, setPendingRequestId, openRecommendForm, selectedRequest, setSelectedRequest, isDetailOpen, setIsDetailOpen, refresh, submitRecommendation, updateRecommendation, deleteRecommendation]);
 
     return (
         <ManpowerRecommendationContext.Provider value={contextValue}>

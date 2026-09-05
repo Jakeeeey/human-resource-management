@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 
 export const dynamic = "force-dynamic";
@@ -93,7 +93,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 data.stage === "Final" && data.verdict === "Passed"
                     ? await maybeAutoApproveRecommendation(data.recommendation_id)
                     : false;
-            return NextResponse.json({ data, autoApproved });
+            const autoRejected =
+                data.stage === "Final" && data.verdict === "Failed"
+                    ? await maybeAutoRejectRecommendation(data.recommendation_id)
+                    : false;
+            return NextResponse.json({ data, autoApproved, autoRejected });
         }
 
         // The client sends only { verdict, notes, interviewed_by } — it has no
@@ -106,7 +110,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             data.stage === "Final" && data.verdict === "Passed" && existing?.verdict !== "Passed"
                 ? await maybeAutoApproveRecommendation(data.recommendation_id)
                 : false;
-        return NextResponse.json({ data, autoApproved });
+        const autoRejected =
+            data.stage === "Final" && data.verdict === "Failed" && existing?.verdict !== "Failed"
+                ? await maybeAutoRejectRecommendation(data.recommendation_id)
+                : false;
+        return NextResponse.json({ data, autoApproved, autoRejected });
     } catch (e: unknown) {
         console.error("Error in PATCH /api/hrm/interviews/[id]:", e);
         const rawMessage = (e as Error).message || "INTERNAL_FAIL";

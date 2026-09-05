@@ -12,6 +12,7 @@ import { Eye, FileText } from "lucide-react";
 type OpenRequestRow = {
     id: number;
     request_no: string;
+    division_id: number | null;
     position: string;
     no_manpower_needed: number;
     status: string;
@@ -29,7 +30,7 @@ interface OpenRequestsListT1Contract {
 
 export function OpenManpowerRequestsList() {
     const context = useManpowerRecommendation() as ReturnType<typeof useManpowerRecommendation> & OpenRequestsListT1Contract;
-    const { recommendations, openRequests, isLoading, error, setSelectedRequest, setIsDetailOpen } = context;
+    const { recommendations, openRequests, divisions, isLoading, error, setSelectedRequest, setIsDetailOpen } = context;
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
 
@@ -45,6 +46,8 @@ export function OpenManpowerRequestsList() {
         requestRecs(requestId).filter((r) => r.status === "Approved" || r.status === "Hired").length;
     const hiredCount = (requestId: number) =>
         requestRecs(requestId).filter((r) => r.status === "Hired").length;
+    const divisionName = (req: OpenRequestRow) =>
+        req.division_id == null ? "N/A" : (divisions.find((d) => d.id === req.division_id)?.name ?? String(req.division_id));
     const getDisplayStatus = (req: OpenRequestRow) => {
         const total = (req.no_manpower_needed ?? 0);
         if (total > 0 && hiredCount(req.id) >= total) return "Closed";
@@ -90,10 +93,11 @@ export function OpenManpowerRequestsList() {
             </div>
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                <Table className="min-w-[680px]">
+                <Table className="min-w-[760px]">
                     <TableHeader className="bg-muted/30">
                         <TableRow className="hover:bg-transparent border-border/50">
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Request No</TableHead>
+                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Division</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Position</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Recommended</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Approved</TableHead>
@@ -104,7 +108,7 @@ export function OpenManpowerRequestsList() {
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-48">
+                                <TableCell colSpan={7} className="text-center h-48">
                                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                                         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
                                         <p className="font-medium animate-pulse">Loading open requests...</p>
@@ -113,7 +117,7 @@ export function OpenManpowerRequestsList() {
                             </TableRow>
                         ) : filteredRequests.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-48">
+                                <TableCell colSpan={7} className="text-center h-48">
                                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                                         <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
                                         <p className="font-medium">No open manpower requests.</p>
@@ -134,6 +138,9 @@ export function OpenManpowerRequestsList() {
                                             <div className="font-bold text-foreground group-hover:text-primary transition-colors">
                                                 {req.request_no}
                                             </div>
+                                        </TableCell>
+                                        <TableCell className="font-medium text-muted-foreground/80">
+                                            {divisionName(req)}
                                         </TableCell>
                                         <TableCell className="font-medium text-muted-foreground/80">
                                             {req.position}

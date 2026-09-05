@@ -70,14 +70,15 @@ export async function GET() {
             return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
         }
 
-        const [data, applicants, openRequests, users] = await Promise.all([
+        const [data, applicants, openRequests, divisions, users] = await Promise.all([
             manpowerRecommendationService.fetchAll(),
             manpowerRecommendationService.fetchApplicants(),
             manpowerRecommendationService.fetchOpenManpowerRequests(),
+            manpowerRecommendationService.fetchDivisions(),
             manpowerRecommendationService.fetchUsers(),
         ]);
 
-        return NextResponse.json({ data, applicants, openRequests, users });
+        return NextResponse.json({ data, applicants, openRequests, divisions, users });
     } catch (e: unknown) {
         const err = e as Error;
         if (err && typeof err === "object" && "issues" in err) {
