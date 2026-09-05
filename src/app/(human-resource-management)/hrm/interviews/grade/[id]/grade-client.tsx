@@ -115,6 +115,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
 
     const form = useForm<GradeFormValues>({
         resolver: zodResolver(GradeFormSchema),
+        mode: "onTouched",
         defaultValues: {
             template_id: undefined as unknown as number,
             verdict: "Pending",
@@ -440,6 +441,14 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                             key={criterion.id ?? `${criterion.name}-${index}`}
                                             control={form.control}
                                             name={`scores.${index}` as const}
+                                            rules={{
+                                                validate: (value) => {
+                                                    if (criterion.is_quiz_criterion) return true;
+                                                    if (typeof value !== "number" || !Number.isFinite(value)) return "Score is required";
+                                                    if (value < 0 || value > 100) return "Score must be between 0 and 100";
+                                                    return true;
+                                                },
+                                            }}
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
@@ -467,6 +476,11 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                             onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                                                         />
                                                     </FormControl>
+                                                    {!!criterion.is_quiz_criterion && field.value == null && (
+                                                        <p className="text-sm text-muted-foreground">
+                                                            No quiz attempt found for this applicant — grading cannot proceed until a quiz score exists.
+                                                        </p>
+                                                    )}
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
@@ -503,6 +517,12 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                             <FormField
                                 control={form.control}
                                 name="interview_date"
+                                rules={{
+                                    validate: (value) =>
+                                        value != null && value !== "" && value > todayInputValue()
+                                            ? "Interview date cannot be in the future"
+                                            : true,
+                                }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">
@@ -511,6 +531,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                         <FormControl>
                                             <Input
                                                 type="date"
+                                                max={todayInputValue()}
                                                 className="bg-muted/30 focus:bg-background transition-colors"
                                                 {...field}
                                             />

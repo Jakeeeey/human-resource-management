@@ -20,7 +20,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { CIVIL_STATUS_OPTIONS, type ApplicationFormValues } from "../../types";
-import { checkFormat } from "../../lib/softValidation";
+import { checkBirthdate, checkFormat, checkHeightCm, checkUnlikelyAge, checkWeightKg } from "../../lib/softValidation";
 import { SoftWarning } from "../SoftWarning";
 import { PhotoCapture } from "../PhotoCapture";
 
@@ -43,6 +43,8 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
     const tin = useWatch({ control: form.control, name: "tin" });
     const philhealth = useWatch({ control: form.control, name: "philhealth_no" });
     const pagibig = useWatch({ control: form.control, name: "pagibig_no" });
+    const heightCm = useWatch({ control: form.control, name: "height_cm" });
+    const weightKg = useWatch({ control: form.control, name: "weight_kg" });
     const photoSelected = useWatch({ control: form.control, name: "photo_selected" });
 
     const age = useMemo(() => computeAge(birthdate), [birthdate]);
@@ -159,13 +161,21 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                     <FormField
                         control={form.control}
                         name="birthdate"
-                        rules={{ required: "Required" }}
+                        rules={{
+                            required: "Required",
+                            validate: (v) => checkBirthdate(v ?? "") ?? true,
+                        }}
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Birthdate</FormLabel>
                                 <FormControl>
-                                    <Input type="date" {...field} />
+                                    <Input
+                                        type="date"
+                                        max={new Date().toISOString().slice(0, 10)}
+                                        {...field}
+                                    />
                                 </FormControl>
+                                <SoftWarning message={checkUnlikelyAge(birthdate)} />
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -224,6 +234,7 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                             <FormControl>
                                 <Input type="number" min={0} step="0.1" {...field} />
                             </FormControl>
+                            <SoftWarning message={checkHeightCm(heightCm)} />
                             <FormMessage />
                         </FormItem>
                     )}
@@ -237,6 +248,7 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                             <FormControl>
                                 <Input type="number" min={0} step="0.1" {...field} />
                             </FormControl>
+                            <SoftWarning message={checkWeightKg(weightKg)} />
                             <FormMessage />
                         </FormItem>
                     )}

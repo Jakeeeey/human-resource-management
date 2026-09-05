@@ -195,9 +195,6 @@ export function InterviewDetail() {
                                             <span className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider ${getVerdictColor(interview.verdict)}`}>
                                                 {interview.verdict}
                                             </span>
-                                            <span className="ml-auto text-sm text-muted-foreground">
-                                                Composite: <span className="font-bold text-foreground">{composite != null ? composite.toFixed(2) : itemsLoading ? "…" : "-"}</span>
-                                            </span>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                                             <div>

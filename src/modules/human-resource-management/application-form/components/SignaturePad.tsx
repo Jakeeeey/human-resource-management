@@ -64,6 +64,10 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
                 if (!canvas || !ctx) return;
                 const p = pointFromEvent(e);
                 const from = lastRef.current ?? p;
+                // Bitmap ink stays dark so the exported PNG remains visible on the
+                // light HR review background; dark mode display is inverted to
+                // white via CSS (`dark:invert` on the canvas), which does not
+                // affect the exported bitmap.
                 ctx.strokeStyle = "#111827";
                 ctx.lineWidth = 2.5;
                 ctx.lineCap = "round";
@@ -122,17 +126,19 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
                 ) : (
                     <div className="space-y-1.5">
                         <Label>Sign below</Label>
-                        <canvas
-                            ref={canvasRef}
-                            width={CANVAS_W}
-                            height={CANVAS_H}
-                            onPointerDown={handlePointerDown}
-                            onPointerMove={handlePointerMove}
-                            onPointerUp={endStroke}
-                            onPointerLeave={endStroke}
-                            onPointerCancel={endStroke}
-                            className="h-[180px] w-full max-w-md touch-none rounded-md border bg-background"
-                        />
+                        <div className="w-full max-w-md overflow-hidden rounded-md border bg-background">
+                            <canvas
+                                ref={canvasRef}
+                                width={CANVAS_W}
+                                height={CANVAS_H}
+                                onPointerDown={handlePointerDown}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={endStroke}
+                                onPointerLeave={endStroke}
+                                onPointerCancel={endStroke}
+                                className="block h-[180px] w-full touch-none dark:invert"
+                            />
+                        </div>
                     </div>
                 )}
 
