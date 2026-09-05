@@ -7,8 +7,8 @@ import { MemoCreationService } from "../services/MemoCreationService";
 import { memoFormSchema, MemoFormValues } from "../types/memo-creation.schema";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
-// @ts-ignore - react-quill-new missing types in CI
-const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false }) as any;
+// @ts-expect-error - react-quill-new missing types in CI
+const ReactQuill = dynamic(() => import("react-quill-new"), { ssr: false }) as React.ElementType;
 import "react-quill-new/dist/quill.snow.css";
 
 import {
