@@ -61,11 +61,11 @@ export function ManpowerRequestDetail() {
                                         <span className="font-medium truncate max-w-full sm:max-w-[160px] flex-1 min-w-0" title={applicant?.full_name ?? `Applicant #${rec.applicant_id}`}>
                                             {applicant?.full_name ?? `Applicant #${rec.applicant_id}`}
                                         </span>
-                                        <div className="flex w-full items-center gap-3 shrink-0 sm:ml-auto sm:w-auto">
+                                        <div className="flex w-full items-center justify-between gap-3 shrink-0 sm:ml-auto sm:w-auto sm:justify-start">
                                             <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider w-[130px] justify-center shrink-0 ${getStatusColor(rec.status ?? "Recommended")}`}>
                                                 {rec.status ?? "Recommended"}
                                             </Badge>
-                                            <Button variant="ghost" size="sm" className="flex-1 sm:flex-none" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
+                                            <Button variant="ghost" size="sm" className="flex-none shrink-0" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
                                                 <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                                 View
                                             </Button>

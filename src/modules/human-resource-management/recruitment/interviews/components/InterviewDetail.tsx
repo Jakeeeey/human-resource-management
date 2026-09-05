@@ -240,7 +240,7 @@ export function InterviewDetail() {
                                         </div>
                                         {/* Passed verdicts are final and can no longer be changed. */}
                                         {isLatest && latest?.verdict !== "Passed" && (
-                                            <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+                                            <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-border/50">
                                                 <span className="text-xs font-bold uppercase text-muted-foreground">Verdict</span>
                                                 <Select value={newVerdict} onValueChange={(v) => setNewVerdict(v as InterviewVerdict)}>
                                                     <SelectTrigger className="truncate w-[160px]">
@@ -270,7 +270,7 @@ export function InterviewDetail() {
                 <div className="p-4 md:p-6 bg-muted/20 border-t border-border/40">
                     <DialogFooter className="flex w-full sm:justify-end gap-3 items-center">
                         <DialogClose asChild>
-                            <Button type="button" variant="outline" className="rounded-full px-6">
+                            <Button type="button" variant="outline" className="rounded-full px-6 w-full sm:w-auto">
                                 Close
                             </Button>
                         </DialogClose>

@@ -380,10 +380,10 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                     <ClipboardCheck className="w-8 h-8 text-primary" />
                 </div>
                 <div className="min-w-0">
-                    <h1 className="text-4xl font-extrabold tracking-tight text-foreground truncate">
+                    <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground truncate">
                         Grade {interview.stage} Interview
                     </h1>
-                    <p className="text-muted-foreground/80 font-medium mt-1 text-lg">
+                    <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
                         Score each criterion from 0 to 100.
                     </p>
                 </div>

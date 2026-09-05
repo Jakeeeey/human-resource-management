@@ -148,7 +148,7 @@ export function TemplateEditorDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{isEdit ? `Edit Template: ${template.name}` : "New Template"}</DialogTitle>
                     <DialogDescription>
@@ -265,7 +265,7 @@ export function TemplateEditorDialog({
                                     return (
                                         <div
                                             key={field.id}
-                                            className="flex items-center gap-2 rounded-lg border p-2"
+                                            className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border p-2"
                                         >
                                             {isLocked && (
                                                 <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -287,7 +287,7 @@ export function TemplateEditorDialog({
                                                 control={form.control}
                                                 name={`criteria.${index}.weight_percentage`}
                                                 render={({ field: weightField }) => (
-                                                    <div className="relative w-24 shrink-0">
+                                                        <div className="relative w-full sm:w-24 shrink-0">
                                                         <Input
                                                             {...weightField}
                                                             type="number"

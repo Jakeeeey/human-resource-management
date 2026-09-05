@@ -115,21 +115,31 @@ export function InterviewEligibleList() {
                 }}
             >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <TabsList aria-label="Interview stage">
-                        <TabsTrigger value="Initial">
+                    <TabsList aria-label="Interview stage" className="w-full sm:w-auto">
+                        <TabsTrigger value="Initial" className="flex-1 sm:flex-none">
                             Initial
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
                                 {filteredInitial.length}
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="Final">
+                        <TabsTrigger value="Final" className="flex-1 sm:flex-none">
                             Final
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
                                 {filteredFinal.length}
                             </span>
                         </TabsTrigger>
                     </TabsList>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <Input
+                            placeholder={stageTab === "Initial" ? "Search by applicant name..." : "Search by name or position..."}
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setPageInitial(1);
+                                setPageFinal(1);
+                            }}
+                            className="w-full sm:w-64"
+                        />
                         <Select
                             value={verdictFilter}
                             onValueChange={(value) => {
@@ -138,7 +148,7 @@ export function InterviewEligibleList() {
                                 setPageFinal(1);
                             }}
                         >
-                            <SelectTrigger className="w-40" aria-label="Filter by verdict">
+                            <SelectTrigger className="w-full sm:w-40" aria-label="Filter by verdict">
                                 <SelectValue placeholder="All verdicts" />
                             </SelectTrigger>
                             <SelectContent>
@@ -148,22 +158,13 @@ export function InterviewEligibleList() {
                                 <SelectItem value="Failed">Failed</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Input
-                            placeholder={stageTab === "Initial" ? "Search by applicant name..." : "Search by name or position..."}
-                            value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setPageInitial(1);
-                                setPageFinal(1);
-                            }}
-                            className="w-64"
-                        />
                     </div>
                 </div>
             </Tabs>
             {stageTab === "Initial" ? (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                    <Table>
+                    <div className="overflow-x-auto">
+                    <Table className="min-w-[680px]">
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent border-border/50">
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Applicant</TableHead>
@@ -250,6 +251,7 @@ export function InterviewEligibleList() {
                             )}
                         </TableBody>
                     </Table>
+                    </div>
                     <Pager
                         page={safePageInitial}
                         totalPages={totalPagesInitial}
@@ -259,7 +261,8 @@ export function InterviewEligibleList() {
                 </div>
             ) : (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                    <Table>
+                    <div className="overflow-x-auto">
+                    <Table className="min-w-[560px]">
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent border-border/50">
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Position</TableHead>
@@ -326,6 +329,7 @@ export function InterviewEligibleList() {
                             )}
                         </TableBody>
                     </Table>
+                    </div>
                     <Pager
                         page={safePageFinal}
                         totalPages={totalPagesFinal}
