@@ -35,6 +35,7 @@ async function proxy(req: NextRequest) {
     case "salesmen": upstreamPath = "/items/salesman"; break;
     case "review-committees": upstreamPath = "/items/review_committee?fields=*.*,approver_id.*"; break;
     case "expense-review-committees": upstreamPath = "/items/expense_review_committee?fields=*.*,approver_id.*,division_id.*"; break;
+    case "settings": upstreamPath = "/items/general_setting?filter[setting_key][_eq]=division_name"; break;
     default:
       // Fallback for cases like /executives/123
       if (segment.startsWith("executives/")) upstreamPath = `/items/executive/${segment.split("/")[1]}`;

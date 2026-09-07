@@ -30,9 +30,10 @@ interface SupervisorTabProps {
   onCreate: (divisionId: number, supervisorId: number) => Promise<void>;
   users: SystemUser[];
   divisions: Division[];
+  divisionNameSetting?: string;
 }
 
-export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divisions }: SupervisorTabProps) {
+export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divisions, divisionNameSetting = "Division" }: SupervisorTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
   const pagination = usePagination(data, 5);
@@ -49,7 +50,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
           <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Field Supervisors</h3>
-          <p className="text-sm text-muted-foreground font-medium">Operational oversight per business unit.</p>
+          <p className="text-sm text-muted-foreground font-medium">Operational oversight per {divisionNameSetting.toLowerCase()} unit.</p>
         </div>
         <Button
           onClick={() => setIsDialogOpen(true)}
@@ -83,7 +84,7 @@ export function SupervisorTab({ data, isLoading, onDelete, onCreate, users, divi
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-muted-foreground/10">
-              <TableHead className="font-semibold py-4 px-6 text-foreground/80">Business Unit</TableHead>
+              <TableHead className="font-semibold py-4 px-6 text-foreground/80">{divisionNameSetting}</TableHead>
               <TableHead className="font-semibold py-4 text-foreground/80">Supervisor Name</TableHead>
               <TableHead className="font-semibold py-4 text-foreground/80">Email Address</TableHead>
               <TableHead className="w-[80px] py-4"></TableHead>
