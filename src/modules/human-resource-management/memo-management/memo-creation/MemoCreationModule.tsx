@@ -67,7 +67,7 @@ const MemoCreationContent = () => {
     const targetCompanyOptions = React.useMemo(() => {
         // Exclude the selected issued_by company from target company choices
         const filteredCompanies = selectedIssuedBy && selectedIssuedBy !== "all"
-            ? companies.filter(c => Number(c.company_id) !== Number(selectedIssuedBy))
+            ? companies.filter(c => String(c.company_id) !== String(selectedIssuedBy))
             : companies;
 
         return [

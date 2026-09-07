@@ -30,8 +30,11 @@ export function useMemoAcknowledgement() {
 
     const handleIssuedByChange = useCallback((value: string) => {
         setSelectedIssuedBy(value);
+        if (value !== "all" && selectedTargetCompany === value) {
+            setSelectedTargetCompany("all");
+        }
         setPageIndex(0);
-    }, []);
+    }, [selectedTargetCompany]);
 
     const handleTargetCompanyChange = useCallback((value: string) => {
         setSelectedTargetCompany(value);
