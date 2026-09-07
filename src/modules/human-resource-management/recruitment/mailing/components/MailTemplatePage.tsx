@@ -87,10 +87,10 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
 
     return (
         <div className="min-h-0 w-full">
-            {/* Sticky action bar: full-bleed + opaque so scrolled content can
-                never show through or above it; inner row stays constrained. */}
-            <div className="sticky top-0 z-30 w-full border-b bg-background">
-                <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 p-2 sm:p-4 lg:flex-row lg:items-center">
+            {/* Sticky action bar: negative top offset + negative top margin pull
+                it over main's top padding so no padding strip shows when stuck. */}
+            <div className="sticky -top-6 z-30 -mt-6 w-full border-b bg-background">
+                <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-3 px-2 py-2 sm:px-4 sm:py-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex min-w-0 items-center gap-2">
                         <Button
                             type="button"
@@ -115,7 +115,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                             </p>
                         </div>
                     </div>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:ml-auto">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <div className="flex items-center gap-2">
                             <Switch
                                 id="mail-template-page-active"
@@ -154,7 +154,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
             </div>
 
             {/* Content: constrained form column + wider preview rail. */}
-            <div className="mx-auto grid w-full max-w-[1200px] gap-6 p-2 sm:p-6 md:p-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <div className="mx-auto grid w-full max-w-[1200px] gap-6 p-4 sm:p-6 md:p-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                 <div className="mx-auto grid w-full min-w-0 max-w-3xl gap-6 lg:mx-0">
                     <Card className="shadow-none border-border overflow-hidden">
                         <CardHeader>
@@ -214,7 +214,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 />
                             </div>
                             <div className="grid min-w-0 gap-2">
-                                <Label>Fields (click to add)</Label>
+                                <Label>Fields</Label>
                                 <p className="text-xs text-muted-foreground">
                                     Click a field to add it to the email — it fills in by
                                     itself when the email sends.
@@ -243,7 +243,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                 <div className="grid min-w-0 content-start gap-6">
                     <Card className="shadow-none border-border overflow-hidden lg:sticky lg:top-24">
                         <CardHeader>
-                            <CardTitle className="text-base">Preview (scrubbed, warnings inline)</CardTitle>
+                            <CardTitle className="text-base">Preview</CardTitle>
                         </CardHeader>
                         <CardContent className="grid min-w-0 gap-3">
                             {form.preview.warnings.length > 0 && (
