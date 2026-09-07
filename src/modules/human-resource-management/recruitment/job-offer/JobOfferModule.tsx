@@ -4,13 +4,7 @@ import React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FileText, Printer } from "lucide-react";
 import { EMPTY_JOB_OFFER, type JobOfferFormData } from "./types";
 
@@ -27,6 +21,17 @@ interface CompanyLogo {
     company_city: string | null;
     logo_data_url: string | null;
     is_default: boolean;
+}
+
+interface StructureDepartment {
+    department_id: number;
+    department_name: string;
+}
+
+interface StructureDivision {
+    division_id: number;
+    division_name: string;
+    departments: StructureDepartment[];
 }
 
 function todayInputValue(): string {
@@ -52,6 +57,12 @@ function formatAmount(input: string): string {
 
 const blank = (v: string) => (v.trim() ? v : "________________");
 
+function departmentDisplay(value: string): string {
+    const name = value.trim();
+    if (!name) return "________________";
+    return /department$/i.test(name) ? name : `${name} Department`;
+}
+
 function salutationPrefix(sex: unknown, civilStatus: unknown): string | null {
     if (sex === "Male") return "Mr.";
     if (sex === "Female") return civilStatus === "Married" ? "Mrs." : "Ms.";
@@ -74,6 +85,9 @@ function JobOfferContent() {
     const [logos, setLogos] = React.useState<CompanyLogo[]>([]);
     const [selectedLogoId, setSelectedLogoId] = React.useState<number | null>(null);
     const [logosError, setLogosError] = React.useState(false);
+    const [structureDivisions, setStructureDivisions] = React.useState<StructureDivision[]>([]);
+    const [structureDepartments, setStructureDepartments] = React.useState<StructureDepartment[]>([]);
+    const [structureError, setStructureError] = React.useState(false);
 
     React.useEffect(() => {
         let cancelled = false;
@@ -117,6 +131,32 @@ function JobOfferContent() {
         let cancelled = false;
         (async () => {
             try {
+                const res = await fetch("/api/hrm/employee-admin/structure/division");
+                if (!res.ok) {
+                    if (!cancelled) setStructureError(true);
+                    return;
+                }
+                const json = await res.json();
+                if (cancelled) return;
+                if (!Array.isArray(json.divisions) || !Array.isArray(json.departments)) {
+                    setStructureError(true);
+                    return;
+                }
+                setStructureDivisions(json.divisions as StructureDivision[]);
+                setStructureDepartments(json.departments as StructureDepartment[]);
+            } catch {
+                if (!cancelled) setStructureError(true);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
                 const res = await fetch("/api/hrm/applicants");
                 if (!res.ok) return;
                 const json = await res.json();
@@ -142,6 +182,41 @@ function JobOfferContent() {
 
     const set = (key: keyof JobOfferFormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
         setForm((f) => ({ ...f, [key]: e.target.value }));
+
+    const selectedDepartmentId =
+        structureDepartments.find((d) => d.department_name === form.department)?.department_id ?? null;
+    const divisionOptions =
+        selectedDepartmentId === null
+            ? []
+            : structureDivisions.filter((div) => div.departments.some((d) => d.department_id === selectedDepartmentId));
+
+    let divisionPlaceholder = "Pick a division";
+    if (selectedDepartmentId === null) divisionPlaceholder = "Select a department first";
+    else if (divisionOptions.length === 0) divisionPlaceholder = "No divisions linked to this department";
+    const divisionDisabled = selectedDepartmentId === null || divisionOptions.length === 0;
+
+    const handleCompanyPick = (v: string) => {
+        const id = Number(v);
+        setSelectedLogoId(id);
+        const row = logos.find((l) => l.id === id);
+        if (row)
+            setForm((f) => ({
+                ...f,
+                companyName: row.company_name,
+                baseLocation: row.company_city?.trim() ? row.company_city : f.baseLocation,
+            }));
+    };
+
+    const handleDepartmentPick = (name: string) => {        setForm((f) => {
+            const deptId = structureDepartments.find((d) => d.department_name === name)?.department_id ?? null;
+            const divisionStillValid =
+                deptId !== null &&
+                structureDivisions.some(
+                    (div) => div.division_name === f.division && div.departments.some((d) => d.department_id === deptId)
+                );
+            return { ...f, department: name, division: divisionStillValid ? f.division : "" };
+        });
+    };
 
     const handleApplicantPick = (id: string) => {
         const found = applicants.find((a) => String(a.id) === id);
@@ -195,7 +270,7 @@ function JobOfferContent() {
                             Job Offer
                         </h1>
                         <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
-                            Fill in the offer details — the printable updates live. Print only, nothing is saved.
+                            Fill in the offer details
                         </p>
                     </div>
                 </div>
@@ -209,20 +284,12 @@ function JobOfferContent() {
                 <div className="bg-card shadow-sm border rounded-xl p-6 space-y-4">
                     <div>
                         <span className={label}>Pre-fill from applicant (optional)</span>
-                        <Select onValueChange={handleApplicantPick} disabled={applicantsLoading}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue
-                                    placeholder={applicantsLoading ? "Loading applicants..." : "Pick an applicant"}
-                                />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {applicants.map((a) => (
-                                    <SelectItem key={a.id} value={String(a.id)}>
-                                        {a.full_name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                            options={applicants.map((a) => ({ value: String(a.id), label: a.full_name }))}
+                            onValueChange={handleApplicantPick}
+                            placeholder={applicantsLoading ? "Loading applicants..." : "Pick an applicant"}
+                            disabled={applicantsLoading}
+                        />
                     </div>
 
                     <p className={section}>Recipient</p>
@@ -250,34 +317,13 @@ function JobOfferContent() {
                     </div>
                     <div>
                         <span className={label}>Company</span>
-                        <Select
+                        <SearchableSelect
+                            options={logos.map((l) => ({ value: String(l.id), label: l.company_name }))}
                             value={selectedLogoId !== null ? String(selectedLogoId) : ""}
-                            onValueChange={(v) => {
-                                const id = Number(v);
-                                setSelectedLogoId(id);
-                                const row = logos.find((l) => l.id === id);
-                                if (row)
-                                    setForm((f) => ({
-                                        ...f,
-                                        companyName: row.company_name,
-                                        baseLocation: row.company_city?.trim() ? row.company_city : f.baseLocation,
-                                    }));
-                            }}
+                            onValueChange={handleCompanyPick}
+                            placeholder={logosError ? "Company list unavailable — using MEN2 default" : logos.length === 0 ? "Loading companies..." : "Pick a company"}
                             disabled={logos.length === 0}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue
-                                    placeholder={logosError ? "Company list unavailable — using MEN2 default" : logos.length === 0 ? "Loading companies..." : "Pick a company"}
-                                />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {logos.map((l) => (
-                <SelectItem key={l.id} value={String(l.id)}>
-                    {l.company_name}
-                </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        />
                     </div>
                     <div>
                         <span className={label}>Position</span>
@@ -290,12 +336,32 @@ function JobOfferContent() {
                         </div>
                         <div>
                             <span className={label}>Department</span>
-                            <Input className={field} value={form.department} onChange={set("department")} placeholder="Sales Department" />
+                            {structureError ? (
+                                <Input className={field} value={form.department} onChange={set("department")} placeholder="Sales Department" />
+                            ) : (
+                                <SearchableSelect
+                                    options={structureDepartments.map((d) => ({ value: d.department_name, label: d.department_name }))}
+                                    value={form.department}
+                                    onValueChange={handleDepartmentPick}
+                                    placeholder={structureDepartments.length === 0 ? "Loading departments..." : "Pick a department"}
+                                    disabled={structureDepartments.length === 0}
+                                />
+                            )}
                         </div>
                     </div>
-                    <div>
+                    <div className={!structureError && divisionDisabled ? "opacity-50" : undefined}>
                         <span className={label}>Division</span>
-                        <Input className={field} value={form.division} onChange={set("division")} placeholder="Dry Division" />
+                        {structureError ? (
+                            <Input className={field} value={form.division} onChange={set("division")} placeholder="Dry Division" />
+                        ) : (
+                            <SearchableSelect
+                                options={divisionOptions.map((div) => ({ value: div.division_name, label: div.division_name }))}
+                                value={form.division}
+                                onValueChange={(v) => setForm((f) => ({ ...f, division: v }))}
+                                placeholder={divisionPlaceholder}
+                                disabled={divisionDisabled}
+                            />
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -396,8 +462,13 @@ function JobOfferContent() {
                         <strong>{blank(form.companyName)}</strong> is pleased to offer you the
                         position of <strong>{blank(form.position)}</strong> based in{" "}
                         <strong>{blank(form.baseLocation)}</strong>. Your skills and experience
-                        will be an ideal fit for the <strong>{blank(form.department)}</strong>{" "}
-                        under <strong>{blank(form.division)}</strong>.
+                        will be an ideal fit for the <strong>{departmentDisplay(form.department)}</strong>
+                        {form.division.trim() ? (
+                            <>
+                                {" "}under <strong>{form.division}</strong>
+                            </>
+                        ) : null}
+                        .
                     </p>
 
                     <p className="mt-4 text-justify">

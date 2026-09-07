@@ -53,11 +53,13 @@ export function SearchableSelect({
                     className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
                     disabled={disabled}
                 >
-                    {selectedLabel || placeholder}
+                    <span className="min-w-0 flex-1 truncate text-left" title={selectedLabel ?? undefined}>
+                        {selectedLabel || placeholder}
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+            <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                 <Command>
                     <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
                     <CommandList>
@@ -85,7 +87,9 @@ export function SearchableSelect({
                                             value === opt.value ? "opacity-100" : "opacity-0"
                                         )}
                                     />
-                                    {opt.label}
+                                    <span className="min-w-0 flex-1 truncate" title={opt.label}>
+                                        {opt.label}
+                                    </span>
                                 </CommandItem>
                             ))}
                         </CommandGroup>
