@@ -70,7 +70,6 @@ export function MailTemplateList() {
                         <TableRow className="bg-muted/30">
                             <TableHead className="max-w-40">Key</TableHead>
                             <TableHead className="max-w-56">Name</TableHead>
-                            <TableHead className="max-w-64">Subject</TableHead>
                             <TableHead className="w-24">Status</TableHead>
                             <TableHead className="w-40 text-right">Actions</TableHead>
                         </TableRow>
@@ -78,7 +77,7 @@ export function MailTemplateList() {
                     <TableBody>
                         {templates.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                                <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
                                     No templates yet. Create the first one.
                                 </TableCell>
                             </TableRow>
@@ -90,9 +89,6 @@ export function MailTemplateList() {
                                 </TableCell>
                                 <TableCell className="max-w-56 truncate" title={row.template_name}>
                                     {row.template_name}
-                                </TableCell>
-                                <TableCell className="max-w-64 truncate" title={row.subject}>
-                                    {row.subject}
                                 </TableCell>
                                 <TableCell>
                                     <Badge
