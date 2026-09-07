@@ -30,6 +30,7 @@ export function useRoleManagement() {
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisionNameSetting, setDivisionNameSetting] = useState("Division");
 
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -75,16 +76,18 @@ export function useRoleManagement() {
 
   const fetchReferenceData = useCallback(async () => {
     try {
-      const [u, d, s, depts] = await Promise.all([
+      const [u, d, s, depts, dName] = await Promise.all([
         provider.listUsers(),
         provider.listDivisions(),
         provider.listSalesmen(),
         provider.listDepartments(),
+        provider.getDivisionNameSetting(),
       ]);
       setUsers(u);
       setDivisions(d);
       setSalesmen(s);
       setDepartments(depts);
+      setDivisionNameSetting(dName);
     } catch (err) {
       console.error("Failed to fetch reference data", err);
     }
@@ -322,6 +325,7 @@ export function useRoleManagement() {
     divisions,
     salesmen,
     departments,
+    divisionNameSetting,
     isLoading,
     isError,
     error,

@@ -35,9 +35,10 @@ interface SalesmanTabProps {
   salesmen: Salesman[];
   supervisors: SupervisorPerDivision[];
   users: SystemUser[];
+  divisionNameSetting?: string;
 }
 
-export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, supervisors, users }: SalesmanTabProps) {
+export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, supervisors, users, divisionNameSetting = "Division" }: SalesmanTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -57,12 +58,12 @@ export function SalesmanTab({ data, isLoading, onDelete, onCreate, salesmen, sup
         const supName = `${supUser?.user_fname || ''} ${supUser?.user_lname || ''}`.trim();
         optionsMap.set(idStr, {
           value: idStr,
-          label: `${supName} (${div?.division_name || 'No Division'})`
+          label: `${supName} (${div?.division_name || `No ${divisionNameSetting}`})`
         });
       }
     });
     return Array.from(optionsMap.values());
-  }, [data]);
+  }, [data, divisionNameSetting]);
 
   const filteredData = React.useMemo(() => {
     let result = data;

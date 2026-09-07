@@ -67,7 +67,8 @@ export default function RoleManagementModule() {
     createSalesmanAssignment,
     createTAApprover,
     deleteTAApprover,
-    departments
+    departments,
+    divisionNameSetting
   } = useRoleManagement();
 
   if (isError) {
@@ -151,7 +152,7 @@ export default function RoleManagementModule() {
               <TabsList className="bg-transparent h-auto p-0 gap-6">
                 {[
                   { value: "executive", label: "Executive", icon: Users },
-                  { value: "division-head", label: "Division Head", icon: Briefcase },
+                  { value: "division-head", label: `${divisionNameSetting} Head`, icon: Briefcase },
                   { value: "supervisor", label: "Supervisor", icon: UserPlus },
                   { value: "salesman", label: "Salesman", icon: UserCircle2 },
                 ].map((item) => (
@@ -176,13 +177,13 @@ export default function RoleManagementModule() {
               <ExecutiveTab data={executives} isLoading={isLoading} users={users} onDelete={deleteExecutive} onCreate={createExecutive} />
             </TabsContent>
             <TabsContent value="division-head" className="mt-0 outline-none">
-              <DivisionHeadTab data={divisionHeads} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteDivisionHead} onCreate={createDivisionHead} />
+              <DivisionHeadTab data={divisionHeads} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteDivisionHead} onCreate={createDivisionHead} divisionNameSetting={divisionNameSetting} />
             </TabsContent>
             <TabsContent value="supervisor" className="mt-0 outline-none">
-              <SupervisorTab data={supervisors} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteSupervisor} onCreate={createSupervisor} />
+              <SupervisorTab data={supervisors} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteSupervisor} onCreate={createSupervisor} divisionNameSetting={divisionNameSetting} />
             </TabsContent>
             <TabsContent value="salesman" className="mt-0 outline-none">
-              <SalesmanTab data={salesmanAssignments} isLoading={isLoading} users={users} salesmen={salesmen} supervisors={supervisors} onDelete={deleteSalesmanAssignment} onCreate={createSalesmanAssignment} />
+              <SalesmanTab data={salesmanAssignments} isLoading={isLoading} users={users} salesmen={salesmen} supervisors={supervisors} onDelete={deleteSalesmanAssignment} onCreate={createSalesmanAssignment} divisionNameSetting={divisionNameSetting} />
             </TabsContent>
           </Tabs>
         ) : (
@@ -229,6 +230,7 @@ export default function RoleManagementModule() {
                 divisions={divisions}
                 onDelete={deleteExpenseReviewCommittee}
                 onCreate={createExpenseReviewCommittee}
+                divisionNameSetting={divisionNameSetting}
               />
             </TabsContent>
             <TabsContent value="ta-committee" className="mt-0 outline-none">
