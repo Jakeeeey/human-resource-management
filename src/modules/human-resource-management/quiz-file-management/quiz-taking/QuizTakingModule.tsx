@@ -16,11 +16,9 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { QuestionCard } from "./components/QuestionCard";
-import { ResultScreen } from "./components/ResultScreen";
 import type { AnswersByQuestionId, StartQuizResponse, SubmitAnswerPayload } from "./types";
-import type { QuizAttempt, QuizAttemptDetail } from "@/modules/human-resource-management/quiz-file-management/quiz-history/types";
 
-type Step = "loading" | "blocked" | "in-progress" | "submitting" | "result";
+type Step = "loading" | "blocked" | "in-progress" | "submitting";
 
 const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
 
@@ -32,7 +30,6 @@ function buildSubmitAnswers(
     for (const q of questions) {
         const given = answers[q.id] || [];
         if (CHOICE_TYPES.has(q.question_type)) {
-            // given[0] holds the picked choice id as a string.
             const picked = given[0] ? Number(given[0]) : null;
             payload.push({
                 question_id: q.id,
@@ -49,11 +46,18 @@ function buildSubmitAnswers(
     return payload;
 }
 
-export default function QuizTakingModule() {
+interface QuizTakingModuleProps {
+    returnHref?: string;
+}
+
+export default function QuizTakingModule({
+    returnHref = "/hrm/quiz-file-management/quiz-management",
+}: QuizTakingModuleProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const quizId = searchParams.get("quiz_id");
     const applicantId = searchParams.get("applicant_id");
+    const applicationId = searchParams.get("application_id");
 
     const [step, setStep] = useState<Step>("loading");
     const [blockedMessage, setBlockedMessage] = useState("");
@@ -62,11 +66,8 @@ export default function QuizTakingModule() {
     const [answers, setAnswers] = useState<AnswersByQuestionId>({});
     const [startedAt, setStartedAt] = useState<string | null>(null);
     const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
-    const [result, setResult] = useState<QuizAttempt | null>(null);
     const isSubmittingRef = useRef(false);
 
-    // Navigation guard: intercepted sidebar/link clicks and the Back button
-    // stash their target here and raise the in-app confirm dialog.
     const [pendingNav, setPendingNav] = useState<
         { kind: "link"; href: string } | { kind: "back" } | null
     >(null);
@@ -117,6 +118,7 @@ export default function QuizTakingModule() {
                 body: JSON.stringify({
                     quiz_id: Number(quizId),
                     applicant_id: Number(applicantId),
+                    application_id: applicationId ? Number(applicationId) : null,
                     started_at: startedAt,
                     answers: buildSubmitAnswers(data.questions, answers),
                 }),
@@ -124,20 +126,25 @@ export default function QuizTakingModule() {
             const submitBody = await submitRes.json();
             if (!submitRes.ok) throw new Error(submitBody.error || "Submit failed");
 
-            const attemptId = submitBody.data.id;
-            const detailRes = await fetch(`/api/hrm/quiz-file-management/quiz-attempt/${attemptId}`);
-            const detail: QuizAttemptDetail = await detailRes.json();
-
-            setResult(detail.attempt);
-            setStep("result");
+            // NOTE: attempt detail is deliberately NOT fetched here — it carries
+            // correct answers, which must never reach the applicant's browser.
+            // Only display-safe scalars travel on as query params to the done
+            // screen (score, pass flag, quiz name, totals) — never answers.
+            const params = new URLSearchParams({
+                score: String(submitBody.data?.score ?? submitBody.data?.percentage_score ?? ""),
+                passed: String(submitBody.data?.passed ?? ""),
+                quiz: data.quiz.name,
+                total: String(data.questions.length),
+                threshold: String(data.quiz.pass_threshold_value),
+            });
+            router.push(`${returnHref}?${params.toString()}`);
         } catch {
             isSubmittingRef.current = false;
             setBlockedMessage("Failed to submit the quiz. Please try again.");
             setStep("blocked");
         }
-    }, [data, quizId, applicantId, startedAt, answers]);
+    }, [data, quizId, applicantId, applicationId, startedAt, answers, router, returnHref]);
 
-    // Countdown timer -- auto-submits the moment it hits zero.
     useEffect(() => {
         if (step !== "in-progress" || secondsRemaining == null) return;
         if (secondsRemaining <= 0) {
@@ -183,13 +190,11 @@ export default function QuizTakingModule() {
         }
         document.addEventListener("click", handleClick, { capture: true });
 
-        // Trap the Back button: seed an extra history entry, and on each
-        // popstate re-seed it (staying put) while the proctor is asked.
         window.history.pushState(null, "", window.location.href);
         function handlePopState() {
             if (bypassPopRef.current) {
                 bypassPopRef.current = false;
-                return; // proctor chose "End attempt" -- let this navigation through
+                return;
             }
             window.history.pushState(null, "", window.location.href);
             setPendingNav({ kind: "back" });
@@ -217,9 +222,9 @@ export default function QuizTakingModule() {
                 <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => router.push("/hrm/quiz-file-management/quiz-management")}
+                    onClick={() => router.push(returnHref)}
                 >
-                    Back to Quiz Management
+                    Done
                 </Button>
             </div>
         );
@@ -227,15 +232,6 @@ export default function QuizTakingModule() {
 
     if (step === "submitting") {
         return <div className="text-sm text-muted-foreground">Submitting your answers...</div>;
-    }
-
-    if (step === "result" && result) {
-        return (
-            <ResultScreen
-                attempt={result}
-                onNextCandidate={() => router.push("/hrm/quiz-file-management/quiz-management")}
-            />
-        );
     }
 
     if (!data) return null;

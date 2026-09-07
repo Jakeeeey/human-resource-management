@@ -1,7 +1,3 @@
-// ============================================================================
-// Quiz File Management — Quiz Taking — Type Definitions
-// ============================================================================
-
 export type TakingQuestionType =
     | "true_false"
     | "multiple_choice"
@@ -39,9 +35,6 @@ export interface StartQuizResponse {
 
 export type AnswersByQuestionId = Record<number, string[]>;
 
-// Choice questions submit the picked choice id plus the on-screen order (so the
-// breakdown's A/B/C/D labels match what the applicant saw). Text questions submit
-// the typed text per blank.
 export type SubmitAnswerPayload =
     | {
           question_id: number;

@@ -161,8 +161,6 @@ export function QuestionDialog({
             );
             removeBlank(toRemove);
         }
-        // blankFields.length is included so the effect re-checks after its own
-        // append/remove; appendBlank/removeBlank are stable useFieldArray refs.
     }, [questionType, questionText, blankFields.length, appendBlank, removeBlank]);
 
     useEffect(() => {
@@ -261,7 +259,6 @@ export function QuestionDialog({
         form.setValue("question_image", null);
     };
 
-    // --- per-option images (multiple choice) ---
     const setOptionImageFile = (i: number, file: File) => {
         if (file.size > MAX_FILE_SIZE) {
             toast.error(
@@ -316,8 +313,6 @@ export function QuestionDialog({
                 questionImage = uploadResult.data?.id || null;
             }
 
-            // Resolve any per-option images to their uploaded UUIDs, then require
-            // that every choice carries text or an image.
             let options = data.options;
             if (CHOICE_TYPES.has(data.question_type)) {
                 options = await Promise.all(
@@ -367,7 +362,7 @@ export function QuestionDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{isEdit ? "Edit Question" : "Add Question"}</DialogTitle>
                     <DialogDescription>

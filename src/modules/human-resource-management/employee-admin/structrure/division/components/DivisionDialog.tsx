@@ -60,6 +60,7 @@ interface DivisionDialogProps {
     departments: Department[];
     bankAccounts: BankAccount[];
     onSubmit: (data: Record<string, unknown>) => Promise<void>;
+    divisionNameSetting?: string;
 }
 
 
@@ -75,6 +76,7 @@ export function DivisionDialog({
     departments,
     bankAccounts,
     onSubmit,
+    divisionNameSetting = "Division",
 }: DivisionDialogProps) {
     const isEdit = !!division;
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -220,12 +222,12 @@ export function DivisionDialog({
 
                 <DialogHeader>
                     <DialogTitle>
-                        {isEdit ? "Edit Division" : "Create Division"}
+                        {isEdit ? `Edit ${divisionNameSetting}` : `Create ${divisionNameSetting}`}
                     </DialogTitle>
                     <DialogDescription>
                         {isEdit
-                            ? "Update the division information and manage department bank assignments."
-                            : "Fill in the information to create a new division."}
+                            ? `Update the ${divisionNameSetting.toLowerCase()} information and manage department bank assignments.`
+                            : `Fill in the information to create a new ${divisionNameSetting.toLowerCase()}.`}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -245,7 +247,7 @@ export function DivisionDialog({
                                     rules={{ required: "Division name is required" }}
                                     render={({ field }) => (
                                         <FormItem className="col-span-2">
-                                            <FormLabel>Division Name *</FormLabel>
+                                            <FormLabel>{divisionNameSetting} Name *</FormLabel>
                                             <FormControl>
                                                 <Input {...field} placeholder="e.g. Finance & Administration" />
                                             </FormControl>
@@ -261,7 +263,7 @@ export function DivisionDialog({
                                     rules={{ required: "Division code is required" }}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Division Code *</FormLabel>
+                                            <FormLabel>{divisionNameSetting} Code *</FormLabel>
                                             <FormControl>
                                                 <Input maxLength={10} {...field} placeholder="e.g. FIN-ADMIN" />
                                             </FormControl>
@@ -277,7 +279,7 @@ export function DivisionDialog({
                                     rules={{ required: "Division head is required" }}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Division Head *</FormLabel>
+                                            <FormLabel>{divisionNameSetting} Head *</FormLabel>
                                             <FormControl>
                                                 <SearchableSelect
                                                     options={users.map(user => ({
@@ -432,7 +434,7 @@ export function DivisionDialog({
                             </Button>
                             <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {isEdit ? "Update" : "Create"} Division
+                                {isEdit ? "Update" : "Create"} {divisionNameSetting}
                             </Button>
                         </DialogFooter>
 

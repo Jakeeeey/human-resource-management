@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, Play, UserCheck } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -62,6 +62,19 @@ export const createColumns = (
                 </Badge>
             );
         },
+    },
+    {
+        id: "applicant_quiz",
+        header: "Applicant Quiz",
+        cell: ({ row }) =>
+            row.original.is_applicant_quiz ? (
+                <Badge variant="default" className="gap-1">
+                    <UserCheck className="h-3 w-3" />
+                    Active
+                </Badge>
+            ) : (
+                <span className="text-muted-foreground">—</span>
+            ),
     },
     {
         id: "pass_threshold",

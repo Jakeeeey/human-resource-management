@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import type { Quiz, QuizFormData, QuizStatus, PassThresholdType } from "../types";
 import {
@@ -48,6 +48,7 @@ interface FormData {
     shuffle_questions: boolean;
     shuffle_answers: boolean;
     category_filter: string[];
+    is_applicant_quiz: boolean;
 }
 
 const PASS_THRESHOLD_TYPE: PassThresholdType = "percentage";
@@ -63,6 +64,7 @@ const DEFAULT_FORM: FormData = {
     shuffle_questions: true,
     shuffle_answers: true,
     category_filter: [],
+    is_applicant_quiz: false,
 };
 
 interface QuizSettingsDialogProps {
@@ -82,19 +84,27 @@ export function QuizSettingsDialog({
 
     const form = useForm<FormData>({ defaultValues: DEFAULT_FORM });
     const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+    const [activeQuestionCategories, setActiveQuestionCategories] = useState<(string | null)[]>([]);
 
     useEffect(() => {
         if (!open) return;
         fetch("/api/hrm/quiz-file-management/file-management?includeInactive=true")
             .then((res) => res.json())
             .then((data) => {
+                const rows: { category: string | null; is_active?: boolean }[] = data.questions || [];
                 const set = new Set<string>();
-                (data.questions || []).forEach((q: { category: string | null }) => {
+                rows.forEach((q) => {
                     if (q.category) set.add(q.category);
                 });
                 setCategoryOptions(Array.from(set).sort());
+                setActiveQuestionCategories(
+                    rows.filter((q) => q.is_active !== false).map((q) => q.category ?? null)
+                );
             })
-            .catch(() => setCategoryOptions([]));
+            .catch(() => {
+                setCategoryOptions([]);
+                setActiveQuestionCategories([]);
+            });
     }, [open]);
 
     useEffect(() => {
@@ -111,6 +121,7 @@ export function QuizSettingsDialog({
                 shuffle_questions: Boolean(quiz.shuffle_questions),
                 shuffle_answers: Boolean(quiz.shuffle_answers),
                 category_filter: quiz.category_filter || [],
+                is_applicant_quiz: Boolean(quiz.is_applicant_quiz),
             });
         } else if (!open) {
             form.reset(DEFAULT_FORM);
@@ -118,8 +129,42 @@ export function QuizSettingsDialog({
     }, [open, quiz, form]);
 
     const timeLimitEnabled = useWatch({ control: form.control, name: "time_limit_enabled" });
+    const watchedStatus = useWatch({ control: form.control, name: "status" });
+    const watchedCategoryFilter = useWatch({ control: form.control, name: "category_filter" });
+    const watchedNumberOfQuestions = useWatch({ control: form.control, name: "number_of_questions" });
+
+    const poolSize = useMemo(() => {
+        const cats = watchedCategoryFilter || [];
+        return cats.length
+            ? activeQuestionCategories.filter((c) => c != null && cats.includes(c)).length
+            : activeQuestionCategories.length;
+    }, [activeQuestionCategories, watchedCategoryFilter]);
+
+    const requiredCount = parseInt(watchedNumberOfQuestions || "0", 10) || 0;
+    const applicantQuizEligible = watchedStatus === "active" && poolSize >= requiredCount;
 
     const handleSubmit = async (data: FormData) => {
+        if (data.is_applicant_quiz) {
+            if (data.status !== "active") {
+                form.setError("is_applicant_quiz", {
+                    message:
+                        "Only an Active quiz can be the applicant quiz. Set the status to Active first.",
+                });
+                return;
+            }
+            const need = parseInt(data.number_of_questions, 10) || 0;
+            const cats = data.category_filter || [];
+            const pool = cats.length
+                ? activeQuestionCategories.filter((c) => c != null && cats.includes(c)).length
+                : activeQuestionCategories.length;
+            if (pool < need) {
+                form.setError("is_applicant_quiz", {
+                    message: `This quiz draws ${need} questions but only ${pool} active question(s) match its pool. Add questions or lower the draw count first.`,
+                });
+                return;
+            }
+        }
+
         try {
             await onSubmit({
                 name: data.name,
@@ -135,6 +180,7 @@ export function QuizSettingsDialog({
                 shuffle_questions: data.shuffle_questions,
                 shuffle_answers: data.shuffle_answers,
                 category_filter: data.category_filter,
+                is_applicant_quiz: data.is_applicant_quiz,
             });
             onOpenChange(false);
             form.reset();
@@ -145,13 +191,13 @@ export function QuizSettingsDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
+            <DialogContent className="w-[95vw] sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{isEdit ? "Edit Quiz Settings" : "Create Quiz"}</DialogTitle>
                     <DialogDescription>
                         {isEdit
                             ? "Update this quiz's configuration."
-                            : "Configure a new quiz. Questions are drawn from the shared File Management pool once quiz-taking is built."}
+                            : "Configure a new quiz. Questions are drawn from the shared Question Pool."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -307,8 +353,40 @@ export function QuizSettingsDialog({
                                     )}
                                     <FormDescription>
                                         Leave empty to draw from every active category. Categories come
-                                        from File Management&apos;s own Category tag.
+                                        from the Question Pool&apos;s own Category tag.
                                     </FormDescription>
+                                </FormItem>
+                            )}
+                        />
+
+                        <FormField
+                            control={form.control}
+                            name="is_applicant_quiz"
+                            render={({ field }) => (
+                                <FormItem className="rounded-lg border p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <FormLabel className="!mt-0">Applicant quiz</FormLabel>
+                                        <FormControl>
+                                            <Switch
+                                                checked={field.value}
+                                                onCheckedChange={(v) => {
+                                                    form.clearErrors("is_applicant_quiz");
+                                                    field.onChange(v);
+                                                }}
+                                                disabled={!field.value && !applicantQuizEligible}
+                                            />
+                                        </FormControl>
+                                    </div>
+                                    <FormDescription>
+                                        The applicant flow (application form &rarr; quiz) uses whichever
+                                        quiz is marked here. Only one quiz can hold this at a time, and
+                                        only an Active quiz whose pool covers its draw count.
+                                        {" "}
+                                        {watchedStatus !== "active"
+                                            ? "Set the status to Active to enable this."
+                                            : `${poolSize} active question(s) currently match this quiz's pool (needs ${requiredCount}).`}
+                                    </FormDescription>
+                                    <FormMessage />
                                 </FormItem>
                             )}
                         />

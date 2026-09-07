@@ -1,6 +1,6 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from "next/server"
-import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, LAST_VISITED_PATH_COOKIE, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
+import { decodeJwtPayload, COOKIE_NAME, REFRESH_COOKIE_NAME, pickTokenFromPayload, IS_SECURE_COOKIE } from "@/lib/auth-utils"
 
 const PUBLIC_FILE = /\.(.*)$/
 const BASELINE_PREFIXES = ["/main-dashboard"]
@@ -246,7 +246,7 @@ async function isSubscriptionLocked(pathname: string): Promise<boolean> {
     return false
 }
 
-function applyCommonCookies(response: NextResponse, req: NextRequest, token: string, pathname: string) {
+function applyCommonCookies(response: NextResponse, req: NextRequest, token: string) {
     const currentToken = req.cookies.get(COOKIE_NAME)?.value;
     if (token && token !== currentToken) {
         response.cookies.set({
@@ -260,22 +260,7 @@ function applyCommonCookies(response: NextResponse, req: NextRequest, token: str
         });
     }
 
-    const isNavigation = req.method === "GET" &&
-        !pathname.startsWith("/api") &&
-        !pathname.startsWith("/error") &&
-        !pathname.startsWith("/_next") &&
-        pathname !== "/favicon.ico";
-
-    if (token && isNavigation) {
-        response.cookies.set({
-            name: LAST_VISITED_PATH_COOKIE,
-            value: pathname,
-            maxAge: 60 * 60 * 24 * 7,
-            path: "/",
-            sameSite: "lax",
-            secure: IS_SECURE_COOKIE
-        });
-    }
+    // Last visited path tracking removed
 }
 
 export async function middleware(req: NextRequest) {
@@ -316,28 +301,26 @@ export async function middleware(req: NextRequest) {
             }
         }
 
-        // If the user is already logged in and tries to go to root / or /login, take them to their last visited subsystem
+        // If the user is already logged in (with a VALID token) and tries to go to root / or /login, take them to their last visited subsystem
         if (pathname === "/" || pathname === "/login") {
             const token = req.cookies.get(COOKIE_NAME)?.value;
+            let isValid = false;
+            
             if (token) {
-                const lastVisited = req.cookies.get(LAST_VISITED_PATH_COOKIE)?.value;
-
-                // Validate the saved path: it must start with "/" and must NOT be a known
-                // public/auth route that would trigger another redirect (loop prevention).
-                const UNSAFE_PREFIXES = ["/", "/login", "/forgot-password", "/reset-password", "/api", "/error"];
-                const isSafePath =
-                    lastVisited &&
-                    lastVisited.startsWith("/") &&
-                    !UNSAFE_PREFIXES.some(
-                        (p) => lastVisited === p || lastVisited.startsWith(p + "/")
-                    );
-
-                const target = isSafePath ? lastVisited : "/main-dashboard";
-
-                // Final guard: never redirect to the current page
-                if (target !== pathname) {
-                    return NextResponse.redirect(new URL(target, req.url));
+                const payload = decodeJwtPayload(token);
+                if (payload && payload.exp) {
+                    const now = Math.floor(Date.now() / 1000);
+                    if (payload.exp > now + 10) {
+                        isValid = true;
+                    }
                 }
+            }
+
+            if (isValid) {
+                return NextResponse.redirect(new URL("/main-dashboard", req.url));
+            } else if (token) {
+                 // If token exists but is invalid/expired, we should let them stay on /login
+                 // (We don't need to clear it here, the login process or subsequent requests will overwrite it)
             }
         }
         return NextResponse.next()
@@ -396,7 +379,6 @@ export async function middleware(req: NextRequest) {
                     },
                     cache: "no-store",
                 });
-
                 if (refreshRes.ok) {
                     const data = await refreshRes.json();
                     const newToken = pickTokenFromPayload(data);
@@ -422,6 +404,18 @@ export async function middleware(req: NextRequest) {
                                 : `${COOKIE_NAME}=${newToken}`;
                         }
                         requestHeaders.set("cookie", updatedCookieHeader);
+                    } else {
+                        // Backend returned 200 but no usable token in response body.
+                        // Clear the stale expired cookie immediately and redirect to login
+                        // to prevent an infinite refresh loop on the next request.
+                        console.error("[Middleware] Refresh returned 200 but no valid token was found in the response. Clearing session.");
+                        const loginUrl = req.nextUrl.clone();
+                        loginUrl.pathname = "/login";
+                        loginUrl.searchParams.set("next", pathname);
+                        const clearResponse = NextResponse.redirect(loginUrl);
+                        clearResponse.cookies.delete(COOKIE_NAME);
+                        clearResponse.cookies.delete(REFRESH_COOKIE_NAME);
+                        return clearResponse;
                     }
                 } else if (refreshRes.status >= 500) {
                     console.error(`[Middleware] Spring Boot returned ${refreshRes.status} during refresh.`);
@@ -429,6 +423,18 @@ export async function middleware(req: NextRequest) {
                     url.pathname = "/error/service-down";
                     url.searchParams.set("service", `Spring Boot (Refresh Status ${refreshRes.status})`);
                     return NextResponse.redirect(url);
+                } else {
+                    // Refresh token is expired or invalid (401, 403, etc.).
+                    // Clear both cookies immediately so the middleware won't keep retrying
+                    // on the next request and cause an infinite redirect loop.
+                    console.warn(`[Middleware] Refresh token rejected by backend (status ${refreshRes.status}). Clearing session and redirecting to login.`);
+                    const loginUrl = req.nextUrl.clone();
+                    loginUrl.pathname = "/login";
+                    loginUrl.searchParams.set("next", pathname);
+                    const clearResponse = NextResponse.redirect(loginUrl);
+                    clearResponse.cookies.delete(COOKIE_NAME);
+                    clearResponse.cookies.delete(REFRESH_COOKIE_NAME);
+                    return clearResponse;
                 }
             } catch (err) {
                 console.error("[Middleware] Refresh failed (Server Outage):", err);
@@ -444,7 +450,10 @@ export async function middleware(req: NextRequest) {
         const url = req.nextUrl.clone()
         url.pathname = "/login"
         url.searchParams.set("next", pathname)
-        return NextResponse.redirect(url)
+        const redirectResponse = NextResponse.redirect(url)
+        // Ensure the stale access token is cleared so it doesn't cause loops
+        redirectResponse.cookies.delete(COOKIE_NAME)
+        return redirectResponse
     }
     const payload = decodeJwtPayload(token);
 
@@ -464,7 +473,7 @@ export async function middleware(req: NextRequest) {
                 }
             });
             response.cookies.delete("x-locked-module");
-            applyCommonCookies(response, req, token, pathname);
+            applyCommonCookies(response, req, token);
             return response;
         }
 
@@ -620,7 +629,7 @@ export async function middleware(req: NextRequest) {
             }
         });
         response.cookies.set("x-locked-module", "true", { path: "/" });
-        applyCommonCookies(response, req, token, pathname);
+        applyCommonCookies(response, req, token);
         return response;
     }
 
@@ -632,7 +641,7 @@ export async function middleware(req: NextRequest) {
     });
     response.cookies.delete("x-locked-module");
 
-    applyCommonCookies(response, req, token, pathname);
+    applyCommonCookies(response, req, token);
     return response;
 }
 

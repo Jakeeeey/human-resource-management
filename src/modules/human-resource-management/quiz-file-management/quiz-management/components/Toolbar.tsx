@@ -48,7 +48,7 @@ export function Toolbar() {
                         updateStatus(val === "all" ? null : (val as QuizStatus))
                     }
                 >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>

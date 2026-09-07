@@ -17,6 +17,7 @@ interface UseDivisionsReturn {
     createDivision: (data: Record<string, unknown>) => Promise<void>;
     updateDivision: (id: number, data: Record<string, unknown>) => Promise<void>;
     deleteDivision: (id: number) => Promise<void>;
+    divisionNameSetting: string;
 }
 
 export function useDivisions(): UseDivisionsReturn {
@@ -29,6 +30,7 @@ export function useDivisions(): UseDivisionsReturn {
     const [isLoading, setIsLoading] = useState(true);
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
+    const [divisionNameSetting, setDivisionNameSetting] = useState("Division");
 
     const hasLoadedRef = useRef(false);
 
@@ -56,6 +58,7 @@ export function useDivisions(): UseDivisionsReturn {
             setUsers(data.users || []);
             setDepartments(data.departments || []);
             setBankAccounts(data.bank_accounts || []);
+            setDivisionNameSetting(data.division_name_setting || "Division");
             hasLoadedRef.current = true;
 
         } catch (err) {
@@ -186,5 +189,6 @@ export function useDivisions(): UseDivisionsReturn {
         createDivision,
         updateDivision,
         deleteDivision,
+        divisionNameSetting,
     };
 }

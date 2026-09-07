@@ -112,9 +112,9 @@ export function QuizManagementTable({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <Toolbar />
-                <Button onClick={() => setCreateDialogOpen(true)}>
+                <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Quiz
                 </Button>
@@ -124,8 +124,8 @@ export function QuizManagementTable({
                 {table.getFilteredRowModel().rows.length} quiz(zes) found
             </div>
 
-            <div className="rounded-md border">
-                <UiTable>
+            <div className="rounded-md border overflow-x-auto">
+                <UiTable className="min-w-[800px]">
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
@@ -170,7 +170,7 @@ export function QuizManagementTable({
                 </UiTable>
             </div>
 
-            <div className="flex items-center justify-end space-x-2">
+            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
                 <div className="flex-1 text-sm text-muted-foreground">
                     {table.getFilteredSelectedRowModel().rows.length} of{" "}
                     {table.getFilteredRowModel().rows.length} row(s) selected.

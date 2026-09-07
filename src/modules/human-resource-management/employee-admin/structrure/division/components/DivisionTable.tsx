@@ -48,6 +48,7 @@ interface DivisionTableProps {
     onCreateDivision: (data: Record<string, unknown>) => Promise<void>;
     onUpdateDivision: (id: number, data: Record<string, unknown>) => Promise<void>;
     onDeleteDivision: (id: number) => Promise<void>;
+    divisionNameSetting: string;
 }
 
 export function DivisionTable({
@@ -59,6 +60,7 @@ export function DivisionTable({
     onCreateDivision,
     onUpdateDivision,
     onDeleteDivision,
+    divisionNameSetting,
 }: DivisionTableProps) {
 
 
@@ -90,8 +92,8 @@ export function DivisionTable({
     };
 
     const columns = React.useMemo(
-        () => createColumns(handleEdit, handleDelete),
-        []
+        () => createColumns(handleEdit, handleDelete, divisionNameSetting),
+        [divisionNameSetting]
     );
 
     // eslint-disable-next-line react-hooks/incompatible-library
@@ -133,13 +135,13 @@ export function DivisionTable({
                 <DivisionToolbar />
                 <Button onClick={() => setCreateDialogOpen(true)}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Division
+                    Add {divisionNameSetting}
                 </Button>
             </div>
 
             <div className="flex items-center justify-between">
                 <div className="text-sm text-muted-foreground">
-                    {table.getFilteredRowModel().rows.length} division(s) found
+                    {table.getFilteredRowModel().rows.length} {divisionNameSetting.toLowerCase()}(s) found
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -210,7 +212,7 @@ export function DivisionTable({
                                     colSpan={columns.length}
                                     className="h-24 text-center"
                                 >
-                                    No divisions found.
+                                    No {divisionNameSetting.toLowerCase()}s found.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -250,6 +252,7 @@ export function DivisionTable({
                 departments={departments}
                 bankAccounts={bankAccounts}
                 onSubmit={onCreateDivision}
+                divisionNameSetting={divisionNameSetting}
             />
 
             <DivisionDialog
@@ -266,6 +269,7 @@ export function DivisionTable({
                         setSelectedDivision(null);
                     }
                 }}
+                divisionNameSetting={divisionNameSetting}
             />
 
             <DeleteConfirmDialog
@@ -273,6 +277,7 @@ export function DivisionTable({
                 onOpenChange={setDeleteDialogOpen}
                 division={selectedDivision}
                 onConfirm={handleConfirmDelete}
+                divisionNameSetting={divisionNameSetting}
             />
         </div>
     );
