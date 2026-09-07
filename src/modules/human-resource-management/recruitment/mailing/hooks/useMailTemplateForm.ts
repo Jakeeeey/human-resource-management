@@ -138,16 +138,41 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
         return true;
     };
 
-    // DRY_RUN test-send: routes through the normal save, then records
-    // readiness. Dispatch itself is todo 10's job — no send API is invented
-    // here, and no outbox row is written from this button.
+    // DRY_RUN test-send: routes through the normal save, then records ONE
+    // `dry_run` probe row via POST /api/hrm/mailing/test-send (save alone
+    // writes zero outbox rows — this POST is what makes the click visible in
+    // the Outbox viewer). Never touches the transporter: nothing is emailed.
     const handleDryRunTestSend = async () => {
         setTesting(true);
         try {
             const saved = await handleSave();
             if (!saved) return;
+            const key = templateKey.trim();
+            let recorded = false;
+            try {
+                const res = await fetch("/api/hrm/mailing/test-send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ template_key: key }),
+                });
+                const body = (await res.json().catch(() => null)) as {
+                    success?: boolean;
+                    data?: { ok?: boolean; reason?: string };
+                } | null;
+                recorded = res.ok && body?.success === true && body?.data?.ok === true;
+                if (!recorded && body?.data?.reason) {
+                    toast.error(`Dry-run probe failed: ${body.data.reason}.`);
+                    return;
+                }
+            } catch {
+                // Network/parse failure below — generic toast, no PII.
+            }
+            if (!recorded) {
+                toast.error("Dry-run probe failed. Please try again later.");
+                return;
+            }
             setDryRunReady(true);
-            toast.success("Saved — dry-run ready. Dispatch ships in todo 10.");
+            toast.success("Dry-run recorded — see the Outbox (All statuses).");
         } finally {
             setTesting(false);
         }

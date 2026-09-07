@@ -125,8 +125,8 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                             />
                             <Label htmlFor="mail-template-page-active">Active</Label>
                             {form.dryRunReady && (
-                                <Badge variant="secondary" className="max-w-full truncate" title="Dry-run ready — dispatch ships in todo 10">
-                                    Dry-run ready — dispatch ships in todo 10
+                                <Badge variant="secondary" className="max-w-full truncate" title="Dry-run recorded — see the Outbox">
+                                            Dry-run recorded — see Outbox
                                 </Badge>
                             )}
                         </div>

@@ -2,6 +2,7 @@
 //
 // Auto (dispatch from a hook window):   <event_key>:<application_id>:<interview_id>
 // Manual (Send-now click, unique/click): <event_key>:<application_id>:manual-<epochMs>
+// Test (template probe click, unique):   test:<template_key>:<epochMs>
 //
 // The outbox carries a unique index on idempotency_key: a repeated auto key
 // dedupes (double-dispatch = single row); every manual click mints a fresh
@@ -35,4 +36,17 @@ export function buildManualIdempotencyKey(
     epochMs: number
 ): string {
     return `${eventKey}:${applicationId}:manual-${epochMs}`;
+}
+
+/**
+ * Builds the unique-per-click test key for template dry-run probes.
+ * @param templateKey - Saved template_key under test.
+ * @param epochMs - Click-time epoch millis (Date.now()).
+ * @returns `test:<template_key>:<epochMs>`.
+ */
+export function buildTestIdempotencyKey(
+    templateKey: string,
+    epochMs: number
+): string {
+    return `test:${templateKey}:${epochMs}`;
 }
