@@ -241,7 +241,7 @@ export async function PATCH(req: NextRequest) {
                 return NextResponse.json({ error: "Missing success_count or status parameters" }, { status: 400 });
             }
 
-            const patchBody: any = {
+            const patchBody: Record<string, unknown> = {
                 status: status,
                 synced_companies_count: success_count,
                 updated_by: userId,
