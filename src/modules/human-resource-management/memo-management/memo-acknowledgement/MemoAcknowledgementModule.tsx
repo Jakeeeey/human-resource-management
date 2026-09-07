@@ -56,14 +56,18 @@ const MemoAcknowledgementContent = () => {
     }, [companies]);
 
     const targetCompanyOptions = React.useMemo(() => {
+        const filteredCompanies = selectedIssuedBy && selectedIssuedBy !== "all"
+            ? companies.filter(c => String(c.company_id) !== String(selectedIssuedBy))
+            : companies;
+
         return [
             { value: "all", label: "All Target Companies" },
-            ...companies.map(c => ({
+            ...filteredCompanies.map(c => ({
                 value: String(c.company_id),
                 label: `${c.company_name} (${c.company_code})`
             }))
         ];
-    }, [companies]);
+    }, [companies, selectedIssuedBy]);
 
     return (
         <div className="flex-1 space-y-6 p-6 pt-8 h-full overflow-auto bg-gradient-to-br from-background via-background to-primary/[0.02]">
