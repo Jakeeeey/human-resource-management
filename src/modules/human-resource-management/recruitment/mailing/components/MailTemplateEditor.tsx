@@ -52,7 +52,7 @@ interface QuillStatic {
     register: (path: string, target: unknown, overwrite?: boolean) => void;
 }
 interface ParchmentEmbedBase {
-    new (...args: never[]): unknown;
+    new (...args: never[]): object;
     create: (value?: unknown) => HTMLElement;
 }
 interface VarChipModuleInstance {

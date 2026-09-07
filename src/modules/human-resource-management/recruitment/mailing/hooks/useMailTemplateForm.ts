@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { toast } from "sonner";
 
 import { mailVarAllowlist } from "../types/mail-template.schema";
@@ -13,6 +14,8 @@ import type { MailTemplateRow } from "../providers/mailTemplateService";
 interface UseMailTemplateFormOptions {
     template: MailTemplateRow | null;
     saving: boolean;
+    editorRef: RefObject<MailTemplateEditorHandle | null>;
+    subjectInputRef: RefObject<HTMLInputElement | null>;
     onSave: (
         input: {
             template_key: string;
@@ -37,7 +40,7 @@ const SAMPLE_VARS = Object.fromEntries(mailVarAllowlist.map((name) => [name, "__
  * @param options - Template row (null = create), saving flag, save helper.
  * @returns Form state + preview + save/dry-run handlers.
  */
-export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplateFormOptions) {
+export function useMailTemplateForm({ template, saving, editorRef, subjectInputRef, onSave }: UseMailTemplateFormOptions) {
     const [templateKey, setTemplateKey] = useState("");
     const [templateName, setTemplateName] = useState("");
     const [subject, setSubject] = useState("");
@@ -45,8 +48,6 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
     const [isActive, setIsActive] = useState(true);
     const [testing, setTesting] = useState(false);
     const [dryRunReady, setDryRunReady] = useState(false);
-    const editorRef = useRef<MailTemplateEditorHandle | null>(null);
-    const subjectInputRef = useRef<HTMLInputElement | null>(null);
     const lastFieldRef = useRef<"subject" | "body">("body");
 
     const noteFieldFocus = (field: "subject" | "body") => {
@@ -81,7 +82,7 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
             seen.has(w) ? false : (seen.add(w), true),
         );
         return { subjectText: subjectRender.text, bodyText: bodyRender.text, warnings };
-    }, [subject, bodyHtml]);
+    }, [subject, bodyHtml, editorRef]);
 
     const buildPayload = () => {
         if (!templateKey.trim()) {
@@ -220,8 +221,6 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
         handleSave,
         handleDryRunTestSend,
         insertVar,
-        editorRef,
-        subjectInputRef,
         noteFieldFocus,
         busy,
     };

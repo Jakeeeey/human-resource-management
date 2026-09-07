@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
@@ -15,6 +16,7 @@ import { mailVarAllowlist } from "../types/mail-template.schema";
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import { useMailTemplateForm } from "../hooks/useMailTemplateForm";
 import { MailTemplateEditor, toFriendlyMailVarName } from "./MailTemplateEditor";
+import type { MailTemplateEditorHandle } from "./MailTemplateEditor";
 
 interface MailTemplatePageProps {
     mode: "create" | "edit";
@@ -38,9 +40,14 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
             ? null
             : (templates.find((row) => String(row.id) === String(templateId ?? "")) ?? null);
 
+    const editorRef = useRef<MailTemplateEditorHandle | null>(null);
+    const subjectInputRef = useRef<HTMLInputElement | null>(null);
+
     const form = useMailTemplateForm({
         template,
         saving,
+        editorRef,
+        subjectInputRef,
         onSave: async (input, id) => {
             const targetId = id ?? template?.id;
             const result = await saveTemplate(input, targetId ?? undefined);
@@ -187,7 +194,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 <Label htmlFor="mail-template-page-subject">Subject</Label>
                                 <Input
                                     id="mail-template-page-subject"
-                                    ref={form.subjectInputRef}
+                                    ref={subjectInputRef}
                                     value={form.subject}
                                     onChange={(e) => form.setSubject(e.target.value)}
                                     onFocus={() => form.noteFieldFocus("subject")}
@@ -208,7 +215,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 onFocusCapture={() => form.noteFieldFocus("body")}
                             >
                                 <MailTemplateEditor
-                                    ref={form.editorRef}
+                                    ref={editorRef}
                                     value={form.bodyHtml}
                                     onChange={form.setBodyHtml}
                                 />
