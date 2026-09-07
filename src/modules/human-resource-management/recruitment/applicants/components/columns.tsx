@@ -8,12 +8,10 @@ import type { ApplicantRow } from "../types";
 
 export function getApplicantStageColor(stage: string) {
     switch (stage) {
-        case "Final Passed":
         case "Approved":
         case "Hired":
         case "Passed":
             return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-        case "Final Failed":
         case "Rejected":
         case "Failed":
             return "bg-red-500/10 text-red-600 border-red-500/20";
