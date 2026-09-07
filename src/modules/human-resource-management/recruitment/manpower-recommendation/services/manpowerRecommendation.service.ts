@@ -94,23 +94,40 @@ export const manpowerRecommendationService = {
      * Fetch open (Approved) manpower requests for the recommendation landing table.
      * @returns Typed open manpower request lookup rows.
      */
-    async fetchOpenManpowerRequests(): Promise<{ id: number; request_no: string; position: string; no_manpower_needed: number; status: string }[]> {
+    async fetchOpenManpowerRequests(): Promise<{ id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string }[]> {
         try {
             const url =
                 `${API_BASE_URL}/items/manpower_request` +
-                `?fields=id,request_no,position,no_manpower_needed,status` +
+                `?fields=id,request_no,division_id,position,no_manpower_needed,status` +
                 `&filter[status][_eq]=Approved` +
                 `&sort=-created_at&limit=-1`;
             const response = await fetch(url, { headers });
             if (!response.ok) return [];
             const result = await response.json();
-            return result.data.map((r: { id: number; request_no: string; position: string; no_manpower_needed: number; status: string }) => ({
+            return result.data.map((r: { id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string }) => ({
                 id: r.id,
                 request_no: r.request_no,
+                division_id: r.division_id ?? null,
                 position: r.position,
                 no_manpower_needed: r.no_manpower_needed,
                 status: r.status,
             }));
+        } catch { return []; }
+    },
+
+    /**
+     * Fetch divisions for resolving manpower_request.division_id to names.
+     * division_id is a plain INT (no Directus relation), so request rows
+     * carry ids only — the client joins names from this lookup.
+     * @returns Division lookup rows ({ id, name }).
+     */
+    async fetchDivisions(): Promise<{ id: number; name: string }[]> {
+        try {
+            const url = `${API_BASE_URL}/items/division?fields=division_id,division_name&limit=-1`;
+            const response = await fetch(url, { headers });
+            if (!response.ok) return [];
+            const result = await response.json();
+            return result.data.map((d: { division_id: number; division_name: string }) => ({ id: d.division_id, name: d.division_name }));
         } catch { return []; }
     },
 

@@ -20,9 +20,9 @@ const GradeFormSchema = z.object({
     interview_date: z.string({ error: "Please select an interview date" }).min(1, { error: "Please select an interview date" }),
     notes: z.string().nullable().optional(),
     scores: z.array(
-        z.number({ error: "Enter a score from 0 to 100" })
-            .min(0, { error: "Score must be between 0 and 100" })
-            .max(100, { error: "Score must be between 0 and 100" })
+        z.number({ error: "Enter a score from 1 to 100" })
+            .min(1, { error: "Score must be between 1 and 100" })
+            .max(100, { error: "Score must be between 1 and 100" })
             .optional(),
     ),
 });
@@ -91,7 +91,7 @@ function verdictPill(verdict: string): string {
 
 /**
  * Grade page client for a scheduled interview: all template criteria on one
- * page (score inputs 0–100, quiz row read-only auto-filled from the latest
+ * page (score inputs 1–100, quiz row read-only auto-filled from the latest
  * quiz attempt percentage), live composite SUM(score*weight)/100
  * as a guideline display only, MANUAL-ONLY verdict Select (never derived —
  * HR may Pass a subpar grade at their discretion), and an interview date
@@ -115,7 +115,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
 
     const form = useForm<GradeFormValues>({
         resolver: zodResolver(GradeFormSchema),
-        mode: "onTouched",
+        mode: "onChange",
         defaultValues: {
             template_id: undefined as unknown as number,
             verdict: "Pending",
@@ -385,7 +385,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                         Grade {interview.stage} Interview
                     </h1>
                     <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
-                        Score each criterion from 0 to 100.
+                        Score each criterion from 1 to 100.
                     </p>
                 </div>
             </div>
@@ -445,7 +445,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                 validate: (value) => {
                                                     if (criterion.is_quiz_criterion) return true;
                                                     if (typeof value !== "number" || !Number.isFinite(value)) return "Score is required";
-                                                    if (value < 0 || value > 100) return "Score must be between 0 and 100";
+                                                    if (value < 1 || value > 100) return "Score must be between 1 and 100";
                                                     return true;
                                                 },
                                             }}
@@ -467,13 +467,16 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                     </FormLabel>
                                                     <FormControl>
                                                         <Input
-                                                            type="number"
-                                                            min={0}
-                                                            max={100}
+                                                            type="text"
+                                                            inputMode="numeric"
                                                             disabled={!!criterion.is_quiz_criterion}
                                                             className="bg-muted/30 focus:bg-background transition-colors"
                                                             value={field.value ?? ""}
-                                                            onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+                                                            onChange={(e) => {
+                                                                const digits = e.target.value.replace(/[^0-9]/g, "");
+                                                                form.clearErrors(field.name);
+                                                                field.onChange(digits === "" ? undefined : Number(digits));
+                                                            }}
                                                         />
                                                     </FormControl>
                                                     {!!criterion.is_quiz_criterion && field.value == null && (
