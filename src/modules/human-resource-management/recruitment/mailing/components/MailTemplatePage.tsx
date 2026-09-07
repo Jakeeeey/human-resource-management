@@ -14,20 +14,11 @@ import { Switch } from "@/components/ui/switch";
 import { mailVarAllowlist } from "../types/mail-template.schema";
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import { useMailTemplateForm } from "../hooks/useMailTemplateForm";
-import { MailTemplateEditor } from "./MailTemplateEditor";
+import { MailTemplateEditor, toFriendlyMailVarName } from "./MailTemplateEditor";
 
 interface MailTemplatePageProps {
     mode: "create" | "edit";
     templateId?: string;
-}
-
-/**
- * Friendly chip label for an allowlisted var: underscores → spaces with a
- * leading capital ("applicant_name" → "Applicant name"). The inserted token
- * stays the exact `{{snake_case}}` string.
- */
-function toFriendlyMailVarName(name: string): string {
-    return name.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /**
@@ -193,7 +184,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 </div>
                             </div>
                             <div className="grid min-w-0 gap-2">
-                                <Label htmlFor="mail-template-page-subject">Subject (supports {"{{var}}"})</Label>
+                                <Label htmlFor="mail-template-page-subject">Subject</Label>
                                 <Input
                                     id="mail-template-page-subject"
                                     value={form.subject}

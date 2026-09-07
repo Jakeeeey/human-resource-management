@@ -61,7 +61,10 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
     const preview = useMemo(() => {
         let scrubbed = "";
         try {
-            scrubbed = bodyHtml ? scrubClientHtml(bodyHtml) : "";
+            // Serialize chip spans back to {{tokens}} first: bodyHtml state
+            // holds display labels, which scrub would otherwise unwrap as text.
+            const previewHtml = editorRef.current?.getCleanHtml() ?? bodyHtml;
+            scrubbed = previewHtml ? scrubClientHtml(previewHtml) : "";
         } catch {
             scrubbed = "";
         }
@@ -89,7 +92,10 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
         }
         let scrubbed: string;
         try {
-            scrubbed = scrubClientHtml(bodyHtml);
+            // Chip pills are editor-only chrome: serialize them back to
+            // {{tokens}} first so storage/scrub/dispatch see plain variables.
+            const editorHtml = editorRef.current?.getCleanHtml() ?? bodyHtml;
+            scrubbed = scrubClientHtml(editorHtml);
         } catch {
             toast.error("Editor content is unavailable. Please try again.");
             return null;
