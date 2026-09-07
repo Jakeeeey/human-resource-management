@@ -187,8 +187,10 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 <Label htmlFor="mail-template-page-subject">Subject</Label>
                                 <Input
                                     id="mail-template-page-subject"
+                                    ref={form.subjectInputRef}
                                     value={form.subject}
                                     onChange={(e) => form.setSubject(e.target.value)}
+                                    onFocus={() => form.noteFieldFocus("subject")}
                                     placeholder="e.g. Your interview result for {{position}}"
                                     disabled={form.busy}
                                 />
@@ -201,7 +203,10 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                             <CardTitle className="text-base">Body</CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-4">
-                            <div className="flex min-h-[320px] min-w-0 flex-col gap-2">
+                            <div
+                                className="flex min-h-[320px] min-w-0 flex-col gap-2"
+                                onFocusCapture={() => form.noteFieldFocus("body")}
+                            >
                                 <MailTemplateEditor
                                     ref={form.editorRef}
                                     value={form.bodyHtml}

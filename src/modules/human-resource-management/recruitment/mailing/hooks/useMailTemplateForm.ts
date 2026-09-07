@@ -46,6 +46,12 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
     const [testing, setTesting] = useState(false);
     const [dryRunReady, setDryRunReady] = useState(false);
     const editorRef = useRef<MailTemplateEditorHandle | null>(null);
+    const subjectInputRef = useRef<HTMLInputElement | null>(null);
+    const lastFieldRef = useRef<"subject" | "body">("body");
+
+    const noteFieldFocus = (field: "subject" | "body") => {
+        lastFieldRef.current = field;
+    };
 
     useEffect(() => {
         setTemplateKey(template?.template_key ?? "");
@@ -149,6 +155,18 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
 
     const insertVar = (name: string) => {
         const token = `{{${name}}}`;
+        if (lastFieldRef.current === "subject" && subjectInputRef.current) {
+            const el = subjectInputRef.current;
+            const start = el.selectionStart ?? el.value.length;
+            const end = el.selectionEnd ?? el.value.length;
+            setSubject(`${el.value.slice(0, start)}${token}${el.value.slice(end)}`);
+            const caret = start + token.length;
+            requestAnimationFrame(() => {
+                el.focus();
+                el.setSelectionRange(caret, caret);
+            });
+            return;
+        }
         try {
             if (editorRef.current?.insertToken(token)) return;
         } catch {
@@ -178,6 +196,8 @@ export function useMailTemplateForm({ template, saving, onSave }: UseMailTemplat
         handleDryRunTestSend,
         insertVar,
         editorRef,
+        subjectInputRef,
+        noteFieldFocus,
         busy,
     };
 }
