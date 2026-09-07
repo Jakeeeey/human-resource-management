@@ -19,7 +19,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 
-export interface SearchableSelectProps {
+export interface JobOfferComboboxProps {
     options: { value: string; label: string }[];
     value?: string;
     onValueChange: (value: string) => void;
@@ -28,14 +28,14 @@ export interface SearchableSelectProps {
     className?: string;
 }
 
-export function SearchableSelect({
+export function JobOfferCombobox({
     options,
     value,
     onValueChange,
     placeholder = "Select option...",
     disabled = false,
     className,
-}: SearchableSelectProps) {
+}: JobOfferComboboxProps) {
     const [open, setOpen] = React.useState(false);
 
     // Find the label for the current value
@@ -53,11 +53,13 @@ export function SearchableSelect({
                     className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
                     disabled={disabled}
                 >
-                    {selectedLabel || placeholder}
+                    <span className="min-w-0 flex-1 truncate text-left" title={selectedLabel ?? undefined}>
+                        {selectedLabel || placeholder}
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+            <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                 <Command>
                     <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
                     <CommandList>
@@ -68,13 +70,6 @@ export function SearchableSelect({
                                     key={opt.value}
                                     value={opt.label} // Use label for searching
                                     onSelect={() => {
-                                        // We need to map back to the ID/value since CommandItem uses text content or value prop
-                                        // Here we used label as value for search, so we find the option by label and call onValueChange with its value
-                                        // However, simpler is to use the option.value if unique, but Command compares normalized search.
-                                        // Let's stick to using the opt.value if we want precise selection.
-                                        // Re-eval: onSelect returns the value prop (opt.label).
-                                        // Actually, let's use the option value but ensure standard shadcn pattern.
-
                                         onValueChange(opt.value);
                                         setOpen(false);
                                     }}
@@ -85,7 +80,9 @@ export function SearchableSelect({
                                             value === opt.value ? "opacity-100" : "opacity-0"
                                         )}
                                     />
-                                    {opt.label}
+                                    <span className="min-w-0 flex-1 truncate" title={opt.label}>
+                                        {opt.label}
+                                    </span>
                                 </CommandItem>
                             ))}
                         </CommandGroup>

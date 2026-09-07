@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { JobOfferCombobox } from "./JobOfferCombobox";
 import { FileText, Printer } from "lucide-react";
 import { EMPTY_JOB_OFFER, type JobOfferFormData } from "./types";
 
@@ -284,7 +284,7 @@ function JobOfferContent() {
                 <div className="bg-card shadow-sm border rounded-xl p-6 space-y-4">
                     <div>
                         <span className={label}>Pre-fill from applicant (optional)</span>
-                        <SearchableSelect
+                        <JobOfferCombobox
                             options={applicants.map((a) => ({ value: String(a.id), label: a.full_name }))}
                             onValueChange={handleApplicantPick}
                             placeholder={applicantsLoading ? "Loading applicants..." : "Pick an applicant"}
@@ -317,7 +317,7 @@ function JobOfferContent() {
                     </div>
                     <div>
                         <span className={label}>Company</span>
-                        <SearchableSelect
+                        <JobOfferCombobox
                             options={logos.map((l) => ({ value: String(l.id), label: l.company_name }))}
                             value={selectedLogoId !== null ? String(selectedLogoId) : ""}
                             onValueChange={handleCompanyPick}
@@ -339,7 +339,7 @@ function JobOfferContent() {
                             {structureError ? (
                                 <Input className={field} value={form.department} onChange={set("department")} placeholder="Sales Department" />
                             ) : (
-                                <SearchableSelect
+                                <JobOfferCombobox
                                     options={structureDepartments.map((d) => ({ value: d.department_name, label: d.department_name }))}
                                     value={form.department}
                                     onValueChange={handleDepartmentPick}
@@ -354,7 +354,7 @@ function JobOfferContent() {
                         {structureError ? (
                             <Input className={field} value={form.division} onChange={set("division")} placeholder="Dry Division" />
                         ) : (
-                            <SearchableSelect
+                            <JobOfferCombobox
                                 options={divisionOptions.map((div) => ({ value: div.division_name, label: div.division_name }))}
                                 value={form.division}
                                 onValueChange={(v) => setForm((f) => ({ ...f, division: v }))}
