@@ -20,6 +20,15 @@ interface ApplicantOption {
     position_applied_for: string | null;
 }
 
+interface CompanyLogo {
+    id: number;
+    company_code: string;
+    company_name: string;
+    company_city: string | null;
+    logo_data_url: string | null;
+    is_default: boolean;
+}
+
 function todayInputValue(): string {
     const d = new Date();
     const y = d.getFullYear();
@@ -62,6 +71,47 @@ function JobOfferContent() {
     }));
     const [applicants, setApplicants] = React.useState<ApplicantOption[]>([]);
     const [applicantsLoading, setApplicantsLoading] = React.useState(true);
+    const [logos, setLogos] = React.useState<CompanyLogo[]>([]);
+    const [selectedLogoId, setSelectedLogoId] = React.useState<number | null>(null);
+    const [logosError, setLogosError] = React.useState(false);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/hrm/company-logos");
+                if (!res.ok) {
+                    if (!cancelled) setLogosError(true);
+                    return;
+                }
+                const json = await res.json();
+                if (cancelled) return;
+                if (!Array.isArray(json.data) || json.data.length === 0) {
+                    setLogosError(true);
+                    return;
+                }
+                const rows = json.data as CompanyLogo[];
+                setLogos(rows);
+                const def = rows.find((r) => r.is_default) ?? rows[0];
+                if (def) {
+                    setSelectedLogoId(def.id);
+                    setForm((f) => ({
+                        ...f,
+                        companyName: def.company_name,
+                        baseLocation: def.company_city?.trim() ? def.company_city : f.baseLocation,
+                    }));
+                }
+            } catch {
+                // Logo picker is a convenience — the letterhead falls back
+                // to the bundled MEN2 logo when the table is unreachable.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const selectedLogo = logos.find((l) => l.id === selectedLogoId) ?? null;
 
     React.useEffect(() => {
         let cancelled = false;
@@ -129,6 +179,7 @@ function JobOfferContent() {
     return (
         <div className="p-2 sm:p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen space-y-8">
             <style>{`@media print {
+                @page { margin: 8mm 10mm 10mm 10mm; }
                 body * { visibility: hidden; }
                 #job-offer-print, #job-offer-print * { visibility: visible; }
                 #job-offer-print { position: absolute; left: 0; top: 0; width: 100%; margin: 0; box-shadow: none !important; border: none !important; border-radius: 0 !important; }
@@ -198,8 +249,35 @@ function JobOfferContent() {
                         <Input className={field} type="date" value={form.offerDate} onChange={set("offerDate")} />
                     </div>
                     <div>
-                        <span className={label}>Company name</span>
-                        <Input className={field} value={form.companyName} onChange={set("companyName")} />
+                        <span className={label}>Company</span>
+                        <Select
+                            value={selectedLogoId !== null ? String(selectedLogoId) : ""}
+                            onValueChange={(v) => {
+                                const id = Number(v);
+                                setSelectedLogoId(id);
+                                const row = logos.find((l) => l.id === id);
+                                if (row)
+                                    setForm((f) => ({
+                                        ...f,
+                                        companyName: row.company_name,
+                                        baseLocation: row.company_city?.trim() ? row.company_city : f.baseLocation,
+                                    }));
+                            }}
+                            disabled={logos.length === 0}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue
+                                    placeholder={logosError ? "Company list unavailable — using MEN2 default" : logos.length === 0 ? "Loading companies..." : "Pick a company"}
+                                />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {logos.map((l) => (
+                <SelectItem key={l.id} value={String(l.id)}>
+                    {l.company_name}
+                </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div>
                         <span className={label}>Position</span>
@@ -289,12 +367,12 @@ function JobOfferContent() {
                     id="job-offer-print"
                     className="bg-white text-black shadow-sm border rounded-xl p-8 sm:p-12 max-w-[800px] w-full mx-auto text-[15px] leading-relaxed font-serif"
                 >
-                    <div className="flex items-start justify-between gap-6">
-                        <Image src="/men2-logo.jpg" alt="MEN2 Marketing logo" width={220} height={80} className="h-20 w-auto shrink-0" priority />
-                        <div className="text-[11px] leading-snug text-neutral-500">
-                            <p>Address: {blank(form.headerAddress)}</p>
-                            <p>Contact #: {blank(form.headerContact)}</p>
-                            <p>Email Address: {blank(form.headerEmail)}</p>
+                    <div className="flex items-center justify-start gap-3">
+                        <Image src={selectedLogo?.logo_data_url ?? "/men2-logo.jpg"} alt={`${selectedLogo?.company_name ?? "MEN2 Marketing"} logo`} width={220} height={80} className="h-20 w-auto shrink-0" priority />
+                        <div className="text-sm leading-relaxed text-neutral-500">
+                        <p className="text-xs font-normal">Address: {blank(form.headerAddress)}</p>
+                        <p className="text-xs font-normal">Contact #: {blank(form.headerContact)}</p>
+                        <p>Email Address: {blank(form.headerEmail)}</p>
                         </div>
                     </div>
 
@@ -304,10 +382,10 @@ function JobOfferContent() {
 
                     <p className="mt-6">{formatLongDate(form.offerDate)}</p>
 
-                    <div className="mt-4 font-bold uppercase">
-                        <p>{blank(form.candidateName)}</p>
-                        <p>{blank(form.addressLine)}</p>
-                        <p>{blank(form.contactNumber)}</p>
+                    <div className="mt-4 uppercase">
+                        <p className="font-bold">{blank(form.candidateName)}</p>
+                        <p className="text-sm font-normal normal-case">{blank(form.addressLine)}</p>
+                        <p className="text-sm font-normal">{blank(form.contactNumber)}</p>
                     </div>
 
                     <p className="mt-6">

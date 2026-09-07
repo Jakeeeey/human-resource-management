@@ -33,7 +33,7 @@ export const EMPTY_JOB_OFFER: JobOfferFormData = {
     addressLine: "",
     contactNumber: "",
     salutationName: "",
-    companyName: "Men2 Marketing & Distribution Enterprise Corporation",
+    companyName: "Men2 Marketing Corporation",
     position: "",
     baseLocation: "",
     department: "",
