@@ -17,8 +17,15 @@ export function useMemoCreation() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [selectedIssuedBy, setSelectedIssuedBy] = useState("all");
+    const [selectedIssuedBy, setSelectedIssuedByState] = useState("all");
     const [selectedTargetCompany, setSelectedTargetCompany] = useState("all");
+
+    const setSelectedIssuedBy = useCallback((value: string) => {
+        setSelectedIssuedByState(value);
+        if (value !== "all" && selectedTargetCompany === value) {
+            setSelectedTargetCompany("all");
+        }
+    }, [selectedTargetCompany]);
 
     const handleSearch = useCallback((query: string) => {
         setSearchQuery(query);
