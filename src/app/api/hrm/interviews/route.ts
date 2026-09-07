@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
+import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
+import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 
 export const dynamic = "force-dynamic";
 
@@ -171,6 +173,18 @@ export async function POST(req: NextRequest) {
             created.stage === "Final" && created.verdict === "Failed"
                 ? await maybeAutoRejectRecommendation(created.recommendation_id)
                 : false;
+        // Mail hook (mailing-module todo 11): stage-routed graded event, never awaited.
+        void dispatchMail(created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
+            event_key: created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",
+            application_id: created.application_id,
+            interview_id: created.id,
+            verdict: created.verdict,
+            vars: {
+                verdict: String(created.verdict ?? ""),
+                result: String(created.verdict ?? ""),
+                stage: String(created.stage ?? ""),
+            },
+        }).catch(logRedacted);
         return NextResponse.json({ data: created, autoApproved, autoRejected }, { status: 201 });
     } catch (e: unknown) {
         const err = e as Error;
