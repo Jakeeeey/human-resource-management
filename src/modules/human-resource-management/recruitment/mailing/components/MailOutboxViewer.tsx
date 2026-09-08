@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Clock, Minus, X } from "lucide-react";
 import "react-quill-new/dist/quill.snow.css";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -13,21 +12,20 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
-import { mailOutboxStatusSchema, type MailOutboxStatus } from "../types/mail-outbox.schema";
+import type { MailOutboxStatus } from "../types/mail-outbox.schema";
 import { useMailOutbox } from "../hooks/useMailOutbox";
-import { useMailTemplates } from "../hooks/useMailTemplates";
 import type { MailOutboxRow } from "../providers/mailOutboxService";
 import { renderMailTemplate } from "../utils/mailRenderer";
-import { MailCombobox } from "./MailCombobox";
-
-const STATUS_OPTIONS = [
-    { value: "", label: "All statuses" },
-    ...mailOutboxStatusSchema.options.map((status) => ({ value: status, label: status })),
-];
 
 const SNAPSHOT_UNAVAILABLE_NOTE =
     "Template may have changed since send — snapshot unavailable for rows written before snapshots existed";
@@ -53,24 +51,16 @@ function useIsLargeScreen() {
 }
 
 /**
- * Relative sent-at label with the absolute value kept in `title`.
+ * Wireframe timestamp: "Jun 23, 2023 AM" style with the raw value in `title`.
  * @param value - The raw sent_at string (or null).
- * @returns A short relative label, or the raw value when unparseable.
+ * @returns The formatted timestamp, or "—" when missing/unparseable.
  */
-function formatRelativeTime(value: unknown): string {
+function formatOutboxTimestamp(value: unknown): string {
     if (typeof value !== "string" || value.length === 0) return "—";
-    const time = new Date(value).getTime();
-    if (Number.isNaN(time)) return String(value);
-    const diff = Date.now() - time;
-    if (diff < 0) return String(value);
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days < 30) return `${days}d ago`;
-    return String(value);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return `${day} ${date.getHours() < 12 ? "AM" : "PM"}`;
 }
 
 /**
@@ -112,8 +102,15 @@ function outboxRowTitle(row: MailOutboxRow, linked: LinkedTemplate | null): stri
  * resend/retry (D17).
  * @returns The filter bar + master-detail split (+ dialog below lg).
  */
-export function MailOutboxViewer() {
-    const { rows, loading, error, status, setStatus, refresh } = useMailOutbox();
+interface MailOutboxViewerProps {
+    status: MailOutboxStatus | "";
+    templateFilter: string;
+    query: string;
+    templates: { id: unknown; template_name: string; subject: string; body_html: string }[];
+}
+
+export function MailOutboxViewer({ status, templateFilter, query, templates }: MailOutboxViewerProps) {
+    const { rows, loading, error, refresh } = useMailOutbox(status);
 
     useEffect(() => {
         const handler = () => {
@@ -122,9 +119,6 @@ export function MailOutboxViewer() {
         window.addEventListener("mailing:refresh", handler);
         return () => window.removeEventListener("mailing:refresh", handler);
     }, [refresh]);
-    const { templates } = useMailTemplates();
-    const [templateFilter, setTemplateFilter] = useState("");
-    const [query, setQuery] = useState("");
     const [selected, setSelected] = useState<MailOutboxRow | null>(null);
     const [dialogRow, setDialogRow] = useState<MailOutboxRow | null>(null);
     const isLarge = useIsLargeScreen();
@@ -140,17 +134,6 @@ export function MailOutboxViewer() {
         }
         return map;
     }, [templates]);
-
-    const templateOptions = useMemo(
-        () => [
-            { value: "", label: "All templates" },
-            ...templates.map((template) => ({
-                value: String(template.id),
-                label: template.template_name,
-            })),
-        ],
-        [templates],
-    );
 
     const linkedFor = (row: MailOutboxRow): LinkedTemplate | null => {
         if (row.template_id === null || row.template_id === undefined) return null;
@@ -212,114 +195,92 @@ export function MailOutboxViewer() {
 
     return (
         <div className="grid gap-3">
-            <div className="sticky top-0 z-10 grid gap-2 bg-background pb-2 sm:grid-cols-3">
-                <div className="grid gap-2">
-                    <Label>Status filter</Label>
-                    <MailCombobox
-                        options={STATUS_OPTIONS}
-                        value={status}
-                        onValueChange={(v) => setStatus(v as MailOutboxStatus | "")}
-                        placeholder="All statuses"
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label>Template filter</Label>
-                    <MailCombobox
-                        options={templateOptions}
-                        value={templateFilter}
-                        onValueChange={setTemplateFilter}
-                        placeholder="All templates"
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="outbox-recipient-search">Search recipient</Label>
-                    <Input
-                        id="outbox-recipient-search"
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Recipient or template…"
-                    />
-                </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-                {filtered.length} {filtered.length === 1 ? "row" : "rows"}
-            </p>
             <div className="grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
-                <div
-                    role="listbox"
-                    aria-label="Outbox rows"
-                    className="grid max-h-[560px] content-start gap-2 overflow-y-auto pr-1"
-                >
-                    {rows.length === 0 && (
-                        <p className="rounded-xl border border-border/50 bg-card p-4 text-center text-sm text-muted-foreground shadow-sm">
-                            No outbox rows yet.
-                        </p>
-                    )}
-                    {rows.length > 0 && filtered.length === 0 && (
-                        <p className="rounded-xl border border-border/50 bg-card p-4 text-center text-sm text-muted-foreground shadow-sm">
-                            No rows match these filters.
-                        </p>
-                    )}
-                    {filtered.map((row, index) => {
-                        const isActive = activeRow === row;
-                        const templateName = templateNameFor(row);
-                        return (
-                            <button
-                                key={`${String(row.idempotency_key)}-${index}`}
-                                type="button"
-                                role="option"
-                                aria-selected={isActive}
-                                onClick={() => handleSelect(row)}
-                                className={`flex min-w-0 items-start gap-3 rounded-xl border p-3 text-left shadow-sm ${
-                                    isActive
-                                        ? "border-primary/30 bg-primary/5"
-                                        : "border-border/50 bg-card hover:bg-muted/40"
-                                }`}
-                            >
-                                <span className="mt-0.5 shrink-0">
-                                    <StatusIcon status={row.status} />
-                                </span>
-                                <span className="grid min-w-0 flex-1 gap-0.5">
-                                    <span className="truncate text-sm font-medium" title={row.to_email}>
-                                        {row.to_email}
-                                    </span>
-                                    <span
-                                        className="truncate text-xs text-muted-foreground"
-                                        title={templateName}
+                <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
+                    <div className="max-h-[560px] overflow-auto">
+                    <Table className="min-w-[720px]">
+                        <TableHeader>
+                            <TableRow className="bg-muted/30">
+                                <TableHead className="w-16">Status</TableHead>
+                                <TableHead className="max-w-48">Recipient</TableHead>
+                                <TableHead className="max-w-56">Template Used</TableHead>
+                                <TableHead className="max-w-40">Timestamp</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {rows.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                                        No outbox rows yet.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {rows.length > 0 && filtered.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                                        No rows match these filters.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {filtered.map((row, index) => {
+                                const isActive = activeRow === row;
+                                const templateName = templateNameFor(row);
+                                const linked = linkedFor(row);
+                                const secondLine =
+                                    linked && linked.subject.length > 0
+                                        ? linked.subject
+                                        : String(row.event_key ?? "—");
+                                return (
+                                    <TableRow
+                                        key={`${String(row.idempotency_key)}-${index}`}
+                                        aria-selected={isActive}
+                                        tabIndex={0}
+                                        onClick={() => handleSelect(row)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                handleSelect(row);
+                                            }
+                                        }}
+                                        className={`cursor-pointer ${isActive ? "border-primary/30 bg-primary/5 hover:bg-primary/10" : ""}`}
                                     >
-                                        {templateName}
-                                    </span>
-                                    <span
-                                        className="truncate text-xs text-muted-foreground"
-                                        title={String(row.sent_at ?? "")}
-                                    >
-                                        {formatRelativeTime(row.sent_at)}
-                                    </span>
-                                </span>
-                            </button>
-                        );
-                    })}
+                                        <TableCell>
+                                            <StatusIcon status={row.status} />
+                                        </TableCell>
+                                        <TableCell className="max-w-48 truncate" title={row.to_email}>
+                                            {row.to_email}
+                                        </TableCell>
+                                        <TableCell className="max-w-56">
+                                            <p className="truncate text-sm font-medium" title={templateName}>
+                                                {templateName}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground" title={secondLine}>
+                                                {secondLine}
+                                            </p>
+                                        </TableCell>
+                                        <TableCell className="max-w-40 truncate" title={String(row.sent_at ?? "")}>
+                                            {formatOutboxTimestamp(row.sent_at)}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                    </div>
                 </div>
                 <div className="hidden lg:block">
-                    <div className="grid gap-3 rounded-2xl border border-border/50 bg-card p-4 shadow-sm">
+                    <div className="grid gap-2">
                         {!activeRow ? (
                             <p className="text-sm text-muted-foreground">Select a row to preview.</p>
                         ) : (
-                            <>
-                                <p className="truncate text-sm font-medium" title={outboxRowTitle(activeRow, linkedFor(activeRow))}>
-                                    {outboxRowTitle(activeRow, linkedFor(activeRow))}
-                                </p>
-                                <MailOutboxDetailWarnings row={activeRow} />
-                                <MailOutboxDetailContent
-                                    row={activeRow}
-                                    linked={linkedFor(activeRow)}
-                                    hasTemplateLink={
-                                        activeRow.template_id !== null &&
-                                        activeRow.template_id !== undefined
-                                    }
-                                />
-                                <MailOutboxDetailMeta row={activeRow} />
-                            </>
+                            <MailOutboxDetailContent
+                                row={activeRow}
+                                linked={linkedFor(activeRow)}
+                                hasTemplateLink={
+                                    activeRow.template_id !== null &&
+                                    activeRow.template_id !== undefined
+                                }
+                            />
                         )}
                     </div>
                 </div>
@@ -341,72 +302,13 @@ interface LinkedTemplate {
 }
 
 /**
- * Read-only detail extras shown inline in the lg preview pane: persisted
- * warnings plus the send error when the row carries one.
- */
-function MailOutboxDetailWarnings({ row }: { row: MailOutboxRow }) {
-    const warnings = Array.isArray(row.warnings) ? row.warnings : [];
-    if (warnings.length === 0 && !row.error) return null;
-    return (
-        <div className="grid gap-1.5">
-            {warnings.length > 0 && (
-                <div className="grid gap-1.5">
-                    <p className="text-xs text-muted-foreground">Warnings</p>
-                    <p className="break-words text-sm" title={warnings.join(", ")}>
-                        {warnings.join(", ")}
-                    </p>
-                </div>
-            )}
-            {row.error && (
-                <div className="grid gap-1.5">
-                    <p className="text-xs text-muted-foreground">Error</p>
-                    <p className="break-words text-sm text-destructive" title={String(row.error)}>
-                        {String(row.error)}
-                    </p>
-                </div>
-            )}
-        </div>
-    );
-}
-
-/**
- * Footer meta shared by the inline preview and the dialog fallback:
- * status badge + sent-at + idempotency key.
- */
-function MailOutboxDetailMeta({ row }: { row: MailOutboxRow }) {
-    return (
-        <span className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge
-                variant={String(row.status) === "failed" ? "destructive" : "outline"}
-                className={
-                    String(row.status) === "failed"
-                        ? undefined
-                        : String(row.status) === "sent"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                          : "border-border bg-muted text-muted-foreground"
-                }
-            >
-                {String(row.status ?? "—")}
-            </Badge>
-            <span className="max-w-40 truncate" title={String(row.sent_at ?? "")}>
-                {String(row.sent_at ?? "—")}
-            </span>
-            <span className="max-w-40 truncate" title={String(row.idempotency_key ?? "")}>
-                {String(row.idempotency_key ?? "—")}
-            </span>
-        </span>
-    );
-}
-
-/**
  * Read-only sent-mail body: snapshot subject/body when the row carries
  * todo-21 snapshots, otherwise the currently linked template rendered with
  * blank sample vars under an explicit may-have-changed note (pre-snapshot
- * rows), or a no-link empty state. Snapshot HTML renders as-is in a
- * theme-aware card — it is the sender's own rendered content, passed through
- * verbatim (post-scrub HTML carries no classes/inline styles, so it inherits
- * the card foreground in both modes). Shared by the inline preview and the
- * below-lg dialog fallback so both show identical content.
+ * rows), or a no-link empty state. The email renders in a WHITE card —
+ * light-world email canvas per the wireframe, deliberately not themed —
+ * with Quill typography and no editor instance. Shared by the inline
+ * preview and the below-lg dialog fallback so both show identical content.
  */
 function MailOutboxDetailContent({
     row,
@@ -444,23 +346,16 @@ function MailOutboxDetailContent({
     }
 
     return (
-        <div className="grid gap-3">
+        <div className="grid gap-2">
             {hasFallback && (
                 <p className="text-xs text-muted-foreground">{SNAPSHOT_UNAVAILABLE_NOTE}</p>
             )}
-            <div className="grid gap-1.5">
-                <p className="text-xs text-muted-foreground">Subject</p>
-                <p
-                    className="truncate text-sm font-medium"
-                    title={subject ? subject : undefined}
-                >
+            <div className="rounded-xl bg-muted/50 p-3 sm:p-4">
+                <p className="truncate text-lg font-bold" title={subject ? subject : undefined}>
                     {subject || "—"}
                 </p>
-            </div>
-            <div className="grid gap-1.5">
-                <p className="text-xs text-muted-foreground">Body</p>
-                {html ? (
-                    <div className="px-1 py-2">
+                <div className="mt-2 rounded-lg bg-muted p-4 text-sm leading-relaxed">
+                    {html ? (
                         <div className="ql-container ql-snow">
                             <div
                                 className="ql-editor"
@@ -468,12 +363,10 @@ function MailOutboxDetailContent({
                                 dangerouslySetInnerHTML={{ __html: html }}
                             />
                         </div>
-                    </div>
-                ) : (
-                    <p className="text-sm text-muted-foreground">
-                        {isSnapshot ? "No body recorded." : "Nothing to preview yet."}
-                    </p>
-                )}
+                    ) : (
+                        <p>{isSnapshot ? "No body recorded." : "Nothing to preview yet."}</p>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -508,22 +401,14 @@ function MailOutboxViewDialog({
                 </DialogHeader>
                 <div className="flex-1 overflow-y-auto min-h-0 px-6 pb-4">
                     {!row ? null : (
-                        <div className="grid gap-3">
-                            <MailOutboxDetailWarnings row={row} />
-                            <MailOutboxDetailContent
-                                row={row}
-                                linked={linked}
-                                hasTemplateLink={hasTemplateLink}
-                            />
-                        </div>
+                        <MailOutboxDetailContent
+                            row={row}
+                            linked={linked}
+                            hasTemplateLink={hasTemplateLink}
+                        />
                     )}
                 </div>
-                <DialogFooter className="flex-col gap-2 border-t bg-muted/20 px-6 py-4 sm:flex-row sm:items-center">
-                    {row && (
-                        <span className="sm:mr-auto">
-                            <MailOutboxDetailMeta row={row} />
-                        </span>
-                    )}
+                <DialogFooter className="flex-col gap-2 border-t bg-muted/20 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
                     <Button variant="outline" className="w-full sm:w-auto" onClick={onClose}>
                         Close
                     </Button>
