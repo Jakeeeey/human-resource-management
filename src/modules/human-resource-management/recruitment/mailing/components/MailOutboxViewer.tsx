@@ -227,7 +227,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
         <div className="grid gap-3">
             <div className={previewOpen ? "grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]" : "grid gap-3"}>
                 <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
-                    <div className="h-[560px] overflow-auto">
+                    <div className="h-[560px] overflow-auto [&_[data-slot=table-container]]:h-full [&_[data-slot=table-container]]:overflow-x-visible">
                     <Table className="min-w-[880px]">
                         <TableHeader>
                             <TableRow className="bg-muted/30">
@@ -304,9 +304,8 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                 {previewOpen && (
                 <div className="hidden lg:block">
                     <div className="flex h-[560px] flex-col gap-2">
-                        <div className="min-h-0 flex-1 overflow-y-auto">
                         {!activeRow ? (
-                            <p className="text-sm text-muted-foreground">Select a row to preview.</p>
+                            <p className="min-h-0 flex-1 text-sm text-muted-foreground">Select a row to preview.</p>
                         ) : (
                             <MailOutboxDetailContent
                                 row={activeRow}
@@ -317,7 +316,6 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                                 }
                             />
                         )}
-                        </div>
                         <Button variant="outline" size="sm" className="w-full shrink-0" onClick={() => setPreviewOpen(false)}>
                             Close preview
                         </Button>
@@ -386,15 +384,15 @@ function MailOutboxDetailContent({
     }
 
     return (
-        <div className="grid min-w-0 max-w-full gap-2">
+        <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-2 overflow-x-clip [overflow-wrap:break-word] [&_img]:h-auto [&_img]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_table]:max-w-full [&_table]:overflow-x-auto">
             {hasFallback && (
-                <p className="text-xs text-muted-foreground">{SNAPSHOT_UNAVAILABLE_NOTE}</p>
+                <p className="shrink-0 text-xs text-muted-foreground">{SNAPSHOT_UNAVAILABLE_NOTE}</p>
             )}
-            <div className="min-w-0 max-w-full rounded-xl border border-border/50 bg-muted/50 p-3 sm:p-4">
-                <p className="mb-4 truncate text-lg font-bold" title={subject ? subject : undefined}>
+            <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-3 rounded-xl border border-border/50 bg-muted/50 p-3 sm:p-4">
+                <p className="shrink-0 truncate text-lg font-bold" title={subject ? subject : undefined}>
                     {subject || "—"}
                 </p>
-                <div className="mt-2 max-h-[480px] overflow-y-auto rounded-lg border border-border bg-card p-4 text-sm leading-relaxed text-card-foreground shadow-sm">
+                <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-card p-4 text-sm leading-relaxed text-card-foreground shadow-sm">
                     {html ? (
                         <div className="ql-snow">
                             <div
