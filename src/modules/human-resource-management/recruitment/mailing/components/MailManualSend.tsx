@@ -23,7 +23,7 @@ import {
     type SendNowApplicant,
 } from "../providers/mailSendNowService";
 import { MailCombobox } from "./MailCombobox";
-import { extractMailVarTokens } from "./MailComposePreview";
+import { MailComposePreview, extractMailVarTokens } from "./MailComposePreview";
 import {
     MailConfirmDialog,
     MailConfirmDialogAction,
@@ -34,10 +34,47 @@ import {
     MailConfirmDialogHeader,
     MailConfirmDialogTitle,
 } from "./MailConfirmDialog";
-import { MailTemplateEditor } from "./MailTemplateEditor";
+import { MailTemplateEditor, toFriendlyMailVarName } from "./MailTemplateEditor";
 import type { MailTemplateEditorHandle } from "./MailTemplateEditor";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Port of the job-offer salutation rule (JobOfferModule salutationPrefix +
+// surnameOf — ported, never imported, per the module-boundary ban): Mr. for
+// Male, Mrs. for Female + Married, Ms. for other Female, null when unknown.
+function mailSalutationPrefix(sex: unknown, civilStatus: unknown): string | null {
+    if (sex === "Male") return "Mr.";
+    if (sex === "Female") return civilStatus === "Married" ? "Mrs." : "Ms.";
+    return null;
+}
+
+function mailSurnameOf(fullName: string): string {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    const last = parts.length > 0 ? parts[parts.length - 1] : "";
+    return last.charAt(0).toUpperCase() + last.slice(1).toLowerCase();
+}
+
+// Example values shown as variable-input placeholders (display only —
+// never submitted; the renderer still sends blank for unfilled tokens).
+const MAIL_VAR_EXAMPLES: Record<string, string> = {
+    applicant_name: "Juan Dela Cruz",
+    candidate_name: "Juan Dela Cruz",
+    salutation_name: "Mr. Dela Cruz",
+    position: "Software Engineer",
+    company_name: "Vertex Technologies Corporation",
+    verdict: "Passed",
+    result: "Passed",
+    decision_date: "September 8, 2026",
+    request_no: "REQ-2026-014",
+    base_location: "Cebu City",
+    department: "Engineering",
+    division: "Operations",
+    interview_date: "September 10, 2026",
+    interview_time: "9:00 AM",
+    venue: "Vertex HQ, Cebu City",
+    contact_person: "Maria Santos",
+    sender_name: "HR Recruitment",
+};
 
 /**
  * Manual Send composer (template picker + receiver + variable fill-in +
@@ -65,6 +102,10 @@ export function MailManualSend() {
     const [sending, setSending] = useState(false);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [varsOpen, setVarsOpen] = useState(false);
+    const [varsSnapshot, setVarsSnapshot] = useState<Record<string, string>>({});
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewBody, setPreviewBody] = useState("");
+    const [applicantVitals, setApplicantVitals] = useState<{ sex: unknown; civil_status: unknown } | null>(null);
 
     // Body editor ref (page-level creation, same as MailTemplatePage): bodyHtml
     // state holds DISPLAY html (chip spans); consumers read CLEAN html
@@ -149,6 +190,35 @@ export function MailManualSend() {
         };
     }, [pickedApplicationId]);
 
+    // Salutation vitals: sex + civil status from the application record (same
+    // read the job-offer form uses). Silent on failure — fields stay manual.
+    const pickedApplicantId = picked?.applicant_id;
+    useEffect(() => {
+        if (pickedApplicantId === undefined || pickedApplicantId === null) {
+            setApplicantVitals(null);
+            return;
+        }
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch(
+                    `/api/hrm/applications/by-applicant?applicant_id=${pickedApplicantId}`
+                );
+                if (!res.ok || cancelled) return;
+                const json = await res.json();
+                const app = json?.data?.application;
+                if (cancelled || !app || typeof app !== "object") return;
+                const record = app as Record<string, unknown>;
+                setApplicantVitals({ sex: record.sex, civil_status: record.civil_status });
+            } catch {
+                // Autofill is a convenience — the vars stay manual on failure.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [pickedApplicantId]);
+
     const pickedTemplateName = useMemo(
         () => templateOptions.find((opt) => opt.value === templateId)?.label ?? null,
         [templateOptions, templateId]
@@ -196,16 +266,73 @@ export function MailManualSend() {
         [tokens, sendVars]
     );
 
-    const emailError =
-        toEmail.trim().length > 0 && !EMAIL_PATTERN.test(toEmail.trim())
-            ? "Enter a valid email, or leave blank to use the application record."
-            : null;
+    // Applicant-driven defaults for the tokens the record can answer: names
+    // from the picked row, position from the application, salutation from the
+    // vitals fetch. Everything else (verdict/dates/venue/…) stays manual.
+    const autoVars = useMemo(() => {
+        const filled: Record<string, string> = {};
+        if (!picked) return filled;
+        if (picked.full_name.trim().length > 0) {
+            filled.applicant_name = picked.full_name;
+            filled.candidate_name = picked.full_name;
+        }
+        if (picked.position_applied_for !== null && picked.position_applied_for.trim().length > 0) {
+            filled.position = picked.position_applied_for;
+        }
+        const prefix = mailSalutationPrefix(applicantVitals?.sex, applicantVitals?.civil_status);
+        if (prefix) {
+            const surname = mailSurnameOf(picked.full_name);
+            filled.salutation_name = surname ? `${prefix} ${surname}` : prefix;
+        }
+        return filled;
+    }, [picked, applicantVitals]);
+
+    // Autofill: fills live tokens that have a record value and no user value
+    // yet. Absent-key check (not emptiness) so cleared fields stay cleared
+    // while template-switch resets (vars = {}) re-fill.
+    useEffect(() => {
+        if (tokens.allowed.length === 0) return;
+        const patch: Record<string, string> = {};
+        for (const name of tokens.allowed) {
+            if (name in vars) continue;
+            const value = autoVars[name];
+            if (value) patch[name] = value;
+        }
+        if (Object.keys(patch).length > 0) {
+            setVars((prev) => ({ ...prev, ...patch }));
+        }
+    }, [tokens, autoVars, vars]);
+
+    const emailMissing = toEmail.trim().length === 0;
+    const emailError = emailMissing
+        ? null
+        : !EMAIL_PATTERN.test(toEmail.trim())
+          ? "Enter a valid email address."
+          : null;
+    const showEmailRequired = emailMissing && (picked !== null || selectedTemplate !== null);
 
     const loading = templatesLoading || applicantsLoading;
     const loadError = templatesError ?? applicantsError;
 
     const setVar = (name: string, value: string) => {
         setVars((prev) => ({ ...prev, [name]: value }));
+    };
+
+    // Variables modal open/close: opening snapshots so Cancel can discard
+    // in-modal edits; Save keeps them (inputs already write live state).
+    const openVars = () => {
+        setVarsSnapshot(vars);
+        setVarsOpen(true);
+    };
+    const cancelVars = () => {
+        setVars(varsSnapshot);
+        setVarsOpen(false);
+    };
+    // Preview snapshot: captures the CLEAN body in the click handler (chip
+    // spans serialized back to {{tokens}}) — never a ref read during render.
+    const handlePreview = () => {
+        setPreviewBody(editorRef.current?.getCleanHtml() ?? bodyHtml);
+        setPreviewOpen(true);
     };
 
     // Discard confirm: clears receiver + vars + customization back to the
@@ -305,10 +432,7 @@ export function MailManualSend() {
     }
 
     const sendBlocked =
-        sending || !picked || !templateId || emailError !== null || missingVars.length > 0;
-    const varsTitle = pickedTemplateName
-        ? `Template Variables: ${pickedTemplateName}`
-        : "Template Variables";
+        sending || !picked || !templateId || emailMissing || emailError !== null || missingVars.length > 0;
 
     return (
         <div className="mx-auto grid w-full max-w-[1200px] gap-4">
@@ -330,7 +454,7 @@ export function MailManualSend() {
                             variant="outline"
                             className="w-full sm:w-auto"
                             disabled={sending}
-                            onClick={() => setVarsOpen(true)}
+                            onClick={openVars}
                         >
                             Variables
                         </Button>
@@ -378,6 +502,11 @@ export function MailManualSend() {
                                 {emailError}
                             </p>
                         )}
+                        {showEmailRequired && (
+                            <p className="text-xs text-destructive" role="alert">
+                                Recipient email is required.
+                            </p>
+                        )}
                     </div>
                     {selectedTemplate && (
                         <div className="grid min-w-0 gap-1.5">
@@ -396,7 +525,7 @@ export function MailManualSend() {
                 </section>
 
                 <section
-                    className="flex min-h-[320px] flex-col rounded-lg border border-border bg-card p-4"
+                    className="flex max-h-[560px] min-h-[320px] flex-col rounded-lg border border-border bg-card p-4"
                     aria-label="Email body"
                 >
                     {selectedTemplate ? (
@@ -411,8 +540,9 @@ export function MailManualSend() {
 
             {missingVars.length > 0 && (
                 <p className="text-sm text-destructive" role="alert">
-                    Fill in the {missingVars.length === 1 ? "highlighted field" : `${missingVars.length} highlighted fields`} before
-                    sending
+                    {missingVars.length === 1
+                        ? "1 variable left unfilled — fill it in before sending"
+                        : `${missingVars.length} variables left unfilled — fill them in before sending`}
                 </p>
             )}
 
@@ -427,6 +557,14 @@ export function MailManualSend() {
                         Cancel
                     </Button>
                     <Button
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        disabled={!selectedTemplate || sending}
+                        onClick={handlePreview}
+                    >
+                        Preview
+                    </Button>
+                    <Button
                         className="w-full sm:w-auto"
                         disabled={sendBlocked}
                         onClick={() => void handleSend()}
@@ -439,32 +577,35 @@ export function MailManualSend() {
             <Dialog open={varsOpen} onOpenChange={setVarsOpen}>
                 <DialogContent className="w-[95vw] sm:max-w-[560px] max-h-[85vh] flex flex-col overflow-hidden rounded-2xl p-0">
                     <DialogHeader className="px-6 pt-6 pb-4">
-                        <DialogTitle className="truncate" title={varsTitle}>
-                            {varsTitle}
+                        <DialogTitle className="truncate" title="Template Variables">
+                            Template Variables
                         </DialogTitle>
                     </DialogHeader>
                     <div className="flex-1 overflow-y-auto min-h-0 px-6 pb-4">
                         <div className="grid gap-3">
-                            {tokens.allowed.map((name) => (
+                            {tokens.allowed.map((name) => {
+                                const friendly = toFriendlyMailVarName(name);
+                                return (
                                 <div key={name} className="grid min-w-0 gap-1.5">
                                     <Label
                                         htmlFor={`mail-compose-var-${name}`}
-                                        className="truncate font-mono text-xs text-muted-foreground"
+                                        className="truncate text-xs text-muted-foreground"
                                         title={`{{${name}}}`}
                                     >
-                                        {`{{${name}}}`}
+                                        {friendly}
                                     </Label>
                                     <Input
                                         id={`mail-compose-var-${name}`}
                                         value={vars[name] ?? ""}
                                         onChange={(e) => setVar(name, e.target.value)}
-                                        placeholder={`{{${name}}}`}
+                                        placeholder={MAIL_VAR_EXAMPLES[name] ?? friendly}
                                         disabled={sending}
                                         className="truncate text-sm"
-                                        title={`{{${name}}}`}
+                                        title={friendly}
                                     />
                                 </div>
-                            ))}
+                                );
+                            })}
                             {tokens.unknown.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
                                     {tokens.unknown.map((name) => (
@@ -484,7 +625,7 @@ export function MailManualSend() {
                         <Button
                             variant="outline"
                             className="w-full sm:w-auto"
-                            onClick={() => setVarsOpen(false)}
+                            onClick={cancelVars}
                         >
                             Cancel
                         </Button>
@@ -492,7 +633,34 @@ export function MailManualSend() {
                             className="w-full sm:w-auto"
                             onClick={() => setVarsOpen(false)}
                         >
-                            Populate & Continue
+                            Save
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                <DialogContent className="w-[95vw] sm:max-w-[760px] max-h-[85vh] flex flex-col overflow-hidden rounded-2xl p-0">
+                    <DialogHeader className="px-6 pt-6 pb-4">
+                        <DialogTitle className="truncate" title="Email preview">
+                            Email preview
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-y-auto min-h-0 px-6 pb-4">
+                        <MailComposePreview
+                            subject={subject}
+                            bodyHtml={previewBody}
+                            vars={sendVars}
+                            applicantLabel={picked ? picked.full_name : null}
+                        />
+                    </div>
+                    <DialogFooter className="flex-col gap-2 border-t bg-muted/20 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+                        <Button
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            onClick={() => setPreviewOpen(false)}
+                        >
+                            Close
                         </Button>
                     </DialogFooter>
                 </DialogContent>
