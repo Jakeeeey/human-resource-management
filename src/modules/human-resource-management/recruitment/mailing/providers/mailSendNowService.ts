@@ -72,6 +72,28 @@ export async function listSendNowApplicants(): Promise<Envelope<SendNowApplicant
     }
 }
 
+/**
+ * Resolves one application record email for compose autofill (read-only;
+ * single address only — never a list).
+ * @param applicationId - Application row id.
+ * @returns The validated email, or null when unknown/invalid/unreachable.
+ */
+export async function getApplicantEmail(applicationId: string | number): Promise<string | null> {
+    try {
+        const res = await fetch(
+            `/api/hrm/mailing/applicant-email?application_id=${encodeURIComponent(String(applicationId))}`
+        );
+        const body = (await res.json()) as {
+            success?: boolean;
+            data?: { email?: unknown };
+        };
+        if (!res.ok || body?.success !== true) return null;
+        return typeof body?.data?.email === "string" ? body.data.email : null;
+    } catch {
+        return null;
+    }
+}
+
 /** Manual send input: one template + one application, optional email override
  * plus send-only customization (subject/body/vars overrides, never persisted). */
 export interface ManualMailSendInput {
