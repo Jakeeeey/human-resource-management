@@ -56,6 +56,8 @@ interface MailComposePreviewProps {
     bodyHtml: string;
     vars: Record<string, string>;
     applicantLabel: string | null;
+    /** Hides the recipient header + display-mode control (dialog embeds). */
+    chrome?: boolean;
 }
 
 /**
@@ -77,6 +79,7 @@ export function MailComposePreview({
     bodyHtml,
     vars,
     applicantLabel,
+    chrome = true,
 }: MailComposePreviewProps) {
     const [mode, setMode] = useState<MailPreviewMode>("light");
     const [announcement, setAnnouncement] = useState("");
@@ -127,6 +130,7 @@ export function MailComposePreview({
             className="grid content-start gap-3 rounded-lg border border-border bg-card p-4"
             aria-label="Email preview"
         >
+            {chrome && (
             <div className="grid gap-1">
                 <h3
                     className="truncate text-sm font-medium"
@@ -134,10 +138,12 @@ export function MailComposePreview({
                 >
                     {applicantLabel ? `Previewing as: ${applicantLabel}` : "Previewing as: nobody yet"}
                 </h3>
-                <p className="sr-only" aria-live="polite">
-                    {announcement}
-                </p>
             </div>
+            )}
+            <p className="sr-only" aria-live="polite">
+                {announcement}
+            </p>
+            {chrome && (
             <div className="grid gap-1.5">
                 <div
                     role="group"
@@ -169,6 +175,7 @@ export function MailComposePreview({
                           : "Light matches the default inbox render."}
                 </p>
             </div>
+            )}
             {unknownTokens.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                     {unknownTokens.map((name) => (

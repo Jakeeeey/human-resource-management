@@ -640,7 +640,7 @@ export function MailManualSend() {
             </Dialog>
 
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-                <DialogContent className="w-[95vw] sm:max-w-[760px] max-h-[85vh] flex flex-col overflow-hidden rounded-2xl p-0">
+                <DialogContent className="w-[95vw] sm:max-w-[760px] max-h-[85vh] flex flex-col overflow-hidden rounded-2xl p-0 [&>button]:hidden">
                     <DialogHeader className="px-6 pt-6 pb-4">
                         <DialogTitle className="truncate" title="Email preview">
                             Email preview
@@ -652,6 +652,7 @@ export function MailManualSend() {
                             bodyHtml={previewBody}
                             vars={sendVars}
                             applicantLabel={picked ? picked.full_name : null}
+                            chrome={false}
                         />
                     </div>
                     <DialogFooter className="flex-col gap-2 border-t bg-muted/20 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">

@@ -31,7 +31,7 @@ const STATUS_OPTIONS = [
  * @returns The tabbed module.
  */
 export function MailingModule() {
-    const [tab, setTab] = useState("templates");
+    const [tab, setTab] = useState("outbox");
     const router = useRouter();
     const [sendNowBinding, setSendNowBinding] = useState<MailBindingRow | null>(null);
 
@@ -86,10 +86,10 @@ export function MailingModule() {
             <Tabs value={tab} onValueChange={handleTabChange} className="grid gap-4">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <TabsList className="justify-start">
+                        <TabsTrigger value="outbox">Outbox</TabsTrigger>
+                        <TabsTrigger value="send">Compose</TabsTrigger>
                         <TabsTrigger value="templates">Templates</TabsTrigger>
                         <TabsTrigger value="bindings">Bindings</TabsTrigger>
-                        <TabsTrigger value="send">Compose</TabsTrigger>
-                        <TabsTrigger value="outbox">Outbox</TabsTrigger>
                     </TabsList>
                     {tab === "templates" && (
                         <Button className="w-full sm:w-auto" onClick={() => router.push("/hrm/mailing/templates/new")}>
@@ -111,24 +111,15 @@ export function MailingModule() {
                                 placeholder="All templates"
                             />
                             <Input
-                                aria-label="Search recipient or template"
-                                title="Search recipient or template"
+                                aria-label="Search recipient or email"
+                                title="Search recipient or email"
                                 value={outboxQuery}
                                 onChange={(event) => setOutboxQuery(event.target.value)}
-                                placeholder="Recipient or template…"
+                                placeholder="Recipient or email…"
                             />
                         </div>
                     )}
                 </div>
-                <TabsContent value="templates" forceMount hidden={tab !== "templates"}>
-                    <MailTemplateList />
-                </TabsContent>
-                <TabsContent value="bindings" forceMount hidden={tab !== "bindings"}>
-                    <MailBindingsManager onSendNow={setSendNowBinding} />
-                </TabsContent>
-                <TabsContent value="send" forceMount hidden={tab !== "send"}>
-                    <MailManualSend />
-                </TabsContent>
                 <TabsContent value="outbox" forceMount hidden={tab !== "outbox"}>
                     <MailOutboxViewer
                         status={outboxStatus}
@@ -136,6 +127,15 @@ export function MailingModule() {
                         query={outboxQuery}
                         templates={templates}
                     />
+                </TabsContent>
+                <TabsContent value="send" forceMount hidden={tab !== "send"}>
+                    <MailManualSend />
+                </TabsContent>
+                <TabsContent value="templates" forceMount hidden={tab !== "templates"}>
+                    <MailTemplateList />
+                </TabsContent>
+                <TabsContent value="bindings" forceMount hidden={tab !== "bindings"}>
+                    <MailBindingsManager onSendNow={setSendNowBinding} />
                 </TabsContent>
             </Tabs>
             <MailSendNowDialog binding={sendNowBinding} onClose={() => setSendNowBinding(null)} />

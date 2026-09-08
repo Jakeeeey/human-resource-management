@@ -162,8 +162,6 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
         return templateById.get(String(row.template_id)) ?? null;
     };
 
-    const templateNameFor = (row: MailOutboxRow): string => linkedFor(row)?.name ?? "—";
-
     const recipientNameFor = (row: MailOutboxRow): string => {
         if (typeof row.idempotency_key !== "string") return "—";
         const segments = row.idempotency_key.split(":");
@@ -172,11 +170,10 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
     };
 
     // Client-side over the loaded rows only (no new API params): template
-    // match AND recipient-name/email/template-name substring match, case-insensitive.
+    // match AND recipient-name/email substring match, case-insensitive.
     const filtered = useMemo(() => {
         const needle = query.trim().toLowerCase();
         return rows.filter((row) => {
-            const templateName = templateNameFor(row);
             if (templateFilter !== "") {
                 const rowTemplateId =
                     row.template_id === null || row.template_id === undefined
@@ -185,7 +182,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                 if (rowTemplateId !== templateFilter) return false;
             }
             if (needle !== "") {
-                const haystack = `${recipientNameFor(row)} ${row.to_email} ${templateName}`.toLowerCase();
+                const haystack = `${recipientNameFor(row)} ${row.to_email}`.toLowerCase();
                 if (!haystack.includes(needle)) return false;
             }
             return true;
