@@ -227,7 +227,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
         <div className="grid gap-3">
             <div className={previewOpen ? "grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]" : "grid gap-3"}>
                 <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
-                    <div className="max-h-[560px] overflow-auto">
+                    <div className="h-[560px] overflow-auto">
                     <Table className="min-w-[880px]">
                         <TableHeader>
                             <TableRow className="bg-muted/30">
@@ -303,7 +303,8 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                 </div>
                 {previewOpen && (
                 <div className="hidden lg:block">
-                    <div className="grid gap-2">
+                    <div className="flex h-[560px] flex-col gap-2">
+                        <div className="min-h-0 flex-1 overflow-y-auto">
                         {!activeRow ? (
                             <p className="text-sm text-muted-foreground">Select a row to preview.</p>
                         ) : (
@@ -316,7 +317,8 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                                 }
                             />
                         )}
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => setPreviewOpen(false)}>
+                        </div>
+                        <Button variant="outline" size="sm" className="w-full shrink-0" onClick={() => setPreviewOpen(false)}>
                             Close preview
                         </Button>
                     </div>
