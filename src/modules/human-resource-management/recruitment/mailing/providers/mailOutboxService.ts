@@ -16,6 +16,8 @@ export interface MailOutboxRow {
     warnings: string[];
     error: string | null;
     sent_at: unknown;
+    rendered_subject: string | null;
+    rendered_body_html: string | null;
 }
 
 interface Envelope<T> {
@@ -50,6 +52,8 @@ function normalizeWarnings(value: unknown): string[] {
  */
 function normalizeRow(row: Record<string, unknown>): MailOutboxRow {
     const rawError = row.error;
+    const rawSubject = row.rendered_subject;
+    const rawBody = row.rendered_body_html;
     return {
         id: row.id ?? null,
         idempotency_key: row.idempotency_key ?? null,
@@ -60,6 +64,8 @@ function normalizeRow(row: Record<string, unknown>): MailOutboxRow {
         warnings: normalizeWarnings(row.warnings),
         error: rawError === null || rawError === undefined ? null : String(rawError),
         sent_at: row.sent_at ?? null,
+        rendered_subject: typeof rawSubject === "string" ? rawSubject : null,
+        rendered_body_html: typeof rawBody === "string" ? rawBody : null,
     };
 }
 

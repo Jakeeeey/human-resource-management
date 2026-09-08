@@ -57,6 +57,10 @@ export interface MaskedOutboxRow {
     warnings: string[];
     error: string | null;
     sent_at: unknown;
+    /** Rendered snapshot subject (todo 21) — sender's own content, no addresses. */
+    rendered_subject: string | null;
+    /** Rendered snapshot body HTML (todo 21) — sender's own content, no addresses. */
+    rendered_body_html: string | null;
 }
 
 /**
@@ -90,6 +94,8 @@ export function toMaskedOutboxRow(
     }
 
     const rawError = row.error;
+    const rawSubject = row.rendered_subject;
+    const rawBody = row.rendered_body_html;
     return {
         id: row.id ?? null,
         idempotency_key: row.idempotency_key ?? null,
@@ -103,5 +109,7 @@ export function toMaskedOutboxRow(
                 ? null
                 : maskEmailsInFreeText(String(rawError)),
         sent_at: row.sent_at ?? null,
+        rendered_subject: typeof rawSubject === "string" ? rawSubject : null,
+        rendered_body_html: typeof rawBody === "string" ? rawBody : null,
     };
 }

@@ -237,6 +237,8 @@ interface OutboxWrite {
     warnings: string[];
     error: string | null;
     sent_at: string | null;
+    rendered_subject: string | null;
+    rendered_body_html: string | null;
 }
 
 /**
@@ -356,6 +358,8 @@ export async function dispatchMail(
                 warnings: ["missing-or-invalid-recipient"],
                 error: null,
                 sent_at: null,
+                rendered_subject: null,
+                rendered_body_html: null,
             });
             return { ok: false, reason: "skipped" };
         }
@@ -371,6 +375,8 @@ export async function dispatchMail(
                 warnings: ["missing-or-inactive-template"],
                 error: null,
                 sent_at: null,
+                rendered_subject: null,
+                rendered_body_html: null,
             });
             return { ok: false, reason: "skipped" };
         }
@@ -390,6 +396,8 @@ export async function dispatchMail(
                 warnings: [...warnings, `forbidden-html:${forbiddenReason ?? "rejected"}`],
                 error: null,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             return { ok: false, reason: "skipped" };
         }
@@ -407,6 +415,8 @@ export async function dispatchMail(
                 warnings: [...warnings, "rate-capped"],
                 error: null,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             logRedacted("[dispatchMail] rate cap hit:", {
                 event_key: eventKey,
@@ -425,6 +435,8 @@ export async function dispatchMail(
                 warnings,
                 error: null,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             return { ok: true };
         }
@@ -457,6 +469,8 @@ export async function dispatchMail(
                 warnings,
                 error: sendError,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             return { ok: false, reason: "send-failed" };
         }
@@ -470,6 +484,8 @@ export async function dispatchMail(
             warnings,
             error: null,
             sent_at: getPhilippineTime(),
+            rendered_subject: renderedSubject.text,
+            rendered_body_html: renderedBody.text,
         });
         return { ok: true };
     } catch (error) {

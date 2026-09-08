@@ -125,6 +125,8 @@ export async function POST(req: NextRequest) {
                 warnings: ["manual-send", "missing-or-inactive-template"],
                 error: null,
                 sent_at: null,
+                rendered_subject: null,
+                rendered_body_html: null,
             });
             return NextResponse.json({
                 success: true,
@@ -153,6 +155,8 @@ export async function POST(req: NextRequest) {
                 warnings: ["manual-send", "missing-or-invalid-recipient"],
                 error: null,
                 sent_at: null,
+                rendered_subject: null,
+                rendered_body_html: null,
             });
             return NextResponse.json({
                 success: true,
@@ -182,6 +186,8 @@ export async function POST(req: NextRequest) {
                 warnings: [...warnings, `forbidden-html:${forbiddenReason ?? "rejected"}`],
                 error: null,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             return NextResponse.json({
                 success: true,
@@ -207,6 +213,8 @@ export async function POST(req: NextRequest) {
                 warnings: [...warnings, "rate-capped"],
                 error: null,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             logRedacted("[mailing-manual-send] rate cap hit:", {
                 event_key: MANUAL_EVENT_KEY,
@@ -233,6 +241,8 @@ export async function POST(req: NextRequest) {
                 warnings,
                 error: null,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             return NextResponse.json({
                 success: true,
@@ -268,6 +278,8 @@ export async function POST(req: NextRequest) {
                 warnings,
                 error: sendError,
                 sent_at: null,
+                rendered_subject: renderedSubject.text,
+                rendered_body_html: renderedBody.text,
             });
             return NextResponse.json({
                 success: true,
@@ -289,6 +301,8 @@ export async function POST(req: NextRequest) {
             warnings,
             error: null,
             sent_at: getPhilippineTime(),
+            rendered_subject: renderedSubject.text,
+            rendered_body_html: renderedBody.text,
         });
         return NextResponse.json({
             success: true,

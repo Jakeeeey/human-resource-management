@@ -16,6 +16,8 @@ export const dynamic = "force-dynamic";
 // `status` query value is validated against `mailOutboxStatusSchema` and an
 // unknown value answers 400 (never 500, never an ambiguous empty 200).
 
+const OUTBOX_FIELDS_RENDERED =
+    "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at,rendered_subject,rendered_body_html";
 const OUTBOX_FIELDS_FULL =
     "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at";
 const OUTBOX_FIELDS_BASE =
@@ -39,15 +41,25 @@ export async function GET(req: NextRequest) {
             statusFilter = `&filter[status][_eq]=${parsed.data}`;
         }
 
+        // Snapshot columns (`rendered_subject`/`rendered_body_html`, todo 21)
+        // may lack a Directus read grant — Directus answers unknown fields
+        // with 400 (surfaced by dFetch as a body without `data`), so degrade
+        // full+rendered → full → base instead of breaking the list (same
+        // fallback shape as the company-logos route). Each step runs only on
+        // a no-`data` answer, so a denied grant on the new fields yields a
+        // working list without snapshots, never a 500/403 to the client.
         // `warnings` is a JSON column the user-created schema may or may not
-        // carry yet — Directus answers unknown fields with 400 (surfaced by
-        // dFetch as a body without `data`), so retry without it and surface
-        // `warnings: []` per row instead of breaking the list (same fallback
-        // shape as the company-logos route).
-        const full = (await dFetch(
-            `/items/mail_outbox?fields=${OUTBOX_FIELDS_FULL}&sort=-id&limit=-1${statusFilter}`
+        // carry yet — same retry rule one level down.
+        const rendered = (await dFetch(
+            `/items/mail_outbox?fields=${OUTBOX_FIELDS_RENDERED}&sort=-id&limit=-1${statusFilter}`
         )) as { data?: Record<string, unknown>[] };
-        let rows = Array.isArray(full?.data) ? full.data : null;
+        let rows = Array.isArray(rendered?.data) ? rendered.data : null;
+        if (!rows) {
+            const full = (await dFetch(
+                `/items/mail_outbox?fields=${OUTBOX_FIELDS_FULL}&sort=-id&limit=-1${statusFilter}`
+            )) as { data?: Record<string, unknown>[] };
+            rows = Array.isArray(full?.data) ? full.data : null;
+        }
         if (!rows) {
             const base = (await dFetch(
                 `/items/mail_outbox?fields=${OUTBOX_FIELDS_BASE}&sort=-id&limit=-1${statusFilter}`

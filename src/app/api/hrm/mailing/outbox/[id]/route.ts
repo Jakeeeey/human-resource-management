@@ -12,6 +12,8 @@ export const dynamic = "force-dynamic";
 // `warnings`/`error` echoes are scrubbed before serialization. Unknown id
 // answers 404 (never 500, never a masked empty row).
 
+const OUTBOX_FIELDS_RENDERED =
+    "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at,rendered_subject,rendered_body_html";
 const OUTBOX_FIELDS_FULL =
     "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at";
 const OUTBOX_FIELDS_BASE =
@@ -31,11 +33,21 @@ export async function GET(
             );
         }
 
-        const full = (await dFetch(
-            `/items/mail_outbox/${encodeURIComponent(id)}?fields=${OUTBOX_FIELDS_FULL}`
+        // Same full+rendered → full → base degradation as the list route:
+        // each retry runs only on a no-`data` answer, so a denied grant on
+        // the todo-21 snapshot columns degrades instead of 404ing the row.
+        const rendered = (await dFetch(
+            `/items/mail_outbox/${encodeURIComponent(id)}?fields=${OUTBOX_FIELDS_RENDERED}`
         )) as { data?: Record<string, unknown> };
         let row =
-            full?.data && typeof full.data === "object" ? full.data : null;
+            rendered?.data && typeof rendered.data === "object" ? rendered.data : null;
+        if (!row) {
+            const full = (await dFetch(
+                `/items/mail_outbox/${encodeURIComponent(id)}?fields=${OUTBOX_FIELDS_FULL}`
+            )) as { data?: Record<string, unknown> };
+            row =
+                full?.data && typeof full.data === "object" ? full.data : null;
+        }
         if (!row) {
             const base = (await dFetch(
                 `/items/mail_outbox/${encodeURIComponent(id)}?fields=${OUTBOX_FIELDS_BASE}`
