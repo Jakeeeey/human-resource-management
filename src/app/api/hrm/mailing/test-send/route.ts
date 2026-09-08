@@ -86,6 +86,8 @@ export async function POST(req: NextRequest) {
                 warnings,
                 error: null,
                 sent_at: null,
+                rendered_subject: subjectRender.text,
+                rendered_body_html: bodyRender.text,
             }),
         });
 

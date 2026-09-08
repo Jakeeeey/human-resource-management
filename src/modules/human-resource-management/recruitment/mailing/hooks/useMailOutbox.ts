@@ -9,14 +9,16 @@ import type { MailOutboxStatus } from "../types/mail-outbox.schema";
 // over the todo-7 routes. No resend/retry exists by design (D17).
 
 /**
- * Loads masked outbox rows with an optional status filter.
- * @returns Outbox state + filter + refresh helpers.
+ * Loads masked outbox rows with an optional status filter. Status is
+ * caller-owned (the module tabs row) so the filter bar can live outside
+ * the viewer; the hook refetches whenever it changes.
+ * @param status - Server-side status filter ("" = all).
+ * @returns Outbox rows + loading/error/refresh helpers.
  */
-export function useMailOutbox() {
+export function useMailOutbox(status: MailOutboxStatus | "" = "") {
     const [rows, setRows] = useState<MailOutboxRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [status, setStatus] = useState<MailOutboxStatus | "">("");
 
     const refresh = useCallback(async (next?: MailOutboxStatus | "") => {
         const filter = next ?? "";
@@ -42,5 +44,5 @@ export function useMailOutbox() {
         void refresh(status);
     }, [refresh, status]);
 
-    return { rows, loading, error, status, setStatus, refresh };
+    return { rows, loading, error, refresh };
 }

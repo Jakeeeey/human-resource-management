@@ -64,7 +64,7 @@ export function MailCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className={cn("w-full justify-between", !value && "text-muted-foreground", className)}
+                    className={cn("w-full min-w-0 max-w-full justify-between", !value && "text-muted-foreground", className)}
                     disabled={disabled}
                 >
                     <span className="min-w-0 flex-1 truncate text-left" title={selectedLabel ?? undefined}>
@@ -73,16 +73,20 @@ export function MailCombobox({
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
+            <PopoverContent
+                className="w-(--radix-popover-trigger-width) max-w-[calc(100vw-2rem)] overflow-hidden p-0"
+                align="start"
+            >
                 <Command>
                     <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
-                    <CommandList>
+                    <CommandList className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain">
                         <CommandEmpty>No results found.</CommandEmpty>
                         <CommandGroup>
                             {options.map((opt) => (
                                 <CommandItem
                                     key={opt.value}
-                                    value={opt.label}
+                                    value={`${opt.label} ${opt.value}`}
+                                    keywords={[opt.label]}
                                     onSelect={() => {
                                         onValueChange(opt.value);
                                         setOpen(false);

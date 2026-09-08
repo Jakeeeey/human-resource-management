@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,14 @@ interface MailBindingsManagerProps {
 export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
     const { bindings, loading, mutating, error, refresh, createBinding, toggleBinding, unhookBinding } =
         useMailBindings();
+
+    useEffect(() => {
+        const handler = () => {
+            void refresh();
+        };
+        window.addEventListener("mailing:refresh", handler);
+        return () => window.removeEventListener("mailing:refresh", handler);
+    }, [refresh]);
     const { templates } = useMailTemplates();
 
     const [eventKey, setEventKey] = useState<MailEventKey>("initial_interview.graded");
@@ -162,63 +170,68 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
             </div>
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                <Table className="min-w-[680px]">
-                    <TableHeader>
-                        <TableRow className="bg-muted/30">
-                            <TableHead className="max-w-48">Event</TableHead>
-                            <TableHead className="max-w-56">Template</TableHead>
-                            <TableHead className="w-28">Condition</TableHead>
-                            <TableHead className="w-24">Enabled</TableHead>
-                            <TableHead className="w-44 text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {bindings.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                                    No bindings yet. Hook a template to an event above.
-                                </TableCell>
+                    <Table className="min-w-[720px]">
+                        <TableHeader>
+                            <TableRow className="bg-muted/30">
+                                <TableHead className="max-w-56">Event</TableHead>
+                                <TableHead className="max-w-56">Template</TableHead>
+                                <TableHead className="max-w-40">Condition</TableHead>
+                                <TableHead className="w-24">Enabled</TableHead>
+                                <TableHead className="w-44 text-right">Actions</TableHead>
                             </TableRow>
-                        )}
-                        {bindings.map((row) => (
-                            <TableRow key={String(row.id)}>
-                                <TableCell className="max-w-48 truncate" title={row.event_key}>
-                                    {row.event_key}
-                                </TableCell>
-                                <TableCell className="max-w-56 truncate" title={templateLabel(row.template_id)}>
-                                    {templateLabel(row.template_id)}
-                                </TableCell>
-                                <TableCell className="truncate" title={row.send_condition}>
-                                    {row.send_condition}
-                                </TableCell>
-                                <TableCell>
-                                    <Switch
-                                        checked={row.is_enabled}
-                                        onCheckedChange={(next) => void handleToggle(row, next)}
-                                        disabled={mutating}
-                                        aria-label={`Enabled for ${row.event_key}`}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {onSendNow && row.event_key === "final_interview.invited" && (
-                                        <Button variant="ghost" size="sm" disabled={mutating} onClick={() => onSendNow(row)}>
-                                            Send now
-                                        </Button>
-                                    )}
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="text-destructive"
-                                        disabled={mutating}
-                                        onClick={() => void handleUnhook(row)}
+                        </TableHeader>
+                        <TableBody>
+                            {bindings.length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                                        No bindings yet. Hook a template to an event above.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                            {bindings.map((row) => (
+                                <TableRow key={String(row.id)}>
+                                    <TableCell className="max-w-56 truncate" title={row.event_key}>
+                                        {row.event_key}
+                                    </TableCell>
+                                    <TableCell
+                                        className="max-w-56 truncate text-muted-foreground"
+                                        title={templateLabel(row.template_id)}
                                     >
-                                        Unhook
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                                        {templateLabel(row.template_id)}
+                                    </TableCell>
+                                    <TableCell className="max-w-40 truncate text-muted-foreground" title={row.send_condition}>
+                                        {row.send_condition}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Switch
+                                            checked={row.is_enabled}
+                                            onCheckedChange={(next) => void handleToggle(row, next)}
+                                            disabled={mutating}
+                                            aria-label={`Enabled for ${row.event_key}`}
+                                        />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            {onSendNow && row.event_key === "final_interview.invited" && (
+                                                <Button variant="ghost" size="sm" disabled={mutating} onClick={() => onSendNow(row)}>
+                                                    Send now
+                                                </Button>
+                                            )}
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-destructive"
+                                                disabled={mutating}
+                                                onClick={() => void handleUnhook(row)}
+                                            >
+                                                Unhook
+                                            </Button>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </div>
             </div>
         </div>

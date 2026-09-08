@@ -22,6 +22,8 @@ export const mailOutboxSchema = z.object({
     warnings: z.array(z.string()).default([]),
     error: z.string().optional().nullable(),
     sent_at: z.string().optional().nullable(),
+    rendered_subject: z.string().optional().nullable(),
+    rendered_body_html: z.string().optional().nullable(),
 });
 
 export type MailOutbox = z.infer<typeof mailOutboxSchema>;

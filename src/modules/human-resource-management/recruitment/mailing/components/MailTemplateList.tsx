@@ -1,10 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Copy, MoreHorizontal, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
     Table,
     TableBody,
@@ -23,14 +32,56 @@ import type { MailTemplateRow } from "../providers/mailTemplateService";
  */
 export function MailTemplateList() {
     const router = useRouter();
-    const { templates, loading, error, refresh } = useMailTemplates();
+    const { templates, loading, error, refresh, saveTemplate } = useMailTemplates();
 
-    const openCreate = () => {
-        router.push("/hrm/mailing/templates/new");
-    };
+    useEffect(() => {
+        const handler = () => {
+            void refresh();
+        };
+        window.addEventListener("mailing:refresh", handler);
+        return () => window.removeEventListener("mailing:refresh", handler);
+    }, [refresh]);
+    const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
     const openEdit = (row: MailTemplateRow) => {
         router.push(`/hrm/mailing/templates/${String(row.id)}`);
+    };
+
+    // Duplicate posts a full copy through the existing templates POST route
+    // (saveTemplate without an id = create + list refresh). The key stays
+    // unique by checking the loaded list: {key}-copy, then -copy-2…-copy-N.
+    const duplicateTemplate = async (row: MailTemplateRow) => {
+        if (duplicatingId !== null) return;
+        const taken = new Set(templates.map((item) => item.template_key));
+        let candidate = `${row.template_key}-copy`;
+        let attempt = 1;
+        while (taken.has(candidate) && attempt < 100) {
+            attempt += 1;
+            candidate = `${row.template_key}-copy-${attempt}`;
+        }
+        if (taken.has(candidate)) {
+            toast.error("Could not find a unique key for the copy. Please try again.");
+            return;
+        }
+        const copyName = `Copy of ${row.template_name}`;
+        setDuplicatingId(String(row.id));
+        try {
+            const result = await saveTemplate({
+                template_key: candidate,
+                template_name: copyName,
+                subject: row.subject,
+                body_html: row.body_html,
+                body_text: row.body_text,
+                is_active: row.is_active,
+            });
+            if (!result.ok) {
+                toast.error(result.message);
+                return;
+            }
+            toast.success(`Duplicated as "${copyName}".`);
+        } finally {
+            setDuplicatingId(null);
+        }
     };
 
     if (loading) {
@@ -55,14 +106,6 @@ export function MailTemplateList() {
 
     return (
         <div className="grid gap-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:px-1 sm:py-1">
-                <p className="text-sm text-muted-foreground" title={`${templates.length} templates`}>
-                    {templates.length} template{templates.length === 1 ? "" : "s"}
-                </p>
-                <Button className="w-full sm:w-auto" onClick={openCreate}>
-                    New template
-                </Button>
-            </div>
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                 <Table className="min-w-[640px]">
@@ -103,9 +146,32 @@ export function MailTemplateList() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <Button variant="ghost" size="sm" onClick={() => openEdit(row)}>
-                                        Edit
-                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                aria-label={`Template actions for ${row.template_name}`}
+                                                title={`Template actions for ${row.template_name}`}
+                                                disabled={duplicatingId === String(row.id)}
+                                            >
+                                                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onSelect={() => openEdit(row)}>
+                                                <Pencil aria-hidden="true" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onSelect={() => void duplicateTemplate(row)}
+                                                disabled={duplicatingId !== null}
+                                            >
+                                                <Copy aria-hidden="true" />
+                                                {duplicatingId === String(row.id) ? "Duplicating…" : "Duplicate"}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </TableCell>
                             </TableRow>
                         ))}

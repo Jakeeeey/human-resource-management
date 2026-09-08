@@ -57,6 +57,10 @@ export interface MaskedOutboxRow {
     warnings: string[];
     error: string | null;
     sent_at: unknown;
+    /** Rendered snapshot subject (todo 21) — sender's own content, no addresses. */
+    rendered_subject: string | null;
+    /** Rendered snapshot body HTML (todo 21) — sender's own content, no addresses. */
+    rendered_body_html: string | null;
 }
 
 /**
@@ -90,6 +94,8 @@ export function toMaskedOutboxRow(
     }
 
     const rawError = row.error;
+    const rawSubject = row.rendered_subject;
+    const rawBody = row.rendered_body_html;
     return {
         id: row.id ?? null,
         idempotency_key: row.idempotency_key ?? null,
@@ -103,5 +109,68 @@ export function toMaskedOutboxRow(
                 ? null
                 : maskEmailsInFreeText(String(rawError)),
         sent_at: row.sent_at ?? null,
+        rendered_subject: typeof rawSubject === "string" ? rawSubject : null,
+        rendered_body_html: typeof rawBody === "string" ? rawBody : null,
+    };
+}
+
+/** Unmasked outbox row: `to_email` verbatim (gated companion to MaskedOutboxRow). */
+export interface OutboxRow {
+    id: unknown;
+    idempotency_key: unknown;
+    /** Full stored recipient — ONLY safe behind the login-gated routes. */
+    to_email: string;
+    template_id: unknown;
+    event_key: unknown;
+    status: unknown;
+    warnings: string[];
+    error: string | null;
+    sent_at: unknown;
+    rendered_subject: string | null;
+    rendered_body_html: string | null;
+}
+
+/**
+ * Projects a raw Directus `mail_outbox` row WITHOUT masking: `to_email`
+ * verbatim, `warnings`/`error` echoes verbatim (same array/string
+ * normalization as the masked path, zero scrubbing). ONLY call this from
+ * login-gated routes — an ungated caller would expose recipient PII.
+ * @param row - Raw Directus row object.
+ * @returns Unmasked row for authenticated viewers.
+ */
+export function toOutboxRow(row: Record<string, unknown>): OutboxRow {
+    const rawWarnings = row.warnings;
+    let warnings: string[];
+    if (Array.isArray(rawWarnings)) {
+        warnings = rawWarnings.map((entry) => String(entry));
+    } else if (typeof rawWarnings === "string" && rawWarnings.length > 0) {
+        try {
+            const parsed: unknown = JSON.parse(rawWarnings);
+            warnings = Array.isArray(parsed)
+                ? parsed.map((entry) => String(entry))
+                : [rawWarnings];
+        } catch {
+            warnings = [rawWarnings];
+        }
+    } else {
+        warnings = [];
+    }
+
+    const rawError = row.error;
+    const rawToEmail = row.to_email;
+    const rawSubject = row.rendered_subject;
+    const rawBody = row.rendered_body_html;
+    return {
+        id: row.id ?? null,
+        idempotency_key: row.idempotency_key ?? null,
+        to_email: typeof rawToEmail === "string" ? rawToEmail : "",
+        template_id: row.template_id ?? null,
+        event_key: row.event_key ?? null,
+        status: row.status ?? null,
+        warnings,
+        error: rawError === null || rawError === undefined ? null : String(rawError),
+        sent_at: row.sent_at ?? null,
+        rendered_subject: typeof rawSubject === "string" ? rawSubject : null,
+        rendered_body_html: typeof rawBody === "string" ? rawBody : null,
     };
 }
