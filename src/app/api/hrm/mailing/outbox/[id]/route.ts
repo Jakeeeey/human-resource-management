@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { toMaskedOutboxRow } from "@/modules/human-resource-management/recruitment/mailing/utils/mailMask";
+import { toOutboxRow } from "@/modules/human-resource-management/recruitment/mailing/utils/mailMask";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,9 +10,9 @@ export const dynamic = "force-dynamic";
 // GET /api/hrm/mailing/outbox/[id]
 //
 // Status-only single-row viewer (D17 — no resend endpoint exists on this
-// path). Same no-PII posture as the list route: `to_email` is masked and
-// `warnings`/`error` echoes are scrubbed before serialization. Unknown id
-// answers 404 (never 500, never a masked empty row).
+// path). LOGIN-GATED like the list route (user order 2026-09-08 —
+// `to_email` unmasked): 401 AUTH_DENIED without a valid session.
+// Unknown id answers 404 (never 500, never an empty row).
 
 const OUTBOX_FIELDS_RENDERED =
     "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at,rendered_subject,rendered_body_html";
@@ -24,6 +26,15 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const cookieStore = await cookies();
+        const token: string | undefined = cookieStore.get(COOKIE_NAME)?.value;
+        const payload = token ? decodeJwtPayload(token) : null;
+        const raw = payload?.id || payload?.user_id || payload?.sub;
+        const userId = typeof raw === "string" ? parseInt(raw, 10) : raw;
+        if (!userId) {
+            return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
+        }
+
         const resolvedParams = await params;
         const id = resolvedParams.id;
         if (!id) {
@@ -66,7 +77,7 @@ export async function GET(
 
         return NextResponse.json({
             success: true,
-            data: toMaskedOutboxRow(row),
+            data: toOutboxRow(row),
         });
     } catch (error) {
         console.error("[mailing-outbox] get-by-id error:", error);

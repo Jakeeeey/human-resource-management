@@ -25,6 +25,7 @@ import {
 import type { MailOutboxStatus } from "../types/mail-outbox.schema";
 import { useMailOutbox } from "../hooks/useMailOutbox";
 import type { MailOutboxRow } from "../providers/mailOutboxService";
+import { listSendNowApplicants } from "../providers/mailSendNowService";
 import { renderMailTemplate } from "../utils/mailRenderer";
 
 const SNAPSHOT_UNAVAILABLE_NOTE =
@@ -51,7 +52,7 @@ function useIsLargeScreen() {
 }
 
 /**
- * Wireframe timestamp: "Jun 23, 2023 AM" style with the raw value in `title`.
+ * Wireframe timestamp: "Jun 23, 2023" style with the raw value in `title`.
  * @param value - The raw sent_at string (or null).
  * @returns The formatted timestamp, or "—" when missing/unparseable.
  */
@@ -60,7 +61,7 @@ function formatOutboxTimestamp(value: unknown): string {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return String(value);
     const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return `${day} ${date.getHours() < 12 ? "AM" : "PM"}`;
+    return day;
 }
 
 /**
@@ -121,7 +122,28 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
     }, [refresh]);
     const [selected, setSelected] = useState<MailOutboxRow | null>(null);
     const [dialogRow, setDialogRow] = useState<MailOutboxRow | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(true);
+    const [applicantNames, setApplicantNames] = useState<Map<string, string>>(new Map());
     const isLarge = useIsLargeScreen();
+
+    // Recipient names: the outbox carries no name column, so resolve via the
+    // applicant directory (one fetch): application_id → full_name. The app id
+    // rides in idempotency_key segment 2 for auto/manual keys
+    // (<event>:<appId>:…); test-probe keys carry a template key instead.
+    useEffect(() => {
+        let cancelled = false;
+        void listSendNowApplicants().then((res) => {
+            if (cancelled || !res.success || !Array.isArray(res.data)) return;
+            const map = new Map<string, string>();
+            for (const row of res.data) {
+                map.set(String(row.application_id), row.full_name);
+            }
+            setApplicantNames(map);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const templateById = useMemo(() => {
         const map = new Map<string, { name: string; subject: string; body: string }>();
@@ -142,8 +164,15 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
 
     const templateNameFor = (row: MailOutboxRow): string => linkedFor(row)?.name ?? "—";
 
+    const recipientNameFor = (row: MailOutboxRow): string => {
+        if (typeof row.idempotency_key !== "string") return "—";
+        const segments = row.idempotency_key.split(":");
+        if (segments.length < 3 || segments[0] === "test" || !/^\d+$/.test(segments[1])) return "—";
+        return applicantNames.get(segments[1]) ?? "—";
+    };
+
     // Client-side over the loaded rows only (no new API params): template
-    // match AND recipient/template-name substring match, case-insensitive.
+    // match AND recipient-name/email/template-name substring match, case-insensitive.
     const filtered = useMemo(() => {
         const needle = query.trim().toLowerCase();
         return rows.filter((row) => {
@@ -156,13 +185,13 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                 if (rowTemplateId !== templateFilter) return false;
             }
             if (needle !== "") {
-                const haystack = `${row.to_email} ${templateName}`.toLowerCase();
+                const haystack = `${recipientNameFor(row)} ${row.to_email} ${templateName}`.toLowerCase();
                 if (!haystack.includes(needle)) return false;
             }
             return true;
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rows, templateFilter, query, templateById]);
+    }, [rows, templateFilter, query, templateById, applicantNames]);
 
     // Selection defaults to the first visible row; a stale pick outside the
     // current filter falls back to the first row.
@@ -170,6 +199,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
 
     const handleSelect = (row: MailOutboxRow) => {
         setSelected(row);
+        setPreviewOpen(true);
         if (!isLarge) setDialogRow(row);
     };
 
@@ -195,41 +225,44 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
 
     return (
         <div className="grid gap-3">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
+            <div className={previewOpen ? "grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]" : "grid gap-3"}>
                 <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
                     <div className="max-h-[560px] overflow-auto">
-                    <Table className="min-w-[720px]">
+                    <Table className="min-w-[880px]">
                         <TableHeader>
                             <TableRow className="bg-muted/30">
-                                <TableHead className="w-16">Status</TableHead>
+                                <TableHead className="w-16 text-center">Status</TableHead>
                                 <TableHead className="max-w-48">Recipient</TableHead>
-                                <TableHead className="max-w-56">Template Used</TableHead>
-                                <TableHead className="max-w-40">Timestamp</TableHead>
+                                <TableHead className="max-w-56">Email</TableHead>
+                                <TableHead className="max-w-56">Subject</TableHead>
+                                <TableHead className="max-w-40">Date</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {rows.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                                         No outbox rows yet.
                                     </TableCell>
                                 </TableRow>
                             )}
                             {rows.length > 0 && filtered.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                                         No rows match these filters.
                                     </TableCell>
                                 </TableRow>
                             )}
                             {filtered.map((row, index) => {
                                 const isActive = activeRow === row;
-                                const templateName = templateNameFor(row);
                                 const linked = linkedFor(row);
-                                const secondLine =
-                                    linked && linked.subject.length > 0
-                                        ? linked.subject
-                                        : String(row.event_key ?? "—");
+                                const recipientName = recipientNameFor(row);
+                                const subjectLine =
+                                    row.rendered_subject !== null && row.rendered_subject.length > 0
+                                        ? row.rendered_subject
+                                        : linked && linked.subject.length > 0
+                                          ? linked.subject
+                                          : "—";
                                 return (
                                     <TableRow
                                         key={`${String(row.idempotency_key)}-${index}`}
@@ -244,19 +277,19 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                                         }}
                                         className={`cursor-pointer ${isActive ? "border-primary/30 bg-primary/5 hover:bg-primary/10" : ""}`}
                                     >
-                                        <TableCell>
-                                            <StatusIcon status={row.status} />
+                                        <TableCell className="w-16">
+                                            <span className="flex justify-center">
+                                                <StatusIcon status={row.status} />
+                                            </span>
                                         </TableCell>
-                                        <TableCell className="max-w-48 truncate" title={row.to_email}>
+                                        <TableCell className="max-w-48 truncate" title={recipientName}>
+                                            {recipientName}
+                                        </TableCell>
+                                        <TableCell className="max-w-56 truncate" title={row.to_email}>
                                             {row.to_email}
                                         </TableCell>
-                                        <TableCell className="max-w-56">
-                                            <p className="truncate text-sm font-medium" title={templateName}>
-                                                {templateName}
-                                            </p>
-                                            <p className="truncate text-xs text-muted-foreground" title={secondLine}>
-                                                {secondLine}
-                                            </p>
+                                        <TableCell className="max-w-56 truncate" title={subjectLine}>
+                                            {subjectLine}
                                         </TableCell>
                                         <TableCell className="max-w-40 truncate" title={String(row.sent_at ?? "")}>
                                             {formatOutboxTimestamp(row.sent_at)}
@@ -268,6 +301,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                     </Table>
                     </div>
                 </div>
+                {previewOpen && (
                 <div className="hidden lg:block">
                     <div className="grid gap-2">
                         {!activeRow ? (
@@ -282,8 +316,12 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                                 }
                             />
                         )}
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => setPreviewOpen(false)}>
+                            Close preview
+                        </Button>
                     </div>
                 </div>
+                )}
             </div>
             <MailOutboxViewDialog
                 row={dialogRow}
@@ -346,17 +384,17 @@ function MailOutboxDetailContent({
     }
 
     return (
-        <div className="grid gap-2">
+        <div className="grid min-w-0 max-w-full gap-2">
             {hasFallback && (
                 <p className="text-xs text-muted-foreground">{SNAPSHOT_UNAVAILABLE_NOTE}</p>
             )}
-            <div className="rounded-xl bg-muted/50 p-3 sm:p-4">
-                <p className="truncate text-lg font-bold" title={subject ? subject : undefined}>
+            <div className="min-w-0 max-w-full rounded-xl border border-border/50 bg-muted/50 p-3 sm:p-4">
+                <p className="mb-4 truncate text-lg font-bold" title={subject ? subject : undefined}>
                     {subject || "—"}
                 </p>
-                <div className="mt-2 rounded-lg bg-muted p-4 text-sm leading-relaxed">
+                <div className="mt-2 max-h-[480px] overflow-y-auto rounded-lg border border-border bg-card p-4 text-sm leading-relaxed text-card-foreground shadow-sm">
                     {html ? (
-                        <div className="ql-container ql-snow">
+                        <div className="ql-snow">
                             <div
                                 className="ql-editor"
                                 contentEditable={false}
