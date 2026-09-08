@@ -60,7 +60,7 @@ export function MailingModule() {
                     <TabsList className="justify-start">
                         <TabsTrigger value="templates">Templates</TabsTrigger>
                         <TabsTrigger value="bindings">Bindings</TabsTrigger>
-                        <TabsTrigger value="send">Send</TabsTrigger>
+                        <TabsTrigger value="send">Compose</TabsTrigger>
                         <TabsTrigger value="outbox">Outbox</TabsTrigger>
                     </TabsList>
                     {tab === "templates" && (

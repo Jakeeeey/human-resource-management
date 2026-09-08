@@ -208,12 +208,6 @@ export function MailManualSend() {
         setVars((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Template chip detach: clears the selection, discarding unsent edits via
-    // the same re-hydrate effect as a template switch.
-    const detachTemplate = () => {
-        setTemplateId("");
-    };
-
     // Discard confirm: clears receiver + vars + customization back to the
     // template defaults (same reset lines as a successful send). The template
     // row is never touched.
@@ -323,26 +317,11 @@ export function MailManualSend() {
                     <h2 className="truncate text-lg font-semibold" title="Compose Email">
                         Compose Email
                     </h2>
-                    {pickedTemplateName ? (
-                        <p
-                            className="truncate text-sm text-muted-foreground"
-                            title={`Using ${pickedTemplateName} — edits affect this send only`}
-                        >
-                            Using {pickedTemplateName} — edits affect this send only{" "}
-                            <button
-                                type="button"
-                                onClick={detachTemplate}
-                                disabled={sending}
-                                className="text-primary underline underline-offset-4 focus-visible:ring-1 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
-                            >
-                                Change
-                            </button>
-                        </p>
-                    ) : (
-                        <p className="truncate text-sm text-muted-foreground" title="Pick a template to start composing.">
-                            Pick a template to start composing.
-                        </p>
-                    )}
+                        {!pickedTemplateName && (
+                            <p className="truncate text-sm text-muted-foreground" title="Pick an active template below to start.">
+                                Pick an active template below to start.
+                            </p>
+                        )}
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0">
                     {tokens.allowed.length > 0 && (
@@ -433,7 +412,7 @@ export function MailManualSend() {
             {missingVars.length > 0 && (
                 <p className="text-sm text-destructive" role="alert">
                     Fill in the {missingVars.length === 1 ? "highlighted field" : `${missingVars.length} highlighted fields`} before
-                    sending — we will flag anything left empty.
+                    sending
                 </p>
             )}
 
