@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Mail } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,10 +16,46 @@ import type { MailBindingRow } from "../providers/mailBindingService";
 /**
  * Mailing module root: templates CRUD + bindings manager (+ manual Send-now
  * applicant picker, todo 12) + outbox viewer.
+ *
+ * Send-Test deep-link: the Templates tab kebab navigates here with
+ * `?template=<id>`. A render-phase consume reads that query once, switches
+ * to the Send tab with the id as the composer initial template, and a
+ * strip effect removes the query so later mounts start blank. An unknown id
+ * passes through and the composer treats it as no-preselect (no matching
+ * template row).
  * @returns The tabbed module.
  */
 export function MailingModule() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const [tab, setTab] = useState("templates");
+    const [sendTemplateId, setSendTemplateId] = useState<string | undefined>(undefined);
+    const [consumedParam, setConsumedParam] = useState<string | null>(null);
     const [sendNowBinding, setSendNowBinding] = useState<MailBindingRow | null>(null);
+
+    // Render-phase consume (documented derived-state pattern, not an effect):
+    // a fresh `?template=` switches to Send with the id as composer initial.
+    // Resetting the guard when the query is gone keeps repeat Send Tests working.
+    const preselectParam = searchParams.get("template");
+    if (preselectParam && preselectParam !== consumedParam) {
+        setConsumedParam(preselectParam);
+        setSendTemplateId(preselectParam);
+        setTab("send");
+    }
+    if (!preselectParam && consumedParam !== null) {
+        setConsumedParam(null);
+    }
+
+    // External sync only: strip the consumed query so later mounts start blank.
+    useEffect(() => {
+        if (preselectParam) router.replace(pathname);
+    }, [preselectParam, router, pathname]);
+
+    const handleTabChange = (next: string) => {
+        setTab(next);
+        if (next !== "send") setSendTemplateId(undefined);
+    };
 
     return (
         <div className="grid gap-4 p-2 sm:p-6 md:p-10">
@@ -33,7 +70,7 @@ export function MailingModule() {
                     </p>
                 </div>
             </div>
-            <Tabs defaultValue="templates" className="grid gap-4">
+            <Tabs value={tab} onValueChange={handleTabChange} className="grid gap-4">
                 <TabsList className="justify-start">
                     <TabsTrigger value="templates">Templates</TabsTrigger>
                     <TabsTrigger value="bindings">Bindings</TabsTrigger>
@@ -47,7 +84,7 @@ export function MailingModule() {
                     <MailBindingsManager onSendNow={setSendNowBinding} />
                 </TabsContent>
                 <TabsContent value="send">
-                    <MailManualSend />
+                    <MailManualSend initialTemplateId={sendTemplateId} />
                 </TabsContent>
                 <TabsContent value="outbox">
                     <MailOutboxViewer />

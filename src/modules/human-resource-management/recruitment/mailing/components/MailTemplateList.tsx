@@ -1,10 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Copy, Eye, FlaskConical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
     Table,
     TableBody,
@@ -16,6 +26,15 @@ import {
 
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import type { MailTemplateRow } from "../providers/mailTemplateService";
+import {
+    MailConfirmDialog,
+    MailConfirmDialogCancel,
+    MailConfirmDialogContent,
+    MailConfirmDialogDescription,
+    MailConfirmDialogFooter,
+    MailConfirmDialogHeader,
+    MailConfirmDialogTitle,
+} from "./MailConfirmDialog";
 
 /**
  * Template list with dedicated-page create/edit navigation.
@@ -23,7 +42,9 @@ import type { MailTemplateRow } from "../providers/mailTemplateService";
  */
 export function MailTemplateList() {
     const router = useRouter();
-    const { templates, loading, error, refresh } = useMailTemplates();
+    const { templates, loading, error, refresh, saveTemplate } = useMailTemplates();
+    const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<MailTemplateRow | null>(null);
 
     const openCreate = () => {
         router.push("/hrm/mailing/templates/new");
@@ -31,6 +52,47 @@ export function MailTemplateList() {
 
     const openEdit = (row: MailTemplateRow) => {
         router.push(`/hrm/mailing/templates/${String(row.id)}`);
+    };
+
+    const openSendTest = (row: MailTemplateRow) => {
+        router.push(`/hrm/mailing?template=${encodeURIComponent(String(row.id))}`);
+    };
+
+    // Duplicate posts a full copy through the existing templates POST route
+    // (saveTemplate without an id = create + list refresh). The key stays
+    // unique by checking the loaded list: {key}-copy, then -copy-2…-copy-N.
+    const duplicateTemplate = async (row: MailTemplateRow) => {
+        if (duplicatingId !== null) return;
+        const taken = new Set(templates.map((item) => item.template_key));
+        let candidate = `${row.template_key}-copy`;
+        let attempt = 1;
+        while (taken.has(candidate) && attempt < 100) {
+            attempt += 1;
+            candidate = `${row.template_key}-copy-${attempt}`;
+        }
+        if (taken.has(candidate)) {
+            toast.error("Could not find a unique key for the copy. Please try again.");
+            return;
+        }
+        const copyName = `Copy of ${row.template_name}`;
+        setDuplicatingId(String(row.id));
+        try {
+            const result = await saveTemplate({
+                template_key: candidate,
+                template_name: copyName,
+                subject: row.subject,
+                body_html: row.body_html,
+                body_text: row.body_text,
+                is_active: row.is_active,
+            });
+            if (!result.ok) {
+                toast.error(result.message);
+                return;
+            }
+            toast.success(`Duplicated as "${copyName}".`);
+        } finally {
+            setDuplicatingId(null);
+        }
     };
 
     if (loading) {
@@ -103,9 +165,48 @@ export function MailTemplateList() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <Button variant="ghost" size="sm" onClick={() => openEdit(row)}>
-                                        Edit
-                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                aria-label={`Template actions for ${row.template_name}`}
+                                                title={`Template actions for ${row.template_name}`}
+                                                disabled={duplicatingId === String(row.id)}
+                                            >
+                                                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onSelect={() => openEdit(row)}>
+                                                <Eye aria-hidden="true" />
+                                                View
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => openEdit(row)}>
+                                                <Pencil aria-hidden="true" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onSelect={() => void duplicateTemplate(row)}
+                                                disabled={duplicatingId !== null}
+                                            >
+                                                <Copy aria-hidden="true" />
+                                                {duplicatingId === String(row.id) ? "Duplicating…" : "Duplicate"}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => openSendTest(row)}>
+                                                <FlaskConical aria-hidden="true" />
+                                                Send Test
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onSelect={() => setDeleteTarget(row)}
+                                            >
+                                                <Trash2 aria-hidden="true" />
+                                                Delete
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -113,6 +214,23 @@ export function MailTemplateList() {
                 </Table>
                 </div>
             </div>
+            <MailConfirmDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+                <MailConfirmDialogContent>
+                    <MailConfirmDialogHeader>
+                        <MailConfirmDialogTitle>
+                            {deleteTarget ? `Delete "${deleteTarget.template_name}"?` : "Delete this template?"}
+                        </MailConfirmDialogTitle>
+                        <MailConfirmDialogDescription>
+                            Templates cannot be deleted here — the templates API has no delete
+                            endpoint by design. To hide it from Send, open Edit and set the
+                            template Inactive instead.
+                        </MailConfirmDialogDescription>
+                    </MailConfirmDialogHeader>
+                    <MailConfirmDialogFooter>
+                        <MailConfirmDialogCancel>Close</MailConfirmDialogCancel>
+                    </MailConfirmDialogFooter>
+                </MailConfirmDialogContent>
+            </MailConfirmDialog>
         </div>
     );
 }

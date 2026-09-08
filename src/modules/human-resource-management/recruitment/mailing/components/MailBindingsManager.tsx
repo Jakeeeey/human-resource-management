@@ -7,14 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 
 import { mailEventKeySchema, type MailEventKey } from "../types/mail-template.schema";
 import { mailSendConditionSchema, type MailSendCondition } from "../types/mail-binding.schema";
@@ -36,7 +28,7 @@ interface MailBindingsManagerProps {
  * Bindings manager: 3-key select + condition select + enabled toggle +
  * unhook. Never defaults to an enabled final_interview.invited binding.
  * @param onSendNow - Optional Send-now hook point (todo 12).
- * @returns The bindings table + create form.
+ * @returns The bindings flow cards + create form.
  */
 export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
     const { bindings, loading, mutating, error, refresh, createBinding, toggleBinding, unhookBinding } =
@@ -160,46 +152,57 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                     Add binding
                 </Button>
             </div>
-            <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                <Table className="min-w-[680px]">
-                    <TableHeader>
-                        <TableRow className="bg-muted/30">
-                            <TableHead className="max-w-48">Event</TableHead>
-                            <TableHead className="max-w-56">Template</TableHead>
-                            <TableHead className="w-28">Condition</TableHead>
-                            <TableHead className="w-24">Enabled</TableHead>
-                            <TableHead className="w-44 text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {bindings.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                                    No bindings yet. Hook a template to an event above.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {bindings.map((row) => (
-                            <TableRow key={String(row.id)}>
-                                <TableCell className="max-w-48 truncate" title={row.event_key}>
+            <div className="grid gap-4">
+                {bindings.length === 0 && (
+                    <div className="rounded-lg border border-border bg-card p-4 text-center text-sm text-muted-foreground">
+                        No bindings yet. Hook a template to an event above.
+                    </div>
+                )}
+                {bindings.map((row) => (
+                    <div key={String(row.id)} className="rounded-lg border border-border bg-card p-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0 truncate text-sm font-semibold" title={row.event_key}>
+                                {row.event_key}
+                            </div>
+                            <Switch
+                                checked={row.is_enabled}
+                                onCheckedChange={(next) => void handleToggle(row, next)}
+                                disabled={mutating}
+                                aria-label={`Enabled for ${row.event_key}`}
+                            />
+                        </div>
+                        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                            <div className="min-w-0 flex-1 rounded-lg border border-border bg-muted/30 p-3">
+                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Trigger</div>
+                                <div className="min-w-0 truncate text-sm font-medium" title={row.event_key}>
                                     {row.event_key}
-                                </TableCell>
-                                <TableCell className="max-w-56 truncate" title={templateLabel(row.template_id)}>
-                                    {templateLabel(row.template_id)}
-                                </TableCell>
-                                <TableCell className="truncate" title={row.send_condition}>
+                                </div>
+                                <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                    Condition
+                                </div>
+                                <div className="truncate text-sm text-muted-foreground" title={row.send_condition}>
                                     {row.send_condition}
-                                </TableCell>
-                                <TableCell>
-                                    <Switch
-                                        checked={row.is_enabled}
-                                        onCheckedChange={(next) => void handleToggle(row, next)}
-                                        disabled={mutating}
-                                        aria-label={`Enabled for ${row.event_key}`}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-right">
+                                </div>
+                            </div>
+                            <span aria-hidden="true" className="self-center text-muted-foreground">
+                                →
+                            </span>
+                            <div className="min-w-0 flex-1 rounded-lg border border-border bg-muted/30 p-3">
+                                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Action</div>
+                                <div className="text-sm font-medium">Send template</div>
+                                <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                                    Template
+                                </div>
+                                <div
+                                    className="min-w-0 truncate text-sm text-muted-foreground"
+                                    title={templateLabel(row.template_id)}
+                                >
+                                    {templateLabel(row.template_id)}
+                                </div>
+                                <div className="mt-1 truncate text-xs text-muted-foreground" title="Applicant email">
+                                    Applicant email
+                                </div>
+                                <div className="mt-3 flex flex-wrap justify-end gap-2">
                                     {onSendNow && row.event_key === "final_interview.invited" && (
                                         <Button variant="ghost" size="sm" disabled={mutating} onClick={() => onSendNow(row)}>
                                             Send now
@@ -214,12 +217,11 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                                     >
                                         Unhook
                                     </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-                </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

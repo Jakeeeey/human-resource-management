@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import {
@@ -29,9 +28,17 @@ import {
 } from "./MailConfirmDialog";
 import { MailStatusBadge } from "./MailStatusBadge";
 import { MailVarDocs } from "./MailHoverCard";
-import { toFriendlyMailVarName } from "./MailTemplateEditor";
+import { MailTemplateEditor, toFriendlyMailVarName } from "./MailTemplateEditor";
+import type { MailTemplateEditorHandle } from "./MailTemplateEditor";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+interface MailManualSendProps {
+    // Mount-only initial template (Send-Test deep-link from the Templates
+    // tab kebab via `?template=<id>`, read by MailingModule). Ignored after
+    // mount: the Send tab remounts per visit, so each deep-link lands fresh.
+    initialTemplateId?: string;
+}
 
 /**
  * Manual Send composer (template picker + receiver + variable fill-in +
@@ -40,17 +47,18 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * the Send-now list shape (rows without application_id already dropped by the
  * provider). Customization is send-only: the template row is never patched.
  * Switching templates re-hydrates subject/body/vars, discarding unsent edits.
+ * @param initialTemplateId - Preselected template id on first mount only.
  * @returns The Gmail-native single column (sticky header, borderless To/Subject
  * rows, open body canvas, variables strip, toggle-only preview, sticky send bar).
  */
-export function MailManualSend() {
+export function MailManualSend({ initialTemplateId }: MailManualSendProps = {}) {
     const { templates, loading: templatesLoading, error: templatesError, refresh: refreshTemplates } =
         useMailTemplates();
 
     const [applicants, setApplicants] = useState<SendNowApplicant[]>([]);
     const [applicantsLoading, setApplicantsLoading] = useState(true);
     const [applicantsError, setApplicantsError] = useState<string | null>(null);
-    const [templateId, setTemplateId] = useState("");
+    const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
     const [pickedId, setPickedId] = useState("");
     const [toEmail, setToEmail] = useState("");
     const [subject, setSubject] = useState("");
@@ -59,6 +67,11 @@ export function MailManualSend() {
     const [sending, setSending] = useState(false);
     const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
     const [confirmOpen, setConfirmOpen] = useState(false);
+
+    // Body editor ref (page-level creation, same as MailTemplatePage): bodyHtml
+    // state holds DISPLAY html (chip spans); consumers read CLEAN html
+    // ({{tokens}}) via getCleanHtml() inside memos/handlers only.
+    const editorRef = useRef<MailTemplateEditorHandle | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -127,9 +140,19 @@ export function MailManualSend() {
 
     // Var inputs derive from the LIVE customized text (first-seen order):
     // typing a new allowlisted {{token}} into subject/body reveals its input.
-    const tokens = useMemo(
-        () => extractMailVarTokens(subject, bodyHtml),
-        [subject, bodyHtml]
+    // The body read is the CLEAN html (chip spans serialized back to
+    // {{tokens}}); the display state alone would hide painted chips.
+    const tokens = useMemo(() => {
+        const cleanBody = editorRef.current?.getCleanHtml() ?? bodyHtml;
+        return extractMailVarTokens(subject, cleanBody);
+    }, [subject, bodyHtml, editorRef]);
+
+    // Clean body for the preview card: same chip-serialization as the tokens
+    // strip so the preview renders plain {{tokens}} (MailComposePreview
+    // itself is untouched — it still receives plain body html).
+    const previewBodyHtml = useMemo(
+        () => editorRef.current?.getCleanHtml() ?? bodyHtml,
+        [bodyHtml, editorRef]
     );
 
     // Trimmed, blank-dropped vars shared by the preview and the POST body.
@@ -185,12 +208,15 @@ export function MailManualSend() {
         try {
             const trimmedEmail = toEmail.trim();
             const trimmedSubject = subject.trim();
+            // POST the CLEAN body (chip spans serialized back to {{tokens}});
+            // the non-empty guard runs on the clean string.
+            const cleanBody = editorRef.current?.getCleanHtml() ?? bodyHtml;
             const result = await postManualMailSend({
                 template_id: templateId,
                 application_id: picked.application_id,
                 ...(trimmedEmail.length > 0 ? { to_email: trimmedEmail } : {}),
                 ...(trimmedSubject.length > 0 ? { subject: trimmedSubject } : {}),
-                ...(bodyHtml.length > 0 ? { body_html: bodyHtml } : {}),
+                ...(cleanBody.length > 0 ? { body_html: cleanBody } : {}),
                 ...(Object.keys(sendVars).length > 0 ? { vars: sendVars } : {}),
             });
             if (!result.success) {
@@ -368,15 +394,7 @@ export function MailManualSend() {
                     <Label htmlFor="mail-manualsend-body" className="text-xs text-muted-foreground">
                         Body
                     </Label>
-                    <Textarea
-                        id="mail-manualsend-body"
-                        value={bodyHtml}
-                        onChange={(e) => setBodyHtml(e.target.value)}
-                        placeholder="Email body ({{variables}} fill in on send)"
-                        disabled={sending}
-                        rows={8}
-                        className="min-h-64 resize-y border-0 bg-transparent shadow-none focus-visible:ring-0"
-                    />
+                    <MailTemplateEditor ref={editorRef} value={bodyHtml} onChange={setBodyHtml} />
                 </div>
             )}
         </div>
@@ -385,7 +403,7 @@ export function MailManualSend() {
     const previewPane = selectedTemplate ? (
         <MailComposePreview
             subject={subject}
-            bodyHtml={bodyHtml}
+            bodyHtml={previewBodyHtml}
             vars={sendVars}
             applicantLabel={applicantLabel}
         />
