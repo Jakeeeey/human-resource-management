@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy, Eye, FlaskConical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Copy, MoreHorizontal, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -26,15 +25,6 @@ import {
 
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import type { MailTemplateRow } from "../providers/mailTemplateService";
-import {
-    MailConfirmDialog,
-    MailConfirmDialogCancel,
-    MailConfirmDialogContent,
-    MailConfirmDialogDescription,
-    MailConfirmDialogFooter,
-    MailConfirmDialogHeader,
-    MailConfirmDialogTitle,
-} from "./MailConfirmDialog";
 
 /**
  * Template list with dedicated-page create/edit navigation.
@@ -43,19 +33,18 @@ import {
 export function MailTemplateList() {
     const router = useRouter();
     const { templates, loading, error, refresh, saveTemplate } = useMailTemplates();
-    const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<MailTemplateRow | null>(null);
 
-    const openCreate = () => {
-        router.push("/hrm/mailing/templates/new");
-    };
+    useEffect(() => {
+        const handler = () => {
+            void refresh();
+        };
+        window.addEventListener("mailing:refresh", handler);
+        return () => window.removeEventListener("mailing:refresh", handler);
+    }, [refresh]);
+    const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
     const openEdit = (row: MailTemplateRow) => {
         router.push(`/hrm/mailing/templates/${String(row.id)}`);
-    };
-
-    const openSendTest = (row: MailTemplateRow) => {
-        router.push(`/hrm/mailing?template=${encodeURIComponent(String(row.id))}`);
     };
 
     // Duplicate posts a full copy through the existing templates POST route
@@ -117,14 +106,6 @@ export function MailTemplateList() {
 
     return (
         <div className="grid gap-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:px-1 sm:py-1">
-                <p className="text-sm text-muted-foreground" title={`${templates.length} templates`}>
-                    {templates.length} template{templates.length === 1 ? "" : "s"}
-                </p>
-                <Button className="w-full sm:w-auto" onClick={openCreate}>
-                    New template
-                </Button>
-            </div>
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                 <Table className="min-w-[640px]">
@@ -179,10 +160,6 @@ export function MailTemplateList() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem onSelect={() => openEdit(row)}>
-                                                <Eye aria-hidden="true" />
-                                                View
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => openEdit(row)}>
                                                 <Pencil aria-hidden="true" />
                                                 Edit
                                             </DropdownMenuItem>
@@ -193,18 +170,6 @@ export function MailTemplateList() {
                                                 <Copy aria-hidden="true" />
                                                 {duplicatingId === String(row.id) ? "Duplicating…" : "Duplicate"}
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => openSendTest(row)}>
-                                                <FlaskConical aria-hidden="true" />
-                                                Send Test
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                variant="destructive"
-                                                onSelect={() => setDeleteTarget(row)}
-                                            >
-                                                <Trash2 aria-hidden="true" />
-                                                Delete
-                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
@@ -214,23 +179,6 @@ export function MailTemplateList() {
                 </Table>
                 </div>
             </div>
-            <MailConfirmDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-                <MailConfirmDialogContent>
-                    <MailConfirmDialogHeader>
-                        <MailConfirmDialogTitle>
-                            {deleteTarget ? `Delete "${deleteTarget.template_name}"?` : "Delete this template?"}
-                        </MailConfirmDialogTitle>
-                        <MailConfirmDialogDescription>
-                            Templates cannot be deleted here — the templates API has no delete
-                            endpoint by design. To hide it from Send, open Edit and set the
-                            template Inactive instead.
-                        </MailConfirmDialogDescription>
-                    </MailConfirmDialogHeader>
-                    <MailConfirmDialogFooter>
-                        <MailConfirmDialogCancel>Close</MailConfirmDialogCancel>
-                    </MailConfirmDialogFooter>
-                </MailConfirmDialogContent>
-            </MailConfirmDialog>
         </div>
     );
 }

@@ -114,6 +114,14 @@ function outboxRowTitle(row: MailOutboxRow, linked: LinkedTemplate | null): stri
  */
 export function MailOutboxViewer() {
     const { rows, loading, error, status, setStatus, refresh } = useMailOutbox();
+
+    useEffect(() => {
+        const handler = () => {
+            void refresh();
+        };
+        window.addEventListener("mailing:refresh", handler);
+        return () => window.removeEventListener("mailing:refresh", handler);
+    }, [refresh]);
     const { templates } = useMailTemplates();
     const [templateFilter, setTemplateFilter] = useState("");
     const [query, setQuery] = useState("");
@@ -233,14 +241,9 @@ export function MailOutboxViewer() {
                     />
                 </div>
             </div>
-            <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">
-                    {filtered.length} {filtered.length === 1 ? "row" : "rows"}
-                </p>
-                <Button variant="outline" size="sm" className="ml-auto" onClick={() => void refresh()}>
-                    Refresh
-                </Button>
-            </div>
+            <p className="text-xs text-muted-foreground">
+                {filtered.length} {filtered.length === 1 ? "row" : "rows"}
+            </p>
             <div className="grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
                 <div
                     role="listbox"

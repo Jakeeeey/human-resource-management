@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -33,13 +33,6 @@ import type { MailTemplateEditorHandle } from "./MailTemplateEditor";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-interface MailManualSendProps {
-    // Mount-only initial template (Send-Test deep-link from the Templates
-    // tab kebab via `?template=<id>`, read by MailingModule). Ignored after
-    // mount: the Send tab remounts per visit, so each deep-link lands fresh.
-    initialTemplateId?: string;
-}
-
 /**
  * Manual Send composer (template picker + receiver + variable fill-in +
  * send-only customization + live preview, one click = one manual-send POST =
@@ -47,18 +40,17 @@ interface MailManualSendProps {
  * the Send-now list shape (rows without application_id already dropped by the
  * provider). Customization is send-only: the template row is never patched.
  * Switching templates re-hydrates subject/body/vars, discarding unsent edits.
- * @param initialTemplateId - Preselected template id on first mount only.
  * @returns The Gmail-native single column (sticky header, borderless To/Subject
  * rows, open body canvas, variables strip, toggle-only preview, sticky send bar).
  */
-export function MailManualSend({ initialTemplateId }: MailManualSendProps = {}) {
+export function MailManualSend() {
     const { templates, loading: templatesLoading, error: templatesError, refresh: refreshTemplates } =
         useMailTemplates();
 
     const [applicants, setApplicants] = useState<SendNowApplicant[]>([]);
     const [applicantsLoading, setApplicantsLoading] = useState(true);
     const [applicantsError, setApplicantsError] = useState<string | null>(null);
-    const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
+    const [templateId, setTemplateId] = useState("");
     const [pickedId, setPickedId] = useState("");
     const [toEmail, setToEmail] = useState("");
     const [subject, setSubject] = useState("");
@@ -73,7 +65,7 @@ export function MailManualSend({ initialTemplateId }: MailManualSendProps = {}) 
     // ({{tokens}}) via getCleanHtml() inside memos/handlers only.
     const editorRef = useRef<MailTemplateEditorHandle | null>(null);
 
-    useEffect(() => {
+    const loadApplicants = useCallback(() => {
         let cancelled = false;
         setApplicantsLoading(true);
         setApplicantsError(null);
@@ -91,6 +83,21 @@ export function MailManualSend({ initialTemplateId }: MailManualSendProps = {}) 
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => loadApplicants(), [loadApplicants]);
+
+    const handleRefresh = useCallback(() => {
+        void refreshTemplates();
+        loadApplicants();
+    }, [refreshTemplates, loadApplicants]);
+
+    useEffect(() => {
+        const handler = () => {
+            handleRefresh();
+        };
+        window.addEventListener("mailing:refresh", handler);
+        return () => window.removeEventListener("mailing:refresh", handler);
+    }, [handleRefresh]);
 
     const templateOptions = useMemo(
         () =>
