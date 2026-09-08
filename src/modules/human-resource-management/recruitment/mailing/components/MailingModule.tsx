@@ -6,6 +6,7 @@ import { Mail } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { MailBindingsManager } from "./MailBindingsManager";
+import { MailManualSend } from "./MailManualSend";
 import { MailOutboxViewer } from "./MailOutboxViewer";
 import { MailSendNowDialog } from "./MailSendNowDialog";
 import { MailTemplateList } from "./MailTemplateList";
@@ -36,6 +37,7 @@ export function MailingModule() {
                 <TabsList className="justify-start">
                     <TabsTrigger value="templates">Templates</TabsTrigger>
                     <TabsTrigger value="bindings">Bindings</TabsTrigger>
+                    <TabsTrigger value="send">Send</TabsTrigger>
                     <TabsTrigger value="outbox">Outbox</TabsTrigger>
                 </TabsList>
                 <TabsContent value="templates">
@@ -43,6 +45,9 @@ export function MailingModule() {
                 </TabsContent>
                 <TabsContent value="bindings">
                     <MailBindingsManager onSendNow={setSendNowBinding} />
+                </TabsContent>
+                <TabsContent value="send">
+                    <MailManualSend />
                 </TabsContent>
                 <TabsContent value="outbox">
                     <MailOutboxViewer />

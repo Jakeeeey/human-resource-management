@@ -108,7 +108,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * wall time for sent_at on real sends. Never server default / UTC toISOString.
  * @returns Current Philippine time as a MySQL-compatible string.
  */
-function getPhilippineTime(): string {
+export function getPhilippineTime(): string {
     return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
 }
 
@@ -134,7 +134,7 @@ export function matchSendCondition(condition: unknown, verdict: unknown): boolea
  * @param ctx - Dispatch context.
  * @returns Trimmed email, or "" when missing/unresolvable.
  */
-async function resolveRecipientEmail(ctx: DispatchCtx): Promise<string> {
+export async function resolveRecipientEmail(ctx: DispatchCtx): Promise<string> {
     try {
         if (typeof ctx.to_email === "string" && ctx.to_email.trim().length > 0) {
             return ctx.to_email.trim();
@@ -189,7 +189,7 @@ async function listEnabledBindings(eventKey: string): Promise<BindingRow[]> {
  * @param templateId - Template id from the binding.
  * @returns Template row, or null when missing/inactive.
  */
-async function fetchActiveTemplate(templateId: string | number): Promise<TemplateRow | null> {
+export async function fetchActiveTemplate(templateId: string | number): Promise<TemplateRow | null> {
     try {
         const res = (await dFetch(
             `/items/mail_templates/${encodeURIComponent(String(templateId))}` +
@@ -245,7 +245,7 @@ interface OutboxWrite {
  * @param row - Outbox payload.
  * @returns True when the row was recorded.
  */
-async function writeOutboxRow(row: OutboxWrite): Promise<boolean> {
+export async function writeOutboxRow(row: OutboxWrite): Promise<boolean> {
     try {
         await dFetch("/items/mail_outbox", {
             method: "POST",
@@ -266,7 +266,7 @@ async function writeOutboxRow(row: OutboxWrite): Promise<boolean> {
  * @param cap - MAIL_RATE_PER_MINUTE (default 20).
  * @returns True when the send may proceed (slot consumed).
  */
-function takeRateSlot(cap: number): boolean {
+export function takeRateSlot(cap: number): boolean {
     const now = Date.now();
     while (sendTimestamps.length > 0 && now - (sendTimestamps[0] as number) > 60_000) {
         sendTimestamps.shift();

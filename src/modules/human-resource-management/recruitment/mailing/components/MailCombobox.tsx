@@ -76,13 +76,14 @@ export function MailCombobox({
             <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                 <Command>
                     <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
-                    <CommandList>
+                    <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
                         <CommandEmpty>No results found.</CommandEmpty>
                         <CommandGroup>
                             {options.map((opt) => (
                                 <CommandItem
                                     key={opt.value}
-                                    value={opt.label}
+                                    value={`${opt.label} ${opt.value}`}
+                                    keywords={[opt.label]}
                                     onSelect={() => {
                                         onValueChange(opt.value);
                                         setOpen(false);
