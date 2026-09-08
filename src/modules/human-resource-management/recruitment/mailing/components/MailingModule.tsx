@@ -69,16 +69,16 @@ export function MailingModule() {
                         </Button>
                     )}
                 </div>
-                <TabsContent value="templates">
+                <TabsContent value="templates" forceMount hidden={tab !== "templates"}>
                     <MailTemplateList />
                 </TabsContent>
-                <TabsContent value="bindings">
+                <TabsContent value="bindings" forceMount hidden={tab !== "bindings"}>
                     <MailBindingsManager onSendNow={setSendNowBinding} />
                 </TabsContent>
-                <TabsContent value="send">
+                <TabsContent value="send" forceMount hidden={tab !== "send"}>
                     <MailManualSend />
                 </TabsContent>
-                <TabsContent value="outbox">
+                <TabsContent value="outbox" forceMount hidden={tab !== "outbox"}>
                     <MailOutboxViewer />
                 </TabsContent>
             </Tabs>
