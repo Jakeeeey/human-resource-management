@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         }
 
         const subjectRender = renderMailTemplate(typeof template.subject === "string" ? template.subject : "", SAMPLE_VARS);
-        const bodyRender = renderMailTemplate(typeof template.body_html === "string" ? template.body_html : "", SAMPLE_VARS);
+        const bodyRender = renderMailTemplate(typeof template.body_html === "string" ? template.body_html : "", SAMPLE_VARS, { boldVars: true });
         const warnings = [...subjectRender.warnings, ...bodyRender.warnings];
 
         const forbiddenReason = assertMailableHtml(bodyRender.text);
