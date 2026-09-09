@@ -36,8 +36,6 @@ export const APPLICANT_STAGE = [
     "Initial Failed",
     "Recommended",
     "Final Pending",
-    "Final Passed",
-    "Final Failed",
     "Approved",
     "Hired",
     "Rejected",
@@ -155,8 +153,10 @@ function initialStageFor(verdict: InterviewVerdict): ApplicantStage {
 }
 
 function finalStageFor(verdict: InterviewVerdict): ApplicantStage {
-    if (verdict === "Passed") return "Final Passed";
-    if (verdict === "Failed") return "Final Failed";
+    // Graded Finals collapse into the recommendation outcome they drive
+    // (Passed auto-approves, Failed auto-rejects): no separate stages.
+    if (verdict === "Passed") return "Approved";
+    if (verdict === "Failed") return "Rejected";
     return "Final Pending";
 }
 

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
+import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
+import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 
 export const dynamic = "force-dynamic";
 
@@ -50,11 +52,12 @@ export async function GET() {
             return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
         }
 
-        const [list, quizApps, recommendedRecs, users] = await Promise.all([
+        const [list, quizApps, recommendedRecs, users, allRecs] = await Promise.all([
             interviewService.fetchInterviews(),
             interviewService.fetchQuizCompletedApplications(),
             interviewService.fetchRecommendedRecommendations(),
             manpowerRecommendationService.fetchUsers(),
+            manpowerRecommendationService.fetchAll(),
         ]);
         const interviews = list.interviews;
 
@@ -85,8 +88,19 @@ export async function GET() {
         for (const i of interviews) {
             if (i.stage === "Final" && i.recommendation_id != null) finalRecIds.add(i.recommendation_id);
         }
-        const eligibleFinal = recommendedRecs
-            .filter((rec) => finalRecIds.has(rec.id))
+        // Every recommendation with a Final interview stays visible regardless
+        // of current status: a Passed Final auto-flips its rec to Approved,
+        // which drops it from the Recommended-only pool and hid graded rows.
+        const recommendedIds = new Set(recommendedRecs.map((r) => r.id));
+        const applicantNameById = new Map(list.applicants.map((a) => [a.id, a.full_name]));
+        const extraRecs = allRecs
+            .filter((r) => r.id !== undefined && !recommendedIds.has(r.id))
+            .map((r) => ({
+                ...r,
+                full_name: (r.applicant_id != null ? applicantNameById.get(r.applicant_id) : undefined) ?? "Unknown applicant",
+            }));
+        const eligibleFinal = [...recommendedRecs, ...extraRecs]
+            .filter((rec) => rec.id !== undefined && finalRecIds.has(rec.id))
             .map((rec) => {
                 const finals = interviews
                     .filter((i) => i.stage === "Final" && i.recommendation_id === rec.id)
@@ -155,7 +169,23 @@ export async function POST(req: NextRequest) {
             created.stage === "Final" && created.verdict === "Passed"
                 ? await maybeAutoApproveRecommendation(created.recommendation_id)
                 : false;
-        return NextResponse.json({ data: created, autoApproved }, { status: 201 });
+        const autoRejected =
+            created.stage === "Final" && created.verdict === "Failed"
+                ? await maybeAutoRejectRecommendation(created.recommendation_id)
+                : false;
+        // Mail hook (mailing-module todo 11): stage-routed graded event, never awaited.
+        void dispatchMail(created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
+            event_key: created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",
+            application_id: created.application_id,
+            interview_id: created.id,
+            verdict: created.verdict,
+            vars: {
+                verdict: String(created.verdict ?? ""),
+                result: String(created.verdict ?? ""),
+                stage: String(created.stage ?? ""),
+            },
+        }).catch(logRedacted);
+        return NextResponse.json({ data: created, autoApproved, autoRejected }, { status: 201 });
     } catch (e: unknown) {
         const err = e as Error;
         if (err && typeof err === "object" && "issues" in err) {

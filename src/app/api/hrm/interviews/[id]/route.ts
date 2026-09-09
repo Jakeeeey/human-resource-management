@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
+import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
+import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +95,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 data.stage === "Final" && data.verdict === "Passed"
                     ? await maybeAutoApproveRecommendation(data.recommendation_id)
                     : false;
-            return NextResponse.json({ data, autoApproved });
+            const autoRejected =
+                data.stage === "Final" && data.verdict === "Failed"
+                    ? await maybeAutoRejectRecommendation(data.recommendation_id)
+                    : false;
+            // Mail hook (mailing-module todo 11): stage-routed graded event, never awaited.
+            void dispatchMail(data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
+                event_key: data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",
+                application_id: data.application_id,
+                interview_id: data.id,
+                verdict: data.verdict,
+                vars: {
+                    verdict: String(data.verdict ?? ""),
+                    result: String(data.verdict ?? ""),
+                    stage: String(data.stage ?? ""),
+                },
+            }).catch(logRedacted);
+            return NextResponse.json({ data, autoApproved, autoRejected });
         }
 
         // The client sends only { verdict, notes, interviewed_by } — it has no
@@ -106,7 +124,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             data.stage === "Final" && data.verdict === "Passed" && existing?.verdict !== "Passed"
                 ? await maybeAutoApproveRecommendation(data.recommendation_id)
                 : false;
-        return NextResponse.json({ data, autoApproved });
+        const autoRejected =
+            data.stage === "Final" && data.verdict === "Failed" && existing?.verdict !== "Failed"
+                ? await maybeAutoRejectRecommendation(data.recommendation_id)
+                : false;
+        // Mail hook (mailing-module todo 11): real verdict transitions only, never awaited.
+        if (data.verdict !== existing?.verdict) {
+            void dispatchMail(data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
+                event_key: data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",
+                application_id: data.application_id,
+                interview_id: data.id,
+                verdict: data.verdict,
+                vars: {
+                    verdict: String(data.verdict ?? ""),
+                    result: String(data.verdict ?? ""),
+                    stage: String(data.stage ?? ""),
+                },
+            }).catch(logRedacted);
+        }
+        return NextResponse.json({ data, autoApproved, autoRejected });
     } catch (e: unknown) {
         console.error("Error in PATCH /api/hrm/interviews/[id]:", e);
         const rawMessage = (e as Error).message || "INTERNAL_FAIL";

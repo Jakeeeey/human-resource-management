@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { FileText } from "lucide-react";
+import { Eye, FileText } from "lucide-react";
+import { AttachmentPreviewDialog, type ApplicationAttachmentFile } from "./AttachmentPreviewDialog";
 
 import { Form } from "@/components/ui/form";
 import {
@@ -57,7 +58,8 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
     const [loadError, setLoadError] = useState<string | null>(null);
     const [submittedAt, setSubmittedAt] = useState<string>("");
     const [signatureImage, setSignatureImage] = useState<string | null>(null);
-    const [attachmentFiles, setAttachmentFiles] = useState<{ type: string; label: string; filename: string; file_url: string | null }[]>([]);
+    const [attachmentFiles, setAttachmentFiles] = useState<ApplicationAttachmentFile[]>([]);
+    const [previewFile, setPreviewFile] = useState<ApplicationAttachmentFile | null>(null);
 
     useEffect(() => {
         if (!open || applicantId === null) return;
@@ -116,7 +118,8 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
     }, [open, applicantId]);
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <>
+        <Dialog open={open} onOpenChange={(o) => { if (!o) setPreviewFile(null); onOpenChange(o); }}>
             <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
@@ -177,9 +180,21 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                                                     <p className="text-xs text-muted-foreground truncate">{f.type}{f.label ? ` — ${f.label}` : ""}</p>
                                                 </div>
                                                 {f.file_url ? (
-                                                    <a href={f.file_url} download={f.filename} className="text-sm font-medium text-primary hover:underline shrink-0">
-                                                        Download
-                                                    </a>
+                                                    <>
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => setPreviewFile(f)}
+                                                            className="shrink-0 rounded-lg h-7 px-2 sm:px-3"
+                                                        >
+                                                            <Eye className="mr-1 h-3 w-3 sm:mr-1.5 sm:h-3.5 sm:w-3.5" />
+                                                            Preview
+                                                        </Button>
+                                                        <a href={f.file_url} download={f.filename} className="text-sm font-medium text-primary hover:underline shrink-0">
+                                                            Download
+                                                        </a>
+                                                    </>
                                                 ) : (
                                                     <span className="text-xs text-muted-foreground shrink-0">Unavailable</span>
                                                 )}
@@ -203,5 +218,11 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                 </div>
             </DialogContent>
         </Dialog>
+        <AttachmentPreviewDialog
+            open={previewFile !== null}
+            onOpenChange={(o) => { if (!o) setPreviewFile(null); }}
+            file={previewFile}
+        />
+        </>
     );
 }

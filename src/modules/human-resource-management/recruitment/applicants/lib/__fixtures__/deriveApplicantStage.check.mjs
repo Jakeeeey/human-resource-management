@@ -13,8 +13,6 @@ const EXPECTED_ORDER = [
     "Initial Failed",
     "Recommended",
     "Final Pending",
-    "Final Passed",
-    "Final Failed",
     "Approved",
     "Hired",
     "Rejected",
@@ -99,7 +97,7 @@ const cases = [
             recommendations: [rec(5, "Recommended", "2026-01-04T08:00:00")],
             finalInterviews: [iv(9, "Passed", "2026-01-05T08:00:00", 5)],
         }),
-        expect: "Final Passed",
+        expect: "Approved",
     },
     {
         name: "final-failed",
@@ -107,7 +105,7 @@ const cases = [
             recommendations: [rec(5, "Recommended", "2026-01-04T08:00:00")],
             finalInterviews: [iv(9, "Failed", "2026-01-05T08:00:00", 5)],
         }),
-        expect: "Final Failed",
+        expect: "Rejected",
     },
     {
         name: "approved",
@@ -164,7 +162,7 @@ const cases = [
                 iv(10, "Passed", "2026-01-06T08:00:00", 5),
             ],
         }),
-        expect: "Final Passed",
+        expect: "Approved",
     },
     {
         name: "quiz-ignored-then-initial-passed",
