@@ -34,6 +34,10 @@ const FROZEN_EVENT_KEYS = [
     "initial_interview.graded",
     "final_interview.graded",
     "final_interview.invited",
+    "onboarding.profile_created",
+    "onboarding.docs_verified",
+    "onboarding.training_completed",
+    "onboarding.completed",
 ] as const;
 
 type FrozenEventKey = (typeof FROZEN_EVENT_KEYS)[number];
