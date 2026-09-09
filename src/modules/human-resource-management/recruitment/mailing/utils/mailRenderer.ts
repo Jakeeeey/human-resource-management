@@ -24,25 +24,44 @@ export interface RenderMailResult {
     warnings: string[];
 }
 
+export interface RenderMailOptions {
+    /** Wraps non-empty substituted values in `<strong>` (body renders only —
+     * subjects must never pass this: email subjects carry no HTML). */
+    boldVars?: boolean;
+}
+
+function escapeMailVarValue(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
 /**
  * Substitutes {{var}} tokens against the frozen allowlist.
  * @param template - Subject or body carrying {{var}} tokens.
  * @param vars - Per-send variable values (e.g. applicant_name, position).
+ * @param options - `{ boldVars: true }` escapes + bolds substituted values
+ * (body HTML only — plaintext-safe: mailHtmlToText decodes the entities).
  * @returns The rendered text plus unknown-var warnings.
  */
 export function renderMailTemplate(
     template: string,
-    vars: Record<string, string>
+    vars: Record<string, string>,
+    options?: RenderMailOptions
 ): RenderMailResult {
     if (typeof template !== "string" || template.length === 0) {
         return { text: template ?? "", warnings: [] };
     }
+    const boldVars = options?.boldVars === true;
     const seen = new Set<string>();
     const warnings: string[] = [];
     const text = template.replace(VAR_TOKEN, (_match, name: string) => {
         if (ALLOWLIST.has(name)) {
             const value = vars[name];
-            return typeof value === "string" ? value : "";
+            if (typeof value !== "string" || value.length === 0) return "";
+            return boldVars ? `<strong>${escapeMailVarValue(value)}</strong>` : value;
         }
         if (!seen.has(name)) {
             seen.add(name);

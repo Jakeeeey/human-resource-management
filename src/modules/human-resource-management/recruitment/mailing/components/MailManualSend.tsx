@@ -240,14 +240,15 @@ export function MailManualSend() {
         setVars({});
     }, [templateId, selectedSubject, selectedBody]);
 
-    // Var inputs derive from the LIVE customized text (first-seen order):
-    // typing a new allowlisted {{token}} into subject/body reveals its input.
-    // The body read is the CLEAN html (chip spans serialized back to
+    // Var inputs derive from the LIVE customized body only (first-seen
+    // order): the subject is plain text, so its {{tokens}} never surface as
+    // inputs. Typing a new allowlisted {{token}} into the body reveals its
+    // input. The body read is the CLEAN html (chip spans serialized back to
     // {{tokens}}); the display state alone would hide painted chips.
     const tokens = useMemo(() => {
         const cleanBody = editorRef.current?.getCleanHtml() ?? bodyHtml;
-        return extractMailVarTokens(subject, cleanBody);
-    }, [subject, bodyHtml, editorRef]);
+        return extractMailVarTokens("", cleanBody);
+    }, [bodyHtml, editorRef]);
 
     // Trimmed, blank-dropped vars shared by the preview and the POST body.
     const sendVars = useMemo(() => {

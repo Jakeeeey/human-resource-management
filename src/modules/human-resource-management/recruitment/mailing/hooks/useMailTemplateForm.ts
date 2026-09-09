@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { RefObject } from "react";
 import { toast } from "sonner";
 
@@ -15,7 +15,6 @@ interface UseMailTemplateFormOptions {
     template: MailTemplateRow | null;
     saving: boolean;
     editorRef: RefObject<MailTemplateEditorHandle | null>;
-    subjectInputRef: RefObject<HTMLInputElement | null>;
     onSave: (
         input: {
             template_key: string;
@@ -40,7 +39,7 @@ const SAMPLE_VARS = Object.fromEntries(mailVarAllowlist.map((name) => [name, "__
  * @param options - Template row (null = create), saving flag, save helper.
  * @returns Form state + preview + save/dry-run handlers.
  */
-export function useMailTemplateForm({ template, saving, editorRef, subjectInputRef, onSave }: UseMailTemplateFormOptions) {
+export function useMailTemplateForm({ template, saving, editorRef, onSave }: UseMailTemplateFormOptions) {
     const [templateKey, setTemplateKey] = useState("");
     const [templateName, setTemplateName] = useState("");
     const [subject, setSubject] = useState("");
@@ -48,11 +47,6 @@ export function useMailTemplateForm({ template, saving, editorRef, subjectInputR
     const [isActive, setIsActive] = useState(true);
     const [testing, setTesting] = useState(false);
     const [dryRunReady, setDryRunReady] = useState(false);
-    const lastFieldRef = useRef<"subject" | "body">("body");
-
-    const noteFieldFocus = (field: "subject" | "body") => {
-        lastFieldRef.current = field;
-    };
 
     useEffect(() => {
         setTemplateKey(template?.template_key ?? "");
@@ -76,7 +70,7 @@ export function useMailTemplateForm({ template, saving, editorRef, subjectInputR
             scrubbed = "";
         }
         const subjectRender = renderMailTemplate(subject, SAMPLE_VARS);
-        const bodyRender = renderMailTemplate(scrubbed, SAMPLE_VARS);
+        const bodyRender = renderMailTemplate(scrubbed, SAMPLE_VARS, { boldVars: true });
         const seen = new Set<string>();
         const warnings = [...subjectRender.warnings, ...bodyRender.warnings].filter((w) =>
             seen.has(w) ? false : (seen.add(w), true),
@@ -179,20 +173,10 @@ export function useMailTemplateForm({ template, saving, editorRef, subjectInputR
         }
     };
 
+    // Subject is plain text (no chips): field buttons always insert into
+    // the body editor, falling back to append when it is unavailable.
     const insertVar = (name: string) => {
         const token = `{{${name}}}`;
-        if (lastFieldRef.current === "subject" && subjectInputRef.current) {
-            const el = subjectInputRef.current;
-            const start = el.selectionStart ?? el.value.length;
-            const end = el.selectionEnd ?? el.value.length;
-            setSubject(`${el.value.slice(0, start)}${token}${el.value.slice(end)}`);
-            const caret = start + token.length;
-            requestAnimationFrame(() => {
-                el.focus();
-                el.setSelectionRange(caret, caret);
-            });
-            return;
-        }
         try {
             if (editorRef.current?.insertToken(token)) return;
         } catch {
@@ -221,7 +205,6 @@ export function useMailTemplateForm({ template, saving, editorRef, subjectInputR
         handleSave,
         handleDryRunTestSend,
         insertVar,
-        noteFieldFocus,
         busy,
     };
 }

@@ -382,7 +382,7 @@ export async function dispatchMail(
         }
 
         const renderedSubject = renderMailTemplate(template.subject, vars);
-        const renderedBody = renderMailTemplate(template.body_html, vars);
+        const renderedBody = renderMailTemplate(template.body_html, vars, { boldVars: true });
         const warnings = [...renderedSubject.warnings, ...renderedBody.warnings];
 
         const forbiddenReason = assertMailableHtml(renderedBody.text);

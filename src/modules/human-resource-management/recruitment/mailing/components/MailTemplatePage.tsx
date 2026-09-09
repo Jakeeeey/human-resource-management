@@ -41,13 +41,11 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
             : (templates.find((row) => String(row.id) === String(templateId ?? "")) ?? null);
 
     const editorRef = useRef<MailTemplateEditorHandle | null>(null);
-    const subjectInputRef = useRef<HTMLInputElement | null>(null);
 
     const form = useMailTemplateForm({
         template,
         saving,
         editorRef,
-        subjectInputRef,
         onSave: async (input, id) => {
             const targetId = id ?? template?.id;
             const result = await saveTemplate(input, targetId ?? undefined);
@@ -194,11 +192,9 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 <Label htmlFor="mail-template-page-subject">Subject</Label>
                                 <Input
                                     id="mail-template-page-subject"
-                                    ref={subjectInputRef}
                                     value={form.subject}
                                     onChange={(e) => form.setSubject(e.target.value)}
-                                    onFocus={() => form.noteFieldFocus("subject")}
-                                    placeholder="e.g. Your interview result for {{position}}"
+                                    placeholder="e.g. Your interview result"
                                     disabled={form.busy}
                                 />
                             </div>
@@ -211,8 +207,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                         </CardHeader>
                         <CardContent className="grid gap-4">
                             <div
-                                className="flex min-h-[320px] min-w-0 flex-col gap-2"
-                                onFocusCapture={() => form.noteFieldFocus("body")}
+                                className="flex max-h-[560px] min-h-[320px] min-w-0 flex-col gap-2"
                             >
                                 <MailTemplateEditor
                                     ref={editorRef}
@@ -223,8 +218,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                             <div className="grid min-w-0 gap-2">
                                 <Label>Fields</Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Click a field to add it to the email — it fills in by
-                                    itself when the email sends.
+                                    Click a field to add it to the email
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {mailVarAllowlist.map((name) => (

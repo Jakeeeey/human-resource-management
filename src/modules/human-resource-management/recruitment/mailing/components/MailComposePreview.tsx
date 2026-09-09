@@ -92,7 +92,7 @@ export function MailComposePreview({
             scrubbed = "";
         }
         const subjectRender = renderMailTemplate(subject, vars);
-        const bodyRender = renderMailTemplate(scrubbed, vars);
+        const bodyRender = renderMailTemplate(scrubbed, vars, { boldVars: true });
         const seen = new Set<string>();
         const warnings = [...subjectRender.warnings, ...bodyRender.warnings].filter((w) =>
             seen.has(w) ? false : (seen.add(w), true),
