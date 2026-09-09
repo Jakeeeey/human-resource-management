@@ -28,7 +28,11 @@ function validationFailed(errors: Record<string, string[]>) {
 }
 
 // Directus reads booleans back as 0/1 and json columns back as string|null —
-// normalize so the envelope always matches PaperworkTemplateSchema.
+// normalize so the envelope always matches PaperworkTemplateSchema. Task 16:
+// `source`/`pdf_file` are owner-added columns — rows written before they
+// exist read back without the keys, so default to the HTML contract here;
+// writes carrying the new fields surface NEEDS-CREATION when Directus
+// rejects unknown fields (asserted in task-16 evidence, never migrated).
 function normalize(row: Record<string, unknown>): PaperworkTemplate {
   const rawZones = row["zones"];
   let zones: PaperworkZone[] = [];
@@ -43,10 +47,22 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     }
   }
   const active = row["is_active"];
+  const rawSource = row["source"];
+  const rawPdfFile = row["pdf_file"];
+  const pdfFile =
+    typeof rawPdfFile === "string" && rawPdfFile !== ""
+      ? rawPdfFile
+      : rawPdfFile !== null &&
+          typeof rawPdfFile === "object" &&
+          typeof (rawPdfFile as { id?: unknown }).id === "string"
+        ? (rawPdfFile as { id: string }).id
+        : null;
   return {
     ...(row as object),
     zones,
     is_active: active === true || active === 1 || active === "1",
+    source: rawSource === "pdf" ? "pdf" : "html",
+    pdf_file: pdfFile,
   } as PaperworkTemplate;
 }
 
@@ -95,13 +111,32 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         company_key: validation.data.company_key,
         title: validation.data.title,
-        body_html: validation.data.body_html,
+        // PDF-only: body is always the empty string (legacy column, never rendered).
+        body_html: "",
         zones: validation.data.zones ?? [],
         is_active: validation.data.is_active ?? true,
+        source: "pdf",
+        pdf_file: validation.data.pdf_file ?? null,
         created_at: now,
         updated_at: now,
       }),
     })) as { data?: Record<string, unknown> };
+
+    if (!created?.data) {
+      console.error(
+        "[onboarding-paperwork-templates] create returned no row; " +
+          "if paperwork_templates.source|pdf_file are missing in Directus, " +
+          "report NEEDS-CREATION:paperwork_templates.source|pdf_file (owner adds, never auto-migrated)."
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Template could not be created. If this persists, report NEEDS-CREATION:paperwork_templates.source|pdf_file.",
+        },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json(
       {

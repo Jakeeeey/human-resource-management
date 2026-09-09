@@ -1,14 +1,15 @@
 export { PaperworkRegistryModule } from "./PaperworkRegistryModule";
 export type {
   PaperworkTemplate,
+  PaperworkTemplateSource,
   PaperworkZone,
   PaperworkZoneRect,
   CreatePaperworkTemplateInput,
   UpdatePaperworkTemplateInput,
 } from "./types/paperwork-template.schema";
 export {
-  PAPERWORK_BODY_HTML_MAX,
   PaperworkTemplateSchema,
+  PaperworkTemplateSourceSchema,
   PaperworkZoneSchema,
   PaperworkZoneRectSchema,
   PaperworkZonesSchema,

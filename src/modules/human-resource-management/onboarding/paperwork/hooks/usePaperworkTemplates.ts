@@ -61,11 +61,14 @@ export function usePaperworkTemplates() {
       setSaving(true);
       try {
         if (selected) {
+          // PDF-only: kind + file UUID travel on edit; body_html is legacy
+          // and never sent.
           const patch: UpdatePaperworkTemplateInput = {
             title: data.title,
-            body_html: data.body_html,
             is_active: data.is_active,
           };
+          if (data.source !== undefined) patch.source = data.source;
+          if (data.pdf_file !== undefined) patch.pdf_file = data.pdf_file;
           await updateTemplate(selected.id, patch);
           toast.success("Template updated");
         } else {

@@ -2,12 +2,14 @@
 
 // portalProvider.tsx — client fetch layer for the hiree-scoped portal API.
 // Thin context provider mirroring the hub profileProvider shape: session +
-// checklist + envelopes + link with loading/error flags. Uploads travel ONLY
+// checklist + link with loading/error flags. Uploads travel ONLY
 // via the application-form upload canon (`uploadApplicationFile` — kind/
 // size/mime server-validated, folder-routed); the form holds `File|null`
 // and this layer persists only the returned `data.id` UUID via the link
 // route. DIRECTUS_STATIC_TOKEN never reaches the browser (server hydration
 // only — every fetch below hits our own Next routes).
+// Signing envelopes are NOT fetched here (Todo 19) — kiosk signing runs on
+// the HR-operated signing desk (`hrm/onboarding/signing`).
 
 import {
   createContext,
@@ -16,7 +18,6 @@ import {
   useEffect,
   useState,
 } from "react";
-import type { SigningEnvelope } from "@/modules/human-resource-management/onboarding/signing/types/signing-envelope.schema";
 import type { PortalChecklistItem } from "@/modules/human-resource-management/employee-portal/types/portal-checklist.schema";
 import { uploadApplicationFile } from "@/modules/human-resource-management/application-form/providers/fetchProvider";
 
@@ -28,7 +29,6 @@ interface PortalSession {
 interface PortalFetchContextType {
   session: PortalSession | null;
   checklist: PortalChecklistItem[];
-  envelopes: SigningEnvelope[];
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -67,7 +67,6 @@ export function PortalFetchProvider({
       : null
   );
   const [checklist, setChecklist] = useState<PortalChecklistItem[]>([]);
-  const [envelopes, setEnvelopes] = useState<SigningEnvelope[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -90,28 +89,15 @@ export function PortalFetchProvider({
         setSession(active);
       }
       const headers = scopeHeaders(active);
-      const [checklistRes, envelopesRes] = await Promise.all([
-        fetch(`${BASE}/checklist?profile_id=${active?.profile_id}`, {
-          cache: "no-store",
-          headers,
-        }),
-        fetch(`${BASE}/envelopes?profile_id=${active?.profile_id}`, {
-          cache: "no-store",
-          headers,
-        }),
-      ]);
+      const checklistRes = await fetch(`${BASE}/checklist?profile_id=${active?.profile_id}`, {
+        cache: "no-store",
+        headers,
+      });
       if (!checklistRes.ok) throw new Error("Checklist fetch failed");
-      if (!envelopesRes.ok) throw new Error("Envelopes fetch failed");
       const checklistBody = await readJson(checklistRes);
-      const envelopesBody = await readJson(envelopesRes);
       setChecklist(
         Array.isArray(checklistBody.data)
           ? (checklistBody.data as PortalChecklistItem[])
-          : []
-      );
-      setEnvelopes(
-        Array.isArray(envelopesBody.data)
-          ? (envelopesBody.data as SigningEnvelope[])
           : []
       );
     } catch (err) {
@@ -161,7 +147,6 @@ export function PortalFetchProvider({
       value={{
         session,
         checklist,
-        envelopes,
         isLoading,
         isError,
         error,

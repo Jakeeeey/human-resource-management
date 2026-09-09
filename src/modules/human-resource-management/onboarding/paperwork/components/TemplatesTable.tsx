@@ -16,6 +16,7 @@ import { Frame, Pencil } from "lucide-react";
 
 // TemplatesTable.tsx — registry rows: per-company key, title (truncated per
 // QA §1), zone counts (required/total), active flag, edit + zones actions.
+// PDF-only: every template is an uploaded PDF (no source column).
 
 interface TemplatesTableProps {
   templates: PaperworkTemplate[];
@@ -43,8 +44,7 @@ export function TemplatesTable({
   if (templates.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-        No paperwork templates yet. Create the first Quill-built template to
-        start marking signature zones.
+        No paperwork templates yet. Upload the first PDF to start marking signature zones.
       </p>
     );
   }
@@ -52,7 +52,7 @@ export function TemplatesTable({
   return (
     <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
-      <Table className="min-w-[720px]">
+      <Table className="min-w-[760px]">
         <TableHeader>
           <TableRow>
             <TableHead>Company</TableHead>

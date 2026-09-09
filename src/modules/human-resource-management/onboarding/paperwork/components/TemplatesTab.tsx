@@ -1,6 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePaperworkTemplates } from "../hooks/usePaperworkTemplates";
+import {
+    listPaperworkCompanies,
+    type PaperworkCompany,
+} from "../providers/paperworkCompanyProvider";
 import { TemplatesTable } from "./TemplatesTable";
 import { TemplateDialog } from "./TemplateDialog";
 import { ZonesEditor } from "./ZonesEditor";
@@ -31,6 +36,24 @@ export function TemplatesTab() {
     saveTemplate,
     saveZones,
   } = usePaperworkTemplates();
+
+  // Company directory for the key combobox (read-only, fails soft — the
+  // dialog falls back to free text when the directory is unreachable).
+  const [companies, setCompanies] = useState<PaperworkCompany[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void listPaperworkCompanies().then((rows) => {
+      if (!cancelled) setCompanies(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const companyOptions = companies.map((row) => ({
+    value: row.code,
+    label: row.name,
+  }));
 
   return (
     <div className="space-y-4">
@@ -76,6 +99,7 @@ export function TemplatesTab() {
         open={dialogOpen}
         template={selected}
         saving={saving}
+        companyOptions={companyOptions}
         onClose={closeDialog}
         onSave={(d) => void saveTemplate(d)}
       />

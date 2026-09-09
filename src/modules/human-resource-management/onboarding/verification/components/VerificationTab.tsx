@@ -13,10 +13,10 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 // (counts + refresh with error-retry), queue table, return/ack dialogs, trail
 // dialog. HR-only; the hiree portal is Todo 9 and lives elsewhere.
 
-function dialogKey(dialog: { kind: string; row?: { profile: { id: number } } }): string {
-  return dialog.kind === "none"
-    ? "none"
-    : `${dialog.kind}-${dialog.row?.profile.id ?? 0}`;
+function dialogKey(prefix: string, dialog: { kind: string; row?: { profile: { id: number } } }): string {
+  return dialog.kind === prefix
+    ? `${prefix}-${dialog.row?.profile.id ?? 0}`
+    : `${prefix}-closed`;
 }
 
 export function VerificationTab() {
@@ -84,7 +84,7 @@ export function VerificationTab() {
       />
 
       <ReturnDialog
-        key={dialogKey(dialog)}
+        key={dialogKey("return", dialog)}
         open={dialog.kind === "return"}
         row={dialog.kind === "return" ? dialog.row : null}
         working={working}
@@ -93,7 +93,7 @@ export function VerificationTab() {
       />
 
       <AckDialog
-        key={dialogKey(dialog)}
+        key={dialogKey("ack", dialog)}
         open={dialog.kind === "ack"}
         row={dialog.kind === "ack" ? dialog.row : null}
         working={working}

@@ -5,17 +5,18 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { SigningEnvelope } from "../types/signing-envelope.schema";
 import {
-  capturePagesToPng,
-  flattenPagesToPdf,
-} from "../signingFlatten";
-import { fileFinishedEnvelope } from "../signingFiling";
-import type { VaultPointer } from "../signingVault";
+  requestPdfBurn,
+  stampPreviewToDataUrl,
+  type PdfBurnPointer,
+} from "../pdfBurnClient";
 
-// SigningFilingPanel.tsx — Todo 8 filing surface (client). Renders inside
-// the signing surface for LOCKED envelopes: captures the same-origin page
-// boxes via the REAL `html-to-image.toPng` call, slices A4 PDF bytes with a
-// selectable text layer, then files upload → `data.id` → link. Vault goes
-// pointer-only after confirm; oversize rejects 413 (never downscaled).
+// SigningFilingPanel.tsx — Todo 18 filing surface (client). Renders inside
+// the signing surface for LOCKED envelopes: the server burns the LOCKED
+// envelope strokes into the trusted admin-template PDF via `pdf-lib` and
+// files upload → `data.id` → link. Vault goes pointer-only after confirm;
+// oversize/corrupt rejects with reason (never filed, never downscaled).
+// The Todo 8 `html-to-image`/`jspdf` client flatten branch is REMOVED from
+// this path (those files stay for history — never imported here).
 
 interface SigningFilingPanelProps {
   envelope: SigningEnvelope;
@@ -24,9 +25,11 @@ interface SigningFilingPanelProps {
   userId: number | null;
   /** 201 record list id. Null until Todo 9/10 supplies it. */
   listId: number | null;
-  /** Returns the rendered same-origin page boxes in page order. */
-  getPageNodes: () => HTMLElement[];
-  onFiled?: (pointer: VaultPointer) => void;
+  /** Renderer-owned bitmap size per 1-based page (fraction bridge). */
+  pageSizes: Record<number, { width: number; height: number }>;
+  /** Placed stamps (preview URLs feed the redundant PNG embed, best-effort). */
+  stamps: { id: string; pngUrl?: string }[];
+  onFiled?: (pointer: PdfBurnPointer) => void;
 }
 
 export function SigningFilingPanel({
@@ -34,12 +37,13 @@ export function SigningFilingPanel({
   templateTitle,
   userId,
   listId,
-  getPageNodes,
+  pageSizes,
+  stamps,
   onFiled,
 }: SigningFilingPanelProps) {
   const [filing, setFiling] = useState(false);
   const [reason, setReason] = useState("");
-  const [pointer, setPointer] = useState<VaultPointer | null>(null);
+  const [pointer, setPointer] = useState<PdfBurnPointer | null>(null);
 
   const locked = envelope.status === "finished";
   const alreadyFiled = envelope.pdf_file !== null && envelope.pdf_file !== "";
@@ -57,39 +61,32 @@ export function SigningFilingPanel({
     }
     setFiling(true);
     try {
-      // Client-side flatten: REAL toPng per page → jspdf A4 slices.
-      const nodes = getPageNodes();
-      const shots = await capturePagesToPng(nodes);
-      const { bytes } = await flattenPagesToPdf(
-        shots.map((pngDataUrl, index) => ({
-          page: index + 1,
-          pngDataUrl,
-          textLines: [
-            { text: templateTitle },
-            { text: `Envelope ${envelope.envelope_key} — page ${index + 1}` },
-          ],
-        }))
-      );
-      const result = await fileFinishedEnvelope({
+      // Server-side burn: the route reads the LOCKED strokes itself — the
+      // client sends only the 201 intent + page sizes (+ redundant PNGs).
+      const stampPngs: { stampId: string; pngDataUrl: string }[] = [];
+      for (const stamp of stamps) {
+        const pngDataUrl = await stampPreviewToDataUrl(stamp.pngUrl);
+        if (pngDataUrl) stampPngs.push({ stampId: stamp.id, pngDataUrl });
+      }
+      const result = await requestPdfBurn({
         envelopeId: envelope.id,
-        envelopeKey: envelope.envelope_key,
-        pdfBytes: bytes,
         record: {
           user_id: userId as number,
           list_id: listId as number,
           record_name: `Signed ${templateTitle} (${envelope.envelope_key})`,
-          description: `Flattened signing envelope ${envelope.envelope_key}`,
+          description: `Burned signing envelope ${envelope.envelope_key}`,
         },
+        pageSizes,
         reason: alreadyFiled ? reason.trim() : undefined,
-        version: alreadyFiled ? 2 : 1,
+        stampPngs,
       });
-      setPointer(result.pointer);
+      setPointer(result);
       toast.success(
-        result.pointer.version > 1
-          ? `Re-filed as vault version ${result.pointer.version}`
+        result.version > 1
+          ? `Re-filed as vault version ${result.version}`
           : "Filed to 201"
       );
-      onFiled?.(result.pointer);
+      onFiled?.(result);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Filing failed");
     } finally {
@@ -101,7 +98,8 @@ export function SigningFilingPanel({
     configured,
     alreadyFiled,
     reason,
-    getPageNodes,
+    pageSizes,
+    stamps,
     templateTitle,
     envelope,
     userId,

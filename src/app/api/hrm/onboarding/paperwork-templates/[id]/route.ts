@@ -41,11 +41,27 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     }
   }
   const active = row["is_active"];
+  const rawSource = row["source"];
+  const rawPdfFile = row["pdf_file"];
+  const pdfFile =
+    typeof rawPdfFile === "string" && rawPdfFile !== ""
+      ? rawPdfFile
+      : rawPdfFile !== null &&
+          typeof rawPdfFile === "object" &&
+          typeof (rawPdfFile as { id?: unknown }).id === "string"
+        ? (rawPdfFile as { id: string }).id
+        : null;
   return {
     ...(row as object),
     zones,
     is_active: active === true || active === 1 || active === "1",
+    source: rawSource === "pdf" ? "pdf" : "html",
+    pdf_file: pdfFile,
   } as PaperworkTemplate;
+}
+
+function coherenceError(message: string) {
+  return NextResponse.json({ success: false, message }, { status: 400 });
 }
 
 export async function GET(
@@ -112,18 +128,47 @@ export async function PATCH(
     }
 
     const data = validation.data;
+    // PDF-only coherence: the resolved row must keep a file UUID. `body_html`
+    // is never written (legacy column); `source`, when provided, must be "pdf".
+    const storedPdf =
+      typeof current.data["pdf_file"] === "string" &&
+      current.data["pdf_file"] !== ""
+        ? (current.data["pdf_file"] as string)
+        : null;
+    const nextPdf = data.pdf_file !== undefined ? data.pdf_file : storedPdf;
+    if (!nextPdf) {
+      return coherenceError("PDF file is required for PDF templates");
+    }
+
     const patch: Record<string, unknown> = {};
     if (data.company_key !== undefined) patch["company_key"] = data.company_key;
     if (data.title !== undefined) patch["title"] = data.title;
-    if (data.body_html !== undefined) patch["body_html"] = data.body_html;
     if (data.zones !== undefined) patch["zones"] = data.zones;
     if (data.is_active !== undefined) patch["is_active"] = data.is_active;
+    if (data.source !== undefined) patch["source"] = data.source;
+    if (data.pdf_file !== undefined) patch["pdf_file"] = data.pdf_file;
     patch["updated_at"] = getPhilippineTime();
 
     const updated = (await dFetch(`/items/paperwork_templates/${templateId}`, {
       method: "PATCH",
       body: JSON.stringify(patch),
     })) as { data?: Record<string, unknown> };
+
+    if (!updated?.data) {
+      console.error(
+        "[onboarding-paperwork-templates] update returned no row; " +
+          "if paperwork_templates.source|pdf_file are missing in Directus, " +
+          "report NEEDS-CREATION:paperwork_templates.source|pdf_file (owner adds, never auto-migrated)."
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Template could not be updated. If this persists, report NEEDS-CREATION:paperwork_templates.source|pdf_file.",
+        },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

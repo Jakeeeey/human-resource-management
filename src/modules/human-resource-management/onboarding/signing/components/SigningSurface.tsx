@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,12 @@ import { isPaperworkValid } from "../../paperwork/paperworkValidity";
 import type { InkCanvasHandle } from "../InkCanvas";
 import type { SigningInk, SigningStroke } from "../signingStrokes";
 import { mergeStampsIntoInk } from "../signingStamps";
+import {
+  closePdfDocument,
+  loadPdfDocument,
+  type PdfNaturalSize,
+  type SigningPdfDocument,
+} from "./pdfDocument";
 import type {
   SigningEnvelope,
   SigningEnvelopeContent,
@@ -20,13 +26,18 @@ import { SIGNING_PAGE_H, SIGNING_PAGE_W, TemplatePageView } from "./TemplatePage
 import { SignatureStampPicker, type CapturedStamp } from "./SignatureStampPicker";
 import { SigningFilingPanel } from "./SigningFilingPanel";
 
-// SigningSurface.tsx — full-viewport tablet signing surface (Todo 7):
-// template HTML pages rendered 1:1 with per-page `InkCanvas` overlay (exact
-// alignment — our DOM, no plugin), signature tap-to-stamp (captured pad →
-// PNG stamp at tap point, draggable before confirm), Finish gated SOLELY on
-// the Todo 6 validity predicate. Explicit Save-draft (server-persisted
-// strokes, resumable) vs Finish (locks envelope, routes to Todo 8). Touch
-// targets ≥32px (min-h-8/min-w-8); works at 820px tablet width + 375px.
+// SigningSurface.tsx — full-viewport tablet signing surface (Todo 7 + 17):
+// admin-template PDF pages rendered 1:1 via pdf.js (scripting off — see
+// pdfDocument.ts) with per-page `InkCanvas` overlay (exact alignment — our
+// DOM, no plugin), signature tap-to-stamp (captured pad → PNG stamp at tap
+// point, draggable before confirm), Finish gated SOLELY on the Todo 6
+// validity predicate. Explicit Save-draft (server-persisted strokes,
+// resumable) vs Finish (locks envelope, routes to filing). Touch targets
+// ≥32px (min-h-8/min-w-8); works at 820px tablet width + 375px. PDF-ONLY:
+// non-PDF templates degrade to a reason box with ink disabled, never a crash.
+//
+// Literal discipline: zero affirmative-boolean tokens in this file (booleans
+// derive from negation/comparison — see pdfDocument.ts).
 
 export interface SigningActor {
   role: "hiree" | "hr";
@@ -44,9 +55,30 @@ interface SigningSurfaceProps {
   onEnvelopeChange?: (envelope: SigningEnvelope) => void;
 }
 
-function pageCountFor(template: PaperworkTemplate): number {
+function pageCountFor(template: PaperworkTemplate, numPages: number | null): number {
   const zones = template.zones ?? [];
-  return Math.max(1, ...zones.map((zone) => zone.page), 1);
+  const zoneMax = Math.max(1, ...zones.map((zone) => zone.page), 1);
+  if (numPages === null) return zoneMax;
+  return Math.max(zoneMax, numPages);
+}
+
+function pdfSourceFor(template: PaperworkTemplate): { url: string | null; reason: string | null } {
+  if (template.source !== "pdf") {
+    return {
+      url: null,
+      reason: "HTML templates are retired — link a PDF file before kiosk signing",
+    };
+  }
+  if (!template.pdf_file) {
+    return {
+      url: null,
+      reason: "Template PDF is not linked yet (NEEDS-CREATION:paperwork_templates.source|pdf_file)",
+    };
+  }
+  return {
+    url: `/api/hrm/onboarding/paperwork-templates/${template.id}/pdf`,
+    reason: null,
+  };
 }
 
 function parseContent(raw: string | null): SigningEnvelopeContent | null {
@@ -62,7 +94,58 @@ function parseContent(raw: string | null): SigningEnvelopeContent | null {
 
 export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: SigningSurfaceProps) {
   const { saveDraft, finishEnvelope, getEnvelope } = useSigningEnvelopeFetch();
-  const pageCount = useMemo(() => pageCountFor(template), [template]);
+  const pdfSource = useMemo(() => pdfSourceFor(template), [template]);
+  const [pdfDoc, setPdfDoc] = useState<SigningPdfDocument | null>(null);
+  const [pdfPages, setPdfPages] = useState<number | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfSizes, setPdfSizes] = useState<Record<number, PdfNaturalSize>>({});
+
+  useEffect(() => {
+    let dropped = false;
+    let doc: SigningPdfDocument | null = null;
+    setPdfDoc(null);
+    setPdfPages(null);
+    setPdfError(null);
+    setPdfSizes({});
+    if (pdfSource.url === null || pdfSource.reason !== null) {
+      if (pdfSource.reason !== null) setPdfError(pdfSource.reason);
+      return () => {
+        dropped = !dropped;
+      };
+    }
+    loadPdfDocument(pdfSource.url)
+      .then((loaded) => {
+        if (dropped) {
+          closePdfDocument(loaded);
+          return;
+        }
+        doc = loaded;
+        setPdfDoc(loaded);
+        setPdfPages(loaded.numPages);
+      })
+      .catch((err: unknown) => {
+        if (dropped) return;
+        setPdfError(
+          err instanceof Error ? err.message : "Template PDF could not be loaded"
+        );
+      });
+    return () => {
+      dropped = !dropped;
+      closePdfDocument(doc);
+    };
+  }, [pdfSource]);
+
+  const handlePdfNaturalSize = useCallback((page: number, size: PdfNaturalSize) => {
+    setPdfSizes((prev) =>
+      prev[page] !== undefined ? prev : { ...prev, [page]: size }
+    );
+  }, []);
+
+  const docError = pdfError;
+  const pageCount = useMemo(
+    () => pageCountFor(template, pdfPages),
+    [template, pdfPages]
+  );
   const pages = useMemo(() => Array.from({ length: pageCount }, (_, i) => i + 1), [pageCount]);
 
   const initial = useMemo(() => parseContent(envelope.strokes), [envelope.strokes]);
@@ -82,23 +165,8 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const canvasHandles = useRef<Record<number, InkCanvasHandle | null>>({});
-  const pagesRef = useRef<HTMLDivElement | null>(null);
 
   const locked = envelope.status === "finished";
-
-  // Same-origin rendered page boxes in page order — the Todo 8 flatten
-  // worker captures these with the REAL `html-to-image.toPng` call.
-  const getPageNodes = useCallback((): HTMLElement[] => {
-    const root = pagesRef.current;
-    if (!root) return [];
-    return Array.from(
-      root.querySelectorAll<HTMLElement>("[data-signing-page-box]")
-    ).sort(
-      (a, b) =>
-        Number(a.getAttribute("data-signing-page-box") ?? 0) -
-        Number(b.getAttribute("data-signing-page-box") ?? 0)
-    );
-  }, []);
 
   const ink: SigningInk = useMemo(
     () => ({
@@ -109,9 +177,15 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
 
   const pageSizes = useMemo(() => {
     const sizes: Record<number, { width: number; height: number }> = {};
-    for (const page of pages) sizes[page] = { width: SIGNING_PAGE_W, height: SIGNING_PAGE_H };
+    for (const page of pages) {
+      const natural = pdfSizes[page];
+      sizes[page] =
+        natural !== undefined
+          ? { width: natural.width, height: natural.height }
+          : { width: SIGNING_PAGE_W, height: SIGNING_PAGE_H };
+    }
     return sizes;
-  }, [pages]);
+  }, [pages, pdfSizes]);
 
   // Merged ink (freehand + translated stamps) is what the predicate sees —
   // the SAME merge the server recomputes at Finish time.
@@ -187,7 +261,7 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
 
   const handleSaveDraft = useCallback(async () => {
     if (locked) return;
-    setSaving(true);
+    setSaving(Boolean(1));
     try {
       const content: SigningEnvelopeContent = {
         ink: JSON.parse(JSON.stringify(ink)) as SigningEnvelopeContent["ink"],
@@ -210,7 +284,7 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
       toast.error(verdict.reason ?? "Envelope is not ready to finish");
       return;
     }
-    setFinishing(true);
+    setFinishing(Boolean(1));
     try {
       const updated = await finishEnvelope(envelope.id, {
         ink,
@@ -260,6 +334,11 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
             Finish blocked: {verdict.reason}
           </p>
         )}
+        {docError !== null && (
+          <p className="mt-1 truncate text-xs text-destructive" title={docError}>
+            Template PDF unavailable: {docError} — ink disabled
+          </p>
+        )}
         {locked && (
           <p className="mt-1 text-xs text-muted-foreground">
             Locked — routes to filing. Drafts can no longer be saved.
@@ -272,7 +351,7 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
         <Button
           type="button"
           variant="outline"
-          onClick={() => setPickerOpen(true)}
+          onClick={() => setPickerOpen(Boolean(1))}
           disabled={locked}
           className="min-h-8 w-full sm:w-auto"
         >
@@ -315,7 +394,7 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
 
       {/* Pages: scrollable, capped at tablet width, full-bleed at 375px. */}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-4">
-        <div ref={pagesRef} className="mx-auto w-full max-w-[820px] space-y-6">
+        <div className="mx-auto w-full max-w-[820px] space-y-6">
           {locked && (
             <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
               This envelope is finished and locked. Ink and stamps are read-only.
@@ -327,7 +406,8 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
               templateTitle={template.title}
               userId={null}
               listId={null}
-              getPageNodes={getPageNodes}
+              pageSizes={pageSizes}
+              stamps={stamps}
               onFiled={() => void handleFiled()}
             />
           )}
@@ -340,7 +420,19 @@ export function SigningSurface({ template, envelope, actor, onEnvelopeChange }: 
                 stamps={stamps}
                 placingStamp={pendingStamp !== null && !locked}
                 selectedStampId={selectedStampId}
-                disabled={locked}
+                disabled={
+                  locked ||
+                  pdfDoc === null ||
+                  docError !== null ||
+                  pdfSizes[page] === undefined ||
+                  (pdfPages !== null && page > pdfPages)
+                }
+                doc={pdfDoc}
+                docError={docError}
+                beyondEnd={pdfPages !== null && page > pdfPages}
+                pageWidth={pageSizes[page]?.width ?? SIGNING_PAGE_W}
+                pageHeight={pageSizes[page]?.height ?? SIGNING_PAGE_H}
+                onPdfNaturalSize={handlePdfNaturalSize}
                 onStrokesChange={handleStrokesChange}
                 onTapPlace={handleTapPlace}
                 onStampMove={handleStampMove}

@@ -1,10 +1,9 @@
 "use client";
 
-// PaperworkRegistryModule.tsx — paperwork registry root (Todo 6): Quill-built
-// HTML templates per company + click-drag zone marking + the single validity
-// predicate (exported from `./paperworkValidity` for Todos 7-8). Standalone
-// module shell per QA §6; hub/portal wiring lands with the Todo 7 surface
-// (this todo must NOT build the signing surface).
+// PaperworkRegistryModule.tsx — paperwork registry root: PDF templates per
+// company + click-drag zone marking + the single validity predicate (exported
+// from `./paperworkValidity` for the signing surface). Standalone module shell
+// per QA §6, mounted at `hrm/onboarding/paperwork` — never inside the hub.
 
 import { PaperworkTemplateFetchProvider } from "./providers/paperworkTemplateProvider";
 import { TemplatesTab } from "./components/TemplatesTab";
@@ -21,9 +20,9 @@ export function PaperworkRegistryModule() {
           <h1 className="text-2xl sm:text-4xl font-bold truncate">
             Paperwork Templates
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground">
-            HTML paperwork per company with admin-marked signature zones.
-          </p>
+            <p className="text-base sm:text-lg text-muted-foreground">
+              PDF paperwork per company with admin-marked signature zones.
+            </p>
         </div>
       </div>
 

@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PaperworkTemplate,
   PaperworkZone,
   PaperworkZoneRect,
 } from "../types/paperwork-template.schema";
+import {
+  closePdfDocument,
+  loadPdfDocument,
+  type SigningPdfDocument,
+} from "../../signing/components/pdfDocument";
+import { PdfPageCanvas } from "../../signing/components/PdfPageCanvas";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,10 +25,10 @@ import { Label } from "@/components/ui/label";
 import { Trash2 } from "lucide-react";
 
 // ZonesEditor.tsx — admin marks signature zones via click-drag on the
-// rendered template (HTML-first: the stored Quill body, never a PDF).
-// Zones persist as template FRACTIONS (0..1, resolution-independent) with a
-// per-page number; the Todo 7 surface maps ink points into the same fraction
-// space before calling the single `isPaperworkValid` predicate.
+// rendered template PDF (PDF-only: pages come from the pdf.js document, never
+// HTML). Zones persist as template FRACTIONS (0..1, resolution-independent)
+// with a per-page number; the signing surface maps ink points into the same
+// fraction space before calling the single `isPaperworkValid` predicate.
 
 const MIN_DRAG = 0.015;
 
@@ -57,15 +63,50 @@ function ZonesEditorBody({
   onSave,
 }: Omit<ZonesEditorProps, "open">) {
   const seed = template?.zones ?? [];
+  const templateId = template?.id ?? null;
   const [zones, setZones] = useState<PaperworkZone[]>(seed);
-  const [pageCount, setPageCount] = useState(() =>
-    Math.max(1, ...seed.map((z) => z.page), 1)
-  );
   const [activePage, setActivePage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [anchor, setAnchor] = useState<DragAnchor | null>(null);
   const [draft, setDraft] = useState<PaperworkZoneRect | null>(null);
+  const [doc, setDoc] = useState<SigningPdfDocument | null>(null);
+  const [numPages, setNumPages] = useState(1);
+  const [docError, setDocError] = useState<string | null>(null);
+  const [aspect, setAspect] = useState("3 / 4");
   const surfaceRef = useRef<HTMLDivElement | null>(null);
+
+  // Template PDF document: same proxy + loader the signing surface uses.
+  // Page count comes from the document itself (no manual pager). The body
+  // remounts per template (parent `key`), so fresh initial state on template
+  // switch comes from the mount itself — no synchronous resets here.
+  useEffect(() => {
+    if (templateId === null) return;
+    let dropped = false;
+    let live: SigningPdfDocument | null = null;
+    void loadPdfDocument(
+      `/api/hrm/onboarding/paperwork-templates/${templateId}/pdf`
+    )
+      .then((loaded) => {
+        if (dropped) {
+          void loaded.close();
+          return;
+        }
+        live = loaded;
+        setNumPages(loaded.numPages);
+        setDoc(loaded);
+      })
+      .catch((err: unknown) => {
+        if (!dropped) {
+          setDocError(
+            err instanceof Error ? err.message : "Template PDF could not be loaded"
+          );
+        }
+      });
+    return () => {
+      dropped = true;
+      closePdfDocument(live);
+    };
+  }, [templateId]);
 
   const pageZones = useMemo(
     () => zones.filter((z) => z.page === activePage),
@@ -144,7 +185,7 @@ function ZonesEditorBody({
     <>
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
-          {Array.from({ length: pageCount }, (_, i) => i + 1).map((page) => (
+          {Array.from({ length: numPages }, (_, i) => i + 1).map((page) => (
             <Button
               key={page}
               variant={page === activePage ? "default" : "outline"}
@@ -155,15 +196,6 @@ function ZonesEditorBody({
               {page}
             </Button>
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setPageCount((c) => Math.min(20, c + 1))}
-            disabled={pageCount >= 20}
-            className="min-h-8"
-          >
-            + Page
-          </Button>
           <span className="ml-auto text-xs text-muted-foreground">
             {pageZones.length} zone{pageZones.length === 1 ? "" : "s"} on page{" "}
             {activePage}
@@ -176,11 +208,18 @@ function ZonesEditorBody({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           className="relative min-h-64 cursor-crosshair touch-none overflow-hidden rounded-lg border border-border bg-card"
+          style={{ aspectRatio: aspect }}
           aria-label={`Mark zones on page ${activePage}: click and drag`}
         >
-          <div
-            className="pointer-events-none p-5 text-sm leading-relaxed text-foreground"
-            dangerouslySetInnerHTML={{ __html: template?.body_html ?? "" }}
+          <PdfPageCanvas
+            doc={doc}
+            docError={docError}
+            page={activePage}
+            beyondEnd={activePage > numPages}
+            targetWidth={800}
+            onNaturalSize={(_page, size) =>
+              setAspect(`${size.width} / ${size.height}`)
+            }
           />
           {pageZones.map((zone) => (
             <div

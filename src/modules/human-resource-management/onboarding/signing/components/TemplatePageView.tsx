@@ -7,12 +7,24 @@ import type { PaperworkTemplate, PaperworkZone } from "../../paperwork/types/pap
 import type { SigningStamp } from "../types/signing-envelope.schema";
 import type { SigningStroke } from "../signingStrokes";
 
-// TemplatePageView.tsx — ONE template page rendered 1:1 with a per-page
-// `InkCanvas` overlay in exact alignment (our DOM, no plugin): the HTML
-// body, the required/optional zone outlines, the ink canvas, and placed
-// signature stamps all share ONE relatively-positioned box at the exact
-// bitmap size (PAGE_W × PAGE_H), so ink points map to fractions by division
-// and the Todo 6 predicate's fraction mapping holds.
+import { PdfPageCanvas } from "./PdfPageCanvas";
+import type {
+  PdfNaturalSize,
+  SigningPdfDocument,
+} from "./pdfDocument";
+
+// TemplatePageView.tsx — ONE admin-template PDF page rendered 1:1 with a
+// per-page `InkCanvas` overlay in exact alignment (our DOM, no plugin): the
+// PDF bitmap, the required/optional zone outlines, the ink canvas, and placed
+// signature stamps all share ONE relatively-positioned box at the resolved
+// page bitmap size, so ink points map to fractions by division and the Todo 6
+// predicate's fraction mapping holds.
+//
+// PDF-ONLY (Todo 17, owner order 2026-09-09): the Quill-HTML render branch is
+// deleted — dead code is a defect. Non-PDF templates degrade to a reason box
+// with ink disabled (the surface owns that gate); nothing here parses HTML.
+//
+// Literal discipline: zero affirmative-boolean tokens in this file (see pdfDocument.ts).
 
 export const SIGNING_PAGE_W = 800;
 export const SIGNING_PAGE_H = 1050;
@@ -25,6 +37,12 @@ interface TemplatePageViewProps {
   placingStamp: boolean;
   selectedStampId: string | null;
   disabled?: boolean;
+  doc: SigningPdfDocument | null;
+  docError: string | null;
+  beyondEnd: boolean;
+  pageWidth: number;
+  pageHeight: number;
+  onPdfNaturalSize: (page: number, size: PdfNaturalSize) => void;
   onStrokesChange: (page: number, strokes: SigningStroke[]) => void;
   onTapPlace: (page: number, x: number, y: number) => void;
   onStampMove: (id: string, x: number, y: number) => void;
@@ -45,6 +63,12 @@ export function TemplatePageView({
   placingStamp,
   selectedStampId,
   disabled = false,
+  doc,
+  docError,
+  beyondEnd,
+  pageWidth,
+  pageHeight,
+  onPdfNaturalSize,
   onStrokesChange,
   onTapPlace,
   onStampMove,
@@ -123,21 +147,17 @@ export function TemplatePageView({
         className={`relative w-full overflow-hidden rounded-lg border border-border bg-card ${
           placingStamp ? "cursor-copy" : ""
         }`}
-        style={{ aspectRatio: `${SIGNING_PAGE_W} / ${SIGNING_PAGE_H}` }}
+        style={{ aspectRatio: `${pageWidth} / ${pageHeight}` }}
         aria-label={`Signing page ${page}${placingStamp ? " — tap to place signature stamp" : ""}`}
       >
-        {page === 1 ? (
-          <div
-            className="pointer-events-none absolute inset-0 overflow-hidden p-5 text-sm leading-relaxed text-foreground"
-            dangerouslySetInnerHTML={{ __html: template.body_html }}
-          />
-        ) : (
-          <div className="pointer-events-none absolute inset-0 overflow-hidden p-5">
-            <p className="text-xs text-muted-foreground">
-              {template.title} — continued (page {page})
-            </p>
-          </div>
-        )}
+        <PdfPageCanvas
+          doc={doc}
+          docError={docError}
+          page={page}
+          beyondEnd={beyondEnd}
+          targetWidth={SIGNING_PAGE_W}
+          onNaturalSize={onPdfNaturalSize}
+        />
         {pageZones.map((zone) => (
           <div
             key={zone.id}
@@ -158,8 +178,8 @@ export function TemplatePageView({
           page={page}
           value={strokes}
           onChange={(next) => onStrokesChange(page, next)}
-          width={SIGNING_PAGE_W}
-          height={SIGNING_PAGE_H}
+          width={pageWidth}
+          height={pageHeight}
           disabled={disabled}
           showClear={false}
           transparent
