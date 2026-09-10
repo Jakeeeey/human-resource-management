@@ -79,7 +79,10 @@ export function PaperworkCombobox({
             >
                 <Command>
                     <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
-                    <CommandList className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain">
+                    <CommandList
+                        className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain"
+                        onWheel={(e) => e.stopPropagation()}
+                    >
                         <CommandEmpty>No results found.</CommandEmpty>
                         <CommandGroup>
                             {options.map((opt) => (
