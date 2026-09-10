@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
         // Send-only overrides (never persisted): override ?? template value,
         // then rendered with the per-send vars (replacing the old `{}`).
         const renderedSubject = renderMailTemplate(subject ?? template.subject, sendVars);
-        const renderedBody = renderMailTemplate(body_html ?? template.body_html, sendVars);
+        const renderedBody = renderMailTemplate(body_html ?? template.body_html, sendVars, { boldVars: true });
         const warnings = [...renderedSubject.warnings, ...renderedBody.warnings, "manual-send"];
 
         const forbiddenReason = assertMailableHtml(renderedBody.text);
