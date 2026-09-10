@@ -26,13 +26,16 @@ export const PaperworkZoneRectSchema = z
 export type PaperworkZoneRect = z.infer<typeof PaperworkZoneRectSchema>;
 
 // One admin-marked zone on a template page (page is 1-based, matching the
-// SigningInk page numbering from `signing/signingStrokes.ts`).
+// SigningInk page numbering from `signing/signingStrokes.ts`). `label` is a
+// display-only rename (ids stay stable for validity + envelopes); blank or
+// absent falls back to the id everywhere.
 export const PaperworkZoneSchema = z
   .object({
     id: z.string().min(1).max(64),
     page: z.number().int().positive(),
     rect: PaperworkZoneRectSchema,
     required: z.boolean(),
+    label: z.string().max(64).optional(),
   })
   .strict();
 

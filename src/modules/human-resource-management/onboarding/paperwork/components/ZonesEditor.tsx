@@ -20,9 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Pencil, Tag, Trash2 } from "lucide-react";
 
 // ZonesEditor.tsx — admin marks signature zones via click-drag on the
 // rendered template PDF (PDF-only: pages come from the pdf.js document, never
@@ -67,6 +66,9 @@ function ZonesEditorBody({
   const [zones, setZones] = useState<PaperworkZone[]>(seed);
   const [activePage, setActivePage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const [anchor, setAnchor] = useState<DragAnchor | null>(null);
   const [draft, setDraft] = useState<PaperworkZoneRect | null>(null);
   const [doc, setDoc] = useState<SigningPdfDocument | null>(null);
@@ -175,6 +177,30 @@ function ZonesEditorBody({
   const removeZone = (id: string) => {
     setZones((prev) => prev.filter((z) => z.id !== id));
     setSelectedId((cur) => (cur === id ? null : cur));
+    setRenamingId((cur) => (cur === id ? null : cur));
+  };
+
+  const beginRename = (id: string) => {
+    const zone = zones.find((z) => z.id === id);
+    setRenamingId(id);
+    setRenameDraft(zone?.label ?? "");
+  };
+
+  const commitRename = () => {
+    if (!renamingId) return;
+    const label = renameDraft.trim().slice(0, 64);
+    setZones((prev) =>
+      prev.map((z) => {
+        if (z.id !== renamingId) return z;
+        if (!label) {
+          const cleared: PaperworkZone = { ...z };
+          delete cleared.label;
+          return cleared;
+        }
+        return { ...z, label };
+      })
+    );
+    setRenamingId(null);
   };
 
   const handleSave = () => {
@@ -197,8 +223,7 @@ function ZonesEditorBody({
             </Button>
           ))}
           <span className="ml-auto text-xs text-muted-foreground">
-            {pageZones.length} zone{pageZones.length === 1 ? "" : "s"} on page{" "}
-            {activePage}
+            Page {activePage} of {numPages}
           </span>
         </div>
 
@@ -227,12 +252,16 @@ function ZonesEditorBody({
               data-zone-id={zone.id}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => setSelectedId(zone.id)}
+              onMouseEnter={() => setHoveredId(zone.id)}
+              onMouseLeave={() => setHoveredId((cur) => (cur === zone.id ? null : cur))}
+              onFocus={() => setHoveredId(zone.id)}
+              onBlur={() => setHoveredId((cur) => (cur === zone.id ? null : cur))}
               className={`absolute rounded-sm border-2 ${
                 selectedId === zone.id
                   ? "border-primary bg-primary/20"
                   : zone.required
-                    ? "border-amber-500 bg-amber-500/10"
-                    : "border-emerald-500 bg-emerald-500/10"
+                    ? "border-orange-500 bg-orange-500/10"
+                    : "border-yellow-300 bg-yellow-300/10"
               }`}
               style={{
                 left: `${zone.rect.x * 100}%`,
@@ -240,9 +269,128 @@ function ZonesEditorBody({
                 width: `${zone.rect.w * 100}%`,
                 height: `${zone.rect.h * 100}%`,
               }}
-              title={`${zone.id} — ${zone.required ? "required" : "optional"}`}
             />
           ))}
+          {pageZones
+            .filter((zone) => zone.id === hoveredId && zone.id !== selectedId)
+            .map((zone) => {
+              const display = zone.label?.trim() ? zone.label : zone.id;
+              const below = zone.rect.y < 0.25;
+              return (
+              <div
+                key={`hover-${zone.id}`}
+                className="pointer-events-none absolute z-10 max-w-[220px]"
+                style={below
+                  ? {
+                      left: `${zone.rect.x * 100}%`,
+                      top: `calc(${(zone.rect.y + zone.rect.h) * 100}% + 4px)`,
+                    }
+                  : {
+                      left: `${zone.rect.x * 100}%`,
+                      bottom: `calc(${(1 - zone.rect.y) * 100}% + 4px)`,
+                    }
+                }
+              >
+                <p
+                  className="flex min-w-0 items-center gap-1.5 truncate rounded-full border border-border bg-card py-1 pl-2 pr-2.5 text-xs font-medium shadow-md"
+                  title={display}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${zone.required ? "bg-orange-500" : "bg-yellow-300"}`}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">{display}</span>
+                </p>
+              </div>
+              );
+            })}
+          {pageZones
+            .filter((zone) => zone.id === selectedId)
+            .map((zone) => {
+              // Flip above the rect when it sits near the page bottom so the
+              // toolbar never clips below the surface.
+              const flipUp = zone.rect.y + zone.rect.h > 0.8;
+              return (
+              <div
+                key={`actions-${zone.id}`}
+                className="absolute z-10 flex items-center gap-1 rounded-lg border border-border bg-card p-1 shadow-md"
+                style={flipUp
+                  ? {
+                      left: `${zone.rect.x * 100}%`,
+                      bottom: `calc(${(1 - zone.rect.y) * 100}% + 4px)`,
+                    }
+                  : {
+                      left: `${zone.rect.x * 100}%`,
+                      top: `calc(${(zone.rect.y + zone.rect.h) * 100}% + 4px)`,
+                    }
+                }
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                {renamingId === zone.id ? (
+                  <div className="flex min-w-0 items-center gap-1">
+                    <Input
+                      value={renameDraft}
+                      onChange={(e) => setRenameDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename();
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      placeholder="Zone label…"
+                      maxLength={64}
+                      autoFocus
+                      className="h-8 w-40"
+                      aria-label="Zone label"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={commitRename}
+                      className="min-h-8 shrink-0"
+                    >
+                      Save
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => beginRename(zone.id)}
+                      className="min-h-8 min-w-8 px-2"
+                      aria-label={`Rename ${zone.id}`}
+                      title="Rename"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleRequired(zone.id)}
+                      className={`min-h-8 min-w-8 px-2 ${zone.required ? "bg-blue-500/20 text-blue-600 hover:bg-blue-500/30 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-400" : "text-muted-foreground"}`}
+                      aria-label={zone.required ? "Make optional" : "Make required"}
+                      aria-pressed={zone.required}
+                      title={zone.required ? "Required — click to make optional" : "Optional — click to make required"}
+                    >
+                      <Tag className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeZone(zone.id)}
+                      className="min-h-8 min-w-8 px-2"
+                      aria-label={`Delete ${zone.id}`}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              );
+            })}
           {draft && draft.w > 0 && draft.h > 0 && (
             <div
               className="pointer-events-none absolute rounded-sm border-2 border-dashed border-primary bg-primary/10"
@@ -255,60 +403,17 @@ function ZonesEditorBody({
             />
           )}
         </div>
-        <p className="text-xs text-muted-foreground">
-          Click and drag on the rendered template to mark a zone. Amber =
-          required, green = optional. Tiny drags under the minimum size are
-          ignored.
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>Click and drag on the rendered template to mark a zone.</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-orange-500" aria-hidden="true" />
+            Required
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-yellow-300" aria-hidden="true" />
+            Optional
+          </span>
         </p>
-
-        {zones.length > 0 && (
-          <div className="space-y-2">
-            <Label id="pw-zones-list">Zones ({zones.length})</Label>
-            <ul className="max-h-48 space-y-2 overflow-y-auto" aria-labelledby="pw-zones-list">
-              {zones.map((zone) => (
-                <li
-                  key={zone.id}
-                  className={`flex min-h-8 items-center gap-2 rounded-lg border border-border px-2 py-1 text-sm ${
-                    selectedId === zone.id ? "bg-muted" : ""
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedId(zone.id);
-                      setActivePage(zone.page);
-                    }}
-                    className="min-h-8 min-w-0 flex-1 truncate text-left"
-                    title={zone.id}
-                  >
-                    <span className="truncate font-mono text-xs">{zone.id}</span>
-                  </button>
-                  <Badge variant="outline">p{zone.page}</Badge>
-                  <Badge variant={zone.required ? "default" : "secondary"}>
-                    {zone.required ? "required" : "optional"}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleRequired(zone.id)}
-                    className="min-h-8"
-                  >
-                    {zone.required ? "Make optional" : "Make required"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeZone(zone.id)}
-                    className="min-h-8 min-w-8 px-2"
-                    aria-label={`Delete ${zone.id}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
       <DialogFooter className="flex-col gap-2 sm:flex-row">
         <Button
