@@ -41,7 +41,6 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     }
   }
   const active = row["is_active"];
-  const rawSource = row["source"];
   const rawPdfFile = row["pdf_file"];
   const pdfFile =
     typeof rawPdfFile === "string" && rawPdfFile !== ""
@@ -55,7 +54,8 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     ...(row as object),
     zones,
     is_active: active === true || active === 1 || active === "1",
-    source: rawSource === "pdf" ? "pdf" : "html",
+    // PDF-only: every template reads as pdf regardless of stored value.
+    source: "pdf",
     pdf_file: pdfFile,
   } as PaperworkTemplate;
 }

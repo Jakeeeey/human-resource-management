@@ -47,7 +47,6 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     }
   }
   const active = row["is_active"];
-  const rawSource = row["source"];
   const rawPdfFile = row["pdf_file"];
   const pdfFile =
     typeof rawPdfFile === "string" && rawPdfFile !== ""
@@ -61,7 +60,8 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     ...(row as object),
     zones,
     is_active: active === true || active === 1 || active === "1",
-    source: rawSource === "pdf" ? "pdf" : "html",
+    // PDF-only: every template reads as pdf regardless of stored value.
+    source: "pdf",
     pdf_file: pdfFile,
   } as PaperworkTemplate;
 }
@@ -111,8 +111,6 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         company_key: validation.data.company_key,
         title: validation.data.title,
-        // PDF-only: body is always the empty string (legacy column, never rendered).
-        body_html: "",
         zones: validation.data.zones ?? [],
         is_active: validation.data.is_active ?? true,
         source: "pdf",
