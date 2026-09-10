@@ -20,8 +20,7 @@ import { LineCapStyle, PDFDocument, rgb } from "pdf-lib";
 
 import type { SigningInk, SigningStroke } from "../signingStrokes";
 import { parseInk } from "../signingStrokes";
-import type { SigningStamp } from "../types/signing-envelope.schema";
-import { mergeStampsIntoInk } from "../signingStamps";
+import { mergeStampsIntoInk, type SigningStamp } from "../signingStamps";
 import {
   bitmapPointToPdfPoint,
   hexToPdfColor,

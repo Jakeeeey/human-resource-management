@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/table";
 import { Frame, Pencil } from "lucide-react";
 
-// TemplatesTable.tsx — registry rows: companies (junction set, legacy key
-// fallback when the junction is empty), title (truncated per QA §1), zone
-// counts (required/total), active flag, edit + zones actions.
+// TemplatesTable.tsx — registry rows: companies (junction set, "—" when
+// unscopped), title (truncated per QA §1), zone counts (required/total),
+// active flag, edit + zones actions.
 // PDF-only: every template is an uploaded PDF (no source column).
 
 interface TemplatesTableProps {
@@ -73,9 +73,7 @@ export function TemplatesTable({
               (id) => companyById.get(id)?.name ?? `#${id}`
             );
             const companyTitle =
-              junctionNames.length > 0
-                ? junctionNames.join(", ")
-                : template.company_key;
+              junctionNames.length > 0 ? junctionNames.join(", ") : "—";
             return (
               <TableRow key={template.id}>
                 <TableCell className="max-w-[360px] truncate" title={template.title}>
@@ -104,8 +102,8 @@ export function TemplatesTable({
                       )}
                     </span>
                   ) : (
-                    <span className="block truncate font-mono text-xs">
-                      {template.company_key}
+                    <span className="block truncate text-xs text-muted-foreground">
+                      —
                     </span>
                   )}
                 </TableCell>

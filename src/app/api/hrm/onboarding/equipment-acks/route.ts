@@ -6,16 +6,19 @@ import { findCatalogItem } from "@/modules/human-resource-management/onboarding/
 import { equipmentDocRef } from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
 import { AcknowledgeEquipmentItemSchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
 import { EquipmentQuerySchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
+import { readUserExists } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/hrm/onboarding/equipment-acks — ack rows for one hire.
+// GET /api/hrm/onboarding/equipment-acks?user_id= — ack rows for one EMPLOYEE
+// (`user.user_id`).
 // POST /api/hrm/onboarding/equipment-acks — hiree digital-acknowledge of one
-// ISSUED item. Writes into Todo 10's `acknowledgement_logs` store
-// (doc_ref `equipment:ack:<profileId>:<itemKey>`, signer
-// `hiree:<employeeId>` or `hr-override:<userId>`, method ink|stamp|typed).
-// Ack-without-issue → 422 (never counted); double-ack collapses to 200.
+// ISSUED item. Writes into `acknowledgement_logs` (doc_ref
+// `equipment:ack:<userId>:<itemKey>`, signer `hiree:<userId>` — the employee
+// themself — or `hr-override:<userId>`, method ink|stamp|typed). Unknown
+// employees → 400; ack-without-issue → 422 (never counted); double-ack
+// collapses to 200.
 
 function getPhilippineTime(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
@@ -28,6 +31,13 @@ function validationFailed(errors: Record<string, string[]>) {
   );
 }
 
+function employeeNotFound() {
+  return NextResponse.json(
+    { success: false, message: "The employee does not exist" },
+    { status: 400 }
+  );
+}
+
 interface AckLogRow {
   id?: number;
   doc_ref?: string;
@@ -36,8 +46,8 @@ interface AckLogRow {
   method?: string;
 }
 
-function ackPrefix(profileId: number): string {
-  return `equipment:ack:${profileId}:`;
+function ackPrefix(userId: number): string {
+  return `equipment:ack:${userId}:`;
 }
 
 async function findRows(docRef: string, signer?: string): Promise<AckLogRow[]> {
@@ -58,9 +68,9 @@ export async function GET(req: NextRequest) {
     if (!query.success) {
       return validationFailed(query.error.flatten().fieldErrors);
     }
-    const profileId = query.data.profile_id;
+    const userId = query.data.user_id;
     const result = (await dFetch(
-      `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(ackPrefix(profileId))}&limit=100`
+      `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(ackPrefix(userId))}&limit=100`
     )) as { data?: AckLogRow[] };
     return NextResponse.json({ success: true, data: result?.data ?? [] });
   } catch (error) {
@@ -80,11 +90,15 @@ export async function POST(req: NextRequest) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
     const {
-      profile_id: profileId,
+      user_id: userId,
       item_key: itemKey,
       signer,
       method,
     } = validation.data;
+
+    if (!(await readUserExists(userId))) {
+      return employeeNotFound();
+    }
 
     let catalog;
     try {
@@ -103,7 +117,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const issueRef = equipmentDocRef("issue", profileId, itemKey);
+    const issueRef = equipmentDocRef("issue", userId, itemKey);
     const issueRows = await findRows(issueRef);
     if (issueRows.length === 0) {
       return NextResponse.json(
@@ -115,7 +129,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const ackRef = equipmentDocRef("ack", profileId, itemKey);
+    const ackRef = equipmentDocRef("ack", userId, itemKey);
     const prior = await findRows(ackRef, signer);
     if (prior.length > 0) {
       return NextResponse.json({ success: true, data: prior[0] ?? null });

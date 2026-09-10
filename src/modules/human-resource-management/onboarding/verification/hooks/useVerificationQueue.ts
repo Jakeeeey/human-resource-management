@@ -19,7 +19,11 @@ export type VerificationDialog =
   | { kind: "ack"; row: QueueRow }
   | { kind: "trail"; row: QueueRow };
 
-export function useVerificationQueue() {
+/**
+ * @param userId - The canonical selected hire from the workspace route. The
+ * route returns the global queue and this hook scopes it to that employee.
+ */
+export function useVerificationQueue(userId: number) {
   const {
     queue,
     isLoading,
@@ -37,6 +41,17 @@ export function useVerificationQueue() {
   const [dialog, setDialog] = useState<VerificationDialog>({ kind: "none" });
   const [working, setWorking] = useState(false);
 
+  const scopedRows = useMemo(
+    () => (queue?.rows ?? []).filter((row) => row.userId === userId),
+    [queue, userId]
+  );
+
+  const scopedCounts = useMemo(() => {
+    const counts = { pending: 0, returned: 0, approved: 0 };
+    for (const row of scopedRows) counts[row.queueState] += 1;
+    return counts;
+  }, [scopedRows]);
+
   const closeDialog = useCallback(() => {
     setDialog({ kind: "none" });
   }, []);
@@ -52,7 +67,7 @@ export function useVerificationQueue() {
   const openTrail = useCallback(
     (row: QueueRow) => {
       setDialog({ kind: "trail", row });
-      void fetchTrail(buildDocRef(row.profile.id));
+      void fetchTrail(buildDocRef(row.userId));
     },
     [fetchTrail]
   );
@@ -66,8 +81,8 @@ export function useVerificationQueue() {
     async (row: QueueRow) => {
       setWorking(true);
       try {
-        await decide({ profile_id: row.profile.id, decision: "approve" });
-        toast.success(`Employee #${row.profile.employee_id} verified`);
+        await decide({ user_id: row.userId, decision: "approve" });
+        toast.success(`Employee #${row.userId} verified`);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Approval refused");
       } finally {
@@ -82,7 +97,7 @@ export function useVerificationQueue() {
       setWorking(true);
       try {
         await decide({
-          profile_id: row.profile.id,
+          user_id: row.userId,
           decision: "return",
           reason,
         });
@@ -101,7 +116,7 @@ export function useVerificationQueue() {
     async (row: QueueRow) => {
       setWorking(true);
       try {
-        await decide({ profile_id: row.profile.id, decision: "resubmit" });
+        await decide({ user_id: row.userId, decision: "resubmit" });
         toast.success("Resubmitted — back in the pending queue");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Resubmit refused");
@@ -117,7 +132,7 @@ export function useVerificationQueue() {
       setWorking(true);
       try {
         await recordAck({
-          doc_ref: buildDocRef(row.profile.id),
+          doc_ref: buildDocRef(row.userId),
           signer,
           method,
         });
@@ -134,8 +149,8 @@ export function useVerificationQueue() {
 
   return useMemo(
     () => ({
-      rows: queue?.rows ?? [],
-      counts: queue?.counts ?? { pending: 0, returned: 0, approved: 0 },
+      rows: scopedRows,
+      counts: scopedCounts,
       isLoading,
       isError,
       error,
@@ -155,7 +170,8 @@ export function useVerificationQueue() {
       retryTrail,
     }),
     [
-      queue,
+      scopedRows,
+      scopedCounts,
       isLoading,
       isError,
       error,

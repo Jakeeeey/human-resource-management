@@ -1,176 +1,136 @@
 "use client";
 
-import type { SigningEnvelopeResponse } from "../types/signing-envelope.schema";
-import type { SigningEnvelope } from "../types/signing-envelope.schema";
-import type { SigningInk } from "../signingStrokes";
+import { createContext, useContext, type ReactNode } from "react";
 
-// signingEnvelopeProvider.tsx — client fetch layer for the
-// signing-envelopes API routes. Thin context provider mirroring the
-// paperworkTemplateProvider shape: list + get + openDraft + saveDraft +
-// finish with loading/error flags. Draft vs finish stay distinct calls
-// (distinct server writes — never one blurred mutation).
+import type {
+  JobOffer,
+  PaperworkItem,
+  Paperworks,
+  SigningEnvelope,
+} from "../types/contracts";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
+// signingEnvelopeProvider.tsx — client fetch layer for the APPLICANT-SCOPED
+// signing API (todo 13 re-key). The signing aggregate is keyed by
+// `applicant_id` (UNIQUE) and carries `joboffer_id` / `paperworks_id`; there
+// is NO per-template envelope.
+//
+// Reads answer the four todo-9 list routes:
+//   signing-envelope?applicant_id=  job-offer?applicant_id=
+//   paperworks?applicant_id=        paperwork-item?paperworks_id=
+// Writes answer the two signing routes:
+//   PATCH job-offer/{id}         { signature_file? }  (todo 11)
+//   PATCH paperwork-item/{id}    { strokes, pdf_file } (todo 12)
+// Every mutation delegates to the server services — this layer never
+// recomputes a rollup or writes a status itself.
 
-interface SigningEnvelopeFetchContextType {
-  envelopes: SigningEnvelope[];
-  isLoading: boolean;
-  isError: boolean;
-  error: Error | null;
-  refetch: () => Promise<void>;
-  getEnvelope: (id: number) => Promise<SigningEnvelope | null>;
-  openDraft: (profileId: number, templateId: number, attempt?: number) => Promise<SigningEnvelope | null>;
-  saveDraft: (id: number, strokes: string) => Promise<SigningEnvelope | null>;
-  finishEnvelope: (
-    id: number,
-    payload: {
-      ink: SigningInk;
-      stamps?: { id: string; page: number; x: number; y: number; strokes: { points: { x: number; y: number }[]; width: number; color: string }[] }[];
-      pageSizes: Record<number, { width: number; height: number }>;
-      actor: { role: "hiree" | "hr"; profile_id: number | null };
-    }
-  ) => Promise<SigningEnvelope | null>;
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  message?: string;
 }
 
-const SigningEnvelopeFetchContext = createContext<
-  SigningEnvelopeFetchContextType | undefined
+export interface SignOfferResult {
+  offer: JobOffer;
+  envelope: SigningEnvelope;
+  paperworks: Paperworks;
+  requiredCount: number;
+  signedCount: number;
+  /** `"incomplete"` after this call, or null when the set came out complete. */
+  applicantStatus: string | null;
+}
+
+export interface SignItemResult {
+  item: PaperworkItem;
+  envelope: SigningEnvelope;
+  paperworks: Paperworks;
+  requiredCount: number;
+  signedCount: number;
+}
+
+interface SigningSetFetchContextType {
+  listEnvelopes: (applicantId?: number) => Promise<SigningEnvelope[]>;
+  listJobOffers: (applicantId?: number) => Promise<JobOffer[]>;
+  listPaperworks: (applicantId?: number) => Promise<Paperworks[]>;
+  listPaperworkItems: (paperworksId: number) => Promise<PaperworkItem[]>;
+  signJobOffer: (
+    offerId: number,
+    signatureFile: string | null
+  ) => Promise<SignOfferResult>;
+  signPaperworkItem: (
+    itemId: number,
+    strokes: string,
+    pdfFile: string
+  ) => Promise<SignItemResult>;
+}
+
+const SigningSetFetchContext = createContext<
+  SigningSetFetchContextType | undefined
 >(undefined);
 
-const BASE = "/api/hrm/onboarding/signing-envelopes";
+async function readList<T>(url: string): Promise<T[]> {
+  const res = await fetch(url, { cache: "no-store" });
+  const body = (await res.json().catch(() => null)) as ApiEnvelope<T[]> | null;
+  if (!res.ok || !body?.success) {
+    throw new Error(body?.message || "Request failed");
+  }
+  return Array.isArray(body.data) ? body.data : [];
+}
 
-async function readEnvelope(res: Response): Promise<SigningEnvelopeResponse> {
-  return (await res.json().catch(() => null)) as SigningEnvelopeResponse;
+async function patch<T>(url: string, payload: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const body = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
+  if (!res.ok || !body?.success || !body.data) {
+    throw new Error(body?.message || "Request failed");
+  }
+  return body.data;
+}
+
+function scope(applicantId?: number): string {
+  return applicantId === undefined ? "" : `?applicant_id=${applicantId}`;
 }
 
 export function SigningEnvelopeFetchProvider({
   children,
 }: {
-  children: React.ReactNode;
-}): React.ReactNode {
-  const [envelopes, setEnvelopes] = useState<SigningEnvelope[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setIsError(false);
-      const res = await fetch(BASE, { cache: "no-store" });
-      if (!res.ok) throw new Error("Fetch failed");
-      const body = await readEnvelope(res);
-      setEnvelopes(Array.isArray(body.data) ? body.data : []);
-    } catch (err) {
-      setIsError(true);
-      setError(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
-
-  const getEnvelope = useCallback(async (id: number) => {
-    const res = await fetch(`${BASE}/${id}`, { cache: "no-store" });
-    const body = await readEnvelope(res);
-    if (!res.ok || !body.success) {
-      throw new Error(body?.message || "Fetch failed");
-    }
-    return (body.data as SigningEnvelope) ?? null;
-  }, []);
-
-  const openDraft = useCallback(
-    async (profileId: number, templateId: number, attempt?: number) => {
-      const res = await fetch(BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile_id: profileId,
-          template_id: templateId,
-          attempt,
-        }),
-      });
-      const body = await readEnvelope(res);
-      if (!res.ok || !body.success) {
-        throw new Error(body?.message || "Open draft failed");
-      }
-      await fetchData();
-      return (body.data as SigningEnvelope) ?? null;
-    },
-    [fetchData]
-  );
-
-  const saveDraft = useCallback(
-    async (id: number, strokes: string) => {
-      const res = await fetch(`${BASE}/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strokes }),
-      });
-      const body = await readEnvelope(res);
-      if (!res.ok || !body.success) {
-        throw new Error(body?.message || "Save draft failed");
-      }
-      await fetchData();
-      return (body.data as SigningEnvelope) ?? null;
-    },
-    [fetchData]
-  );
-
-  const finishEnvelope = useCallback(
-    async (
-      id: number,
-      payload: {
-        ink: SigningInk;
-        stamps?: { id: string; page: number; x: number; y: number; strokes: { points: { x: number; y: number }[]; width: number; color: string }[] }[];
-        pageSizes: Record<number, { width: number; height: number }>;
-        actor: { role: "hiree" | "hr"; profile_id: number | null };
-      }
-    ) => {
-      const res = await fetch(`${BASE}/${id}/finish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const body = await readEnvelope(res);
-      if (!res.ok || !body.success) {
-        throw new Error(body?.message || "Finish failed");
-      }
-      await fetchData();
-      return (body.data as SigningEnvelope) ?? null;
-    },
-    [fetchData]
-  );
+  children: ReactNode;
+}): ReactNode {
+  const value: SigningSetFetchContextType = {
+    listEnvelopes: (applicantId) =>
+      readList<SigningEnvelope>(
+        `/api/hrm/onboarding/signing-envelope${scope(applicantId)}`
+      ),
+    listJobOffers: (applicantId) =>
+      readList<JobOffer>(`/api/hrm/onboarding/job-offer${scope(applicantId)}`),
+    listPaperworks: (applicantId) =>
+      readList<Paperworks>(`/api/hrm/onboarding/paperworks${scope(applicantId)}`),
+    listPaperworkItems: (paperworksId) =>
+      readList<PaperworkItem>(
+        `/api/hrm/onboarding/paperwork-item?paperworks_id=${paperworksId}`
+      ),
+    signJobOffer: (offerId, signatureFile) =>
+      patch<SignOfferResult>(`/api/hrm/onboarding/job-offer/${offerId}`, {
+        signature_file: signatureFile,
+      }),
+    signPaperworkItem: (itemId, strokes, pdfFile) =>
+      patch<SignItemResult>(`/api/hrm/onboarding/paperwork-item/${itemId}`, {
+        strokes,
+        pdf_file: pdfFile,
+      }),
+  };
 
   return (
-    <SigningEnvelopeFetchContext.Provider
-      value={{
-        envelopes,
-        isLoading,
-        isError,
-        error,
-        refetch: fetchData,
-        getEnvelope,
-        openDraft,
-        saveDraft,
-        finishEnvelope,
-      }}
-    >
+    <SigningSetFetchContext.Provider value={value}>
       {children}
-    </SigningEnvelopeFetchContext.Provider>
+    </SigningSetFetchContext.Provider>
   );
 }
 
-export function useSigningEnvelopeFetch(): SigningEnvelopeFetchContextType {
-  const ctx = useContext(SigningEnvelopeFetchContext);
+export function useSigningEnvelopeFetch(): SigningSetFetchContextType {
+  const ctx = useContext(SigningSetFetchContext);
   if (!ctx) {
     throw new Error(
       "useSigningEnvelopeFetch must be used inside SigningEnvelopeFetchProvider"

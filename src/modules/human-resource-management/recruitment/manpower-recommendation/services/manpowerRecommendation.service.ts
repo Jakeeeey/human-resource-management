@@ -1,4 +1,5 @@
 import { ManpowerRecommendation, ManpowerRecommendationCreateInput } from "../types";
+import { isApplicantSlotOccupying } from "../utils/applicantPipeline";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -74,18 +75,21 @@ export const manpowerRecommendationService = {
 
     /**
      * Fetch applicants for the recommendation form dropdown.
+     * `status` is the applicant PIPELINE truth (todo 8) — the client joins it
+     * to rec rows for slot/hire counts and the already-approved exclusion.
      * @returns Typed applicant lookup rows.
      */
-    async fetchApplicants(): Promise<{ id: number; full_name: string; position_applied_for: string }[]> {
+    async fetchApplicants(): Promise<{ id: number; full_name: string; position_applied_for: string; status: string }[]> {
         try {
-            const url = `${API_BASE_URL}/items/applicant?fields=id,full_name,position_applied_for&sort=full_name&limit=-1`;
+            const url = `${API_BASE_URL}/items/applicant?fields=id,full_name,position_applied_for,status&sort=full_name&limit=-1`;
             const response = await fetch(url, { headers });
             if (!response.ok) return [];
             const result = await response.json();
-            return result.data.map((a: { id: number; full_name: string; position_applied_for: string }) => ({
+            return result.data.map((a: { id: number; full_name: string; position_applied_for: string; status: string }) => ({
                 id: a.id,
                 full_name: a.full_name,
                 position_applied_for: a.position_applied_for,
+                status: a.status,
             }));
         } catch { return []; }
     },
@@ -230,9 +234,16 @@ export const manpowerRecommendationService = {
     },
 
     /**
-      * Fetch a request's slot capacity: need vs active (Approved/Hired) fill.
+      * Fetch a request's slot capacity: need vs active fill.
+      *
+      * RECONCILED (todo 8): slot occupancy follows the APPLICANT pipeline
+      * (`applicant.status` is the single truth), NOT the recommendation column.
+      * The rec row only supplies the request -> applicant linkage; an applicant
+      * occupies a slot from `final_approved` through `hired`, and a terminal
+      * rejected/withdrawn pipeline frees the slot even when the rec row still
+      * reads Approved/Hired.
       * @param requestId - Manpower request record ID.
-      * @returns Slot need and active fill count.
+      * @returns Slot need and active pipeline fill count.
       */
     async fetchRequestCapacity(requestId: number): Promise<{ need: number; active: number; request_no: string }> {
         try {
@@ -247,7 +258,7 @@ export const manpowerRecommendationService = {
             const request_no = (reqJson.data?.request_no ?? `#${requestId}`) as string;
             const recRes = await fetch(
                 `${API_BASE_URL}/items/manpower_recommendation` +
-                `?filter[manpower_request_id][_eq]=${requestId}&filter[status][_in]=Approved,Hired&fields=id&limit=-1`,
+                `?filter[manpower_request_id][_eq]=${requestId}&fields=applicant_id&limit=-1`,
                 { headers }
             );
             if (!recRes.ok) {
@@ -256,7 +267,27 @@ export const manpowerRecommendationService = {
                 throw new Error(`HTTP error! status: ${recRes.status}`);
             }
             const recJson = await recRes.json();
-            return { need, active: (recJson.data as unknown[]).length, request_no };
+            const applicantIds = [...new Set(
+                (recJson.data as { applicant_id: number | null }[])
+                    .map((rec) => rec.applicant_id)
+                    .filter((applicantId): applicantId is number => typeof applicantId === "number")
+            )];
+            let active = 0;
+            if (applicantIds.length > 0) {
+                const applicantRes = await fetch(
+                    `${API_BASE_URL}/items/applicant` +
+                    `?filter[id][_in]=${applicantIds.join(",")}&fields=id,status&limit=-1`,
+                    { headers }
+                );
+                if (!applicantRes.ok) {
+                    const errorText = await applicantRes.text();
+                    console.error(`DIRECTUS ERROR [fetchRequestCapacity applicants:${requestId}]:`, errorText);
+                    throw new Error(`HTTP error! status: ${applicantRes.status}`);
+                }
+                const applicantJson = await applicantRes.json();
+                active = (applicantJson.data as { status: string }[]).filter((applicant) => isApplicantSlotOccupying(applicant.status)).length;
+            }
+            return { need, active, request_no };
         } catch (e) {
             console.error("Error fetching manpower request capacity:", e);
             throw new Error("INTERNAL_FAIL: Failed to fetch manpower request capacity");

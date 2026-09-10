@@ -1,15 +1,12 @@
 "use client";
 
 // portalProvider.tsx — client fetch layer for the hiree-scoped portal API.
-// Thin context provider mirroring the hub profileProvider shape: session +
-// checklist + link with loading/error flags. Uploads travel ONLY
-// via the application-form upload canon (`uploadApplicationFile` — kind/
-// size/mime server-validated, folder-routed); the form holds `File|null`
-// and this layer persists only the returned `data.id` UUID via the link
-// route. DIRECTUS_STATIC_TOKEN never reaches the browser (server hydration
-// only — every fetch below hits our own Next routes).
-// Signing envelopes are NOT fetched here (Todo 19) — kiosk signing runs on
-// the HR-operated signing desk (`hrm/onboarding/signing`).
+// The identity is resolved SERVER-SIDE from the session cookie
+// (`/portal/session`) and echoed back — an applicant before hiring, an
+// employee after the hire. The browser no longer asserts any identity header
+// and never receives the Directus token (every fetch below hits our own Next
+// routes). Signing envelopes are NOT fetched here: kiosk signing runs on the
+// HR-operated, applicant-scoped signing desk (`hrm/onboarding/signing`).
 
 import {
   createContext,
@@ -18,13 +15,11 @@ import {
   useEffect,
   useState,
 } from "react";
-import type { PortalChecklistItem } from "@/modules/human-resource-management/employee-portal/types/portal-checklist.schema";
+import type {
+  PortalChecklistItem,
+  PortalSession,
+} from "@/modules/human-resource-management/employee-portal/types/portal-checklist.schema";
 import { uploadApplicationFile } from "@/modules/human-resource-management/application-form/providers/fetchProvider";
-
-interface PortalSession {
-  profile_id: number;
-  employee_id: number;
-}
 
 interface PortalFetchContextType {
   session: PortalSession | null;
@@ -46,26 +41,12 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   return (await res.json().catch(() => null)) as Record<string, unknown>;
 }
 
-function scopeHeaders(session: PortalSession | null): Record<string, string> {
-  if (!session) return {};
-  return {
-    "x-actor-role": "hiree",
-    "x-hiree-profile-id": String(session.profile_id),
-  };
-}
-
 export function PortalFetchProvider({
-  initialProfileId,
   children,
 }: {
-  initialProfileId: number | null;
   children: React.ReactNode;
 }): React.ReactNode {
-  const [session, setSession] = useState<PortalSession | null>(
-    initialProfileId !== null
-      ? { profile_id: initialProfileId, employee_id: 0 }
-      : null
-  );
+  const [session, setSession] = useState<PortalSession | null>(null);
   const [checklist, setChecklist] = useState<PortalChecklistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
@@ -75,23 +56,17 @@ export function PortalFetchProvider({
     try {
       setIsLoading(true);
       setIsError(false);
-      let active: PortalSession | null = session;
-      if (!active) {
-        const sessionRes = await fetch(`${BASE}/session`, { cache: "no-store" });
-        const sessionBody = await readJson(sessionRes);
-        if (!sessionRes.ok || !sessionBody.success) {
-          throw new Error(
-            (sessionBody.message as string) || "Hiree session not found"
-          );
-        }
-        const data = sessionBody.data as PortalSession;
-        active = { profile_id: data.profile_id, employee_id: data.employee_id };
-        setSession(active);
+      const sessionRes = await fetch(`${BASE}/session`, { cache: "no-store" });
+      const sessionBody = await readJson(sessionRes);
+      if (!sessionRes.ok || !sessionBody.success) {
+        throw new Error(
+          (sessionBody.message as string) || "Hiree session not found"
+        );
       }
-      const headers = scopeHeaders(active);
-      const checklistRes = await fetch(`${BASE}/checklist?profile_id=${active?.profile_id}`, {
+      setSession(sessionBody.data as PortalSession);
+
+      const checklistRes = await fetch(`${BASE}/checklist`, {
         cache: "no-store",
-        headers,
       });
       if (!checklistRes.ok) throw new Error("Checklist fetch failed");
       const checklistBody = await readJson(checklistRes);
@@ -106,7 +81,6 @@ export function PortalFetchProvider({
     } finally {
       setIsLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -125,12 +99,8 @@ export function PortalFetchProvider({
       );
       const res = await fetch(`${BASE}/documents`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...scopeHeaders(session) },
-        body: JSON.stringify({
-          profile_id: session.profile_id,
-          doc_key: docKey,
-          file_id: fileId,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doc_key: docKey, file_id: fileId }),
       });
       const body = await readJson(res);
       if (!res.ok || !body.success) {

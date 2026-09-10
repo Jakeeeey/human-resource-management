@@ -3,55 +3,56 @@ import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
-  assertHireeScope,
   buildChecklist,
-  readHireeScope,
+  portalMarkerPrefix,
+  readPortalToken,
+  resolvePortalIdentity,
 } from "@/modules/human-resource-management/employee-portal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/hrm/onboarding/portal/checklist?profile_id=<id> — the hiree's OWN
-// document checklist (required/optional from the hub config). Filed state is
-// derived from the portal file-description markers, so
-// upload→UUID→checklist-check round-trips through one read path.
-// Access matrix: role=hr → 403; cross-hire profile_id → 403 (asserted).
+// GET /api/hrm/onboarding/portal/checklist — the caller's OWN document
+// checklist, keyed to the session-resolved identity (applicant pre-hire /
+// employee post-hire). Filed state derives from the identity-keyed file
+// markers stamped by the documents route, so upload -> UUID -> checklist
+// round-trips through one read path. No `profile_id` query/header exists —
+// there is nothing for the client to assert.
 
-const querySchema = z
-  .object({
-    profile_id: z.coerce.number().int().positive(),
-  })
-  .strict();
+const FiledRowsSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string().min(1),
+      description: z.unknown(),
+    })
+  ),
+});
 
 export async function GET(req: NextRequest) {
   try {
-    const params = Object.fromEntries(req.nextUrl.searchParams.entries());
-    const query = querySchema.safeParse(params);
-    if (!query.success) {
+    const resolved = await resolvePortalIdentity(readPortalToken(req));
+    if (!resolved.ok) {
       return NextResponse.json(
-        { success: false, message: "Validation failed" },
-        { status: 400 }
+        { success: false, message: resolved.message },
+        { status: resolved.status }
       );
     }
 
-    const scope = assertHireeScope(
-      readHireeScope(req.headers, query.data.profile_id)
-    );
-    if (!scope.ok) {
-      return NextResponse.json(
-        { success: false, message: scope.message },
-        { status: scope.status }
-      );
-    }
-
-    const marker = `onboarding-portal:${query.data.profile_id}:`;
-    const result = (await dFetch(
+    const key = { kind: resolved.identity.kind, id: resolved.identity.id };
+    const marker = portalMarkerPrefix(key);
+    const body: unknown = await dFetch(
       `/files?filter[description][_contains]=${encodeURIComponent(marker)}&fields=id,description&limit=100`
-    )) as { data?: { id: string; description: unknown }[] };
-    const rows = Array.isArray(result?.data) ? result.data : [];
+    );
+    const parsed = FiledRowsSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new Error(
+        `PORTAL_FILE_MARKER_READ_FAILED: ${JSON.stringify(body).slice(0, 300)}`
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      data: buildChecklist(query.data.profile_id, rows),
+      data: buildChecklist(key, parsed.data.data),
     });
   } catch (error) {
     console.error("[onboarding-portal] checklist error:", error);

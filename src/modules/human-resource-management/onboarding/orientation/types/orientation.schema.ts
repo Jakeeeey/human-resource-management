@@ -6,6 +6,11 @@ import { z } from "zod";
 // (HR-owned) + `department` (department-owned). Topic TITLES live ONLY in
 // `../orientationSeed.ts` (seed data, admin-editable via the topics routes)
 // — never inline literals anywhere else in code.
+//
+// Check-offs are keyed to the EMPLOYEE `user_id` (todo 20): each check is the
+// orientation-phase `onboarding_task` row for that employee, so `checked_by`
+// is the session actor id (never a client-asserted role). There is no
+// `profile_id` / actor-role payload anywhere in this contract.
 
 export const ORIENTATION_TRACKS = ["company", "department"] as const;
 
@@ -28,16 +33,24 @@ export const OrientationTopicSchema = z.object({
 export type OrientationTopic = z.infer<typeof OrientationTopicSchema>;
 
 export const OrientationCheckSchema = z.object({
-  profile_id: z.number().int().positive(),
+  user_id: z.number().int().positive(),
   topic_id: z.string().min(1),
-  checked_by: OrientationRoleSchema,
+  checked_by: z.number().int().positive().nullable(),
   checked_at: z.string().min(1),
 });
 
 export type OrientationCheck = z.infer<typeof OrientationCheckSchema>;
 
-// Actor performing a check-off. Company track requires `hr`;
-// department track requires `department` — any other pairing is 403.
+// Roster entry for the tab's employee picker (`user.user_id` + display name).
+export const OrientationEmployeeSchema = z.object({
+  user_id: z.number().int().positive(),
+  name: z.string().min(1),
+});
+
+export type OrientationEmployee = z.infer<typeof OrientationEmployeeSchema>;
+
+// Actor for the HR-owned TOPIC ADMIN surface only (topics routes). Check-offs
+// no longer take an actor — the session supplies `checked_by` server-side.
 export const OrientationActorSchema = z
   .object({
     role: OrientationRoleSchema,
@@ -48,9 +61,8 @@ export type OrientationActor = z.infer<typeof OrientationActorSchema>;
 
 export const CheckOffOrientationSchema = z
   .object({
-    profile_id: z.number().int().positive(),
+    user_id: z.number().int().positive(),
     topic_id: z.string().min(1),
-    actor: OrientationActorSchema,
   })
   .strict();
 
@@ -93,6 +105,12 @@ export interface OrientationStateResponse {
     checks: OrientationCheck[];
     done: boolean;
   } | null;
+  message?: string;
+}
+
+export interface OrientationRosterResponse {
+  success: boolean;
+  data?: { employees: OrientationEmployee[] } | null;
   message?: string;
 }
 

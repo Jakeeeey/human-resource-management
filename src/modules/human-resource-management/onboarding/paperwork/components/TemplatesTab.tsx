@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { usePaperworkTemplates } from "../hooks/usePaperworkTemplates";
 import {
     listPaperworkCompanies,
-    resolveLegacyCompanyIds,
     type PaperworkCompany,
 } from "../providers/paperworkCompanyProvider";
 import {
@@ -69,13 +68,10 @@ export function TemplatesTab() {
     code: row.code,
   }));
 
-  // Legacy `company_key` resolves through the directory when the junction is
-  // empty (old rows, unresolvable keys stay on the raw key — zero data loss).
-  const companyIdsFor = (templateId: number, legacyKey: string): number[] => {
-    const ids = templateCompanyIds.get(templateId);
-    if (ids && ids.length > 0) return ids;
-    return resolveLegacyCompanyIds(companies, legacyKey);
-  };
+  // Junction-first scoping: empty set means unscoped (dialog forces a pick
+  // on the next edit).
+  const companyIdsFor = (templateId: number): number[] =>
+    templateCompanyIds.get(templateId) ?? [];
 
   const refreshJunction = () => {
     void listAllTemplateCompanies().then((rows) =>
@@ -130,11 +126,7 @@ export function TemplatesTab() {
         template={selected}
         saving={saving}
         companyOptions={companyOptions}
-        initialCompanyIds={
-          selected
-            ? companyIdsFor(selected.id, selected.company_key)
-            : []
-        }
+        initialCompanyIds={selected ? companyIdsFor(selected.id) : []}
         onClose={closeDialog}
         onSave={(d, ids) => {
           void saveTemplate(d, ids).then(() => refreshJunction());

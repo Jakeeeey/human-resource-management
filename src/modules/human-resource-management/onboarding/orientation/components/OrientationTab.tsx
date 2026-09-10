@@ -11,22 +11,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AlertCircle, Building2, CheckCircle2, Users } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import { useOrientation } from "../hooks/useOrientation";
 import type { OrientationTopic } from "../types/orientation.schema";
 
-// OrientationTab.tsx — hub Orientation tab body (Todo 11 fills this; other
-// shells stay untouched). Two tracks per pdf §7: company (HR check-off) +
-// department (department check-off). Titles come from the topic store (seed
-// data, admin-editable) — never inline literals. Predicate banner reflects
-// `done` (both tracks complete → orientation predicate true).
+// OrientationTab.tsx — workspace Orientation section, keyed to the EMPLOYEE
+// (`user_id`) since todo 20. Two tracks per pdf §7: company (HR-owned) +
+// department (department-owned). Titles come from the topic store (seed data,
+// admin-editable) — never inline literals. Check-offs complete the employee's
+// orientation `onboarding_task` rows; the employee is the canonical hire from
+// the route, so there is no picker and no client role selector.
 
 function TrackCard({
   title,
@@ -35,7 +29,6 @@ function TrackCard({
   topics,
   checkedIds,
   ownerLabel,
-  canCheck,
   checkingId,
   onCheck,
 }: {
@@ -45,7 +38,6 @@ function TrackCard({
   topics: OrientationTopic[];
   checkedIds: Set<string>;
   ownerLabel: string;
-  canCheck: boolean;
   checkingId: string | null;
   onCheck: (topicId: string) => void;
 }) {
@@ -82,12 +74,12 @@ function TrackCard({
             {topics.map((topic) => {
               const checked = checkedIds.has(topic.id);
               return (
-                <li
-                  key={topic.id}
-                  className="flex items-center gap-3 py-2.5"
-                >
+                <li key={topic.id} className="flex items-center gap-3 py-2.5">
                   <span className="min-w-0 flex-1">
-                    <span className="block max-w-[300px] truncate text-sm font-medium" title={topic.title}>
+                    <span
+                      className="block max-w-[300px] truncate text-sm font-medium"
+                      title={topic.title}
+                    >
                       {topic.title}
                     </span>
                     {!topic.required && (
@@ -105,15 +97,11 @@ function TrackCard({
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={!canCheck || checkingId === topic.id}
+                      disabled={checkingId === topic.id}
                       onClick={() => onCheck(topic.id)}
                       className="shrink-0"
                       aria-label={`Check off ${topic.title}`}
-                      title={
-                        canCheck
-                          ? `Check off as ${ownerLabel}`
-                          : `Only ${ownerLabel} can check this off`
-                      }
+                      title={`Owned by ${ownerLabel}`}
                     >
                       Check off
                     </Button>
@@ -128,13 +116,9 @@ function TrackCard({
   );
 }
 
-export function OrientationTab() {
+export function OrientationTab({ userId }: { userId: number }) {
   const {
-    profiles,
-    profileId,
-    selectHire,
-    role,
-    setRole,
+    selectedEmployee,
     companyTopics,
     departmentTopics,
     checkedIds,
@@ -142,67 +126,30 @@ export function OrientationTab() {
     isLoading,
     isError,
     error,
+    rosterError,
     actionError,
     checkingId,
     checkTopic,
-  } = useOrientation();
+  } = useOrientation(userId);
+
+  const employeeLabel = selectedEmployee?.name ?? `Employee #${userId}`;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          {profileId === null
-            ? "No hire selected"
-            : done
-              ? `Hire ${profileId}: orientation complete`
-              : `Hire ${profileId}: orientation in progress`}
+          {done
+            ? `${employeeLabel}: orientation complete`
+            : `${employeeLabel}: orientation in progress`}
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Select
-            value={profileId === null ? "" : String(profileId)}
-            onValueChange={(v) => selectHire(Number(v))}
-          >
-            <SelectTrigger
-              className="h-9 w-full sm:w-auto"
-              aria-label="Select hire"
-            >
-              <SelectValue placeholder="Select hire" />
-            </SelectTrigger>
-            <SelectContent className="max-h-60">
-              {profiles.map((p) => (
-                <SelectItem key={p.id} value={String(p.employee_id)}>
-                  Hire #{p.employee_id} — {p.status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={role}
-            onValueChange={(v) =>
-              setRole(v === "department" ? "department" : "hr")
-            }
-          >
-            <SelectTrigger
-              className="h-9 w-full sm:w-auto"
-              aria-label="Acting role"
-              title="Acting role: company topics need HR, department topics need department"
-            >
-              <SelectValue placeholder="Acting role" />
-            </SelectTrigger>
-            <SelectContent className="max-h-60">
-              <SelectItem value="hr">Acting as HR</SelectItem>
-              <SelectItem value="department">Acting as Department</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
-      {(isError || actionError) && (
+      {(isError || actionError || rosterError) && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Orientation action failed</AlertTitle>
           <AlertDescription>
-            {actionError ?? error?.message ?? "Fetch failed"}
+            {actionError ?? error?.message ?? rosterError?.message ?? "Fetch failed"}
           </AlertDescription>
         </Alert>
       )}
@@ -222,18 +169,16 @@ export function OrientationTab() {
             topics={companyTopics}
             checkedIds={checkedIds}
             ownerLabel="HR"
-            canCheck={role === "hr"}
             checkingId={checkingId}
             onCheck={(id) => void checkTopic(id)}
           />
           <TrackCard
             title="Department Orientation"
-            description="Department-owned track, checked off by the department."
+            description="Department-owned track; HR checks it off as the department proxy."
             icon={<Users className="h-4 w-4 text-muted-foreground shrink-0" />}
             topics={departmentTopics}
             checkedIds={checkedIds}
             ownerLabel="Department"
-            canCheck={role === "department"}
             checkingId={checkingId}
             onCheck={(id) => void checkTopic(id)}
           />

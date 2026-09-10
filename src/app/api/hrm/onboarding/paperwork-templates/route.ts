@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
@@ -11,13 +10,11 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/hrm/onboarding/paperwork-templates — list (+ `?company_key=`
-// legacy per-company filter; app-level key, NOT a UNIQUE column).
+// GET /api/hrm/onboarding/paperwork-templates — list.
 // POST /api/hrm/onboarding/paperwork-templates — create; zones default to []
-// (freeform-ink-only template), is_active defaults true. Todo 20:
-// `company_key` is legacy read-fallback — accepted when present (degraded
-// writes, old rows) but never required; company scoping lives in the
-// `paperwork_template_companies` junction via the `[id]/companies` route.
+// (freeform-ink-only template), is_active defaults true. Company scoping
+// lives in the `paperwork_template_companies` junction via the
+// `[id]/companies` route — this collection carries no company column.
 
 function getPhilippineTime(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
@@ -61,10 +58,6 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
         : null;
   return {
     ...(row as object),
-    // Legacy key may be absent on junction-scoped rows — coerce to "" so
-    // the envelope type stays string while the junction owns scoping.
-    company_key:
-      typeof row["company_key"] === "string" ? row["company_key"] : "",
     zones,
     is_active: active === true || active === 1 || active === "1",
     // PDF-only: every template reads as pdf regardless of stored value.
@@ -73,23 +66,9 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
   } as PaperworkTemplate;
 }
 
-const listQuerySchema = z
-  .object({
-    company_key: z.string().min(1).optional(),
-  })
-  .strict();
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const params = Object.fromEntries(req.nextUrl.searchParams.entries());
-    const query = listQuerySchema.safeParse(params);
-    if (!query.success) {
-      return validationFailed(query.error.flatten().fieldErrors);
-    }
-
-    const filter = query.data.company_key
-      ? `?filter[company_key][_eq]=${encodeURIComponent(query.data.company_key)}&limit=100`
-      : "?limit=100";
+    const filter = "?limit=100";
     const result = (await dFetch(`/items/paperwork_templates${filter}`)) as {
       data?: Record<string, unknown>[];
     };
@@ -113,9 +92,6 @@ export async function POST(req: NextRequest) {
     }
 
     const now = getPhilippineTime();
-    // Legacy `company_key` is written ONLY when the caller supplies it
-    // (degraded-path writes); the dialog's normal path sends none — the
-    // junction replace route owns company scoping.
     const payload: Record<string, unknown> = {
       title: validation.data.title,
       zones: validation.data.zones ?? [],
@@ -125,9 +101,6 @@ export async function POST(req: NextRequest) {
       created_at: now,
       updated_at: now,
     };
-    if (validation.data.company_key !== undefined) {
-      payload["company_key"] = validation.data.company_key;
-    }
     const created = (await dFetch("/items/paperwork_templates", {
       method: "POST",
       body: JSON.stringify(payload),

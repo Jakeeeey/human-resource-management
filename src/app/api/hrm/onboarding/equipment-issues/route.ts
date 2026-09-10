@@ -9,16 +9,19 @@ import {
 } from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
 import { IssueEquipmentItemSchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
 import { EquipmentQuerySchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
+import { readUserExists } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/hrm/onboarding/equipment-issues — issue rows for one hire.
+// GET /api/hrm/onboarding/equipment-issues?user_id= — issue rows for one
+// EMPLOYEE (`user.user_id`).
 // POST /api/hrm/onboarding/equipment-issues — HR records handover of one
 // catalog item. Writes an issue row into `acknowledgement_logs`
-// (doc_ref `equipment:issue:<profileId>:<itemKey>`, signer `issuer:<role>`,
-// method `typed`). Unknown item keys → 400; double-issue → 409.
-// Asset tables are NEVER written here (Master List owns assets).
+// (doc_ref `equipment:issue:<userId>:<itemKey>`, signer `issuer:<role>`,
+// method `typed`). Unknown employees → 400; unknown item keys → 400;
+// double-issue → 409. Asset tables are NEVER written here (Master List owns
+// assets).
 
 function getPhilippineTime(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
@@ -31,6 +34,13 @@ function validationFailed(errors: Record<string, string[]>) {
   );
 }
 
+function employeeNotFound() {
+  return NextResponse.json(
+    { success: false, message: "The employee does not exist" },
+    { status: 400 }
+  );
+}
+
 interface AckLogRow {
   id?: number;
   doc_ref?: string;
@@ -39,8 +49,8 @@ interface AckLogRow {
   method?: string;
 }
 
-function issuePrefix(profileId: number): string {
-  return `equipment:issue:${profileId}:`;
+function issuePrefix(userId: number): string {
+  return `equipment:issue:${userId}:`;
 }
 
 export async function GET(req: NextRequest) {
@@ -50,9 +60,9 @@ export async function GET(req: NextRequest) {
     if (!query.success) {
       return validationFailed(query.error.flatten().fieldErrors);
     }
-    const profileId = query.data.profile_id;
+    const userId = query.data.user_id;
     const result = (await dFetch(
-      `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(issuePrefix(profileId))}&limit=100`
+      `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(issuePrefix(userId))}&limit=100`
     )) as { data?: AckLogRow[] };
     return NextResponse.json({ success: true, data: result?.data ?? [] });
   } catch (error) {
@@ -71,7 +81,11 @@ export async function POST(req: NextRequest) {
     if (!validation.success) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
-    const { profile_id: profileId, item_key: itemKey } = validation.data;
+    const { user_id: userId, item_key: itemKey } = validation.data;
+
+    if (!(await readUserExists(userId))) {
+      return employeeNotFound();
+    }
 
     let catalog;
     try {
@@ -91,7 +105,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const docRef = equipmentDocRef("issue", profileId, itemKey);
+    const docRef = equipmentDocRef("issue", userId, itemKey);
     const existing = (await dFetch(
       `/items/acknowledgement_logs?filter[doc_ref][_eq]=${encodeURIComponent(docRef)}&fields=id&limit=1`
     )) as { data?: unknown[] };

@@ -2,8 +2,8 @@ import { z } from "zod";
 
 // paperwork-template-company.schema.ts — Zod source of truth for the
 // `paperwork_template_companies` junction (Todo 20). Junction rows are the
-// source of truth for template↔company scoping; `company_key` on the template
-// row is legacy read-fallback only and is never written in the normal path.
+// source of truth for template↔company scoping — the template row carries no
+// company column.
 // Pair grain: UNIQUE (template_id, company_id); duplicate pairs collapse to a
 // single row, never doubled. No native Directus M2M alias fields — manual
 // junction per house pattern (`company_memo_per_companies`).

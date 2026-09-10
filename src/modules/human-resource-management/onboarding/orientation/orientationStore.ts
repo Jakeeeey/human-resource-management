@@ -1,37 +1,37 @@
-// orientationStore.ts — server-side orientation state (seed + check-offs).
+// orientationStore.ts — server-side orientation TOPIC store (seed + overlays).
 //
-// Backing: runtime store seeded from `orientationSeed.ts`. Topic lists are
-// admin-editable through `upsertTopic` (the topics routes) — the seed is
-// the default, never a hardcoded constant in consuming code. Per-hire
-// check-offs live here keyed `<profile_id>:<topic_id>`.
+// Topic lists are admin-editable through `upsertTopic` (the topics routes) —
+// the seed is the default, never a hardcoded constant in consuming code. Since
+// todo 20 the per-employee CHECK-OFFS are NOT held here: they are the
+// employee's orientation-phase `onboarding_task` rows, managed by
+// `orientation-task-service.ts` (keyed to `user_id`). This file stays pure
+// topic data — no `profile_id`, no check state.
 //
-// Role gate (THE rule for Todo 11): company topics check off ONLY by `hr`;
-// department topics ONLY by `department`. A wrong-role attempt returns
-// `{ ok: false, forbidden: true }` (routes map to 403) and moves NOTHING —
-// the predicate stays exactly where it was.
-//
-// Pure logic + module-scoped Maps — no imports, safe for routes + harness.
-// Production note: if the owner later creates an `orientation_checks`
-// Directus collection, swap this store's internals; the function shapes
-// (and the 403/predicate contract) stay identical.
+// Pure logic + module-scoped Maps — no imports beyond the seed, safe for
+// routes + harness.
 
 import { DEFAULT_ORIENTATION_TOPICS } from "./orientationSeed";
 import type {
-  OrientationCheck,
   OrientationRole,
   OrientationTopic,
   OrientationTrack,
 } from "./types/orientation.schema";
-
-function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 /** Responsible party per track (pdf §7: HR / Department). */
 export const TRACK_OWNER: Record<OrientationTrack, OrientationRole> = {
   company: "hr",
   department: "department",
 };
+
+/**
+ * The `onboarding_task_template.code` for one topic — the ONLY topic↔template
+ * mapping formula (`taskTemplateSeed.buildOrientationTemplates` imports this,
+ * so the two can never drift). Example: `company-background` →
+ * `orientation_company_background`.
+ */
+export function orientationTopicCode(topicId: string): string {
+  return `orientation_${topicId.replace(/-/g, "_")}`;
+}
 
 const topics = new Map<string, OrientationTopic>();
 let seeded = false;
@@ -42,12 +42,6 @@ function ensureSeeded(): void {
     topics.set(topic.id, { ...topic });
   }
   seeded = true;
-}
-
-const checks = new Map<string, OrientationCheck>();
-
-function checkKey(profileId: number, topicId: string): string {
-  return `${profileId}:${topicId}`;
 }
 
 function nextSortFor(track: OrientationTrack): number {
@@ -74,6 +68,12 @@ export function listTopics(): OrientationTopic[] {
     if (a.track !== b.track) return a.track === "company" ? -1 : 1;
     return a.sort - b.sort;
   });
+}
+
+/** One topic by id, or null when unknown (check-off ownership gate). */
+export function findTopic(topicId: string): OrientationTopic | null {
+  ensureSeeded();
+  return topics.get(topicId) ?? null;
 }
 
 /** Admin upsert: add a topic (id composed when absent) or edit title/required. */
@@ -123,7 +123,7 @@ export function upsertTopic(input: {
     required: input.required ?? true,
     sort: nextSortFor(input.track),
   };
-  topics.set(created.id, created);
+  topics.set(id, created);
   return created;
 }
 
@@ -142,69 +142,4 @@ export function patchTopic(
   };
   topics.set(id, updated);
   return updated;
-}
-
-export type CheckOffResult =
-  | { ok: true; check: OrientationCheck }
-  | { ok: false; forbidden: true; reason: string }
-  | { ok: false; forbidden: false; reason: string };
-
-/**
- * Check off one topic for one hire. Wrong responsible party → forbidden
- * (403 at the route, predicate unmoved). Unknown topic → not-found
- * (404 at the route). Idempotent: re-checking returns the existing row.
- */
-export function checkOffTopic(input: {
-  profileId: number;
-  topicId: string;
-  role: OrientationRole;
-}): CheckOffResult {
-  ensureSeeded();
-  const topic = topics.get(input.topicId) ?? null;
-  if (!topic) {
-    return { ok: false, forbidden: false, reason: "Unknown orientation topic" };
-  }
-  const owner = TRACK_OWNER[topic.track];
-  if (input.role !== owner) {
-    return {
-      ok: false,
-      forbidden: true,
-      reason: `Topic track '${topic.track}' must be checked off by ${owner}`,
-    };
-  }
-  const key = checkKey(input.profileId, input.topicId);
-  const existing = checks.get(key) ?? null;
-  if (existing) return { ok: true, check: existing };
-  const check: OrientationCheck = {
-    profile_id: input.profileId,
-    topic_id: input.topicId,
-    checked_by: input.role,
-    checked_at: getPhilippineTime(),
-  };
-  checks.set(key, check);
-  return { ok: true, check };
-}
-
-/** Checks recorded for one hire. */
-export function listChecksFor(profileId: number): OrientationCheck[] {
-  return [...checks.values()].filter((c) => c.profile_id === profileId);
-}
-
-/**
- * Orientation predicate (Todo 5 machine + Todo 14 orchestrator shape):
- * true iff EVERY required topic has a check for this hire. Both tracks
- * complete is exactly this — required spans both tracks.
- */
-export function isOrientationDone(profileId: number): boolean {
-  ensureSeeded();
-  const required = [...topics.values()].filter((t) => t.required);
-  if (required.length === 0) return false;
-  return required.every((t) => checks.has(checkKey(profileId, t.id)));
-}
-
-/** Harness/test reset (never called from product paths). */
-export function resetOrientationStore(): void {
-  topics.clear();
-  checks.clear();
-  seeded = false;
 }

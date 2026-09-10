@@ -11,16 +11,24 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Users } from "lucide-react";
-import type { ApplicantRow } from "../types";
+import { FileText, History, Users } from "lucide-react";
+import { APPLICANT_STATUS_LABELS, type ApplicantRow } from "../types";
 import { ApplicationViewDialog } from "@/modules/human-resource-management/recruitment/manpower-recommendation/components/ApplicationViewDialog";
-import { getApplicantStageColor } from "./columns";
+import { getApplicantStatusColor } from "./columns";
+import { formatDateTime } from "@/lib/utils";
 
 function formatSubmitted(value: string | null | undefined) {
     if (!value) return "—";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "—";
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatTimelineAt(value: string | null | undefined) {
+    if (!value) return "Time unknown";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Time unknown";
+    return formatDateTime(date);
 }
 
 interface ApplicantDetailDrawerProps {
@@ -75,14 +83,14 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                                 <div className="flex-1">
                                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                                        Stage
+                                        Status
                                     </span>
-                                    {row ? (
+                                    {row?.status ? (
                                         <Badge
                                             variant="outline"
-                                            className={`px-3 py-1.5 rounded-full font-bold uppercase tracking-wider ${getApplicantStageColor(row.stage)}`}
+                                            className={`px-3 py-1.5 rounded-full font-bold uppercase tracking-wider ${getApplicantStatusColor(row.status)}`}
                                         >
-                                            {row.stage}
+                                            {APPLICANT_STATUS_LABELS[row.status]}
                                         </Badge>
                                     ) : (
                                         <span className="font-medium">—</span>
@@ -103,6 +111,33 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                         </div>
                     </div>
 
+                    <div className="bg-card shadow-sm border border-border/50 rounded-xl p-6 space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                            <History className="w-5 h-5 text-primary/70" />
+                            <h3 className="text-lg font-semibold tracking-tight">Timeline</h3>
+                        </div>
+                        {row && row.timeline.length > 0 ? (
+                            <ol className="space-y-4">
+                                {row.timeline.map((event) => (
+                                    <li
+                                        key={`${event.kind}-${event.id}`}
+                                        className="border-l-2 border-primary/30 pl-3"
+                                    >
+                                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                            {formatTimelineAt(event.at)}
+                                        </div>
+                                        <div className="text-sm font-medium text-foreground">
+                                            {event.detail}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ol>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                No recorded interview or recommendation activity yet.
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 <div className="p-4 md:p-6 bg-muted/20 border-t border-border/40">

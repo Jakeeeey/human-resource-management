@@ -43,7 +43,7 @@ function ApplicantsModuleContent() {
                             Applicants
                         </h1>
                         <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
-                            Every applicant with their current hiring-pipeline stage.
+                            Every applicant with their current hiring status.
                         </p>
                     </div>
                 </div>

@@ -5,7 +5,12 @@ export type {
   PortalDocKey,
   PortalDocumentLink,
   LinkPortalDocumentInput,
-  PortalActor,
+  PortalIdentity,
+  PortalIdentityKey,
+  PortalIdentityKind,
+  PortalPhase,
+  PortalSession,
+  PortalSessionResponse,
 } from "./types/portal-checklist.schema";
 export {
   PORTAL_DOC_CONFIG,
@@ -14,14 +19,19 @@ export {
   isKnownDocKey,
   parsePortalFileMarker,
   portalFileMarker,
+  portalMarkerPrefix,
 } from "./portalChecklist";
 export {
   LinkPortalDocumentSchema,
-  PortalActorSchema,
   PortalChecklistItemSchema,
   PortalChecklistResponseSchema,
   PortalDocKeySchema,
+  PortalIdentityKeySchema,
+  PortalIdentityKindSchema,
+  PortalPhaseSchema,
+  PortalSessionResponseSchema,
+  PortalSessionSchema,
 } from "./types/portal-checklist.schema";
 export type { PortalDocConfig } from "./portalChecklist";
-export { assertHireeScope, readHireeScope } from "./portalAccess";
-export type { HireeScope, ScopeDecision } from "./portalAccess";
+export { readPortalToken, resolvePortalIdentity } from "./portalAccess";
+export type { PortalIdentityResolution } from "./portalAccess";

@@ -119,12 +119,12 @@ export function VerificationQueueTable({
               </TableRow>
             ) : (
               rows.map((row) => (
-                <TableRow key={row.profile.id}>
+                <TableRow key={row.userId}>
                   <TableCell
                     className="max-w-[140px] truncate font-medium"
-                    title={String(row.profile.employee_id)}
+                    title={String(row.userId)}
                   >
-                    #{row.profile.employee_id}
+                    #{row.userId}
                   </TableCell>
                   <TableCell>{stateBadge(row.queueState)}</TableCell>
                   <TableCell
@@ -152,9 +152,9 @@ export function VerificationQueueTable({
                   </TableCell>
                   <TableCell
                     className="max-w-[180px] truncate"
-                    title={row.profile.updated_at ?? ""}
+                    title={row.updatedAt ?? ""}
                   >
-                    {row.profile.updated_at ?? "—"}
+                    {row.updatedAt ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
@@ -165,7 +165,7 @@ export function VerificationQueueTable({
                             size="sm"
                             disabled={working}
                             onClick={() => onApprove(row)}
-                            aria-label={`Approve documents for employee ${row.profile.employee_id}`}
+                            aria-label={`Approve documents for employee ${row.userId}`}
                             title="Approve"
                           >
                             <CheckCircle2 className="h-4 w-4" />
@@ -175,7 +175,7 @@ export function VerificationQueueTable({
                             size="sm"
                             disabled={working}
                             onClick={() => onReturn(row)}
-                            aria-label={`Return documents for employee ${row.profile.employee_id} for resubmit`}
+                            aria-label={`Return documents for employee ${row.userId} for resubmit`}
                             title="Return for resubmit"
                           >
                             <Undo2 className="h-4 w-4" />
@@ -188,7 +188,7 @@ export function VerificationQueueTable({
                           size="sm"
                           disabled={working}
                           onClick={() => onResubmit(row)}
-                          aria-label={`Resubmit documents for employee ${row.profile.employee_id}`}
+                          aria-label={`Resubmit documents for employee ${row.userId}`}
                           title="Resubmit"
                         >
                           <RotateCcw className="h-4 w-4" />
@@ -207,7 +207,7 @@ export function VerificationQueueTable({
                         size="sm"
                         disabled={working}
                         onClick={() => onRecordAck(row)}
-                        aria-label={`Record acknowledgement for employee ${row.profile.employee_id}`}
+                        aria-label={`Record acknowledgement for employee ${row.userId}`}
                         title="Record acknowledgement"
                       >
                         <PenLine className="h-4 w-4" />
@@ -216,7 +216,7 @@ export function VerificationQueueTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onTrail(row)}
-                        aria-label={`View acknowledgement trail for employee ${row.profile.employee_id}`}
+                        aria-label={`View acknowledgement trail for employee ${row.userId}`}
                         title="Acknowledgement trail"
                       >
                         <ScrollText className="h-4 w-4" />

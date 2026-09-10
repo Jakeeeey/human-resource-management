@@ -1,5 +1,19 @@
 import { Interview, InterviewCreateInput } from "../types";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
+import {
+    APPLICANT_STATUS_ERROR_CODES,
+    canTransition,
+    getApplicantStatus,
+    setApplicantStatus,
+} from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { ensureSigningSetForFinalApproved } from "@/modules/human-resource-management/onboarding/signing/server/signing-set-service";
+
+// interviews/service — interview grading + the applicant-pipeline wiring it owns
+// (todo 8). Every stage transition below routes through the SINGLE writer
+// `setApplicantStatus`; the interviews tables own grades/verdicts and the
+// `applicant.status` column is the pipeline truth. `manpower_recommendation.status`
+// stays a separate recruitment artifact (see `maybeAutoApproveRecommendation`).
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -20,9 +34,11 @@ export function nowPH(): string {
 }
 
 /**
- * Quiz-completed application lookup row for the Initial-tab eligible list.
+ * Initial-stage application lookup row for the Initial-tab eligible list
+ * (applicants at `quiz_completed` awaiting grade plus `initial_interview`
+ * applicants awaiting a definitive verdict).
  */
-export type QuizCompletedApplication = {
+export type InitialStageApplication = {
     id: number;
     applicant_id: number;
     quiz_score: number | null;
@@ -171,18 +187,24 @@ export const interviewService = {
     },
 
     /**
-     * Fetch quiz-completed applications for the Initial-tab eligible list.
+     * Fetch applications whose OWNING APPLICANT is in the initial-interview
+     * pool (`quiz_completed` — awaiting grade — or `initial_interview` —
+     * graded Pending / awaiting a definitive verdict) for the Initial-tab
+     * eligible list. `applicant.status` is the single status truth
+     * (`application.status` was dropped); the relation filter joins through the
+     * registered `application.applicant_id` -> `applicant` relation and matches
+     * the stored snake_case values verbatim.
      * Each row carries the applicant full_name resolved via the applicant
      * table by applicant_id (Directus items/applicant?fields=id,full_name),
      * falling back to `Applicant #id` when missing — never null into UI.
-     * @returns Typed quiz-completed application lookup rows with full_name.
+     * @returns Typed initial-stage application lookup rows with full_name.
      */
-    async fetchQuizCompletedApplications(): Promise<QuizCompletedApplication[]> {
+    async fetchInitialStageApplications(): Promise<InitialStageApplication[]> {
         try {
             const url =
                 `${API_BASE_URL}/items/application` +
                 `?fields=id,applicant_id,quiz_score,quiz_passed,submitted_at` +
-                `&filter[status][_eq]=Quiz Completed` +
+                `&filter[applicant_id][status][_in]=quiz_completed,initial_interview` +
                 `&sort=-submitted_at&limit=-1`;
             const response = await fetch(url, { headers });
             if (!response.ok) return [];
@@ -714,5 +736,99 @@ export async function maybeAutoApproveRecommendation(recommendationId: number | 
     } catch (e) {
         console.error("Error auto-approving recommendation for passed final:", e);
         return false;
+    }
+}
+
+/**
+ * Ordered `applicant.status` path for a persisted interview verdict (todo 8).
+ * A grade action first records the STAGE the applicant entered (the interview
+ * was conducted), then — for a definitive verdict — the OUTCOME:
+ * - Initial `Passed` -> `initial_interview` -> `verdict_pending` (awaiting the
+ *   recommendation decision; rec creation advances to `recommended`).
+ * - Initial `Failed` -> `rejected` (legal from any non-terminal status).
+ * - Final `Passed` -> `final_interview` -> `final_approved` (the approval that
+ *   todo 10 turns into the signing set).
+ * - Final `Failed` -> `rejected`.
+ * - `Pending` verdicts stop at the stage status (still awaiting a verdict).
+ */
+const INTERVIEW_VERDICT_STATUS_PATH: Record<
+    "Initial" | "Final",
+    Record<"Pending" | "Passed" | "Failed", readonly ApplicantStatus[]>
+> = {
+    Initial: {
+        Pending: ["initial_interview"],
+        Passed: ["initial_interview", "verdict_pending"],
+        Failed: ["rejected"],
+    },
+    Final: {
+        Pending: ["final_interview"],
+        Passed: ["final_interview", "final_approved"],
+        Failed: ["rejected"],
+    },
+};
+
+/**
+ * Resolve the owning applicant id for an application row.
+ * @param applicationId - Application record ID.
+ * @returns The applicant id, or null when unreadable/missing.
+ */
+async function fetchApplicantIdForApplication(applicationId: number): Promise<number | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/items/application/${applicationId}?fields=applicant_id`, { headers });
+        if (!response.ok) return null;
+        const result = await response.json();
+        const applicantId = result.data?.applicant_id;
+        return typeof applicantId === "number" ? applicantId : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Advance the applicant pipeline after an interview verdict was persisted
+ * (todo 8). Writes ONLY through the shared status service, so its
+ * ALLOWED_TRANSITIONS table stays the single authority: an out-of-order
+ * verdict (e.g. a Final Passed for an applicant still at `quiz_completed`)
+ * throws the coded `APPLICANT_STATUS_TRANSITION_NOT_ALLOWED` error and no
+ * status is written. Intermediate stage steps already passed (re-grades) are
+ * skipped only while the definitive target stays reachable; otherwise the
+ * coded error surfaces. Call AFTER the recommendation auto-flip so
+ * slot-capacity counts (which follow `applicant.status`) never include this
+ * applicant before the rec decision. A Final `Passed` that lands on
+ * `final_approved` then FIRES the todo-10 signing-set hook, which
+ * idempotently materializes the signing set and advances to `for_signing`
+ * through the same service.
+ * @param input - Stage + owning application id + the persisted verdict.
+ * @throws Error with `APPLICANT_STATUS_ERROR_CODES` when the applicant cannot
+ * be resolved or the transition sequence is not allowed.
+ */
+export async function advanceApplicantForInterviewVerdict(input: {
+    stage: "Initial" | "Final";
+    applicationId: number;
+    verdict: "Pending" | "Passed" | "Failed";
+}): Promise<void> {
+    const applicantId = await fetchApplicantIdForApplication(input.applicationId);
+    if (applicantId === null) {
+        throw new Error(
+            `${APPLICANT_STATUS_ERROR_CODES.readFailed}: application ${input.applicationId} has no readable applicant_id`
+        );
+    }
+    let status = await getApplicantStatus(applicantId);
+    const path = INTERVIEW_VERDICT_STATUS_PATH[input.stage][input.verdict];
+    const finalTarget = path[path.length - 1];
+    for (const target of path) {
+        if (target === status) continue;
+        if (canTransition(status, target)) {
+            await setApplicantStatus({ applicantId, status: target });
+            status = target;
+            continue;
+        }
+        if (target !== finalTarget) continue;
+        await setApplicantStatus({ applicantId, status: target });
+    }
+    // Final Approved hook (todo 10): the approval that commits this applicant
+    // materializes the signing set + advances to `for_signing` (idempotent).
+    if (status === "final_approved") {
+        await ensureSigningSetForFinalApproved({ applicantId });
     }
 }

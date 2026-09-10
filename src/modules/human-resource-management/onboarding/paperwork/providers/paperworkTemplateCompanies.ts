@@ -25,8 +25,7 @@ function toRows(body: PaperworkTemplateCompanyResponse): PaperworkTemplateCompan
 /**
  * Lists every junction row (registry table + signing-desk filter build their
  * template→companies maps from this in one call — no per-template fan-out).
- * Never throws — failure yields [] and callers fall back to the legacy
- * `company_key` display.
+ * Never throws — failure yields [] and callers render the unscoped mark.
  * @returns All junction rows, possibly empty.
  */
 export async function listAllTemplateCompanies(): Promise<

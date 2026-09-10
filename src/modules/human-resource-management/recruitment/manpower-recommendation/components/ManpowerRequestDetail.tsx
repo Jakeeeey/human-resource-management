@@ -1,6 +1,7 @@
 "use client";
 
 import { useManpowerRecommendation } from "../hooks/useManpowerRecommendation";
+import { isApplicantHired, isApplicantSlotOccupying } from "../utils/applicantPipeline";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -25,8 +26,10 @@ export function ManpowerRequestDetail() {
 
     const applicantMap = new Map(applicants.map((a) => [a.id, a]));
     const related = recommendations.filter((r) => r.manpower_request_id === selectedRequest.id);
-    const approvedCount = related.filter((r) => r.status === 'Approved' || r.status === 'Hired').length;
-    const hiredCount = related.filter((r) => r.status === 'Hired').length;
+    // Slot/hire counts follow the APPLICANT pipeline (todo 8 reconciliation):
+    // `applicant.status` is the truth; the rec row only links request->applicant.
+    const approvedCount = related.filter((r) => isApplicantSlotOccupying(applicantMap.get(r.applicant_id)?.status)).length;
+    const hiredCount = related.filter((r) => isApplicantHired(applicantMap.get(r.applicant_id)?.status)).length;
     const totalSlots = selectedRequest.no_manpower_needed ?? 0;
     const isClosed = totalSlots > 0 && hiredCount >= totalSlots;
     const isFull = totalSlots > 0 && approvedCount >= totalSlots && !isClosed;

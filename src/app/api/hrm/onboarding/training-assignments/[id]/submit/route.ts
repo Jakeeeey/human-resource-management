@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
-import { buildOnboardingDispatchCtx } from "@/modules/human-resource-management/onboarding/completion/completionChecklist";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 // Grade + persist entries reused from the untouched quiz engine: the SAME
 // `gradeAnswers` / `persistGradedAttempt` the `quiz-attempt` POST route
@@ -217,21 +216,22 @@ export async function POST(
       : { ...assignment, status: "completed" as const, completed_ref: attemptId };
 
     const completion = buildCompletionScalars(outcome);
-    // Stage notify (Todo 14 approve branch): the training-completed
-    // transition is committed above — never awaited, never throws. Dedup key
-    // `<profile_id>:<transition>`.
-    void dispatchMail(
-      "onboarding.training_completed",
-      buildOnboardingDispatchCtx(
-        {
-          id: completed.profile_id,
-          employee_id: completed.employee_id,
-          application_id: completed.application_id,
-        },
-        "onboarding.training_completed",
-        "completed"
-      )
-    ).catch(logRedacted);
+    // Stage notify: the training-completed transition is committed above —
+    // never awaited, never throws. Employee-keyed dedup key
+    // `<user_id>:onboarding.training_completed` (no profile scope).
+    void dispatchMail("onboarding.training_completed", {
+      event_key: "onboarding.training_completed",
+      application_id:
+        completed.application_id !== null && completed.application_id > 0
+          ? completed.application_id
+          : `onboarding-user:${completed.user_id}`,
+      vars: {
+        user_id: String(completed.user_id),
+        employee_id: String(completed.user_id),
+        status: "completed",
+      },
+      idempotency_key: `${completed.user_id}:onboarding.training_completed`,
+    }).catch(logRedacted);
     return NextResponse.json({
       success: true,
       data: {

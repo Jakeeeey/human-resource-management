@@ -9,25 +9,6 @@ export * from "./pdfBurnClient";
 export * from "./signingFlatten";
 export * from "./signingVault";
 export * from "./signingFiling";
-export type {
-  SigningEnvelope,
-  SigningEnvelopeContent,
-  SigningEnvelopeStatus,
-  SigningStamp,
-  CreateSigningEnvelopeInput,
-  SaveSigningDraftInput,
-  FinishSigningEnvelopeInput,
-  SigningEnvelopeResponse,
-} from "./types/signing-envelope.schema";
-export {
-  SigningEnvelopeSchema,
-  SigningEnvelopeStatusSchema,
-  SigningStampSchema,
-  SigningEnvelopeContentSchema,
-  CreateSigningEnvelopeSchema,
-  SaveSigningDraftSchema,
-  FinishSigningEnvelopeSchema,
-} from "./types/signing-envelope.schema";
 export { SigningEnvelopeFetchProvider, useSigningEnvelopeFetch } from "./providers/signingEnvelopeProvider";
 export { TemplatePageView, SIGNING_PAGE_W, SIGNING_PAGE_H } from "./components/TemplatePageView";
 export { PdfPageCanvas } from "./components/PdfPageCanvas";
@@ -44,5 +25,6 @@ export type {
 export { SignatureStampPicker } from "./components/SignatureStampPicker";
 export type { CapturedStamp } from "./components/SignatureStampPicker";
 export { SigningSurface } from "./components/SigningSurface";
-export type { SigningActor } from "./components/SigningSurface";
+export { SigningItemView } from "./components/SigningItemView";
+export type { SigningActor } from "./components/SigningItemView";
 export { SigningFilingPanel } from "./components/SigningFilingPanel";

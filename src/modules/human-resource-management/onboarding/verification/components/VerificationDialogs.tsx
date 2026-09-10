@@ -45,8 +45,8 @@ export function ReturnDialog({ open, row, working, onClose, onSubmit }: ReturnDi
         </DialogHeader>
         <div className="space-y-4 py-2">
           <p className="text-sm text-muted-foreground">
-            Employee #{row?.profile.employee_id} stays at DOCUMENTS_SUBMITTED
-            with this reason attached; resubmit re-queues the row as pending.
+            Employee #{row?.userId} keeps the HR verification task blocked with
+            this reason attached; resubmit re-queues the row as pending.
           </p>
           <div className="space-y-2">
             <Label htmlFor="onb-return-reason">Reason (required)</Label>
@@ -118,7 +118,7 @@ export function AckDialog({ open, row, working, onClose, onSubmit }: AckDialogPr
             <Input
               id="onb-ack-doc"
               disabled
-              value={row ? buildDocRef(row.profile.id) : ""}
+              value={row ? buildDocRef(row.userId) : ""}
               className="bg-muted text-sm"
             />
           </div>

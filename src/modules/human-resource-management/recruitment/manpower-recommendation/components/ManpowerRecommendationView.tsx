@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useManpowerRecommendationContext } from "../providers/ManpowerRecommendationProvider";
+import { isApplicantHired } from "../utils/applicantPipeline";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -64,7 +65,10 @@ export function ManpowerRecommendationView() {
     const position = matchedRequest?.position || `Request #${selectedRecommendation.manpower_request_id}`;
     // Fully closed request (every slot hired): status is immutable here — a hired
     // employee leaving goes through job exit, never by flipping this record back.
-    const hiredForRequest = recommendations.filter((r) => r.manpower_request_id === selectedRecommendation.manpower_request_id && r.status === "Hired").length;
+    // The hire count follows the APPLICANT pipeline (todo 8 reconciliation):
+    // `applicant.status` is the truth; the rec row only links applicant->request.
+    const applicantStatusById = new Map(applicants.map((a) => [a.id, a.status]));
+    const hiredForRequest = recommendations.filter((r) => r.manpower_request_id === selectedRecommendation.manpower_request_id && isApplicantHired(applicantStatusById.get(r.applicant_id))).length;
     const requestNeed = matchedRequest?.no_manpower_needed ?? 0;
     const isRequestClosed = requestNeed > 0 && hiredForRequest >= requestNeed;
     const isStatusEditable =

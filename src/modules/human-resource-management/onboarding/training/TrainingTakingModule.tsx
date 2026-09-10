@@ -20,15 +20,12 @@ export default function TrainingTakingModule({
   scope,
 }: {
   actor: TrainingActor;
-  scope: { profileId?: number; employeeId?: number };
+  scope: { userId?: number };
 }): React.ReactNode {
   return (
-    <TrainingAssignmentFetchProvider
-      employeeId={scope.employeeId}
-      profileId={scope.profileId}
-    >
+    <TrainingAssignmentFetchProvider userId={scope.userId}>
       {actor.role === "hr" ? (
-        <TrainingOverviewTab profileId={scope.profileId} employeeId={scope.employeeId} />
+        <TrainingOverviewTab userId={scope.userId} />
       ) : (
         <TrainingTakingView actor={actor} />
       )}

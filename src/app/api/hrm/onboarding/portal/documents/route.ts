@@ -3,22 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
   LinkPortalDocumentSchema,
-  assertHireeScope,
   portalFileMarker,
-  readHireeScope,
+  readPortalToken,
+  resolvePortalIdentity,
 } from "@/modules/human-resource-management/employee-portal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // POST /api/hrm/onboarding/portal/documents — links an already-uploaded
-// (application-form canon) file UUID to one checklist slot of the hiree's
-// OWN hire record. Write order: canon upload → persist returned `data.id`
-// → link here (never link before UUID). The route verifies the file exists
-// in Directus, then stamps the portal marker so the checklist GET flips to
-// filed. Access matrix: role=hr → 403; cross-hire profile_id → 403.
+// (application-form canon) file UUID to one checklist slot of the caller's
+// OWN session-resolved identity (applicant pre-hire / employee post-hire).
+// Write order: canon upload -> persist returned `data.id` -> link here
+// (never link before UUID). The route verifies the file exists in Directus,
+// then stamps the identity-keyed marker (`onboarding-portal:<kind>:<id>:
+// <doc_key>`) so the checklist GET flips to filed. The client supplies only
+// `doc_key` + `file_id` — the identity key is server-resolved, never
+// asserted.
 
-function validationFailed(errors: Record<string, string[]>) {
+function validationFailed(errors: Record<string, string[] | undefined>) {
   return NextResponse.json(
     { success: false, message: "Validation failed", errors },
     { status: 400 }
@@ -33,17 +36,15 @@ export async function POST(req: NextRequest) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
 
-    const scope = assertHireeScope(
-      readHireeScope(req.headers, validation.data.profile_id)
-    );
-    if (!scope.ok) {
+    const resolved = await resolvePortalIdentity(readPortalToken(req));
+    if (!resolved.ok) {
       return NextResponse.json(
-        { success: false, message: scope.message },
-        { status: scope.status }
+        { success: false, message: resolved.message },
+        { status: resolved.status }
       );
     }
 
-    const { profile_id, doc_key, file_id } = validation.data;
+    const { doc_key, file_id } = validation.data;
 
     // The UUID must already exist (canon upload first — never link blind).
     let existing: { data?: unknown } | null = null;
@@ -61,15 +62,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const key = { kind: resolved.identity.kind, id: resolved.identity.id };
     await dFetch(`/files/${encodeURIComponent(file_id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ description: portalFileMarker(profile_id, doc_key) }),
+      body: JSON.stringify({ description: portalFileMarker(key, doc_key) }),
     });
 
     return NextResponse.json(
       {
         success: true,
-        data: { profile_id, doc_key, file_id },
+        data: { kind: key.kind, id: key.id, doc_key, file_id },
         message: "Document filed — checklist updated",
       },
       { status: 201 }

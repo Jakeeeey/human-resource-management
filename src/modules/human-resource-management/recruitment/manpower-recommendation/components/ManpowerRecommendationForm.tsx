@@ -1,6 +1,7 @@
 "use client";
 
 import { useManpowerRecommendation } from "../hooks/useManpowerRecommendation";
+import { isApplicantSlotOccupying } from "../utils/applicantPipeline";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -154,7 +155,9 @@ export function ManpowerRecommendationForm() {
                                                     <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
                                                         <CommandEmpty>No applicant found.</CommandEmpty>
                                                         <CommandGroup>
-                                                            {applicants.filter((applicant) => !recommendations.some((r) => r.manpower_request_id === pendingRequestId && r.applicant_id === applicant.id) && !recommendations.some((r) => r.applicant_id === applicant.id && (r.status === "Approved" || r.status === "Hired")) && interviewInitialRows.some((row) => row.applicant_id === applicant.id && row.latestInitialVerdict === "Passed")).map((applicant) => (
+                                                            {/* Already-approved exclusion follows the APPLICANT pipeline (todo 8):
+                                                                `applicant.status` is the truth; the rec row only links request->applicant. */}
+                                                            {applicants.filter((applicant) => !recommendations.some((r) => r.manpower_request_id === pendingRequestId && r.applicant_id === applicant.id) && !isApplicantSlotOccupying(applicant.status) && interviewInitialRows.some((row) => row.applicant_id === applicant.id && row.latestInitialVerdict === "Passed")).map((applicant) => (
                                                                 <CommandItem
                                                                     value={`${applicant.full_name} ${applicant.id}`}
                                                                     key={applicant.id}

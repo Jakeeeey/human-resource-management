@@ -52,10 +52,6 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
         : null;
   return {
     ...(row as object),
-    // Legacy key may be absent on junction-scoped rows — coerce to "" so
-    // the envelope type stays string while the junction owns scoping.
-    company_key:
-      typeof row["company_key"] === "string" ? row["company_key"] : "",
     zones,
     is_active: active === true || active === 1 || active === "1",
     // PDF-only: every template reads as pdf regardless of stored value.
@@ -145,7 +141,6 @@ export async function PATCH(
     }
 
     const patch: Record<string, unknown> = {};
-    if (data.company_key !== undefined) patch["company_key"] = data.company_key;
     if (data.title !== undefined) patch["title"] = data.title;
     if (data.zones !== undefined) patch["zones"] = data.zones;
     if (data.is_active !== undefined) patch["is_active"] = data.is_active;

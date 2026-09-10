@@ -1,9 +1,39 @@
+import { z } from "zod";
+
 import type { PaperworkPageSize } from "../paperwork/paperworkValidity";
 import type { SigningInk, SigningStroke } from "./signingStrokes";
-import type { SigningStamp } from "./types/signing-envelope.schema";
 
-// signingStamps.ts — stamp→ink merge shared by the Todo 7 surface (client
-// validity preview) and the finish route (server-side gate). Import-safe:
+// One signature stamp placed on a page: top-left anchor in page FRACTIONS
+// (0..1, resolution-independent — same space as PaperworkZone rects) plus
+// the captured pad strokes in pad-bitmap px. `stampToStrokes` translates
+// them into page-bitmap space so the validity predicate honors stamped ink
+// exactly like drawn ink.
+export const SigningStampSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    page: z.number().int().positive(),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    strokes: z
+      .array(
+        z
+          .object({
+            points: z.array(
+              z.object({ x: z.number(), y: z.number() }).strict()
+            ),
+            width: z.number().positive(),
+            color: z.string(),
+          })
+          .strict()
+      )
+      .max(500),
+  })
+  .strict();
+
+export type SigningStamp = z.infer<typeof SigningStampSchema>;
+
+// signingStamps.ts — stamp→ink merge shared by the signing surface (client
+// validity preview) and the server burn core. Import-safe:
 // no DOM, no canvas — pure coordinate math so both sides compute the SAME
 // merged ink from the same payload.
 //

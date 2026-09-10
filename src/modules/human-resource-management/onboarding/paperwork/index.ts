@@ -31,10 +31,7 @@ export {
   toTemplateCompanyMap,
 } from "./providers/paperworkTemplateCompanies";
 export type { PaperworkCompany } from "./providers/paperworkCompanyProvider";
-export {
-  listPaperworkCompanies,
-  resolveLegacyCompanyIds,
-} from "./providers/paperworkCompanyProvider";
+export { listPaperworkCompanies } from "./providers/paperworkCompanyProvider";
 export type {
   PaperworkPageSize,
   PaperworkValidityVerdict,

@@ -16,7 +16,7 @@ export {
   AcknowledgementLogSchema,
   CreateAcknowledgementLogSchema,
   buildDocRef,
-  parseDocRefProfileId,
+  parseDocRefEmployeeId,
 } from "./types/acknowledgement-log.schema";
 export type {
   QueueRow,
@@ -25,14 +25,17 @@ export type {
   VerificationDecision,
   VerificationDecisionInput,
   VerificationQueueResponse,
+  VerificationTasks,
 } from "./types/verification-queue.schema";
 export {
-  RETURNED_STAGE_PREFIX,
+  VERIFICATION_PHASE,
+  DOCUMENTS_SUBMITTED_CODE,
+  DOCUMENTS_HR_VERIFIED_CODE,
   MAX_RETURN_REASON_LENGTH,
   VERIFICATION_DECISIONS,
   VerificationDecisionSchema,
   aggregateQueue,
-  buildReturnMarker,
+  buildQueueRow,
   deriveQueueState,
-  parseReturnMarker,
+  findVerificationTasks,
 } from "./types/verification-queue.schema";

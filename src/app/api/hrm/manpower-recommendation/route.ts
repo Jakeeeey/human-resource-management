@@ -3,6 +3,12 @@ import { cookies } from "next/headers";
 import { manpowerRecommendationService, nowPH } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
+import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+
+// manpower-recommendation — the recommendation row is a recruitment ARTIFACT
+// (its `status` column is the artifact lifecycle); the applicant PIPELINE truth
+// is `applicant.status`, advanced here through the shared status service
+// (todo 8 reconciliation).
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +118,14 @@ export async function POST(req: NextRequest) {
         const { status, request_no } = await manpowerRecommendationService.fetchRequestStatus(validated.manpower_request_id);
         if (status !== 'Approved') {
             return NextResponse.json({ error: 'VALIDATION_FAILED', message: `Request ${request_no} is still pending approval. Recommendations open after approval.` }, { status: 400 });
+        }
+
+        // Applicant pipeline (todo 8): creating the recommendation IS the
+        // `recommended` stage. Advance BEFORE the insert so a disallowed
+        // (out-of-order) advance aborts without an orphan recommendation row;
+        // a retry re-runs as an idempotent same-status no-op.
+        if (validated.status === "Recommended") {
+            await setApplicantStatus({ applicantId: validated.applicant_id, status: "recommended" });
         }
 
         const created = await manpowerRecommendationService.create(validated);

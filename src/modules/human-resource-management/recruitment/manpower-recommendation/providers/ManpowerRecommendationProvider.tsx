@@ -9,7 +9,7 @@ const API_PATH = "/api/hrm/manpower-recommendation";
 
 interface ManpowerRecommendationContextType {
     recommendations: ManpowerRecommendation[];
-    applicants: { id: number; full_name: string; position_applied_for: string }[];
+    applicants: { id: number; full_name: string; position_applied_for: string; status: string }[];
     openRequests: { id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string }[];
     divisions: { id: number; name: string }[];
     users: { id: number | string; name: string }[];
@@ -45,7 +45,7 @@ const ManpowerRecommendationContext = createContext<ManpowerRecommendationContex
  */
 export function ManpowerRecommendationProvider({ children }: { children: React.ReactNode }) {
     const [recommendations, setRecommendations] = useState<ManpowerRecommendation[]>([]);
-    const [applicants, setApplicants] = useState<{ id: number; full_name: string; position_applied_for: string }[]>([]);
+    const [applicants, setApplicants] = useState<{ id: number; full_name: string; position_applied_for: string; status: string }[]>([]);
     const [openRequests, setOpenRequests] = useState<{ id: number; request_no: string; division_id: number | null; position: string; no_manpower_needed: number; status: string }[]>([]);
     const [divisions, setDivisions] = useState<{ id: number; name: string }[]>([]);
     const [users, setUsers] = useState<{ id: number | string; name: string }[]>([]);

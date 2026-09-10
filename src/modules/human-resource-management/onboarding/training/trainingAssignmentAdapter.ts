@@ -2,9 +2,8 @@
  * Training-assignment contract + employee-principal adapter (Todo 4).
  *
  * Contract mirrors the live Directus `training_assignments` collection
- * (13 fields, UNIQUE (`profile_id`, `quiz_id`, `opened_at`) — see
- * task-1a-schema-contract.md). No UI here; Todo 12 builds the taking view
- * on top of this adapter.
+ * (re-keyed to the employee `user_id`). No UI here; Todo 12 builds the
+ * taking view on top of this adapter.
  *
  * Hard rules (from the plan, enforced by construction):
  * - Lifecycle is `assigned -> in_progress -> completed` ONLY. Overdue is a
@@ -14,9 +13,9 @@
  * - Pass thresholds are INHERITED from the quiz definition via the real
  *   `gradeAnswers` result (`GradeResult.passThresholdSnapshot`) — this file
  *   never computes score, percentage, or pass/fail.
- * - The `application_id` bridge resolves the hire's real id from the
- *   onboarding profile (stored at hook time) or an explicit HR manual link.
- *   When neither exists it stays `null` — applicant ids are never spoofed.
+ * - The `application_id` bridge is an explicit HR manual link to the
+ *   engine's application chain; when absent it stays `null` — applicant ids
+ *   are never spoofed and never resolved from a profile.
  * - Draw/grade/history inputs are built VERBATIM from the existing engine
  *   shapes (`AnswerInput`, `SubmitAnswerPayload`, `TakingQuestion`,
  *   `QuizAttempt`). Grading is never re-implemented here.
@@ -38,7 +37,7 @@ import type {
 } from "@/modules/human-resource-management/quiz-file-management/quiz-taking/types";
 
 // ---------------------------------------------------------------------------
-// Contract (mirrors Directus `training_assignments`, 13 fields)
+// Contract (mirrors Directus `training_assignments`, keyed to the employee)
 // ---------------------------------------------------------------------------
 
 export const TRAINING_ASSIGNMENT_STATUSES = ["assigned", "in_progress", "completed"] as const;
@@ -47,8 +46,7 @@ export type TrainingAssignmentStatus = (typeof TRAINING_ASSIGNMENT_STATUSES)[num
 
 export interface TrainingAssignment {
     id: number;
-    profile_id: number;
-    employee_id: number;
+    user_id: number;
     quiz_id: number;
     application_id: number | null;
     due: string | null;
@@ -63,15 +61,7 @@ export interface TrainingAssignment {
 
 /** Employee principal carried through the assignment flow (never applicant-shaped). */
 export interface EmployeePrincipal {
-    employee_id: number;
-    profile_id: number;
-}
-
-/** Minimal onboarding-profile slice the bridge reads (hook-stored `application_id`). */
-export interface OnboardingProfileBridge {
-    profile_id: number;
-    employee_id: number;
-    application_id: number | null;
+    user_id: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,8 +145,7 @@ export function abandonedInProgress(reason: string): {
 
 /**
  * Retake target: a retake opens a NEW `quiz_attempt` row under the SAME
- * assignment id (same `profile_id` + `quiz_id` + `opened_at` UNIQUE triple).
- * Returns the verbatim inputs Todo 12's start call needs.
+ * assignment id. Returns the verbatim inputs Todo 12's start call needs.
  */
 export function describeRetakeTarget(assignment: Pick<TrainingAssignment, "id" | "quiz_id" | "application_id">): {
     assignment_id: number;
@@ -168,29 +157,6 @@ export function describeRetakeTarget(assignment: Pick<TrainingAssignment, "id" |
         quiz_id: assignment.quiz_id,
         application_id: assignment.application_id,
     };
-}
-
-// ---------------------------------------------------------------------------
-// Principal bridge: employee -> engine inputs (never spoof applicant ids)
-// ---------------------------------------------------------------------------
-
-/**
- * Resolves the hire's real `application_id` for draw/grade inputs: the
- * hook-stored profile value first, else an explicit HR manual link.
- * Returns `null` when neither exists (Todo 12 persists the attempt with a
- * null bridge + assignment ref + employee principal) — never fabricates one.
- */
-export function resolveApplicationBridge(
-    profile: Pick<OnboardingProfileBridge, "application_id">,
-    manualApplicationId?: number | null
-): number | null {
-    if (profile.application_id !== null && profile.application_id !== undefined) {
-        return profile.application_id;
-    }
-    if (manualApplicationId !== undefined && manualApplicationId !== null) {
-        return manualApplicationId;
-    }
-    return null;
 }
 
 // ---------------------------------------------------------------------------

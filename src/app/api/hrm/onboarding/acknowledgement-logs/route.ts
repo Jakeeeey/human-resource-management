@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // acknowledgement-logs — the audit-trail store (Todo 10 greenfield WRITE).
-// Vault (`signing_envelopes.pdf_file`, Todo 8) is NEVER touched here: the
+// The filed-PDF store (`paperwork_item.pdf_file`) is NEVER touched here: the
 // signed file and the ack log are separate stores, separate writes.
 //
 // GET /api/hrm/onboarding/acknowledgement-logs — read/trail path (exact

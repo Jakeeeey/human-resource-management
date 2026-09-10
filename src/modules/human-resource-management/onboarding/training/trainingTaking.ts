@@ -11,8 +11,7 @@ import type {
 // real `GradeResult` via the Todo 4 adapter's `buildCompletionScalars`.
 
 export interface AssignmentOwner {
-  employee_id: number;
-  profile_id: number;
+  user_id: number;
 }
 
 export type OwnerVerdict =
@@ -20,20 +19,16 @@ export type OwnerVerdict =
   | { ok: false; status: 403; error: string };
 
 /**
- * IDOR gate: a `hiree` actor may touch ONLY the assignment whose
- * `employee_id` AND `profile_id` both match the actor. `hr` actors bypass
- * (HR override, logged by the caller). Both ids must match — matching only
- * one still yields 403.
+ * IDOR gate: a `hiree` actor may touch ONLY the assignment whose `user_id`
+ * matches the actor's (the employee's `user.user_id`). `hr` actors bypass
+ * (HR override, logged by the caller).
  */
 export function assertAssignmentOwner(
   assignment: AssignmentOwner,
   actor: TrainingActor
 ): OwnerVerdict {
   if (actor.role === "hr") return { ok: true };
-  if (
-    actor.employee_id === assignment.employee_id &&
-    actor.profile_id === assignment.profile_id
-  ) {
+  if (actor.user_id === assignment.user_id) {
     return { ok: true };
   }
   return {
@@ -57,8 +52,7 @@ export function normalizeTrainingAssignment(
   const status = row["status"];
   return {
     id: Number(row["id"]),
-    profile_id: Number(row["profile_id"]),
-    employee_id: Number(row["employee_id"]),
+    user_id: Number(row["user_id"]),
     quiz_id: Number(row["quiz_id"]),
     application_id: numOrNull(row["application_id"]),
     due: strOrNull(row["due"]),

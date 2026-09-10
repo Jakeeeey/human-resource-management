@@ -67,25 +67,3 @@ export async function GET(req: NextRequest) {
         );
     }
 }
-
-export async function POST(req: NextRequest) {
-    const body = await req.json();
-    const { full_name, position_applied_for } = body as {
-        full_name: string;
-        position_applied_for?: string | null;
-    };
-
-    if (!full_name || !full_name.trim()) {
-        return NextResponse.json({ error: "full_name is required" }, { status: 400 });
-    }
-
-    const created = await dFetch(`/items/applicant`, {
-        method: "POST",
-        body: JSON.stringify({
-            full_name: full_name.trim(),
-            position_applied_for: position_applied_for?.trim() || null,
-        }),
-    });
-
-    return NextResponse.json({ success: true, data: created?.data });
-}

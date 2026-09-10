@@ -19,7 +19,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Onboarding Hub | HRM",
-  description: "HR onboarding hub: profiles, verification, orientation, training, equipment, completion.",
+  description:
+    "HR onboarding hub: a filterable roster of every hire with phase, next action, owner, due date, and blockers.",
 };
 
 const COOKIE_NAME = "vos_access_token";

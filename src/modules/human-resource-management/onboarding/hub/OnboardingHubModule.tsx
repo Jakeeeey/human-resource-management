@@ -1,81 +1,50 @@
 "use client";
 
-// OnboardingHubModule.tsx — HR hub root (Todo 5). Six tabs per the plan:
-// Profiles (CRUD + acceptance + status machine, live here), Orientation
-// (Todo 11 body, filled) plus Verification / Training / Equipment /
-// Completion shells owned by Todos 10/12-14. Module header per QA §6;
-// hiree portal is Todo 9 (never rendered here — zero HR actions leak the
-// other way either).
+// OnboardingHubModule.tsx — HR hub root. Todo 27 replaced the flat tab
+// navigation (Verification/Orientation/Training/Equipment/Completion) with a
+// filterable master-detail roster: the hub ENTRY is now the enriched hire
+// list, and the per-phase surfaces move into the per-hire workspace (todo 28+).
+// No stage/status is a tab.
 
-import { OnboardingProfileFetchProvider } from "./providers/profileProvider";
-import { ProfilesTab } from "./components/ProfilesTab";
-import { OrientationFetchProvider } from "../orientation/providers/orientationProvider";
-import { OrientationTab } from "../orientation/components/OrientationTab";
-import { EquipmentTab } from "../equipment/components/EquipmentTab";
-import { CompletionTab } from "../completion/components/CompletionTab";
-import { VerificationFetchProvider } from "../verification/providers/verificationProvider";
-import { VerificationTab } from "../verification/components/VerificationTab";
-import { StageTabShell } from "./components/StageTabShell";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, RefreshCw } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+
+import { HireRoster } from "./components/HireRoster";
+import { HIRE_ROSTER_REFRESH_EVENT } from "./hooks/useHireRoster";
 
 export function OnboardingHubModule() {
   return (
-    <div className="p-2 sm:p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen space-y-8">
-      <div className="flex items-center gap-4">
-        <div className="p-3 bg-primary/10 rounded-2xl shrink-0">
-          <ClipboardCheck className="h-6 w-6 text-primary" />
+    <div className="p-2 sm:p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary/10 rounded-2xl shrink-0">
+            <ClipboardCheck className="h-6 w-6 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-4xl font-bold truncate">
+              Onboarding Hub
+            </h1>
+            <p className="text-base sm:text-lg text-muted-foreground">
+              Every hire, their phase, next action, owner, due date, and
+              blockers.
+            </p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-4xl font-bold truncate">
-            Onboarding Hub
-          </h1>
-          <p className="text-base sm:text-lg text-muted-foreground">
-            HR drives hire-to-equipped onboarding from one hire record.
-          </p>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full shrink-0 sm:w-auto"
+          onClick={() => window.dispatchEvent(new Event(HIRE_ROSTER_REFRESH_EVENT))}
+          aria-label="Refresh roster"
+          title="Refresh roster"
+        >
+          <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+          Refresh
+        </Button>
       </div>
 
-      <OnboardingProfileFetchProvider>
-        <Tabs defaultValue="profiles" className="space-y-4">
-          <div className="overflow-x-auto">
-            <TabsList className="w-max min-w-full">
-              <TabsTrigger value="profiles">Profiles</TabsTrigger>
-              <TabsTrigger value="verification">Verification</TabsTrigger>
-              <TabsTrigger value="orientation">Orientation</TabsTrigger>
-              <TabsTrigger value="training">Training</TabsTrigger>
-              <TabsTrigger value="equipment">Equipment</TabsTrigger>
-              <TabsTrigger value="completion">Completion</TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value="profiles">
-            <ProfilesTab />
-          </TabsContent>
-          <TabsContent value="verification">
-            <VerificationFetchProvider>
-              <VerificationTab />
-            </VerificationFetchProvider>
-          </TabsContent>
-          <TabsContent value="orientation">
-            <OrientationFetchProvider>
-              <OrientationTab />
-            </OrientationFetchProvider>
-          </TabsContent>
-          <TabsContent value="training">
-            <StageTabShell
-              title="Training"
-              description="Assignment overview per hire; taking view over the quiz adapter."
-              ownerTodo="Todo 12"
-            />
-          </TabsContent>
-          <TabsContent value="equipment">
-            <EquipmentTab />
-          </TabsContent>
-          <TabsContent value="completion">
-            <CompletionTab />
-          </TabsContent>
-        </Tabs>
-      </OnboardingProfileFetchProvider>
+      <HireRoster />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useManpowerRecommendation } from "../hooks/useManpowerRecommendation";
+import { isApplicantHired, isApplicantSlotOccupying } from "../utils/applicantPipeline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,7 +31,7 @@ interface OpenRequestsListT1Contract {
 
 export function OpenManpowerRequestsList() {
     const context = useManpowerRecommendation() as ReturnType<typeof useManpowerRecommendation> & OpenRequestsListT1Contract;
-    const { recommendations, openRequests, divisions, isLoading, error, setSelectedRequest, setIsDetailOpen } = context;
+    const { recommendations, applicants, openRequests, divisions, isLoading, error, setSelectedRequest, setIsDetailOpen } = context;
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
 
@@ -40,12 +41,18 @@ export function OpenManpowerRequestsList() {
 
     const requestRecs = (requestId: number) =>
         recommendations.filter((r) => r.manpower_request_id === requestId);
+    const applicantById = new Map(applicants.map((a) => [a.id, a]));
+    // Pending recommendation ARTIFACTS (the rec lifecycle display, not a pipeline count).
     const recommendedCount = (requestId: number) =>
         requestRecs(requestId).filter((r) => r.status === "Recommended").length;
+    // Approved/hired counts (and the Closed/Full display status) follow the
+    // APPLICANT pipeline (todo 8 reconciliation): `applicant.status` is the
+    // truth; the rec row only links request->applicant. A rejected/withdrawn
+    // applicant frees its slot even when the rec row still reads Approved.
     const approvedCount = (requestId: number) =>
-        requestRecs(requestId).filter((r) => r.status === "Approved" || r.status === "Hired").length;
+        requestRecs(requestId).filter((r) => isApplicantSlotOccupying(applicantById.get(r.applicant_id)?.status)).length;
     const hiredCount = (requestId: number) =>
-        requestRecs(requestId).filter((r) => r.status === "Hired").length;
+        requestRecs(requestId).filter((r) => isApplicantHired(applicantById.get(r.applicant_id)?.status)).length;
     const divisionName = (req: OpenRequestRow) =>
         req.division_id == null ? "N/A" : (divisions.find((d) => d.id === req.division_id)?.name ?? String(req.division_id));
     const getDisplayStatus = (req: OpenRequestRow) => {

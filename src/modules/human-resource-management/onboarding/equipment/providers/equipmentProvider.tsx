@@ -13,8 +13,8 @@ import type {
 } from "../types/equipment-issue.schema";
 
 // equipmentProvider.tsx — client fetch layer for the equipment issue/ack
-// routes. Thin context provider mirroring the hub profileProvider shape:
-// status + issue + acknowledge + refetch with loading/error flags.
+// routes. Thin context provider: status + issue + acknowledge + refetch with
+// loading/error flags. Everything is keyed to the employee (`user_id`).
 // Asset assignment is NEVER touched here (Master List owns assets).
 
 export interface EquipmentItemStatus {
@@ -33,7 +33,7 @@ export interface EquipmentItemStatus {
 }
 
 export interface EquipmentStatus {
-  profileId: number;
+  userId: number;
   items: EquipmentItemStatus[];
   fullyEquipped: boolean;
 }
@@ -43,7 +43,7 @@ interface EquipmentFetchContextType {
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
-  refetch: (profileId: number) => Promise<void>;
+  refetch: (userId: number) => Promise<void>;
   issueItem: (input: IssueEquipmentItemInput) => Promise<void>;
   acknowledgeItem: (input: AcknowledgeEquipmentItemInput) => Promise<void>;
 }
@@ -78,11 +78,11 @@ export function EquipmentFetchProvider({
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const refetch = useCallback(async (profileId: number) => {
+  const refetch = useCallback(async (userId: number) => {
     try {
       setIsLoading(true);
       setIsError(false);
-      const res = await fetch(`${STATUS_BASE}?profile_id=${profileId}`, {
+      const res = await fetch(`${STATUS_BASE}?user_id=${userId}`, {
         cache: "no-store",
       });
       const body = await readBody(res);
@@ -109,7 +109,7 @@ export function EquipmentFetchProvider({
       if (!res.ok || !body.success) {
         throw new Error(body?.message || "Issue failed");
       }
-      await refetch(input.profile_id);
+      await refetch(input.user_id);
     },
     [refetch]
   );
@@ -125,7 +125,7 @@ export function EquipmentFetchProvider({
       if (!res.ok || !body.success) {
         throw new Error(body?.message || "Acknowledge failed");
       }
-      await refetch(input.profile_id);
+      await refetch(input.user_id);
     },
     [refetch]
   );

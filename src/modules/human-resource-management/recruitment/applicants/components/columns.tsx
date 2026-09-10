@@ -4,27 +4,28 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, Eye } from "lucide-react";
-import type { ApplicantRow } from "../types";
+import { APPLICANT_STATUS_LABELS, type ApplicantRow, type ApplicantStatus } from "../types";
 
-export function getApplicantStageColor(stage: string) {
-    switch (stage) {
-        case "Approved":
-        case "Hired":
-        case "Passed":
+export function getApplicantStatusColor(status: ApplicantStatus) {
+    switch (status) {
+        case "final_approved":
+        case "hired":
             return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-        case "Rejected":
-        case "Failed":
+        case "rejected":
             return "bg-red-500/10 text-red-600 border-red-500/20";
-        case "Recommended":
-        case "Final Pending":
-        case "Pending":
-            return "bg-amber-500/10 text-amber-600 border-amber-500/20";
-        case "Initial Pending":
-        case "Initial Passed":
-        case "Initial Failed":
-            return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-        case "Withdrawn":
+        case "withdrawn":
             return "bg-stone-500/10 text-stone-600 border-stone-500/20";
+        case "recommended":
+        case "verdict_pending":
+        case "for_signing":
+        case "incomplete":
+            return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+        case "initial_interview":
+        case "final_interview":
+            return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+        case "draft":
+        case "submitted":
+        case "quiz_completed":
         default:
             return "bg-primary/10 text-primary border-primary/20";
     }
@@ -72,25 +73,29 @@ export function createColumns(
             ),
         },
         {
-            accessorKey: "stage",
+            accessorKey: "status",
             header: ({ column }) => (
                 <Button
                     variant="ghost"
                     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
                 >
-                    Stage
+                    Status
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             ),
             cell: ({ row }) => {
-                // Server-computed stage rendered verbatim — never re-derived here.
-                const stage = row.getValue("stage") as ApplicantRow["stage"];
+                // `applicant.status` is the single truth — rendered verbatim,
+                // never derived. Sorting/filtering operate on the raw value.
+                const status = row.original.status;
+                if (status === null) {
+                    return <span className="text-muted-foreground">—</span>;
+                }
                 return (
                     <Badge
                         variant="outline"
-                        className={`px-3 py-1.5 rounded-full font-bold uppercase tracking-wider ${getApplicantStageColor(stage)}`}
+                        className={`px-3 py-1.5 rounded-full font-bold uppercase tracking-wider ${getApplicantStatusColor(status)}`}
                     >
-                        {stage}
+                        {APPLICANT_STATUS_LABELS[status]}
                     </Badge>
                 );
             },

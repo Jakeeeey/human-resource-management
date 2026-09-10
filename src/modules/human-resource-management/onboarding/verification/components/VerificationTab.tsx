@@ -13,13 +13,17 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 // (counts + refresh with error-retry), queue table, return/ack dialogs, trail
 // dialog. HR-only; the hiree portal is Todo 9 and lives elsewhere.
 
-function dialogKey(prefix: string, dialog: { kind: string; row?: { profile: { id: number } } }): string {
+function dialogKey(prefix: string, dialog: { kind: string; row?: { userId: number } }): string {
   return dialog.kind === prefix
-    ? `${prefix}-${dialog.row?.profile.id ?? 0}`
+    ? `${prefix}-${dialog.row?.userId ?? 0}`
     : `${prefix}-closed`;
 }
 
-export function VerificationTab() {
+/**
+ * @param userId - The canonical selected hire from the workspace route; the
+ * surface renders ONLY this employee's documents verification state.
+ */
+export function VerificationTab({ userId }: { userId: number }) {
   const {
     rows,
     counts,
@@ -40,7 +44,7 @@ export function VerificationTab() {
     submitAck,
     trail,
     retryTrail,
-  } = useVerificationQueue();
+  } = useVerificationQueue(userId);
 
   return (
     <div className="space-y-4">

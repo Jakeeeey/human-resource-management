@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { SubmitApplicationPayload } from "@/modules/human-resource-management/application-form/types";
 
 export const runtime = "nodejs";
@@ -68,34 +69,37 @@ export async function POST(req: NextRequest) {
         const createdBy = payload?.sub ? Number(payload.sub) || null : null;
 
         const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
-        const normalized = fullName.trim().toLowerCase();
 
-        const searchRes = await dFetch(
-            `/items/applicant?filter[name_normalized][_eq]=${encodeURIComponent(normalized)}&limit=1&fields=id,full_name`
-        );
-        const searchErr = firstError(searchRes);
-        if (searchErr) {
-            return NextResponse.json({ error: searchErr }, { status: 502 });
+        // NO DEDUP / NO REUSE: every submission creates a fresh `applicant` instance.
+        // One person applying twice yields two applicant rows, each with exactly one
+        // application (the `application.applicant_id` UNIQUE key still holds).
+        const createdApplicant = await dFetch(`/items/applicant`, {
+            method: "POST",
+            body: JSON.stringify({
+                full_name: fullName,
+                position_applied_for: position,
+                created_by: createdBy,
+            }),
+        });
+        const applicantErr = firstError(createdApplicant);
+        if (applicantErr || !createdApplicant?.data?.id) {
+            return NextResponse.json(
+                { error: applicantErr || "Failed to create applicant record." },
+                { status: 502 }
+            );
         }
+        const applicantId: number = createdApplicant.data.id;
 
-        let applicantId: number | null = searchRes?.data?.[0]?.id ?? null;
-        if (!applicantId) {
-            const createdApplicant = await dFetch(`/items/applicant`, {
-                method: "POST",
-                body: JSON.stringify({
-                    full_name: fullName,
-                    position_applied_for: position,
-                    created_by: createdBy,
-                }),
-            });
-            const applicantErr = firstError(createdApplicant);
-            if (applicantErr || !createdApplicant?.data?.id) {
-                return NextResponse.json(
-                    { error: applicantErr || "Failed to create applicant record." },
-                    { status: 502 }
-                );
-            }
-            applicantId = createdApplicant.data.id;
+        // The row starts at the DB default `draft`; the SINGLE status writer advances
+        // it to `submitted` (creation IS the submission moment).
+        try {
+            await setApplicantStatus({ applicantId, status: "submitted" });
+        } catch (err: unknown) {
+            console.error(
+                "[application-form] failed to set applicant status:",
+                err instanceof Error ? err.message : err
+            );
+            return NextResponse.json({ error: "Failed to submit application." }, { status: 502 });
         }
 
         const nowIso = new Date().toISOString();
@@ -140,7 +144,6 @@ export async function POST(req: NextRequest) {
                 certification_signed_at: nowIso,
                 signature_file: body.signature_file ?? null,
 
-                status: "Submitted",
                 source: "hrm-assisted",
                 submitted_at: nowIso,
                 created_by: createdBy,

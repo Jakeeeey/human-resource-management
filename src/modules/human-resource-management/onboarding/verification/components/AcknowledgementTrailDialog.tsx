@@ -44,7 +44,7 @@ export function AcknowledgementTrailDialog({
   onClose,
 }: AcknowledgementTrailDialogProps) {
   const [search, setSearch] = useState("");
-  const ref = docRef ?? (row ? buildDocRef(row.profile.id) : "");
+  const ref = docRef ?? (row ? buildDocRef(row.userId) : "");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

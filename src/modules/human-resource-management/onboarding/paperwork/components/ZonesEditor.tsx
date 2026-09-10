@@ -21,7 +21,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Pencil, Tag, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Pencil,
+  Tag,
+  Trash2,
+} from "lucide-react";
 
 // ZonesEditor.tsx — admin marks signature zones via click-drag on the
 // rendered template PDF (PDF-only: pages come from the pdf.js document, never
@@ -44,8 +52,7 @@ interface ZonesEditorProps {
   onSave: (template: PaperworkTemplate, zones: PaperworkZone[]) => void;
 }
 
-function normalizeRect(a: DragAnchor, b: DragAnchor): PaperworkZoneRect {
-  const x = Math.min(a.x, b.x);
+function normalizeRect(a: DragAnchor, b: DragAnchor): PaperworkZoneRect {  const x = Math.min(a.x, b.x);
   const y = Math.min(a.y, b.y);
   return {
     x: Math.max(0, Math.min(1, x)),
@@ -65,6 +72,7 @@ function ZonesEditorBody({
   const templateId = template?.id ?? null;
   const [zones, setZones] = useState<PaperworkZone[]>(seed);
   const [activePage, setActivePage] = useState(1);
+  const [pageDraft, setPageDraft] = useState("1");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -109,6 +117,10 @@ function ZonesEditorBody({
       closePdfDocument(live);
     };
   }, [templateId]);
+
+  useEffect(() => {
+    setPageDraft(String(activePage));
+  }, [activePage]);
 
   const pageZones = useMemo(
     () => zones.filter((z) => z.page === activePage),
@@ -203,6 +215,15 @@ function ZonesEditorBody({
     setRenamingId(null);
   };
 
+  const commitJump = () => {
+    const parsed = Number.parseInt(pageDraft, 10);
+    const next = Number.isFinite(parsed)
+      ? Math.min(numPages, Math.max(1, parsed))
+      : activePage;
+    setActivePage(next);
+    setPageDraft(String(next));
+  };
+
   const handleSave = () => {
     if (template) onSave(template, zones);
   };
@@ -210,21 +231,66 @@ function ZonesEditorBody({
   return (
     <>
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {Array.from({ length: numPages }, (_, i) => i + 1).map((page) => (
-            <Button
-              key={page}
-              variant={page === activePage ? "default" : "outline"}
-              size="sm"
-              onClick={() => setActivePage(page)}
-              className="min-h-8 min-w-8"
-            >
-              {page}
-            </Button>
-          ))}
-          <span className="ml-auto text-xs text-muted-foreground">
-            Page {activePage} of {numPages}
-          </span>
+        <div className="flex flex-nowrap items-center justify-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setActivePage(1)}
+            disabled={activePage <= 1}
+            aria-label="First page"
+            className="min-h-8 min-w-8 px-0"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setActivePage((p) => Math.max(1, p - 1))}
+            disabled={activePage <= 1}
+            aria-label="Previous page"
+            className="min-h-8 min-w-8 px-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={numPages}
+            value={pageDraft}
+            onChange={(e) => setPageDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitJump();
+              }
+              if (e.key === "Escape") setPageDraft(String(activePage));
+            }}
+            onBlur={commitJump}
+            aria-label="Page number"
+            className="h-8 w-14 px-1 text-center"
+          />
+          <span className="text-xs text-muted-foreground">/ {numPages}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setActivePage((p) => Math.min(numPages, p + 1))}
+            disabled={activePage >= numPages}
+            aria-label="Next page"
+            className="min-h-8 min-w-8 px-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setActivePage(numPages)}
+            disabled={activePage >= numPages}
+            aria-label="Last page"
+            className="min-h-8 min-w-8 px-0"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
         </div>
 
         <div

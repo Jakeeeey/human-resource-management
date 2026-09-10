@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { InkCanvas } from "../InkCanvas";
 import type { InkCanvasHandle } from "../InkCanvas";
 import type { PaperworkTemplate, PaperworkZone } from "../../paperwork/types/paperwork-template.schema";
-import type { SigningStamp } from "../types/signing-envelope.schema";
+import type { SigningStamp } from "../signingStamps";
 import type { SigningStroke } from "../signingStrokes";
 
 import { PdfPageCanvas } from "./PdfPageCanvas";

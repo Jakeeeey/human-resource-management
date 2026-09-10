@@ -5,6 +5,7 @@ import { manpowerRecommendationService } from "@/modules/human-resource-manageme
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
+import { getApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ export async function GET() {
 
         const [list, quizApps, recommendedRecs, users, allRecs] = await Promise.all([
             interviewService.fetchInterviews(),
-            interviewService.fetchQuizCompletedApplications(),
+            interviewService.fetchInitialStageApplications(),
             interviewService.fetchRecommendedRecommendations(),
             manpowerRecommendationService.fetchUsers(),
             manpowerRecommendationService.fetchAll(),
@@ -137,21 +138,32 @@ export async function POST(req: NextRequest) {
 
         const validated = InterviewSchema.parse(body);
 
-        // Initial guard: only applications with Quiz Completed status are accepted.
+        // Initial guard: only applications whose owning applicant is in the
+        // initial-interview pool (`quiz_completed` awaiting grade, or
+        // `initial_interview` awaiting a definitive verdict) are accepted.
+        // `applicant.status` is the single truth; the pool resolves the join
+        // via application.applicant_id.
         if (validated.stage === "Initial") {
-            const quizApps = await interviewService.fetchQuizCompletedApplications();
-            if (!quizApps.some((a) => a.id === validated.application_id)) {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Application #${validated.application_id} has not completed the quiz. Initial interviews open after quiz completion.` }, { status: 400 });
+            const initialPool = await interviewService.fetchInitialStageApplications();
+            if (!initialPool.some((a) => a.id === validated.application_id)) {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Application #${validated.application_id} is not in the initial interview stage. Initial interviews open after quiz completion.` }, { status: 400 });
             }
         }
 
-        // Final guard: only Recommended recommendations on Approved requests are accepted.
+        // Final guard: the APPLICANT pipeline must be at `recommended`
+        // (`applicant.status` is the pipeline truth; `manpower_recommendation.status`
+        // stays the separate recruitment artifact lifecycle) and the request
+        // must be Approved.
         if (validated.stage === "Final") {
             const rec = validated.recommendation_id
                 ? await manpowerRecommendationService.fetchById(validated.recommendation_id)
                 : null;
-            if (!rec || rec.status !== "Recommended") {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Recommendation #${validated.recommendation_id ?? "?"} is not a pending recommendation. Final interviews open after recommendation.` }, { status: 400 });
+            if (!rec) {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Recommendation #${validated.recommendation_id ?? "?"} does not exist. Final interviews open after recommendation.` }, { status: 400 });
+            }
+            const applicantStatus = rec.applicant_id != null ? await getApplicantStatus(rec.applicant_id) : null;
+            if (applicantStatus !== "recommended") {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Applicant #${rec.applicant_id ?? "?"} is not in the recommended stage. Final interviews open after recommendation.` }, { status: 400 });
             }
             const { status, request_no } = await manpowerRecommendationService.fetchRequestStatus(rec.manpower_request_id);
             if (status !== "Approved") {

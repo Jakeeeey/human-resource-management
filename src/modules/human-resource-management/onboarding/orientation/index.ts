@@ -2,25 +2,31 @@ export { OrientationTab } from "./components/OrientationTab";
 export { DEFAULT_ORIENTATION_TOPICS } from "./orientationSeed";
 export {
   TRACK_OWNER,
-  checkOffTopic,
-  isOrientationDone,
-  listChecksFor,
+  findTopic,
   listTopics,
+  orientationTopicCode,
   patchTopic,
-  resetOrientationStore,
   upsertTopic,
 } from "./orientationStore";
-export type { CheckOffResult } from "./orientationStore";
 export {
-  applyOrientationEvidence,
-  orientationEvidenceFor,
-} from "./orientationPredicate";
+  ORIENTATION_ERROR_CODES,
+  checkOffOrientationTopic,
+  computeOrientationDone,
+  getOrientationState,
+  isOrientationDone,
+  listOrientationEmployees,
+} from "./orientation-task-service";
+export type {
+  CheckOffOrientationResult,
+  OrientationState,
+} from "./orientation-task-service";
 export { OrientationFetchProvider, useOrientationFetch } from "./providers/orientationProvider";
 export { useOrientation } from "./hooks/useOrientation";
 export type {
   CheckOffOrientationInput,
   CreateOrientationTopicInput,
   OrientationCheck,
+  OrientationEmployee,
   OrientationRole,
   OrientationTopic,
   OrientationTrack,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { manpowerRecommendationService, nowPH } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
+import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         }
 
         const validated = ManpowerRecommendationSchema.omit({ id: true }).partial().parse(body);
+
+        // Applicant pipeline (todo 8): Rejected/Withdrawn close the applicant
+        // pipeline through the SINGLE status service (`applicant.status` is the
+        // truth); the rec column stays the artifact lifecycle. Deliberately NOT
+        // wired for Recommended/Approved/Hired: `recommended` arrives on rec
+        // create, `final_approved` on the graded Final verdict, and `hired` on
+        // signing completion. Runs BEFORE the rec update so a disallowed
+        // (already-terminal) advance aborts without flipping the artifact.
+        if (validated.status === "Rejected" || validated.status === "Withdrawn") {
+            const current = await manpowerRecommendationService.fetchById(id);
+            if (current?.applicant_id != null) {
+                await setApplicantStatus({
+                    applicantId: current.applicant_id,
+                    status: validated.status === "Rejected" ? "rejected" : "withdrawn",
+                });
+            }
+        }
 
         // Slot guard: moving a recommendation INTO Approved/Hired must not exceed capacity.
         if (validated.status === 'Approved' || validated.status === 'Hired') {

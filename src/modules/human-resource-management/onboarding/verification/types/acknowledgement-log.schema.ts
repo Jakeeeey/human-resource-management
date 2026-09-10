@@ -8,8 +8,8 @@ import { z } from "zod";
 // an owner-DB guarantee — the POST route collapses double-acks to one row via
 // exact-triple pre-check + duplicate-error swallow (Todo 2 precedent).
 //
-// This is the audit-trail store ONLY. The signed file lives in the vault
-// (`signing_envelopes.pdf_file`, Todo 8) — the two stores are never merged.
+// This is the audit-trail store ONLY. The signed file lives on its
+// `paperwork_item.pdf_file` — the two stores are never merged.
 // Log shape ported from memo-acknowledgement `AcknowledgementLog` (port, never
 // import — module boundary); the WRITE path is greenfield (memo-ack is
 // GET-only in-repo).
@@ -56,17 +56,18 @@ export interface AcknowledgementLogResponse {
   message?: string;
 }
 
-// Document-reference convention: `onboarding:profile:<profile_id>[:suffix]`.
-// The vault file UUID is NEVER embedded here — vault and ack stay separate.
-export function buildDocRef(profileId: number, suffix?: string): string {
-  const base = `onboarding:profile:${profileId}`;
+// Document-reference convention: `onboarding:employee:<user_id>[:suffix]`.
+// The employee `user_id` is the only identity on this path (no profile); the
+// vault file UUID is NEVER embedded here — vault and ack stay separate.
+export function buildDocRef(userId: number, suffix?: string): string {
+  const base = `onboarding:employee:${userId}`;
   const clean = (suffix ?? "").trim().replace(/[:\s]+/g, "-");
   return clean.length > 0 ? `${base}:${clean}` : base;
 }
 
-// Extracts the profile id from a convention-shaped doc_ref, else null.
-export function parseDocRefProfileId(docRef: string): number | null {
-  const match = /^onboarding:profile:(\d+)(?::.*)?$/.exec(docRef.trim());
+// Extracts the employee id from a convention-shaped doc_ref, else null.
+export function parseDocRefEmployeeId(docRef: string): number | null {
+  const match = /^onboarding:employee:(\d+)(?::.*)?$/.exec(docRef.trim());
   if (!match) return null;
   const id = Number(match[1]);
   return Number.isInteger(id) && id > 0 ? id : null;
