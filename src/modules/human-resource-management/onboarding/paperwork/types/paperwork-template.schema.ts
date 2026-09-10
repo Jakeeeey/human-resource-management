@@ -66,9 +66,14 @@ export type PaperworkTemplate = z.infer<typeof PaperworkTemplateSchema>;
 
 // POST body: PDF-only. `pdf_file` UUID required. (The dropped `body_html`
 // column is neither accepted nor written.)
+// Todo 20: `company_key` is legacy — accepted when present (degraded-path
+// writes + old rows) but NO LONGER REQUIRED and never sent by the dialog in
+// the normal path. Company scoping lives in the
+// `paperwork_template_companies` junction, written via the dedicated
+// `[id]/companies` replace route, never as arrays in cells.
 const CreatePaperworkTemplateBase = z
   .object({
-    company_key: z.string().min(1, "Company key is required"),
+    company_key: z.string().min(1, "Company key is required").optional(),
     title: z.string().min(1, "Title is required"),
     zones: PaperworkZonesSchema.optional(),
     is_active: z.boolean().optional(),

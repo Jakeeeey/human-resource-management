@@ -4,8 +4,13 @@ import { useEffect, useState } from "react";
 import { usePaperworkTemplates } from "../hooks/usePaperworkTemplates";
 import {
     listPaperworkCompanies,
+    resolveLegacyCompanyIds,
     type PaperworkCompany,
 } from "../providers/paperworkCompanyProvider";
+import {
+    listAllTemplateCompanies,
+    toTemplateCompanyMap,
+} from "../providers/paperworkTemplateCompanies";
 import { TemplatesTable } from "./TemplatesTable";
 import { TemplateDialog } from "./TemplateDialog";
 import { ZonesEditor } from "./ZonesEditor";
@@ -37,23 +42,46 @@ export function TemplatesTab() {
     saveZones,
   } = usePaperworkTemplates();
 
-  // Company directory for the key combobox (read-only, fails soft — the
-  // dialog falls back to free text when the directory is unreachable).
+  // Company directory for the multiselect (read-only, fails soft — the
+  // dialog falls back to a legacy free-text key when the directory is
+  // unreachable) + the junction map (template→company ids, one call).
   const [companies, setCompanies] = useState<PaperworkCompany[]>([]);
+  const [templateCompanyIds, setTemplateCompanyIds] = useState<
+    Map<number, number[]>
+  >(new Map());
   useEffect(() => {
     let cancelled = false;
     void listPaperworkCompanies().then((rows) => {
       if (!cancelled) setCompanies(rows);
     });
+    void listAllTemplateCompanies().then((rows) => {
+      if (!cancelled) setTemplateCompanyIds(toTemplateCompanyMap(rows));
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [templates.length]);
 
+  const companyById = new Map(companies.map((row) => [row.id, row]));
   const companyOptions = companies.map((row) => ({
-    value: row.code,
+    value: String(row.id),
     label: row.name,
+    code: row.code,
   }));
+
+  // Legacy `company_key` resolves through the directory when the junction is
+  // empty (old rows, unresolvable keys stay on the raw key — zero data loss).
+  const companyIdsFor = (templateId: number, legacyKey: string): number[] => {
+    const ids = templateCompanyIds.get(templateId);
+    if (ids && ids.length > 0) return ids;
+    return resolveLegacyCompanyIds(companies, legacyKey);
+  };
+
+  const refreshJunction = () => {
+    void listAllTemplateCompanies().then((rows) =>
+      setTemplateCompanyIds(toTemplateCompanyMap(rows))
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -91,6 +119,8 @@ export function TemplatesTab() {
       <TemplatesTable
         templates={templates}
         isLoading={isLoading}
+        templateCompanyIds={templateCompanyIds}
+        companyById={companyById}
         onEdit={openEdit}
         onZones={openZones}
       />
@@ -100,8 +130,15 @@ export function TemplatesTab() {
         template={selected}
         saving={saving}
         companyOptions={companyOptions}
+        initialCompanyIds={
+          selected
+            ? companyIdsFor(selected.id, selected.company_key)
+            : []
+        }
         onClose={closeDialog}
-        onSave={(d) => void saveTemplate(d)}
+        onSave={(d, ids) => {
+          void saveTemplate(d, ids).then(() => refreshJunction());
+        }}
       />
 
       <ZonesEditor

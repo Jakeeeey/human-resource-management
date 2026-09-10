@@ -24,6 +24,22 @@ import {
 import { AlertCircle, PenLine } from "lucide-react";
 import { SigningEnvelopeFetchProvider, useSigningEnvelopeFetch } from "../signing/providers/signingEnvelopeProvider";
 import { SigningSurface } from "../signing/components/SigningSurface";
+import {
+  listPaperworkCompanies,
+  resolveLegacyCompanyIds,
+  type PaperworkCompany,
+} from "../paperwork/providers/paperworkCompanyProvider";
+import {
+  listAllTemplateCompanies,
+  toTemplateCompanyMap,
+} from "../paperwork/providers/paperworkTemplateCompanies";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { OnboardingProfile } from "../hub/types/onboarding-profile.schema";
 import type { PaperworkTemplate } from "../paperwork/types/paperwork-template.schema";
 import type { SigningEnvelope } from "../signing/types/signing-envelope.schema";
@@ -54,6 +70,11 @@ function DeskBody() {
   const [profiles, setProfiles] = useState<OnboardingProfile[]>([]);
   const [templates, setTemplates] = useState<PaperworkTemplate[]>([]);
   const [envelopes, setEnvelopes] = useState<SigningEnvelope[]>([]);
+  const [companies, setCompanies] = useState<PaperworkCompany[]>([]);
+  const [templateCompanyIds, setTemplateCompanyIds] = useState<
+    Map<number, number[]>
+  >(new Map());
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [selectedProfileId, setSelectedProfileId] = useState<number | null>(null);
   const [signing, setSigning] = useState<SigningSession | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(1));
@@ -73,6 +94,32 @@ function DeskBody() {
     [profiles, selectedProfileId]
   );
 
+  const companyIdsFor = useCallback(
+    (template: PaperworkTemplate): number[] => {
+      const ids = templateCompanyIds.get(template.id);
+      if (ids && ids.length > 0) return ids;
+      return resolveLegacyCompanyIds(companies, template.company_key);
+    },
+    [templateCompanyIds, companies]
+  );
+
+  const companyById = useMemo(() => {
+    const map = new Map<number, PaperworkCompany>();
+    for (const company of companies) map.set(company.id, company);
+    return map;
+  }, [companies]);
+
+  // Kiosk model: HR picks the company at the queue; the paperwork list
+  // scopes to templates carrying that company (junction match, legacy key
+  // fallback when the junction is empty).
+  const filteredTemplates = useMemo(() => {
+    if (companyFilter === "all") return templates;
+    const picked = Number(companyFilter);
+    return templates.filter((template) =>
+      companyIdsFor(template).includes(picked)
+    );
+  }, [templates, companyFilter, companyIdsFor]);
+
   const loadQueue = useCallback(async () => {
     try {
       setIsLoading(Boolean(1));
@@ -88,6 +135,12 @@ function DeskBody() {
       const templatesBody = (await readJson(templatesRes)) as ListResponse<PaperworkTemplate[]>;
       setProfiles(Array.isArray(profilesBody.data) ? profilesBody.data : []);
       setTemplates(Array.isArray(templatesBody.data) ? templatesBody.data : []);
+      const [directory, junction] = await Promise.all([
+        listPaperworkCompanies(),
+        listAllTemplateCompanies(),
+      ]);
+      setCompanies(directory);
+      setTemplateCompanyIds(toTemplateCompanyMap(junction));
     } catch (err) {
       setIsError(Boolean(1));
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -300,19 +353,38 @@ function DeskBody() {
       </section>
 
       <section className="bg-card overflow-hidden rounded-2xl border border-border/50 shadow-sm">
-        <div className="border-b border-border px-3 py-2 sm:px-4">
-          <h2 className="truncate text-base font-semibold sm:text-lg" title="Step 2 — pick the paperwork">
-            Step 2 — pick the paperwork
-          </h2>
-          <p className="truncate text-xs text-muted-foreground sm:text-sm" title="Choose a template to start or resume the kiosk signing">
-            Choose a template to start or resume the kiosk signing
-          </p>
+        <div className="flex flex-col gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold sm:text-lg" title="Step 2 — pick the paperwork">
+              Step 2 — pick the paperwork
+            </h2>
+            <p className="truncate text-xs text-muted-foreground sm:text-sm" title="Choose a template to start or resume the kiosk signing">
+              Choose a template to start or resume the kiosk signing
+            </p>
+          </div>
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger
+              className="h-9 w-full sm:w-[220px]"
+              aria-label="Filter paperwork by company"
+            >
+              <SelectValue placeholder="All companies" />
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              <SelectItem value="all">All companies</SelectItem>
+              {companies.map((company) => (
+                <SelectItem key={company.id} value={String(company.id)}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
                 <TableHead>Paperwork</TableHead>
+                <TableHead>Companies</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Envelope</TableHead>
                 <TableHead className="text-right">Action</TableHead>
@@ -321,7 +393,7 @@ function DeskBody() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={5}>
                     <div className="space-y-2 py-4">
                       <Skeleton className="h-10 w-full" />
                       <Skeleton className="h-10 w-full" />
@@ -330,7 +402,7 @@ function DeskBody() {
                 </TableRow>
               ) : !selectedProfile ? (
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={5}>
                     <p className="py-6 text-center text-muted-foreground">
                       Pick a hire first — their paperwork queue appears here.
                     </p>
@@ -338,18 +410,34 @@ function DeskBody() {
                 </TableRow>
               ) : templates.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4}>
+                  <TableCell colSpan={5}>
                     <p className="py-6 text-center text-muted-foreground">
                       No paperwork templates in the registry yet.
                     </p>
                   </TableCell>
                 </TableRow>
+              ) : filteredTemplates.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5}>
+                    <p className="py-6 text-center text-muted-foreground">
+                      No paperwork scoped to this company yet.
+                    </p>
+                  </TableCell>
+                </TableRow>
               ) : (
-                templates.map((template) => {
+                filteredTemplates.map((template) => {
                   const existing = envelopes.find(
                     (envelope) => envelope.template_id === template.id
                   );
                   const key = `launch-${template.id}`;
+                  const ids = companyIdsFor(template);
+                  const names = ids.map(
+                    (id) => companyById.get(id)?.name ?? `#${id}`
+                  );
+                  const companyTitle =
+                    names.length > 0
+                      ? names.join(", ")
+                      : template.company_key;
                   return (
                     <TableRow key={template.id}>
                       <TableCell
@@ -357,6 +445,12 @@ function DeskBody() {
                         title={template.title}
                       >
                         {template.title}
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[180px] truncate text-xs text-muted-foreground"
+                        title={companyTitle}
+                      >
+                        {companyTitle}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="max-w-[120px] truncate" title={template.source}>

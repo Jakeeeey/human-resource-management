@@ -12,9 +12,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // GET /api/hrm/onboarding/paperwork-templates — list (+ `?company_key=`
-// per-company filter; app-level key, NOT a UNIQUE column).
+// legacy per-company filter; app-level key, NOT a UNIQUE column).
 // POST /api/hrm/onboarding/paperwork-templates — create; zones default to []
-// (freeform-ink-only template), is_active defaults true.
+// (freeform-ink-only template), is_active defaults true. Todo 20:
+// `company_key` is legacy read-fallback — accepted when present (degraded
+// writes, old rows) but never required; company scoping lives in the
+// `paperwork_template_companies` junction via the `[id]/companies` route.
 
 function getPhilippineTime(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
@@ -58,6 +61,10 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
         : null;
   return {
     ...(row as object),
+    // Legacy key may be absent on junction-scoped rows — coerce to "" so
+    // the envelope type stays string while the junction owns scoping.
+    company_key:
+      typeof row["company_key"] === "string" ? row["company_key"] : "",
     zones,
     is_active: active === true || active === 1 || active === "1",
     // PDF-only: every template reads as pdf regardless of stored value.
@@ -106,18 +113,24 @@ export async function POST(req: NextRequest) {
     }
 
     const now = getPhilippineTime();
+    // Legacy `company_key` is written ONLY when the caller supplies it
+    // (degraded-path writes); the dialog's normal path sends none — the
+    // junction replace route owns company scoping.
+    const payload: Record<string, unknown> = {
+      title: validation.data.title,
+      zones: validation.data.zones ?? [],
+      is_active: validation.data.is_active ?? true,
+      source: "pdf",
+      pdf_file: validation.data.pdf_file ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    if (validation.data.company_key !== undefined) {
+      payload["company_key"] = validation.data.company_key;
+    }
     const created = (await dFetch("/items/paperwork_templates", {
       method: "POST",
-      body: JSON.stringify({
-        company_key: validation.data.company_key,
-        title: validation.data.title,
-        zones: validation.data.zones ?? [],
-        is_active: validation.data.is_active ?? true,
-        source: "pdf",
-        pdf_file: validation.data.pdf_file ?? null,
-        created_at: now,
-        updated_at: now,
-      }),
+      body: JSON.stringify(payload),
     })) as { data?: Record<string, unknown> };
 
     if (!created?.data) {

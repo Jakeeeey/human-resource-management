@@ -14,6 +14,7 @@ import type {
   UpdatePaperworkTemplateInput,
 } from "../types/paperwork-template.schema";
 import { usePaperworkTemplateFetch } from "../providers/paperworkTemplateProvider";
+import { replaceTemplateCompanies } from "../providers/paperworkTemplateCompanies";
 
 export function usePaperworkTemplates() {
   const {
@@ -57,22 +58,29 @@ export function usePaperworkTemplates() {
   }, []);
 
   const saveTemplate = useCallback(
-    async (data: CreatePaperworkTemplateInput) => {
+    async (data: CreatePaperworkTemplateInput, companyIds: number[] | null) => {
       setSaving(true);
       try {
         if (selected) {
-          // PDF-only: kind + file UUID travel on edit; body_html is legacy
-          // and never sent.
           const patch: UpdatePaperworkTemplateInput = {
             title: data.title,
             is_active: data.is_active,
           };
           if (data.source !== undefined) patch.source = data.source;
           if (data.pdf_file !== undefined) patch.pdf_file = data.pdf_file;
+          if (data.company_key !== undefined) {
+            patch.company_key = data.company_key;
+          }
           await updateTemplate(selected.id, patch);
+          if (companyIds !== null) {
+            await replaceTemplateCompanies(selected.id, companyIds);
+          }
           toast.success("Template updated");
         } else {
-          await createTemplate(data);
+          const created = await createTemplate(data);
+          if (created && companyIds !== null) {
+            await replaceTemplateCompanies(created.id, companyIds);
+          }
           toast.success("Template created");
         }
         closeDialog();

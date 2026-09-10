@@ -7,6 +7,7 @@ import type {
 } from "../types/paperwork-template.schema";
 import { uploadPaperworkPdf } from "../providers/paperworkPdfUpload";
 import { PaperworkCombobox } from "./PaperworkCombobox";
+import { PaperworkCompanyMultiCombobox } from "./PaperworkCompanyMultiCombobox";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +22,11 @@ import { Label } from "@/components/ui/label";
 // TemplateDialog.tsx — create/edit for paperwork templates (PDF-ONLY: every
 // template is an admin-uploaded PDF picked below; zones are marked in the
 // separate zones editor AFTER the template exists).
+// Todo 20: company scoping is a MULTI-pick over the directory. The dialog
+// never writes `company_key` in the normal path — the hook persists the set
+// through the `[id]/companies` junction replace route. `companyIds` null on
+// save marks the degraded path (directory unreachable): the legacy free-text
+// key is written instead so creation never blocks.
 // Form state initializes from props on mount; the dialog remounts it via
 // `key` per open/template so no set-state-in-effect is needed.
 
@@ -28,19 +34,27 @@ interface TemplateDialogProps {
   open: boolean;
   template: PaperworkTemplate | null;
   saving: boolean;
-  companyOptions: { value: string; label: string }[];
+  companyOptions: { value: string; label: string; code: string }[];
+  initialCompanyIds: number[];
   onClose: () => void;
-  onSave: (data: CreatePaperworkTemplateInput) => void;
+  onSave: (
+    data: CreatePaperworkTemplateInput,
+    companyIds: number[] | null
+  ) => void;
 }
 
 function TemplateDialogForm({
   template,
   saving,
   companyOptions,
+  initialCompanyIds,
   onClose,
   onSave,
 }: Omit<TemplateDialogProps, "open">) {
-  const [companyKey, setCompanyKey] = useState(template?.company_key ?? "");
+  const [companyIds, setCompanyIds] = useState<string[]>(
+    initialCompanyIds.map(String)
+  );
+  const [legacyKey, setLegacyKey] = useState(template?.company_key ?? "");
   const [title, setTitle] = useState(template?.title ?? "");
   const [isActive, setIsActive] = useState(template?.is_active ?? true);
   const [pdfFile, setPdfFile] = useState<string | null>(
@@ -48,7 +62,14 @@ function TemplateDialogForm({
   );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [fileKey, setFileKey] = useState(0);
+
+  const directoryUp = companyOptions.length > 0;
+  const legacyFallback =
+    template !== null &&
+    (template.company_key ?? "").trim() !== "" &&
+    initialCompanyIds.length === 0;
 
   const handlePdfSelected = (file: File | undefined) => {
     setUploadError(null);
@@ -80,41 +101,101 @@ function TemplateDialogForm({
   };
 
   const handleSave = () => {
-    if (companyKey.trim() === "" || title.trim() === "") return;
+    setSaveError(null);
+    if (title.trim() === "") {
+      setSaveError("Title is required");
+      return;
+    }
     if (!pdfFile) {
       setUploadError("Upload a PDF file before saving");
       return;
     }
-    onSave({
-      company_key: companyKey.trim(),
-      title: title.trim(),
-      source: "pdf",
-      pdf_file: pdfFile,
-      is_active: isActive,
-    });
+    if (directoryUp) {
+      // Empty pick is rejected with a reason — never saved.
+      const ids = [
+        ...new Set(
+          companyIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+        ),
+      ];
+      if (ids.length === 0) {
+        setSaveError(
+          "Pick at least one company — a template must scope to one or more companies"
+        );
+        return;
+      }
+      onSave(
+        {
+          title: title.trim(),
+          source: "pdf",
+          pdf_file: pdfFile,
+          is_active: isActive,
+        },
+        ids
+      );
+      return;
+    }
+    if (legacyKey.trim() === "") {
+      setSaveError("Company is required");
+      return;
+    }
+    onSave(
+      {
+        company_key: legacyKey.trim(),
+        title: title.trim(),
+        source: "pdf",
+        pdf_file: pdfFile,
+        is_active: isActive,
+      },
+      null
+    );
   };
 
   return (
     <>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="pw-company-key">Company</Label>
-          {companyOptions.length > 0 ? (
+          <Label htmlFor="pw-company-key">Companies</Label>
+          {directoryUp ? (
+            <>
+              <PaperworkCompanyMultiCombobox
+                options={companyOptions}
+                values={companyIds}
+                onValuesChange={(next) => {
+                  setCompanyIds(next);
+                  if (next.length > 0) setSaveError(null);
+                }}
+                placeholder="Select companies…"
+                disabled={saving}
+              />
+              {legacyFallback && (
+                <p className="text-xs text-muted-foreground">
+                  Legacy single-company row ({template?.company_key}) — pick
+                  the set to migrate it to shared scoping.
+                </p>
+              )}
+            </>
+          ) : template !== null ? (
             <PaperworkCombobox
-              options={companyOptions}
-              value={companyKey}
-              onValueChange={setCompanyKey}
-              placeholder="Select company…"
-              disabled={template !== null || saving}
+              options={[{ value: legacyKey, label: legacyKey }]}
+              value={legacyKey}
+              onValueChange={setLegacyKey}
+              placeholder="Company directory unreachable — legacy key kept"
+              disabled={saving}
             />
           ) : (
             <Input
               id="pw-company-key"
-              value={companyKey}
-              disabled={template !== null || saving}
-              onChange={(e) => setCompanyKey(e.target.value)}
+              value={legacyKey}
+              disabled={saving}
+              onChange={(e) => setLegacyKey(e.target.value)}
               placeholder="Per-company scope, e.g. acme-ph"
             />
+          )}
+          {!directoryUp && template === null && (
+            <p className="text-xs text-muted-foreground">
+              Company directory unreachable — saving with a legacy key; HR can
+              re-scope once the directory is back.
+            </p>
           )}
         </div>
         <div className="space-y-2">
@@ -179,6 +260,7 @@ function TemplateDialogForm({
           />
           Active (inactive templates stay on file but leave the registry)
         </label>
+        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       </div>
       <DialogFooter className="flex-col gap-2 sm:flex-row">
         <Button
@@ -206,6 +288,7 @@ export function TemplateDialog({
   template,
   saving,
   companyOptions,
+  initialCompanyIds,
   onClose,
   onSave,
 }: TemplateDialogProps) {
@@ -219,10 +302,11 @@ export function TemplateDialog({
         </DialogHeader>
         {open && (
           <TemplateDialogForm
-            key={template?.id ?? "new"}
+            key={`${template?.id ?? "new"}:${initialCompanyIds.join(",")}`}
             template={template}
             saving={saving}
             companyOptions={companyOptions}
+            initialCompanyIds={initialCompanyIds}
             onClose={onClose}
             onSave={onSave}
           />
