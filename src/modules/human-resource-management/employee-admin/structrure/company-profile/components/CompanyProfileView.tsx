@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCompanyProfile } from "../hooks/useCompanyProfile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ interface CompanyProfileViewProps {
 
 export function CompanyProfileView({ onEdit }: CompanyProfileViewProps) {
     const { data, isLoading, error } = useCompanyProfile();
+    const router = useRouter();
 
     if (isLoading) {
         return (
@@ -94,13 +96,23 @@ export function CompanyProfileView({ onEdit }: CompanyProfileViewProps) {
                                         </span>
                                     </div>
                                 </div>
-                                <Button
-                                    onClick={onEdit}
-                                    className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg transition-all active:scale-95 group"
-                                >
-                                    <Pencil className="w-4 h-4 mr-2 transition-transform group-hover:rotate-12" />
-                                    Edit Profile
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={() => router.push("/hrm/pdf-layout")}
+                                        variant="outline"
+                                        className="shadow-sm transition-all active:scale-95 group"
+                                    >
+                                        <FileText className="w-4 h-4 mr-2 transition-transform group-hover:scale-110" />
+                                        PDF Layout
+                                    </Button>
+                                    <Button
+                                        onClick={onEdit}
+                                        className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg transition-all active:scale-95 group"
+                                    >
+                                        <Pencil className="w-4 h-4 mr-2 transition-transform group-hover:rotate-12" />
+                                        Edit Profile
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-2">

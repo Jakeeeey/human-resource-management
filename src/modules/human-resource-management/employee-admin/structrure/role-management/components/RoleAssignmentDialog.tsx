@@ -28,6 +28,7 @@ interface RoleAssignmentDialogProps {
   supervisors?: SupervisorPerDivision[];
   expenseReviewers?: ExpenseReviewCommittee[];
   onConfirm: (...args: number[]) => Promise<void>;
+  divisionNameSetting?: string;
 }
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
@@ -52,7 +53,8 @@ export function RoleAssignmentDialog({
   salesmen = [],
   supervisors = [],
   expenseReviewers = [],
-  onConfirm
+  onConfirm,
+  divisionNameSetting = "Division"
 }: RoleAssignmentDialogProps) {
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedDivision, setSelectedDivision] = useState<string>("");
@@ -167,13 +169,13 @@ export function RoleAssignmentDialog({
               <div className="space-y-2">
                 <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
                   <LayoutDashboard className="h-3.5 w-3.5 opacity-40" />
-                  Business Unit
+                  {divisionNameSetting}
                 </Label>
                 <SearchableSelect
                   options={divisionOptions}
                   value={selectedDivision}
                   onValueChange={setSelectedDivision}
-                  placeholder="Select a business unit"
+                  placeholder={`Select a ${divisionNameSetting.toLowerCase()}`}
                   className="h-12 border-muted-foreground/10 bg-muted/5 font-medium"
                 />
                 <p className="text-[11px] text-muted-foreground ml-1">Assign this role to a specific vertical.</p>
@@ -205,7 +207,7 @@ export function RoleAssignmentDialog({
                     </p>
                   ) : (
                     <p className="text-[11px] text-muted-foreground ml-1">
-                      Select a business unit first to calculate the next sequence.<br/>
+                      Select a {divisionNameSetting.toLowerCase()} first to calculate the next sequence.<br/>
                       <strong className="text-foreground/70">Note: As the level goes up, the approval authority is higher.</strong>
                     </p>
                   )}

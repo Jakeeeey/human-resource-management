@@ -1,0 +1,4 @@
+{
+  "$comment": "ADMIN-EDITABLE equipment catalog extras for onboarding Todo 13. Pdf §9 items live in equipmentCatalog.ts (PDF_SECTION_9_CATALOG) and must NOT be repeated here. Add objects shaped { key, label, issuer, required } — key must match ^[a-z0-9_]{1,64}$ and must NOT shadow a pdf §9 key. issuer is one of IT | Admin | Department. Deployed as read: routes merge this file at request time; no code change needed for custom items.",
+  "customItems": []
+}

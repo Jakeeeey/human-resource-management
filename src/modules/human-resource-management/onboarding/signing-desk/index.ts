@@ -1,0 +1,1 @@
+export { SigningDeskModule } from "./SigningDeskModule";
