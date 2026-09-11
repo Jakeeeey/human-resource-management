@@ -1,7 +1,7 @@
 "use client";
 
 import { useManpowerRecommendation } from "../hooks/useManpowerRecommendation";
-import { isApplicantHired, isApplicantSlotOccupying } from "../utils/applicantPipeline";
+import { applicantStatusLabel, isApplicantHired, isApplicantSlotOccupying } from "../utils/applicantPipeline";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -65,9 +65,14 @@ export function ManpowerRequestDetail() {
                                             {applicant?.full_name ?? `Applicant #${rec.applicant_id}`}
                                         </span>
                                         <div className="flex w-full items-center justify-between gap-3 shrink-0 sm:ml-auto sm:w-auto sm:justify-start">
-                                            <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider w-[130px] justify-center shrink-0 ${getStatusColor(rec.status ?? "Recommended")}`}>
-                                                {rec.status ?? "Recommended"}
-                                            </Badge>
+                                            <div className="flex shrink-0 flex-col items-center gap-1">
+                                                <Badge variant="outline" className={`px-3 py-1.5 text-xs rounded-full font-bold uppercase tracking-wider w-[130px] justify-center shrink-0 ${getStatusColor(rec.status ?? "Recommended")}`}>
+                                                    {rec.status ?? "Recommended"}
+                                                </Badge>
+                                                <span className="text-[11px] font-medium text-muted-foreground" title="Applicant pipeline status — drives the Slots Filled count, the badge above is the recommendation artifact">
+                                                    Pipeline: {applicantStatusLabel(applicant?.status)}
+                                                </span>
+                                            </div>
                                             <Button variant="ghost" size="sm" className="flex-none shrink-0" onClick={() => handleView(rec)} aria-label={`View recommendation ${rec.id}`}>
                                                 <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
                                                 View

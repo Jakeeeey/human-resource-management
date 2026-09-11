@@ -8,6 +8,7 @@ import type { SigningStamp } from "../signingStamps";
 import type { SigningStroke } from "../signingStrokes";
 
 import { PdfPageCanvas } from "./PdfPageCanvas";
+import { zoneDisplayName } from "../signingCopy";
 import type {
   PdfNaturalSize,
   SigningPdfDocument,
@@ -170,7 +171,7 @@ export function TemplatePageView({
               width: `${zone.rect.w * 100}%`,
               height: `${zone.rect.h * 100}%`,
             }}
-            title={`${zone.id} — ${zone.required ? "required" : "optional"}`}
+            title={`${zoneDisplayName(zone)} — ${zone.required ? "required" : "optional"}`}
           />
         ))}
         <InkCanvas

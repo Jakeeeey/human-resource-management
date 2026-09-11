@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { manpowerRecommendationService, nowPH } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
 import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
 
 export const dynamic = "force-dynamic";
 
@@ -82,10 +83,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         if (validated.status === "Rejected" || validated.status === "Withdrawn") {
             const current = await manpowerRecommendationService.fetchById(id);
             if (current?.applicant_id != null) {
-                await setApplicantStatus({
-                    applicantId: current.applicant_id,
-                    status: validated.status === "Rejected" ? "rejected" : "withdrawn",
-                });
+                try {
+                    await setApplicantStatus({
+                        applicantId: current.applicant_id,
+                        status: validated.status === "Rejected" ? "rejected" : "withdrawn",
+                    });
+                } catch (statusError) {
+                    console.error("[manpower-recommendation] applicant status close failed:", statusError);
+                    const humanized = humanizeApplicantStatusError(statusError, "close");
+                    if (humanized) {
+                        return NextResponse.json({ error: "VALIDATION_FAILED", message: humanized }, { status: 400 });
+                    }
+                    throw statusError;
+                }
             }
         }
 

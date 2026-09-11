@@ -6,6 +6,7 @@ import type {
   JobOffer,
   PaperworkItem,
   Paperworks,
+  SigningCompletion,
   SigningEnvelope,
 } from "../types/contracts";
 
@@ -35,8 +36,9 @@ export interface SignOfferResult {
   paperworks: Paperworks;
   requiredCount: number;
   signedCount: number;
-  /** `"incomplete"` after this call, or null when the set came out complete. */
+  /** `"hired"`/null server truth for the applicant after this call. */
   applicantStatus: string | null;
+  completion: SigningCompletion;
 }
 
 export interface SignItemResult {
@@ -45,6 +47,9 @@ export interface SignItemResult {
   paperworks: Paperworks;
   requiredCount: number;
   signedCount: number;
+  /** `"hired"`/null server truth for the applicant after this call. */
+  applicantStatus: string | null;
+  completion: SigningCompletion;
 }
 
 interface SigningSetFetchContextType {
@@ -52,6 +57,8 @@ interface SigningSetFetchContextType {
   listJobOffers: (applicantId?: number) => Promise<JobOffer[]>;
   listPaperworks: (applicantId?: number) => Promise<Paperworks[]>;
   listPaperworkItems: (paperworksId: number) => Promise<PaperworkItem[]>;
+  /** Read-only hire-block preview: the specific missing prerequisite, or null. */
+  previewHireBlockReason: (applicantId: number) => Promise<string | null>;
   signJobOffer: (
     offerId: number,
     signatureFile: string | null
@@ -89,6 +96,15 @@ async function patch<T>(url: string, payload: unknown): Promise<T> {
   return body.data;
 }
 
+async function readOne<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  const body = (await res.json().catch(() => null)) as ApiEnvelope<T> | null;
+  if (!res.ok || !body?.success || body.data === undefined) {
+    throw new Error(body?.message || "Request failed");
+  }
+  return body.data;
+}
+
 function scope(applicantId?: number): string {
   return applicantId === undefined ? "" : `?applicant_id=${applicantId}`;
 }
@@ -111,6 +127,12 @@ export function SigningEnvelopeFetchProvider({
       readList<PaperworkItem>(
         `/api/hrm/onboarding/paperwork-item?paperworks_id=${paperworksId}`
       ),
+    previewHireBlockReason: async (applicantId) => {
+      const data = await readOne<{ blockedReason: string | null }>(
+        `/api/hrm/onboarding/signing-envelope/completion?applicant_id=${applicantId}`
+      );
+      return data.blockedReason ?? null;
+    },
     signJobOffer: (offerId, signatureFile) =>
       patch<SignOfferResult>(`/api/hrm/onboarding/job-offer/${offerId}`, {
         signature_file: signatureFile,

@@ -2,56 +2,28 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { QuestionCard } from "./components/QuestionCard";
-import type { AnswersByQuestionId, StartQuizResponse, SubmitAnswerPayload } from "./types";
+import { QuizBlockedState, type QuizBlockedVariant } from "./components/QuizBlockedState";
+import { LeaveConfirmDialog } from "./components/LeaveConfirmDialog";
+import { SubmitConfirmDialog } from "./components/SubmitConfirmDialog";
+import { useQuizLeaveGuard } from "./hooks/useQuizLeaveGuard";
+import type { AnswersByQuestionId, StartQuizResponse } from "./types";
+import { buildSubmitAnswers, isQuestionAnswered } from "./utils/answers";
 
 type Step = "loading" | "blocked" | "in-progress" | "submitting";
 
-const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
-
-function buildSubmitAnswers(
-    questions: StartQuizResponse["questions"],
-    answers: AnswersByQuestionId
-): SubmitAnswerPayload[] {
-    const payload: SubmitAnswerPayload[] = [];
-    for (const q of questions) {
-        const given = answers[q.id] || [];
-        if (CHOICE_TYPES.has(q.question_type)) {
-            const picked = given[0] ? Number(given[0]) : null;
-            payload.push({
-                question_id: q.id,
-                answer_given_choice_id: picked != null && !Number.isNaN(picked) ? picked : null,
-                presented_choice_ids: q.choices.map((c) => c.id),
-            });
-            continue;
-        }
-        const blankCount = q.blank_count || 1;
-        for (let i = 0; i < blankCount; i++) {
-            payload.push({ question_id: q.id, blank_index: i, answer_given_text: given[i] || "" });
-        }
-    }
-    return payload;
-}
-
 interface QuizTakingModuleProps {
     returnHref?: string;
+    exitHref?: string;
+    exitLabel?: string;
 }
 
 export default function QuizTakingModule({
     returnHref = "/hrm/quiz-file-management/quiz-management",
+    exitHref = "/hrm/quiz-file-management/quiz-management",
+    exitLabel = "Return to HR",
 }: QuizTakingModuleProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -61,20 +33,21 @@ export default function QuizTakingModule({
 
     const [step, setStep] = useState<Step>("loading");
     const [blockedMessage, setBlockedMessage] = useState("");
+    const [blockedVariant, setBlockedVariant] = useState<QuizBlockedVariant>("start");
     const [data, setData] = useState<StartQuizResponse | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<AnswersByQuestionId>({});
     const [startedAt, setStartedAt] = useState<string | null>(null);
     const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
+    const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
     const isSubmittingRef = useRef(false);
+    const warnedRef = useRef(false);
 
-    const [pendingNav, setPendingNav] = useState<
-        { kind: "link"; href: string } | { kind: "back" } | null
-    >(null);
-    const bypassPopRef = useRef(false);
+    const { pendingNav, confirmLeave, clearPending } = useQuizLeaveGuard(step === "in-progress");
 
     useEffect(() => {
         if (!quizId) {
+            setBlockedVariant("start");
             setBlockedMessage("No quiz selected.");
             setStep("blocked");
             return;
@@ -84,11 +57,13 @@ export default function QuizTakingModule({
                 const res = await fetch(`/api/hrm/quiz-file-management/quiz-attempt/start?quiz_id=${quizId}`);
                 const body = await res.json();
                 if (!res.ok) {
+                    setBlockedVariant("start");
                     setBlockedMessage(body.error || "This quiz can't be started right now.");
                     setStep("blocked");
                     return;
                 }
                 if (!body.questions || body.questions.length === 0) {
+                    setBlockedVariant("start");
                     setBlockedMessage("This quiz has no questions available right now.");
                     setStep("blocked");
                     return;
@@ -100,6 +75,7 @@ export default function QuizTakingModule({
                 setStartedAt(new Date().toISOString());
                 setStep("in-progress");
             } catch {
+                setBlockedVariant("start");
                 setBlockedMessage("Failed to load the quiz. Please try again.");
                 setStep("blocked");
             }
@@ -140,7 +116,10 @@ export default function QuizTakingModule({
             router.push(`${returnHref}?${params.toString()}`);
         } catch {
             isSubmittingRef.current = false;
-            setBlockedMessage("Failed to submit the quiz. Please try again.");
+            setBlockedVariant("submit");
+            setBlockedMessage(
+                "We couldn't submit your answers. Your responses are still here — retry the submission."
+            );
             setStep("blocked");
         }
     }, [data, quizId, applicantId, applicationId, startedAt, answers, router, returnHref]);
@@ -155,83 +134,67 @@ export default function QuizTakingModule({
         return () => clearTimeout(t);
     }, [step, secondsRemaining, handleSubmit]);
 
+    // One-time heads-up before the timer auto-submits (error prevention).
     useEffect(() => {
-        if (step !== "in-progress") return;
+        if (step !== "in-progress" || secondsRemaining == null) return;
+        if (secondsRemaining > 0 && secondsRemaining <= 60 && !warnedRef.current) {
+            warnedRef.current = true;
+            toast.warning("1 minute left", {
+                description: "Your quiz will submit automatically when time runs out.",
+            });
+        }
+    }, [step, secondsRemaining]);
+
+    const answeredFlags = data
+        ? data.questions.map((q) => isQuestionAnswered(q, answers[q.id]))
+        : [];
+    const answeredCount = answeredFlags.filter(Boolean).length;
+    const unansweredCount = answeredFlags.length - answeredCount;
+    const hasProgress = answeredCount > 0;
+
+    useEffect(() => {
+        // Only guard against losing real work — a fresh, untouched quiz should
+        // not trip the browser's native unsaved-changes prompt.
+        if (step !== "in-progress" || !hasProgress) return;
         function handler(e: BeforeUnloadEvent) {
             e.preventDefault();
         }
         window.addEventListener("beforeunload", handler);
         return () => window.removeEventListener("beforeunload", handler);
-    }, [step]);
-
-    const confirmLeave = useCallback(() => {
-        const nav = pendingNav;
-        setPendingNav(null);
-        if (!nav) return;
-        if (nav.kind === "link") {
-            router.push(nav.href);
-        } else {
-            bypassPopRef.current = true;
-            window.history.back();
-        }
-    }, [pendingNav, router]);
-
-    const cancelLeave = useCallback(() => setPendingNav(null), []);
-
-    useEffect(() => {
-        if (step !== "in-progress") return;
-
-        function handleClick(e: MouseEvent) {
-            const link = (e.target as HTMLElement).closest("a");
-            const href = link?.getAttribute("href");
-            if (!href || href.startsWith("#")) return;
-            e.preventDefault();
-            setPendingNav({ kind: "link", href });
-        }
-        document.addEventListener("click", handleClick, { capture: true });
-
-        window.history.pushState(null, "", window.location.href);
-        function handlePopState() {
-            if (bypassPopRef.current) {
-                bypassPopRef.current = false;
-                return;
-            }
-            window.history.pushState(null, "", window.location.href);
-            setPendingNav({ kind: "back" });
-        }
-        window.addEventListener("popstate", handlePopState);
-
-        return () => {
-            document.removeEventListener("click", handleClick, { capture: true });
-            window.removeEventListener("popstate", handlePopState);
-        };
-    }, [step]);
+    }, [step, hasProgress]);
 
     if (step === "loading") {
-        return <div className="text-sm text-muted-foreground">Preparing your quiz...</div>;
-    }
-
-    if (step === "blocked") {
         return (
-            <div className="mx-auto max-w-md space-y-4 py-8">
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Can&apos;t Start Quiz</AlertTitle>
-                    <AlertDescription>{blockedMessage}</AlertDescription>
-                </Alert>
-                <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => router.push(returnHref)}
-                >
-                    Done
-                </Button>
+            <div className="flex min-h-[60dvh] items-center justify-center text-sm text-muted-foreground">
+                Preparing your quiz...
             </div>
         );
     }
 
+    if (step === "blocked") {
+        return (
+            <QuizBlockedState
+                variant={blockedVariant}
+                message={blockedMessage}
+                onRetry={
+                    blockedVariant === "submit"
+                        ? () => {
+                              void handleSubmit();
+                          }
+                        : () => window.location.reload()
+                }
+                onBack={() => router.push(exitHref)}
+                backLabel={exitLabel}
+            />
+        );
+    }
+
     if (step === "submitting") {
-        return <div className="text-sm text-muted-foreground">Submitting your answers...</div>;
+        return (
+            <div className="flex min-h-[60dvh] items-center justify-center text-sm text-muted-foreground">
+                Submitting your answers...
+            </div>
+        );
     }
 
     if (!data) return null;
@@ -240,17 +203,20 @@ export default function QuizTakingModule({
     const isLast = currentIndex === data.questions.length - 1;
 
     return (
-        <div className="mx-auto max-w-2xl space-y-6 py-4">
-            <QuestionCard
-                question={question}
-                index={currentIndex}
-                total={data.questions.length}
-                timeRemainingSeconds={secondsRemaining}
-                value={answers[question.id] || []}
-                onChange={(next) => setAnswers((prev) => ({ ...prev, [question.id]: next }))}
-            />
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 py-4 sm:min-h-[calc(100dvh-3rem)] sm:justify-center sm:py-8">
+            <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+                <QuestionCard
+                    question={question}
+                    index={currentIndex}
+                    total={data.questions.length}
+                    timeRemainingSeconds={secondsRemaining}
+                    value={answers[question.id] || []}
+                    onChange={(next) => setAnswers((prev) => ({ ...prev, [question.id]: next }))}
+                    answeredFlags={answeredFlags}
+                />
+            </div>
 
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-2">
                 <Button
                     variant="outline"
                     disabled={currentIndex === 0}
@@ -259,33 +225,29 @@ export default function QuizTakingModule({
                     Back
                 </Button>
                 {isLast ? (
-                    <Button onClick={handleSubmit}>Submit</Button>
+                    <Button onClick={() => setConfirmSubmitOpen(true)}>Submit</Button>
                 ) : (
                     <Button onClick={() => setCurrentIndex((i) => i + 1)}>Next</Button>
                 )}
             </div>
 
-            <AlertDialog
+            <LeaveConfirmDialog
                 open={pendingNav !== null}
                 onOpenChange={(open) => {
-                    if (!open) cancelLeave();
+                    if (!open) clearPending();
                 }}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>End this quiz attempt?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            The applicant&apos;s answers so far won&apos;t be saved.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={cancelLeave}>Keep taking</AlertDialogCancel>
-                        <AlertDialogAction variant="destructive" onClick={confirmLeave}>
-                            End attempt
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onConfirm={confirmLeave}
+            />
+
+            <SubmitConfirmDialog
+                open={confirmSubmitOpen}
+                onOpenChange={setConfirmSubmitOpen}
+                unansweredCount={unansweredCount}
+                onConfirm={() => {
+                    setConfirmSubmitOpen(false);
+                    handleSubmit();
+                }}
+            />
         </div>
     );
 }

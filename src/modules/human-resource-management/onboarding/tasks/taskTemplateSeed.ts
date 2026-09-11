@@ -63,7 +63,7 @@ const DOCUMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
   },
   {
     code: "documents_acknowledged",
-    title: "Hiree acknowledgement recorded",
+    title: "Documents acknowledgement recorded",
     phase: "documents",
     owner_role: "hiree",
     is_required: true,
@@ -111,7 +111,7 @@ const EQUIPMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
   },
   {
     code: "equipment_acknowledged",
-    title: "Equipment acknowledged by hiree",
+    title: "Equipment acknowledgement recorded",
     phase: "equipment",
     owner_role: "hiree",
     is_required: true,

@@ -3,7 +3,9 @@ import { cookies } from "next/headers";
 import { manpowerRecommendationService, nowPH } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
-import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { ALLOWED_TRANSITIONS, setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
 
 // manpower-recommendation — the recommendation row is a recruitment ARTIFACT
 // (its `status` column is the artifact lifecycle); the applicant PIPELINE truth
@@ -15,6 +17,15 @@ export const dynamic = "force-dynamic";
 const COOKIE_NAME = "vos_access_token";
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
+
+// Picker-pool eligibility (S4 finding #1): the Recommend combobox may offer an
+// applicant ONLY when the create path's `-> recommended` advance is legal.
+// Derived from the single-writer ALLOWED_TRANSITIONS table so the picker can
+// never drift from the transition contract again (previously it offered
+// `quiz_completed`/`initial_interview` rows that creation always rejected).
+const RECOMMENDABLE_FROM: readonly string[] = (Object.keys(ALLOWED_TRANSITIONS) as ApplicantStatus[]).filter(
+    (from) => ALLOWED_TRANSITIONS[from].includes("recommended")
+);
 
 async function dFetch(path: string, options?: RequestInit) {
     const res = await fetch(`${DIRECTUS_URL}${path}`, {
@@ -84,7 +95,12 @@ export async function GET() {
             manpowerRecommendationService.fetchUsers(),
         ]);
 
-        return NextResponse.json({ data, applicants, openRequests, divisions, users });
+        const recommendableApplicants = applicants.map((applicant) => ({
+            ...applicant,
+            can_recommend: RECOMMENDABLE_FROM.includes(applicant.status),
+        }));
+
+        return NextResponse.json({ data, applicants: recommendableApplicants, openRequests, divisions, users });
     } catch (e: unknown) {
         const err = e as Error;
         if (err && typeof err === "object" && "issues" in err) {
@@ -125,7 +141,14 @@ export async function POST(req: NextRequest) {
         // (out-of-order) advance aborts without an orphan recommendation row;
         // a retry re-runs as an idempotent same-status no-op.
         if (validated.status === "Recommended") {
-            await setApplicantStatus({ applicantId: validated.applicant_id, status: "recommended" });
+            try {
+                await setApplicantStatus({ applicantId: validated.applicant_id, status: "recommended" });
+            } catch (statusError) {
+                console.error("[manpower-recommendation] applicant status advance failed:", statusError);
+                const humanized = humanizeApplicantStatusError(statusError, "recommend");
+                if (humanized) throw new Error(`VALIDATION_FAILED: ${humanized}`);
+                throw statusError;
+            }
         }
 
         const created = await manpowerRecommendationService.create(validated);

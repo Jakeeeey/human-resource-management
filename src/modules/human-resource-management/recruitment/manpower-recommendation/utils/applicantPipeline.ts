@@ -1,4 +1,5 @@
 import type { ApplicantStatus } from "@/modules/human-resource-management/onboarding/types/applicant-status";
+import { APPLICANT_STATUS_LABELS } from "@/modules/human-resource-management/recruitment/applicants/types";
 
 // applicantPipeline.ts — the manpower-recommendation module's read model of the
 // APPLICANT pipeline (todo 8 reconciliation).
@@ -37,4 +38,14 @@ export function isApplicantSlotOccupying(status: string | null | undefined): boo
  */
 export function isApplicantHired(status: string | null | undefined): boolean {
   return status === "hired";
+}
+
+/**
+ * Display label for a raw `applicant.status` (snake_case -> "Final Approved").
+ * @param status - Raw `applicant.status` (or null/undefined when unknown).
+ * @returns The display label, the raw value when non-canonical, or "—" when absent.
+ */
+export function applicantStatusLabel(status: string | null | undefined): string {
+  if (!status) return "—";
+  return (APPLICANT_STATUS_LABELS as Record<string, string>)[status] ?? status;
 }

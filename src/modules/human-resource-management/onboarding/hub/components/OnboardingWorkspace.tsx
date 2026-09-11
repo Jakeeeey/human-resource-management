@@ -123,7 +123,7 @@ export function OnboardingWorkspace({
         onValueChange={handleSectionChange}
         className="space-y-4"
       >
-        <TabsList className="w-full justify-start overflow-x-auto overflow-y-hidden">
+        <TabsList className="group-data-[orientation=horizontal]/tabs:h-auto w-full flex-wrap justify-start gap-1">
           {SECTIONS.map((section) => (
             <TabsTrigger
               key={section.value}

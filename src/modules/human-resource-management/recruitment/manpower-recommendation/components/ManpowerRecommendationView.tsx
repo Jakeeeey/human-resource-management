@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useManpowerRecommendationContext } from "../providers/ManpowerRecommendationProvider";
 import { isApplicantHired } from "../utils/applicantPipeline";
+import type { ManpowerRecommendation } from "../types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,6 +74,13 @@ export function ManpowerRecommendationView() {
     const isRequestClosed = requestNeed > 0 && hiredForRequest >= requestNeed;
     const isStatusEditable =
         !isRequestClosed && toStatusOption(selectedRecommendation.status) === "Recommended";
+    const notesEditable = !isRequestClosed;
+    const notesDirty = decisionNotes !== (selectedRecommendation.decision_notes || "");
+    // Nothing is actionable when the status is terminal (Approved/Hired/Rejected/
+    // Withdrawn) AND the notes are untouched — the footer button stays disabled
+    // instead of firing a no-op PATCH that reports success (S4 finding #8).
+    const canSubmit = isStatusEditable || (notesEditable && notesDirty);
+    const submitLabel = isStatusEditable ? "Update Status" : "Save Notes";
     // Status dropdown only on lower-stage (Recommended) records of open requests —
     // Approved/Hired are selection outcomes owned by the interviews flow, never edited here.
     const applicantName = applicants.find(a => a.id === selectedRecommendation.applicant_id)?.full_name || `Applicant #${selectedRecommendation.applicant_id}`;
@@ -87,13 +95,16 @@ export function ManpowerRecommendationView() {
         if (selectedRecommendation.id == null) return;
         setIsSubmitting(true);
         try {
-            // NOTE: send ONLY { status, decision_notes } — decision_by/decision_at
-            // are injected server-side by the Task 5 PATCH route (no userId exists
-            // in client scope; mirrors the updated_by injection pattern).
-            const ok = await updateRecommendation(selectedRecommendation.id, {
-                status: isStatusEditable ? newStatus : toStatusOption(selectedRecommendation.status),
-                decision_notes: isRequestClosed ? selectedRecommendation.decision_notes : decisionNotes.trim() ? decisionNotes : null,
-            });
+            const payload: Partial<ManpowerRecommendation> = {
+                decision_notes: decisionNotes.trim() ? decisionNotes : null,
+            };
+            // Send `status` only for a real change: the PATCH route stamps
+            // decision_by/decision_at whenever status is present, so a notes-only
+            // save must never re-stamp the original decision.
+            if (isStatusEditable && newStatus !== toStatusOption(selectedRecommendation.status)) {
+                payload.status = newStatus;
+            }
+            const ok = await updateRecommendation(selectedRecommendation.id, payload);
             if (ok) setIsViewOpen(false);
         } finally {
             setIsSubmitting(false);
@@ -238,10 +249,12 @@ export function ManpowerRecommendationView() {
                             Close
                         </Button>
                     </DialogClose>
-                    <Button onClick={handleUpdateStatus} disabled={isSubmitting} className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm">
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Update Status
-                    </Button>
+                    {notesEditable && (
+                        <Button onClick={handleUpdateStatus} disabled={isSubmitting || !canSubmit} className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm">
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {submitLabel}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

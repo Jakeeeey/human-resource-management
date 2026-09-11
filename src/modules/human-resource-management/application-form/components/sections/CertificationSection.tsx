@@ -12,7 +12,7 @@ import {
     CERTIFICATION_HEADING,
     type ApplicationFormValues,
 } from "../../types";
-import { SignaturePad, type SignaturePadHandle } from "../SignaturePad";
+import { SIGNATURE_ERROR_ID, SignaturePad, type SignaturePadHandle } from "../SignaturePad";
 
 export function CertificationSection({
     form,
@@ -22,6 +22,7 @@ export function CertificationSection({
     sigRef: RefObject<SignaturePadHandle | null>;
 }) {
     const signatureTypedName = useWatch({ control: form.control, name: "signature_typed_name" });
+    const signatureError = form.formState.errors.signature_typed_name;
 
     return (
         <div className="space-y-4">
@@ -62,20 +63,31 @@ export function CertificationSection({
                 name="signature_typed_mode"
                 render={({ field }) => (
                     <FormItem className="space-y-2">
-                        <FormLabel>Signature</FormLabel>
+                        <FormLabel>
+                            Signature <span className="text-destructive">*</span>
+                        </FormLabel>
                         <SignaturePad
                             ref={sigRef}
                             typedMode={field.value}
                             onTypedModeChange={(t) => {
-                                form.clearErrors(["signature_typed_name"]);
+                                form.clearErrors("signature_typed_name");
                                 field.onChange(t);
                             }}
                             typedName={signatureTypedName}
-                            onTypedNameChange={(n) => form.setValue("signature_typed_name", n)}
+                            onTypedNameChange={(n) => {
+                                form.clearErrors("signature_typed_name");
+                                form.setValue("signature_typed_name", n, { shouldDirty: true });
+                            }}
+                            onStrokeChange={() => form.clearErrors("signature_typed_name")}
+                            invalid={Boolean(signatureError)}
                         />
-                        {form.formState.errors.signature_typed_name && (
-                            <p className="text-sm font-medium text-destructive">
-                                {form.formState.errors.signature_typed_name.message}
+                        {signatureError && (
+                            <p
+                                id={SIGNATURE_ERROR_ID}
+                                role="alert"
+                                className="text-sm font-medium text-destructive"
+                            >
+                                {signatureError.message}
                             </p>
                         )}
                     </FormItem>

@@ -49,7 +49,22 @@ export const createColumns = (
                 <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
         ),
-        cell: ({ row }) => <div className="font-medium">{row.getValue("name")}</div>,
+        cell: ({ row }) => {
+            const quiz = row.original;
+            return (
+                <div className="max-w-[140px] sm:max-w-[280px]">
+                    <div className="truncate font-medium" title={quiz.name}>
+                        {quiz.name}
+                    </div>
+                    {quiz.is_applicant_quiz && (
+                        <Badge variant="default" className="mt-1 gap-1 sm:hidden">
+                            <UserCheck className="h-3 w-3" />
+                            Applicant Quiz
+                        </Badge>
+                    )}
+                </div>
+            );
+        },
     },
     {
         accessorKey: "status",
@@ -66,6 +81,7 @@ export const createColumns = (
     {
         id: "applicant_quiz",
         header: "Applicant Quiz",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) =>
             row.original.is_applicant_quiz ? (
                 <Badge variant="default" className="gap-1">
@@ -79,6 +95,7 @@ export const createColumns = (
     {
         id: "pass_threshold",
         header: "Pass Threshold",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => {
             const q = row.original;
             return <div className="text-muted-foreground">{q.pass_threshold_value}%</div>;
@@ -87,11 +104,13 @@ export const createColumns = (
     {
         id: "number_of_questions",
         header: "# Questions",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => <div>{row.original.number_of_questions}</div>,
     },
     {
         id: "time_limit",
         header: "Time Limit",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => {
             const q = row.original;
             return (
@@ -112,6 +131,7 @@ export const createColumns = (
                 <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
         ),
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => <div>{formatDate(row.getValue("created_at") as string)}</div>,
     },
     {
@@ -140,7 +160,11 @@ export const createColumns = (
             return (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            aria-label={`Open actions for ${quiz.name}`}
+                        >
                             <MoreHorizontal className="h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>

@@ -14,20 +14,26 @@ import type {
 import {
   useSigningEnvelopeFetch,
   type SignItemResult,
+  type SignOfferResult,
 } from "../providers/signingEnvelopeProvider";
 import { SigningItemView } from "./SigningItemView";
 import { SigningFilingPanel } from "./SigningFilingPanel";
+import { SigningCompletionBanner } from "./SigningCompletionBanner";
+import { SigningOfferSection } from "./SigningOfferSection";
+import { useSigningSurfaceCompletion } from "./useSigningSurfaceCompletion";
 
 // SigningSurface.tsx — the applicant's WHOLE signing set (todo 13 re-key).
 // Replaces the per-template kiosk: the surface accepts the ONE offer and then
 // signs EVERY `paperwork_item` of the applicant's batch (offer + full item
 // set), delegating to the todo-11 offer route and the todo-12 per-item route.
 // There is no per-template envelope selection — the unit of work is the
-// applicant.
+// applicant. The offer card / completion notice / filing summary are
+// components; this file owns the shared set state.
 
 interface SigningSurfaceProps {
   applicantId: number;
   applicantName: string;
+  applicantStatus: string | null;
   envelope: SigningEnvelope;
   offer: JobOffer | null;
   paperworks: Paperworks | null;
@@ -36,17 +42,10 @@ interface SigningSurfaceProps {
   onChanged?: () => void;
 }
 
-function offerLabel(offer: JobOffer | null): string {
-  if (!offer) return "No offer on file";
-  if (offer.status === "signed") {
-    return offer.signed_at ? `Signed — ${offer.signed_at}` : "Signed";
-  }
-  return offer.status;
-}
-
 export function SigningSurface({
   applicantId,
   applicantName,
+  applicantStatus,
   envelope,
   offer: initialOffer,
   paperworks: initialPaperworks,
@@ -54,14 +53,24 @@ export function SigningSurface({
   templatesById,
   onChanged,
 }: SigningSurfaceProps) {
-  const { signJobOffer } = useSigningEnvelopeFetch();
+  const {
+    signPaperworkItem,
+    listEnvelopes,
+    listPaperworks,
+    listPaperworkItems,
+  } = useSigningEnvelopeFetch();
   const [envelopeState, setEnvelopeState] = useState(envelope);
   const [offer, setOffer] = useState<JobOffer | null>(initialOffer);
   const [paperworks, setPaperworks] = useState<Paperworks | null>(
     initialPaperworks
   );
   const [items, setItems] = useState<PaperworkItem[]>(initialItems);
-  const [accepting, setAccepting] = useState(false);
+  const [completion, setCompletion] = useSigningSurfaceCompletion({
+    applicantId,
+    envelopeStatus: envelopeState.status,
+    applicantStatus,
+  });
+  const [retrying, setRetrying] = useState(false);
 
   const orderedItems = useMemo(
     () =>
@@ -86,22 +95,33 @@ export function SigningSurface({
     [orderedItems, templatesById]
   );
 
-  const handleAcceptOffer = useCallback(async () => {
-    if (!offer || offer.status === "signed" || accepting) return;
-    setAccepting(true);
+  const reloadSet = useCallback(async () => {
     try {
-      const result = await signJobOffer(offer.id, null);
+      const [envelopeRows, paperworksRows] = await Promise.all([
+        listEnvelopes(applicantId),
+        listPaperworks(applicantId),
+      ]);
+      if (envelopeRows[0]) setEnvelopeState(envelopeRows[0]);
+      const nextPaperworks = paperworksRows[0] ?? null;
+      setPaperworks(nextPaperworks);
+      setItems(
+        nextPaperworks ? await listPaperworkItems(nextPaperworks.id) : []
+      );
+    } catch {
+      // Reconcile is best-effort — the mutation error was already toasted.
+    }
+  }, [applicantId, listEnvelopes, listPaperworks, listPaperworkItems]);
+
+  const handleOfferAccepted = useCallback(
+    (result: SignOfferResult) => {
       setOffer(result.offer);
       setEnvelopeState(result.envelope);
       setPaperworks(result.paperworks);
-      toast.success("Offer accepted");
+      setCompletion(result.completion);
       onChanged?.();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Offer acceptance failed");
-    } finally {
-      setAccepting(false);
-    }
-  }, [offer, accepting, signJobOffer, onChanged]);
+    },
+    [onChanged, setCompletion]
+  );
 
   const handleItemSigned = useCallback(
     (result: SignItemResult) => {
@@ -110,17 +130,68 @@ export function SigningSurface({
       );
       setEnvelopeState(result.envelope);
       setPaperworks(result.paperworks);
+      setCompletion(result.completion);
       onChanged?.();
     },
-    [onChanged]
+    [onChanged, setCompletion]
   );
+
+  const retryItem = useMemo(
+    () =>
+      items.find(
+        (item) =>
+          item.status === "signed" &&
+          item.strokes !== null &&
+          item.pdf_file !== null
+      ) ?? null,
+    [items]
+  );
+
+  const handleRetryCompletion = useCallback(async () => {
+    if (!retryItem?.strokes || !retryItem.pdf_file || retrying) return;
+    setRetrying(true);
+    try {
+      const result = await signPaperworkItem(
+        retryItem.id,
+        retryItem.strokes,
+        retryItem.pdf_file
+      );
+      handleItemSigned(result);
+      if (result.completion.kind === "hired") {
+        toast.success("Completion finished — employee record is ready");
+      } else {
+        toast.warning("Completion is still blocked — see the notice above");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Retry failed");
+      await reloadSet();
+    } finally {
+      setRetrying(false);
+    }
+  }, [
+    retryItem,
+    retrying,
+    signPaperworkItem,
+    handleItemSigned,
+    reloadSet,
+  ]);
 
   const offerSigned = offer?.status === "signed";
   const complete = envelopeState.status === "complete";
+  const hired = applicantStatus === "hired" || completion?.kind === "hired";
+  const nextUnsigned =
+    orderedItems.find((item) => item.status !== "signed") ?? null;
+
+  const handleJumpToNext = useCallback(() => {
+    if (!nextUnsigned) return;
+    document
+      .getElementById(`signing-item-${nextUnsigned.id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [nextUnsigned]);
 
   return (
     <div className="space-y-6">
-      <header className="bg-card overflow-hidden rounded-2xl border border-border/50 shadow-sm">
+      <header className="sticky top-0 z-20 overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
         <div className="flex flex-col gap-2 border-b border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
           <div className="min-w-0">
             <h2
@@ -143,44 +214,30 @@ export function SigningSurface({
               {paperworks?.signed_count ?? 0}/
               {paperworks?.required_count ?? 0})
             </Badge>
-          </div>
-        </div>
-      </header>
-
-      <section className="bg-card overflow-hidden rounded-2xl border border-border/50 shadow-sm">
-        <div className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-semibold sm:text-base">
-              Job offer
-            </h3>
-            <p className="truncate text-xs text-muted-foreground">
-              {offerLabel(offer)}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={offerSigned ? "default" : "outline"}>
-              {offer ? offer.status : "missing"}
-            </Badge>
-            {offer && !offerSigned && (
+            {nextUnsigned && (
               <Button
                 type="button"
-                onClick={() => void handleAcceptOffer()}
-                disabled={accepting}
+                variant="outline"
+                size="sm"
+                onClick={handleJumpToNext}
                 className="min-h-8 w-full sm:w-auto"
-                title="Accept the offer — this unlocks the paperwork signatures"
               >
-                {accepting ? "Accepting…" : "Accept offer"}
+                Next unsigned document
               </Button>
             )}
           </div>
         </div>
-        {!offerSigned && (
-          <p className="px-3 pb-3 text-xs text-muted-foreground sm:px-4">
-            The envelope completes only when the offer is signed and every
-            required document is signed.
-          </p>
-        )}
-      </section>
+      </header>
+
+      <SigningCompletionBanner
+        completion={completion}
+        envelopeStatus={envelopeState.status}
+        applicantStatus={applicantStatus}
+        retrying={retrying}
+        onRetry={() => void handleRetryCompletion()}
+      />
+
+      <SigningOfferSection offer={offer} onAccepted={handleOfferAccepted} />
 
       {orderedItems.map((item) => (
         <SigningItemView
@@ -188,11 +245,18 @@ export function SigningSurface({
           applicantId={applicantId}
           item={item}
           template={templatesById.get(item.template_id) ?? null}
+          awaitingOffer={!offerSigned}
+          defaultExpanded={item.id === nextUnsigned?.id}
+          onReconcile={reloadSet}
           onSigned={handleItemSigned}
         />
       ))}
 
-      <SigningFilingPanel applicantId={applicantId} items={filedSummary} />
+      <SigningFilingPanel
+        applicantId={applicantId}
+        items={filedSummary}
+        filed={hired}
+      />
     </div>
   );
 }

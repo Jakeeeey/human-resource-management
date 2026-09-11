@@ -88,27 +88,38 @@ function EquipmentTabBody({ userId }: { userId: number }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground max-w-[520px] truncate">
+        <p className="text-sm text-muted-foreground max-w-[520px]">
           {status
-            ? `${status.items.filter((i) => i.acked).length}/${status.items.length} items acknowledged`
+            ? `Handover checklist — ${status.items.filter((i) => i.acked).length}/${status.items.length} items acknowledged`
             : `Equipment issue log for employee #${userId}`}
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Select
-            value={ackMethod}
-            onValueChange={(v) => setAckMethod(v as EquipmentAckMethod)}
-          >
-            <SelectTrigger className="h-10 w-full sm:w-[140px]">
-              <SelectValue placeholder="Ack method" />
-            </SelectTrigger>
-            <SelectContent className="max-h-60">
-              {ACK_METHODS.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <span
+              id="equipment-ack-method-label"
+              className="text-xs text-muted-foreground"
+            >
+              Acknowledgement method
+            </span>
+            <Select
+              value={ackMethod}
+              onValueChange={(v) => setAckMethod(v as EquipmentAckMethod)}
+            >
+              <SelectTrigger
+                aria-labelledby="equipment-ack-method-label"
+                className="h-10 w-full sm:w-[140px]"
+              >
+                <SelectValue placeholder="Ack method" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                {ACK_METHODS.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="outline"
             onClick={() => void refetch(userId)}

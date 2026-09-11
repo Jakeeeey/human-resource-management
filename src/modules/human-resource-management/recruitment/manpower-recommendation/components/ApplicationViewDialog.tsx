@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Eye, FileText } from "lucide-react";
 import { AttachmentPreviewDialog, type ApplicationAttachmentFile } from "./AttachmentPreviewDialog";
+import { formatDateLong } from "@/lib/utils";
 
 import { Form } from "@/components/ui/form";
 import {
@@ -100,7 +101,12 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         : []
                 );
                 const raw = body.data.application["submitted_at"];
-                setSubmittedAt(typeof raw === "string" ? raw.slice(0, 10) : "");
+                if (typeof raw === "string") {
+                    const submittedDate = new Date(raw);
+                    setSubmittedAt(Number.isNaN(submittedDate.getTime()) ? "" : formatDateLong(submittedDate));
+                } else {
+                    setSubmittedAt("");
+                }
             })
             .catch((err: unknown) => {
                 if (cancelled) return;
@@ -120,10 +126,10 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
     return (
         <>
         <Dialog open={open} onOpenChange={(o) => { if (!o) setPreviewFile(null); onOpenChange(o); }}>
-            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
+                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3 pr-8">
                             <FileText className="h-5 w-5 text-muted-foreground" />
                             <span className="truncate" title={applicantName}>
                                 {applicantName} — Application
@@ -132,6 +138,9 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         {submittedAt ? (
                             <DialogDescription className="text-sm mt-2">Submitted {submittedAt}</DialogDescription>
                         ) : null}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Read-only view — nothing you touch here is saved.
+                        </p>
                     </DialogHeader>
                 </div>
 
@@ -145,7 +154,7 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         <p className="text-sm text-destructive text-center py-16">{loadError}</p>
                     ) : (
                         <Form {...form}>
-                            <fieldset disabled inert className="space-y-8">
+                            <fieldset disabled inert aria-readonly="true" className="space-y-8 select-none opacity-90">
                                 <ApplicationDetailsSection form={form} />
                                 <PersonalInfoSection form={form} />
                                 <FamilyBackgroundSection form={form} />

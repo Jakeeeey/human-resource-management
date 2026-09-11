@@ -4,6 +4,7 @@ import {
   JobOfferSchema,
   type JobOffer,
   type Paperworks,
+  type SigningCompletion,
   type SigningEnvelope,
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
 import {
@@ -65,6 +66,8 @@ export interface SignJobOfferResult {
    * `null` when no applicant advance was applicable.
    */
   applicantStatus: ApplicantStatus | null;
+  /** Typed completion outcome for the UI (blocked/failed/hired states). */
+  completion: SigningCompletion;
 }
 
 /**
@@ -160,5 +163,6 @@ export async function signJobOffer(
     requiredCount: rollup.requiredCount,
     signedCount: rollup.signedCount,
     applicantStatus,
+    completion: rollup.completion,
   };
 }

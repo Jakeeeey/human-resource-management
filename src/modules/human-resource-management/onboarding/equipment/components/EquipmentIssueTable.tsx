@@ -15,7 +15,10 @@ import {
 
 // EquipmentIssueTable.tsx — issue-log table for the hub equipment tab: one
 // row per catalog item with issue/acknowledge actions. Presentation only —
-// state and mutations stay in EquipmentTab / the provider.
+// state and mutations stay in EquipmentTab / the provider. Below `xl` it
+// renders stacked cards so the status + Actions columns stay visible at rest
+// (S7#2); the min-w-[760px] table only renders once the content column can
+// hold it (S7 NEW-1: ~344px at 768px, so `sm` was too early).
 
 function statusBadge(item: {
   issued: boolean;
@@ -48,6 +51,40 @@ interface EquipmentIssueTableProps {
   onAcknowledge: (itemKey: string) => void;
 }
 
+function IssueActions({
+  item,
+  pendingAction,
+  onIssue,
+  onAcknowledge,
+}: {
+  item: EquipmentItemStatus;
+  pendingAction: string | null;
+  onIssue: (itemKey: string) => void;
+  onAcknowledge: (itemKey: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={item.issued || pendingAction !== null}
+        onClick={() => onIssue(item.key)}
+        className="w-full min-h-[32px] sm:w-auto"
+      >
+        {pendingAction === `issue:${item.key}` ? "Issuing…" : "Issue"}
+      </Button>
+      <Button
+        size="sm"
+        disabled={!item.issued || item.acked || pendingAction !== null}
+        onClick={() => onAcknowledge(item.key)}
+        className="w-full min-h-[32px] sm:w-auto"
+      >
+        {pendingAction === `ack:${item.key}` ? "Saving…" : "Acknowledge"}
+      </Button>
+    </div>
+  );
+}
+
 export function EquipmentIssueTable({
   items,
   isLoading,
@@ -55,38 +92,88 @@ export function EquipmentIssueTable({
   onIssue,
   onAcknowledge,
 }: EquipmentIssueTableProps) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2 py-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">
+        No catalog items.
+      </p>
+    );
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <Table className="min-w-[760px]">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Item</TableHead>
-            <TableHead>Issuer</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Issued</TableHead>
-            <TableHead>Acknowledged</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={6}>
-                <div className="space-y-2 py-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
+    <>
+      {/* Below xl: stacked cards (S7#2, raised for S7 NEW-1). */}
+      <ul className="divide-y divide-border xl:hidden">
+        {items.map((item) => {
+          const badge = statusBadge(item);
+          return (
+            <li key={item.key} className="space-y-2 py-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="block truncate font-medium" title={item.label}>
+                    {item.label}
+                  </span>
+                  {!item.required && (
+                    <span className="text-xs text-muted-foreground">
+                      optional
+                    </span>
+                  )}
                 </div>
-              </TableCell>
-            </TableRow>
-          ) : items.length === 0 ? (
+                <Badge variant="outline" className={badge.className}>
+                  {badge.label}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  Issuer: <Badge variant="outline">{item.issuer}</Badge>
+                </span>
+                <span>
+                  {item.issued
+                    ? `Issued by ${item.issuedBy ?? "issuer"}`
+                    : "Not issued"}
+                </span>
+                <span>
+                  {item.acked
+                    ? `Acknowledged by ${item.ackedBy ?? "hiree"} (${item.ackMethod ?? "—"})`
+                    : "Not acknowledged"}
+                </span>
+              </div>
+              <IssueActions
+                item={item}
+                pendingAction={pendingAction}
+                onIssue={onIssue}
+                onAcknowledge={onAcknowledge}
+              />
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* xl+: the full six-column table. */}
+      <div className="hidden overflow-x-auto xl:block">
+        <Table className="min-w-[760px]">
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8">
-                No catalog items.
-              </TableCell>
+              <TableHead>Item</TableHead>
+              <TableHead>Issuer</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Issued</TableHead>
+              <TableHead>Acknowledged</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ) : (
-            items.map((item) => {
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => {
               const badge = statusBadge(item);
               return (
                 <TableRow key={item.key}>
@@ -136,36 +223,19 @@ export function EquipmentIssueTable({
                       : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={
-                          item.issued || pendingAction !== null
-                        }
-                        onClick={() => onIssue(item.key)}
-                        className="w-full sm:w-auto min-h-[32px]"
-                      >
-                        {pendingAction === `issue:${item.key}` ? "Issuing…" : "Issue"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={
-                          !item.issued || item.acked || pendingAction !== null
-                        }
-                        onClick={() => onAcknowledge(item.key)}
-                        className="w-full sm:w-auto min-h-[32px]"
-                      >
-                        {pendingAction === `ack:${item.key}` ? "Saving…" : "Acknowledge"}
-                      </Button>
-                    </div>
+                    <IssueActions
+                      item={item}
+                      pendingAction={pendingAction}
+                      onIssue={onIssue}
+                      onAcknowledge={onAcknowledge}
+                    />
                   </TableCell>
                 </TableRow>
               );
-            })
-          )}
-        </TableBody>
-      </Table>
-    </div>
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }

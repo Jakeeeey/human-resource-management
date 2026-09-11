@@ -364,6 +364,25 @@ export const interviewService = {
     },
 
     /**
+     * Fetch persisted composite scores for every score sheet, keyed by sheet id.
+     * One Directus read backs the list's "Interview Score" column, which must
+     * show the composite the verdict rests on without an item fetch per row.
+     * @returns Map of score-sheet id to its stored SUM(score*weight)/100 value.
+     */
+    async fetchScoreSheetComposites(): Promise<Record<number, number>> {
+        try {
+            const res = await fetch(`${API_BASE_URL}/items/interview_score_sheet?fields=id,composite_score&limit=-1`, { headers });
+            if (!res.ok) return {};
+            const json = await res.json();
+            const map: Record<number, number> = {};
+            for (const sheet of json.data as { id: number; composite_score: number | string | null }[]) {
+                if (sheet.composite_score != null) map[sheet.id] = Number(sheet.composite_score);
+            }
+            return map;
+        } catch { return {}; }
+    },
+
+    /**
      * Create a full interview grading flow: create sheet row → create items
      * (criterion snapshots) → PATCH sheet composite_score (guideline
      * SUM(score*weight)/100) → create interview row with explicit PH

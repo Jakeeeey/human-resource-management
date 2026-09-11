@@ -103,6 +103,17 @@ export const PAPERWORK_ITEM_STATUS = ["pending", "signed"] as const;
 
 export type PaperworkItemStatus = (typeof PAPERWORK_ITEM_STATUS)[number];
 
+// Completion outcome reported by every signing mutation, so the UI can tell
+// "envelope complete" apart from "hire finalized". `blocked` means the hire
+// gate refused the applicant write (missing application email/position) —
+// the applicant is NOT hired and the completion is retryable; `failed` means
+// the applicant WAS hired but the post-hire orchestrator failed.
+export type SigningCompletion =
+  | { kind: "incomplete" }
+  | { kind: "hired"; userCreated: boolean }
+  | { kind: "blocked"; reason: string }
+  | { kind: "failed"; reason: string };
+
 export const PaperworkItemStatusSchema = z.enum(PAPERWORK_ITEM_STATUS);
 
 export const PaperworkItemSchema = z.object({

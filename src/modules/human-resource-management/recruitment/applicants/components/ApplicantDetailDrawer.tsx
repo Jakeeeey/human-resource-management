@@ -15,13 +15,13 @@ import { FileText, History, Users } from "lucide-react";
 import { APPLICANT_STATUS_LABELS, type ApplicantRow } from "../types";
 import { ApplicationViewDialog } from "@/modules/human-resource-management/recruitment/manpower-recommendation/components/ApplicationViewDialog";
 import { getApplicantStatusColor } from "./columns";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateLong, formatDateTime } from "@/lib/utils";
 
 function formatSubmitted(value: string | null | undefined) {
     if (!value) return "—";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return formatDateLong(date);
 }
 
 function formatTimelineAt(value: string | null | undefined) {
@@ -47,12 +47,14 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent showCloseButton={false} className="detail-drawer w-[95vw] sm:w-full sm:max-w-lg p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent className="detail-drawer w-[95vw] sm:w-full sm:max-w-lg p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
+                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3 pr-8">
                             <Users className="w-6 h-6 text-primary shrink-0" />
-                            <span className="truncate">{row?.full_name || "Applicant"}</span>
+                            <span className="truncate" title={row?.full_name || "Applicant"}>
+                                {row?.full_name || "Applicant"}
+                            </span>
                         </DialogTitle>
                     </DialogHeader>
                 </div>
@@ -68,7 +70,10 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                                     Position
                                 </span>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate">
+                                <div
+                                    className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate"
+                                    title={row?.position_applied_for || "—"}
+                                >
                                     {row?.position_applied_for || "—"}
                                 </div>
                             </div>
@@ -114,7 +119,12 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                     <div className="bg-card shadow-sm border border-border/50 rounded-xl p-6 space-y-4">
                         <div className="flex items-center gap-2 pb-2 border-b border-border/50">
                             <History className="w-5 h-5 text-primary/70" />
-                            <h3 className="text-lg font-semibold tracking-tight">Timeline</h3>
+                            <div className="min-w-0">
+                                <h3 className="text-lg font-semibold tracking-tight">Timeline</h3>
+                                <p className="text-xs text-muted-foreground">
+                                    Recorded history — may lag the current status above.
+                                </p>
+                            </div>
                         </div>
                         {row && row.timeline.length > 0 ? (
                             <ol className="space-y-4">

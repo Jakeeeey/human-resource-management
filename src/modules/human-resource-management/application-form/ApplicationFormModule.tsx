@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
@@ -9,7 +9,6 @@ import { AlertCircle, RotateCcw } from "lucide-react";
 
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
     Card,
@@ -20,205 +19,28 @@ import {
 } from "@/components/ui/card";
 
 import {
-    CERTIFICATION_AGREEMENT_LINE,
-    CERTIFICATION_CLAUSES,
-    CERTIFICATION_HEADING,
     DEFAULT_APPLICATION_FORM,
     type ApplicationFormValues,
-    type CompanyRelativeRow,
-    type EducationLevel,
-    type EducationRow,
-    type FamilyMemberFields,
-    type LicensureExamRow,
-    type ReferenceRow,
-    type SubmitApplicationPayload,
     type SubmitAttachment,
-    type SubmitCompanyRelative,
-    type SubmitEducation,
-    type SubmitFamilyMember,
-    type SubmitLicensureExam,
-    type SubmitReference,
-    type SubmitTraining,
-    type SubmitWorkExperience,
-    type TrainingRow,
-    type WorkExperienceRow,
 } from "./types";
 import {
     resolveTargetQuizId,
     submitApplication,
     uploadApplicationFile,
 } from "./providers/fetchProvider";
-import { loadDraft, saveDraft, clearDraft, type StoredDraft } from "./lib/autosave";
-import { checkBirthdate, checkDateOrder, checkPastDate } from "./lib/softValidation";
+import { loadDraft, saveDraft, clearDraft, hasDraftContent, type StoredDraft } from "./lib/autosave";
+import { checkBirthdate } from "./lib/softValidation";
+import { buildSubmitPayload, checkSectionDateRanges } from "./lib/applicationPayload";
 import type { SignaturePadHandle } from "./components/SignaturePad";
-import { ApplicationDetailsSection } from "./components/sections/ApplicationDetailsSection";
-import { PersonalInfoSection } from "./components/sections/PersonalInfoSection";
-import { FamilyBackgroundSection } from "./components/sections/FamilyBackgroundSection";
-import { CompanyRelativesSection } from "./components/sections/CompanyRelativesSection";
-import { EducationSection } from "./components/sections/EducationSection";
-import { LicensureExamSection } from "./components/sections/LicensureExamSection";
-import { SkillsSection } from "./components/sections/SkillsSection";
-import { WorkExperienceSection } from "./components/sections/WorkExperienceSection";
-import { ReferencesSection } from "./components/sections/ReferencesSection";
-import { TrainingsSection } from "./components/sections/TrainingsSection";
-import { AttachmentsSection } from "./components/sections/AttachmentsSection";
-import { CertificationSection } from "./components/sections/CertificationSection";
-
-const CERTIFICATION_SNAPSHOT = [CERTIFICATION_HEADING, ...CERTIFICATION_CLAUSES, CERTIFICATION_AGREEMENT_LINE].join(
-    "\n\n"
-);
-
-function toNumberOrNull(s: string): number | null {
-    const trimmed = s.trim();
-    if (!trimmed) return null;
-    const n = Number(trimmed);
-    return Number.isFinite(n) ? n : null;
-}
-
-function toStringOrNull(s: string): string | null {
-    const trimmed = s.trim();
-    return trimmed || null;
-}
-
-function isFamilyMemberFilled(m: FamilyMemberFields): boolean {
-    return Boolean(m.name.trim() || m.occupation.trim() || m.company.trim() || m.age.trim() || m.education.trim());
-}
-
-function buildFamilyMembers(values: ApplicationFormValues): SubmitFamilyMember[] {
-    const rows: SubmitFamilyMember[] = [];
-    (["father", "mother", "spouse"] as const).forEach((key) => {
-        if (key === "spouse" && values.civil_status === "Single") return;
-        const m = values[key];
-        if (!isFamilyMemberFilled(m)) return;
-        rows.push({
-            relation: key === "father" ? "Father" : key === "mother" ? "Mother" : "Spouse",
-            name: m.name.trim(),
-            age: toNumberOrNull(m.age),
-            occupation: toStringOrNull(m.occupation),
-            company: toStringOrNull(m.company),
-            education: toStringOrNull(m.education),
-        });
-    });
-    values.family_dependents.forEach((d) => {
-        if (!d.relation || !d.name.trim()) return;
-        rows.push({
-            relation: d.relation,
-            name: d.name.trim(),
-            age: toNumberOrNull(d.age),
-            occupation: toStringOrNull(d.occupation),
-            company: toStringOrNull(d.company),
-            education: toStringOrNull(d.education),
-        });
-    });
-    return rows;
-}
-
-function buildCompanyRelatives(values: ApplicationFormValues): SubmitCompanyRelative[] {
-    if (!values.has_company_relatives) return [];
-    return values.company_relatives
-        .filter((r: CompanyRelativeRow) => r.name.trim())
-        .map((r) => ({
-            name: r.name.trim(),
-            relationship: toStringOrNull(r.relationship),
-            position: toStringOrNull(r.position),
-            area_assignment: toStringOrNull(r.area_assignment),
-        }));
-}
-
-function buildEducation(rows: EducationRow[]): SubmitEducation[] {
-    return rows
-        .filter((r) => r.level)
-        .map((r) => ({
-            level: r.level as EducationLevel,
-            school_name: toStringOrNull(r.school_name),
-            school_address: toStringOrNull(r.school_address),
-            date_from: toStringOrNull(r.date_from),
-            date_to: toStringOrNull(r.date_to),
-            degree_units_earned: toStringOrNull(r.degree_units_earned),
-            honors_awards: toStringOrNull(r.honors_awards),
-        }));
-}
-
-function buildLicensureExams(rows: LicensureExamRow[]): SubmitLicensureExam[] {
-    return rows
-        .filter((r) => r.examination.trim())
-        .map((r) => ({
-            examination: r.examination.trim(),
-            date_taken: toStringOrNull(r.date_taken),
-            rating: toStringOrNull(r.rating),
-            result: toStringOrNull(r.result),
-            inclusive_dates: toStringOrNull(r.inclusive_dates),
-        }));
-}
-
-function buildWorkExperience(values: ApplicationFormValues): SubmitWorkExperience[] {
-    if (values.is_fresh_graduate) return [];
-    return values.work_experience
-        .filter((r: WorkExperienceRow) => r.employer.trim())
-        .map((r) => ({
-            employer: r.employer.trim(),
-            address: toStringOrNull(r.address),
-            job_title: toStringOrNull(r.job_title),
-            date_from: toStringOrNull(r.date_from),
-            date_to: toStringOrNull(r.date_to),
-            salary_rate_start: toNumberOrNull(r.salary_rate_start),
-            salary_rate_end: toNumberOrNull(r.salary_rate_end),
-            supervisor_name: toStringOrNull(r.supervisor_name),
-            supervisor_contact: toStringOrNull(r.supervisor_contact),
-            responsibilities: toStringOrNull(r.responsibilities),
-            reason_for_leaving: toStringOrNull(r.reason_for_leaving),
-        }));
-}
-
-function buildReferences(rows: ReferenceRow[]): SubmitReference[] {
-    return rows
-        .filter((r) => r.name.trim())
-        .map((r) => ({
-            name: r.name.trim(),
-            title_occupation: toStringOrNull(r.title_occupation),
-            company_name_address: toStringOrNull(r.company_name_address),
-            contact_number: toStringOrNull(r.contact_number),
-        }));
-}
-
-function buildTrainings(rows: TrainingRow[]): SubmitTraining[] {
-    return rows
-        .filter((r) => r.title_subject.trim())
-        .map((r) => ({
-            title_subject: r.title_subject.trim(),
-            venue_location: toStringOrNull(r.venue_location),
-            date_from: toStringOrNull(r.date_from),
-            date_to: toStringOrNull(r.date_to),
-        }));
-}
-
-function checkSectionDateRanges(values: ApplicationFormValues): string | null {
-    const ranged: { label: string; rows: { date_from: string; date_to: string }[] }[] = [
-        { label: "Education", rows: values.education },
-        ...(values.is_fresh_graduate ? [] : [{ label: "Work experience", rows: values.work_experience }]),
-        { label: "Trainings", rows: values.trainings },
-    ];
-    for (const section of ranged) {
-        for (let i = 0; i < section.rows.length; i++) {
-            const row = section.rows[i];
-            const orderErr = checkDateOrder(row.date_from, row.date_to);
-            if (orderErr) return `${section.label} entry #${i + 1}: ${orderErr}`;
-        }
-    }
-    for (let i = 0; i < values.licensure_exams.length; i++) {
-        const row = values.licensure_exams[i];
-        if (!row.examination.trim()) continue;
-        const pastErr = checkPastDate(row.date_taken, "Date taken");
-        if (pastErr) return `Licensure exam entry #${i + 1}: ${pastErr}`;
-    }
-    return null;
-}
+import { ApplicationFormSections } from "./components/ApplicationFormSections";
+import { ApplicationFormNav, StickySubmitBar } from "./components/ApplicationFormNav";
 
 export function ApplicationFormModule() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const form = useForm<ApplicationFormValues>({ defaultValues: DEFAULT_APPLICATION_FORM, mode: "onTouched" });
     const sigRef = useRef<SignaturePadHandle | null>(null);
+    const submittedRef = useRef(false);
 
     const quizIdOverride = (() => {
         const raw = searchParams.get("quiz_id");
@@ -239,7 +61,12 @@ export function ApplicationFormModule() {
     }, [searchParams]);
 
     useEffect(() => {
-        setDraftPrompt(loadDraft());
+        const draft = loadDraft();
+        if (draft && hasDraftContent(draft.values)) {
+            setDraftPrompt(draft);
+        } else if (draft) {
+            clearDraft();
+        }
     }, []);
 
     const debouncedSave = useDebouncedCallback((values: ApplicationFormValues) => {
@@ -247,9 +74,11 @@ export function ApplicationFormModule() {
     }, 800);
 
     const watchedValues = useWatch({ control: form.control }) as ApplicationFormValues;
+    const isDirty = form.formState.isDirty;
     useEffect(() => {
+        if (submittedRef.current || !isDirty) return;
         debouncedSave(watchedValues);
-    }, [watchedValues, debouncedSave]);
+    }, [watchedValues, isDirty, debouncedSave]);
 
     const resumeDraft = () => {
         if (!draftPrompt) return;
@@ -294,10 +123,14 @@ export function ApplicationFormModule() {
         }
         if (values.signature_typed_mode && !values.signature_typed_name.trim()) {
             form.setError("signature_typed_name", { message: "Type your name as your signature." });
+            sigRef.current?.focus();
             return;
         }
         if (!values.signature_typed_mode && sigRef.current?.isEmpty()) {
-            toast.error("Please provide a signature, or switch to typing your name.");
+            form.setError("signature_typed_name", {
+                message: "Draw your signature, or switch to typing your name.",
+            });
+            sigRef.current?.focus();
             return;
         }
 
@@ -324,60 +157,19 @@ export function ApplicationFormModule() {
             for (const row of values.attachments) {
                 if (!row.file) continue;
                 const uuid = await uploadApplicationFile(row.file, "attachment", row.file.name);
-                uploadedAttachments.push({ type: row.type, file: uuid, label: toStringOrNull(row.label) });
+                uploadedAttachments.push({ type: row.type, file: uuid, label: row.label.trim() || null });
             }
 
-            const payload: SubmitApplicationPayload = {
-                position_applied_for: values.position_applied_for.trim(),
-                how_heard: (values.how_heard || null) as SubmitApplicationPayload["how_heard"],
-                how_heard_other:
-                    values.how_heard === "Other" ? values.how_heard_other.trim() || null : null,
-
-                first_name: values.first_name.trim(),
-                middle_name: toStringOrNull(values.middle_name),
-                last_name: values.last_name.trim(),
-                nickname: toStringOrNull(values.nickname),
-                address: toStringOrNull(values.address),
-                phone: values.phone.trim(),
-                email: toStringOrNull(values.email),
-                birthdate: values.birthdate,
-                birthplace: toStringOrNull(values.birthplace),
-                sex: values.sex as SubmitApplicationPayload["sex"],
-                height_cm: toNumberOrNull(values.height_cm),
-                weight_kg: toNumberOrNull(values.weight_kg),
-                civil_status: (values.civil_status || null) as SubmitApplicationPayload["civil_status"],
-                religion: toStringOrNull(values.religion),
-                sss_no: toStringOrNull(values.sss_no),
-                tin: toStringOrNull(values.tin),
-                philhealth_no: toStringOrNull(values.philhealth_no),
-                pagibig_no: toStringOrNull(values.pagibig_no),
-                drivers_license_no: toStringOrNull(values.drivers_license_no),
-                photo_file: photoFile,
-
-                family_members: buildFamilyMembers(values),
-                has_company_relatives: values.has_company_relatives,
-                company_relatives: buildCompanyRelatives(values),
-
-                education: buildEducation(values.education),
-                licensure_exams: buildLicensureExams(values.licensure_exams),
-
-                special_skills: toStringOrNull(values.special_skills),
-                languages: toStringOrNull(values.languages),
-                organizational_affiliations: toStringOrNull(values.organizational_affiliations),
-                hobbies_interests: toStringOrNull(values.hobbies_interests),
-
-                work_experience: buildWorkExperience(values),
-                references: buildReferences(values.references),
-                trainings: buildTrainings(values.trainings),
-                attachments: uploadedAttachments,
-
-                certification_agreed: true,
-                certification_text_snapshot: CERTIFICATION_SNAPSHOT,
-                signature_file: signatureFile,
-            };
+            const payload = buildSubmitPayload(values, {
+                signatureFile,
+                photoFile,
+                uploadedAttachments,
+            });
 
             const { applicant_id, application_id, warning } = await submitApplication(payload);
 
+            submittedRef.current = true;
+            debouncedSave.cancel();
             clearDraft();
             if (warning) toast.warning(warning);
             toast.success("Application submitted. Starting the assessment...");
@@ -391,7 +183,7 @@ export function ApplicationFormModule() {
     };
 
     return (
-        <div className="mx-auto max-w-3xl px-4 py-8">
+        <div className="mx-auto max-w-3xl lg:max-w-5xl px-4 py-8">
             <Card>
                 <CardHeader>
                     <CardTitle>Employment Application</CardTitle>
@@ -399,7 +191,7 @@ export function ApplicationFormModule() {
                         Please fill in your details. An HR staff member is available if you need help.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                     {quizChecked && !quizId && (
                         <Alert variant="destructive" className="mb-4">
                             <AlertCircle className="h-4 w-4" />
@@ -439,36 +231,18 @@ export function ApplicationFormModule() {
                             }}
                             className="space-y-8"
                         >
-                            <ApplicationDetailsSection form={form} />
-                            <Separator />
-                            <PersonalInfoSection form={form} />
-                            <Separator />
-                            <FamilyBackgroundSection form={form} />
-                            <Separator />
-                            <CompanyRelativesSection form={form} />
-                            <Separator />
-                            <EducationSection form={form} />
-                            <LicensureExamSection form={form} />
-                            <Separator />
-                            <SkillsSection form={form} />
-                            <Separator />
-                            <WorkExperienceSection form={form} />
-                            <Separator />
-                            <ReferencesSection form={form} />
-                            <Separator />
-                            <TrainingsSection form={form} />
-                            <Separator />
-                            <AttachmentsSection form={form} />
+                            <ApplicationFormNav />
 
-                            <CertificationSection form={form} sigRef={sigRef} />
+                            <p className="text-sm text-muted-foreground">
+                                <span className="text-destructive">*</span> Required field
+                            </p>
 
-                            <Button
-                                type="submit"
-                                className="w-full"
+                            <ApplicationFormSections form={form} sigRef={sigRef} />
+
+                            <StickySubmitBar
+                                submitting={submitting}
                                 disabled={submitting || (quizChecked && !quizId)}
-                            >
-                                {submitting ? "Submitting..." : "Submit Application"}
-                            </Button>
+                            />
                         </form>
                     </Form>
                 </CardContent>

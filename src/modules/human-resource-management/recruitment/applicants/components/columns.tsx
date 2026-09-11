@@ -48,9 +48,10 @@ export function createColumns(
             ),
             cell: ({ row }) => {
                 const applicant = row.original;
+                const name = applicant.full_name || "—";
                 return (
-                    <div className="font-medium truncate max-w-[300px]">
-                        {applicant.full_name || "—"}
+                    <div className="font-medium truncate max-w-[300px]" title={name}>
+                        {name}
                     </div>
                 );
             },
@@ -66,11 +67,14 @@ export function createColumns(
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             ),
-            cell: ({ row }) => (
-                <div className="truncate max-w-[200px]">
-                    {row.original.position_applied_for || "—"}
-                </div>
-            ),
+            cell: ({ row }) => {
+                const position = row.original.position_applied_for || "—";
+                return (
+                    <div className="truncate max-w-[200px]" title={position}>
+                        {position}
+                    </div>
+                );
+            },
         },
         {
             accessorKey: "status",

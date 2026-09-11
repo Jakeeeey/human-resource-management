@@ -64,6 +64,30 @@ export function InterviewEligibleList() {
     const pagedInitial = visibleInitial.slice((safePageInitial - 1) * PAGE_SIZE, safePageInitial * PAGE_SIZE);
     const pagedFinal = visibleFinal.slice((safePageFinal - 1) * PAGE_SIZE, safePageFinal * PAGE_SIZE);
 
+    const filtersActive = searchQuery.trim() !== "" || verdictFilter !== "All";
+
+    const clearFilters = () => {
+        setSearchQuery("");
+        setVerdictFilter("All");
+        setPageInitial(1);
+        setPageFinal(1);
+    };
+
+    /**
+     * Contextual empty-state copy: echoes the active search/verdict so the user
+     * can tell "nothing exists" from "my filter excluded everything".
+     * @param noun - Pluralised subject of the sentence.
+     * @param fallback - Copy for a genuinely empty dataset.
+     * @returns Empty-state sentence for the active filter state.
+     */
+    const emptyMessage = (noun: string, fallback: string): string => {
+        const query = searchQuery.trim();
+        if (query && verdictFilter !== "All") return `No ${noun} match “${query}” with a ${verdictFilter} verdict.`;
+        if (query) return `No ${noun} match “${query}”.`;
+        if (verdictFilter !== "All") return `No ${noun} with a ${verdictFilter} verdict.`;
+        return fallback;
+    };
+
     /**
      * Ungraded (sheet-less) Initial interview for an application — the only
      * state that renders a Grade link on the Initial tab.
@@ -100,11 +124,6 @@ export function InterviewEligibleList() {
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-foreground">Interviews</h2>
-                </div>
-            </div>
             <Tabs
                 value={stageTab}
                 onValueChange={(value) => {
@@ -163,13 +182,14 @@ export function InterviewEligibleList() {
             </Tabs>
             {stageTab === "Initial" ? (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
-                    <Table className="min-w-[680px]">
+                    <div className="hidden overflow-x-auto sm:block">
+                    <Table className="min-w-[760px]">
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent border-border/50">
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Applicant</TableHead>
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Quiz Score</TableHead>
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Quiz Result</TableHead>
+                                <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Interview Score</TableHead>
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Initial Verdict</TableHead>
                                 <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-right pr-6">Actions</TableHead>
                             </TableRow>
@@ -177,7 +197,7 @@ export function InterviewEligibleList() {
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-48">
+                                    <TableCell colSpan={6} className="text-center h-48">
                                         <div className="flex flex-col items-center justify-center text-muted-foreground">
                                             <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
                                             <p className="font-medium animate-pulse">Loading eligible applications...</p>
@@ -186,10 +206,13 @@ export function InterviewEligibleList() {
                                 </TableRow>
                             ) : visibleInitial.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center h-48">
-                                        <div className="flex flex-col items-center justify-center text-muted-foreground">
-                                            <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                                            <p className="font-medium">No quiz-completed applications.</p>
+                                    <TableCell colSpan={6} className="text-center h-48">
+                                        <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
+                                            <FileText className="w-12 h-12 text-muted-foreground/30" />
+                                            <p className="font-medium">{emptyMessage("applications", "No quiz-completed applications.")}</p>
+                                            {filtersActive && (
+                                                <Button variant="outline" size="sm" onClick={clearFilters}>Clear filters</Button>
+                                            )}
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -226,6 +249,9 @@ export function InterviewEligibleList() {
                                                 </span>
                                             )}
                                         </TableCell>
+                                        <TableCell className="font-medium text-muted-foreground/80 text-center">
+                                            {row.latestComposite != null ? Number(row.latestComposite).toFixed(2) : "—"}
+                                        </TableCell>
                                         <TableCell className="text-center">
                                             <VerdictChip verdict={row.latestInitialVerdict} />
                                         </TableCell>
@@ -252,6 +278,60 @@ export function InterviewEligibleList() {
                         </TableBody>
                     </Table>
                     </div>
+                    {/* Mobile: stacked cards so verdict + Grade/History stay reachable at narrow widths */}
+                    <div className="space-y-3 p-3 sm:hidden">
+                        {isLoading ? (
+                            <div className="flex flex-col items-center justify-center text-muted-foreground h-32">
+                                <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
+                                <p className="font-medium animate-pulse">Loading eligible applications...</p>
+                            </div>
+                        ) : pagedInitial.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center text-muted-foreground text-center gap-2 py-8">
+                                <FileText className="w-12 h-12 text-muted-foreground/30" />
+                                <p className="font-medium">{emptyMessage("applications", "No quiz-completed applications.")}</p>
+                                {filtersActive && (
+                                    <Button variant="outline" size="sm" onClick={clearFilters}>Clear filters</Button>
+                                )}
+                            </div>
+                        ) : (
+                            pagedInitial.map((row) => {
+                                const ungraded = ungradedInitialFor(row.id);
+                                const quizScore = row.quiz_attempt_percentage ?? row.quiz_score;
+                                const quizPassed = row.quiz_attempt_id != null ? row.quiz_attempt_passed : row.quiz_passed;
+                                return (
+                                    <div key={row.id} className="rounded-xl border border-border/60 p-4 space-y-3">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-foreground truncate" title={row.full_name || `Applicant #${row.applicant_id}`}>
+                                                {row.full_name || `Applicant #${row.applicant_id}`}
+                                            </p>
+                                            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                                <span>Quiz: <span className="font-semibold text-foreground">{quizScore ?? "—"}</span></span>
+                                                <span>Result: <span className="font-semibold text-foreground">{quizPassed === true ? "Passed" : quizPassed === false ? "Failed" : "No quiz"}</span></span>
+                                                <span>Interview: <span className="font-semibold text-foreground">{row.latestComposite != null ? Number(row.latestComposite).toFixed(2) : "—"}</span></span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <VerdictChip verdict={row.latestInitialVerdict} />
+                                            <div className="flex items-center gap-1">
+                                                {ungraded && (
+                                                    <Button variant="ghost" size="sm" asChild>
+                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade application ${row.id}`}>
+                                                            <Pencil className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                                                            Grade
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                                <Button variant="ghost" size="sm" onClick={() => handleHistoryInitial(row.id)} aria-label={`View history for application ${row.id}`}>
+                                                    <Eye className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                                                    History
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
                     <Pager
                         page={safePageInitial}
                         totalPages={totalPagesInitial}
@@ -261,7 +341,7 @@ export function InterviewEligibleList() {
                 </div>
             ) : (
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="overflow-x-auto">
+                    <div className="hidden overflow-x-auto sm:block">
                     <Table className="min-w-[560px]">
                         <TableHeader className="bg-muted/30">
                             <TableRow className="hover:bg-transparent border-border/50">
@@ -283,9 +363,12 @@ export function InterviewEligibleList() {
                             ) : visibleFinal.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={4} className="text-center h-48">
-                                        <div className="flex flex-col items-center justify-center text-muted-foreground">
-                                            <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
-                                            <p className="font-medium">No recommended applicants awaiting final.</p>
+                                        <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
+                                            <FileText className="w-12 h-12 text-muted-foreground/30" />
+                                            <p className="font-medium">{emptyMessage("recommendations", "No recommended applicants awaiting final.")}</p>
+                                            {filtersActive && (
+                                                <Button variant="outline" size="sm" onClick={clearFilters}>Clear filters</Button>
+                                            )}
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -329,6 +412,56 @@ export function InterviewEligibleList() {
                             )}
                         </TableBody>
                     </Table>
+                    </div>
+                    {/* Mobile: stacked cards so verdict + Grade/History stay reachable at narrow widths */}
+                    <div className="space-y-3 p-3 sm:hidden">
+                        {isLoading ? (
+                            <div className="flex flex-col items-center justify-center text-muted-foreground h-32">
+                                <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
+                                <p className="font-medium animate-pulse">Loading eligible recommendations...</p>
+                            </div>
+                        ) : pagedFinal.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center text-muted-foreground text-center gap-2 py-8">
+                                <FileText className="w-12 h-12 text-muted-foreground/30" />
+                                <p className="font-medium">{emptyMessage("recommendations", "No recommended applicants awaiting final.")}</p>
+                                {filtersActive && (
+                                    <Button variant="outline" size="sm" onClick={clearFilters}>Clear filters</Button>
+                                )}
+                            </div>
+                        ) : (
+                            pagedFinal.map((row) => {
+                                const ungraded = ungradedFinalFor(row.id);
+                                return (
+                                    <div key={row.id} className="rounded-xl border border-border/60 p-4 space-y-3">
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-foreground truncate" title={row.position ?? (row.manpower_request_id != null ? `#${row.manpower_request_id}` : "—")}>
+                                                {row.position ?? (row.manpower_request_id != null ? `#${row.manpower_request_id}` : "—")}
+                                            </p>
+                                            <p className="mt-1 text-sm text-muted-foreground truncate" title={row.full_name ?? undefined}>
+                                                {row.full_name}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <VerdictChip verdict={row.latestFinalVerdict} />
+                                            <div className="flex items-center gap-1">
+                                                {ungraded && (
+                                                    <Button variant="ghost" size="sm" asChild>
+                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade recommendation ${row.id}`}>
+                                                            <Pencil className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                                                            Grade
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                                <Button variant="ghost" size="sm" onClick={() => handleHistoryFinal(row.id)} aria-label={`View history for recommendation ${row.id}`}>
+                                                    <Eye className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                                                    History
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
                     </div>
                     <Pager
                         page={safePageFinal}

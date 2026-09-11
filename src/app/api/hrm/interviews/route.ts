@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
@@ -74,15 +74,17 @@ export async function GET() {
             if (owner) finalApplicantIds.add(owner.applicant_id);
         }
         const initialApps = quizApps.filter((app) => initialAppIds.has(app.id) && !finalApplicantIds.has(app.applicant_id));
-        const latestAttempts = await Promise.all(
-            initialApps.map((app) => interviewService.fetchLatestQuizAttempt(app.id, app.applicant_id)),
-        );
+        const [latestAttempts, compositeBySheet] = await Promise.all([
+            Promise.all(initialApps.map((app) => interviewService.fetchLatestQuizAttempt(app.id, app.applicant_id))),
+            interviewService.fetchScoreSheetComposites(),
+        ]);
         const eligibleInitial = initialApps.map((app, index) => {
             const initials = interviews
                 .filter((i) => i.stage === "Initial" && i.application_id === app.id)
                 .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
             const latestAttempt = latestAttempts[index];
-            return { ...app, full_name: app.full_name || `Applicant #${app.applicant_id}`, latestInitialVerdict: initials[0]?.verdict ?? null, quiz_attempt_id: latestAttempt?.id ?? null, quiz_attempt_percentage: latestAttempt?.percentage_score ?? null, quiz_attempt_passed: latestAttempt?.passed ?? null };
+            const latestSheetId = initials[0]?.score_sheet_id ?? null;
+            return { ...app, full_name: app.full_name || `Applicant #${app.applicant_id}`, latestInitialVerdict: initials[0]?.verdict ?? null, latestComposite: latestSheetId != null ? compositeBySheet[latestSheetId] ?? null : null, quiz_attempt_id: latestAttempt?.id ?? null, quiz_attempt_percentage: latestAttempt?.percentage_score ?? null, quiz_attempt_passed: latestAttempt?.passed ?? null };
         });
 
         const finalRecIds = new Set<number>();
@@ -185,6 +187,15 @@ export async function POST(req: NextRequest) {
             created.stage === "Final" && created.verdict === "Failed"
                 ? await maybeAutoRejectRecommendation(created.recommendation_id)
                 : false;
+        // Applicant pipeline (todo 8): the persisted verdict advances the single
+        // applicant status truth through the shared status service (mirrors
+        // PATCH [id]/route.ts). Ordering: AFTER auto-approve/reject so request
+        // capacity counting is not self-counted.
+        await advanceApplicantForInterviewVerdict({
+            stage: created.stage,
+            applicationId: created.application_id,
+            verdict: created.verdict,
+        });
         // Mail hook (mailing-module todo 11): stage-routed graded event, never awaited.
         void dispatchMail(created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
             event_key: created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",

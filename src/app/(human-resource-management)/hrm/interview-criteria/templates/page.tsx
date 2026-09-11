@@ -19,6 +19,11 @@ export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
 
+export const metadata = {
+    title: "Interview Criteria Templates | HRM",
+    description: "Configure weighted interview scoring rubrics",
+};
+
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
         const parts = token.split(".");

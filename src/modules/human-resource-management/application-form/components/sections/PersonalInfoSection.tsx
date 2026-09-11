@@ -57,10 +57,12 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                 <FormField
                     control={form.control}
                     name="first_name"
-                    rules={{ required: "Required" }}
+                    rules={{ required: "Enter your first name." }}
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>First Name</FormLabel>
+                            <FormLabel>
+                                First Name <span className="text-destructive">*</span>
+                            </FormLabel>
                             <FormControl>
                                 <Input placeholder="Juan" {...field} />
                             </FormControl>
@@ -84,10 +86,12 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                 <FormField
                     control={form.control}
                     name="last_name"
-                    rules={{ required: "Required" }}
+                    rules={{ required: "Enter your last name." }}
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Last Name</FormLabel>
+                            <FormLabel>
+                                Last Name <span className="text-destructive">*</span>
+                            </FormLabel>
                             <FormControl>
                                 <Input placeholder="Dela Cruz" {...field} />
                             </FormControl>
@@ -128,10 +132,12 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                 <FormField
                     control={form.control}
                     name="phone"
-                    rules={{ required: "Required" }}
+                    rules={{ required: "Enter your contact number." }}
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Contact Number</FormLabel>
+                            <FormLabel>
+                                Contact Number <span className="text-destructive">*</span>
+                            </FormLabel>
                             <FormControl>
                                 <Input placeholder="09XXXXXXXXX" inputMode="tel" {...field} />
                             </FormControl>
@@ -162,12 +168,14 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                         control={form.control}
                         name="birthdate"
                         rules={{
-                            required: "Required",
+                            required: "Enter your birthdate.",
                             validate: (v) => checkBirthdate(v ?? "") ?? true,
                         }}
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Birthdate</FormLabel>
+                                <FormLabel>
+                                    Birthdate <span className="text-destructive">*</span>
+                                </FormLabel>
                                 <FormControl>
                                     <Input
                                         type="date"
@@ -203,10 +211,12 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                 <FormField
                     control={form.control}
                     name="sex"
-                    rules={{ required: "Required" }}
+                    rules={{ required: "Select your sex." }}
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Sex</FormLabel>
+                            <FormLabel>
+                                Sex <span className="text-destructive">*</span>
+                            </FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                     <SelectTrigger>

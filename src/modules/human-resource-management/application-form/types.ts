@@ -68,7 +68,7 @@ export const CERTIFICATION_CLAUSES: string[] = [
 ];
 
 export const CERTIFICATION_AGREEMENT_LINE =
-    "I have read, reviewed and explain to me all the above certification statements and other information provided on the application.";
+    "I have read and reviewed all of the above certification statements and other information provided on the application.";
 
 export interface FamilyMemberFields {
     name: string;

@@ -10,17 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { AlertCircle, PenLine } from "lucide-react";
 import {
   SigningEnvelopeFetchProvider,
@@ -34,6 +24,11 @@ import type {
   Paperworks,
   SigningEnvelope,
 } from "../signing/types/contracts";
+import {
+  SigningDeskQueueCards,
+  type SigningQueueRow,
+} from "./components/SigningDeskQueueCards";
+import { SigningDeskTable } from "./components/SigningDeskTable";
 
 interface ApplicantSummary {
   id: number;
@@ -51,28 +46,12 @@ interface TemplateListResponse {
   data?: PaperworkTemplate[];
 }
 
-interface DeskRow {
-  applicant: ApplicantSummary;
-  envelope: SigningEnvelope;
-  offer: JobOffer | null;
-  paperworks: Paperworks | null;
-}
+type DeskRow = SigningQueueRow;
 
 interface OpenSigningSet {
   row: DeskRow;
   items: PaperworkItem[];
 }
-
-const THEAD = (
-  <TableRow className="bg-muted/30">
-    <TableHead>Applicant</TableHead>
-    <TableHead>Applicant status</TableHead>
-    <TableHead>Offer</TableHead>
-    <TableHead>Paperworks</TableHead>
-    <TableHead>Envelope</TableHead>
-    <TableHead className="text-right">Action</TableHead>
-  </TableRow>
-);
 
 function DeskBody() {
   const { listEnvelopes, listJobOffers, listPaperworks, listPaperworkItems } =
@@ -194,6 +173,7 @@ function DeskBody() {
             key={signing.row.envelope.id}
             applicantId={signing.row.applicant.id}
             applicantName={signing.row.applicant.full_name}
+            applicantStatus={signing.row.applicant.status}
             envelope={signing.row.envelope}
             offer={signing.row.offer}
             paperworks={signing.row.paperworks}
@@ -237,110 +217,24 @@ function DeskBody() {
           </h2>
           <p
             className="truncate text-xs text-muted-foreground sm:text-sm"
-            title="Offer + paperwork created on Final Approved — pick one to sign"
+            title="Offer + paperwork created on Final Approved — open a set to sign or review"
           >
-            Offer + paperwork created on Final Approved — pick one to sign
+            Offer + paperwork created on Final Approved — open a set to sign or
+            review
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>{THEAD}</TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <div className="space-y-2 py-4">
-                      <Skeleton className="h-10 w-full" />
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <p className="py-6 text-center text-muted-foreground">
-                      No applicants have a signing set yet.
-                    </p>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row) => (
-                  <TableRow key={row.envelope.id}>
-                    <TableCell
-                      className="max-w-[220px] truncate font-medium"
-                      title={
-                        row.applicant.position_applied_for ??
-                        `Applicant #${row.applicant.id}`
-                      }
-                    >
-                      {row.applicant.full_name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className="max-w-[180px] truncate"
-                        title={row.applicant.status ?? "unknown"}
-                      >
-                        {row.applicant.status ?? "—"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell
-                      className="max-w-[160px] truncate"
-                      title={row.offer ? row.offer.status : "No offer"}
-                    >
-                      {row.offer ? row.offer.status : "—"}
-                    </TableCell>
-                    <TableCell
-                      className="max-w-[200px] truncate"
-                      title={
-                        row.paperworks
-                          ? `${row.paperworks.status} (${row.paperworks.signed_count}/${row.paperworks.required_count})`
-                          : "No paperworks"
-                      }
-                    >
-                      {row.paperworks
-                        ? `${row.paperworks.status} (${row.paperworks.signed_count}/${row.paperworks.required_count})`
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          row.envelope.status === "complete" ? "default" : "secondary"
-                        }
-                        className="max-w-[140px] truncate"
-                        title={row.envelope.status}
-                      >
-                        {row.envelope.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={launching !== null}
-                        onClick={() => void openSigningSet(row)}
-                        aria-label={`Open signing set for ${row.applicant.full_name}`}
-                        title={
-                          row.envelope.status === "complete"
-                            ? "Review the completed signing set"
-                            : "Open the signing set"
-                        }
-                      >
-                        <PenLine className="mr-2 h-4 w-4" />
-                        {launching === row.envelope.id
-                          ? "Opening…"
-                          : row.envelope.status === "complete"
-                            ? "Review"
-                            : "Open signing set"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <SigningDeskQueueCards
+          rows={rows}
+          isLoading={isLoading}
+          launchingId={launching}
+          onOpen={(row) => void openSigningSet(row)}
+        />
+        <SigningDeskTable
+          rows={rows}
+          isLoading={isLoading}
+          launchingId={launching}
+          onOpen={(row) => void openSigningSet(row)}
+        />
       </section>
     </div>
   );

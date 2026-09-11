@@ -4,6 +4,7 @@ import {
   type JobOffer,
   type PaperworkItem,
   type Paperworks,
+  type SigningCompletion,
   type SigningEnvelope,
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
 import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
@@ -94,6 +95,7 @@ export interface SigningRollupResult {
   signedCount: number;
   /** `"hired"` when this call fired/re-observed the completion; else null. */
   applicantStatus: ApplicantStatus | null;
+  completion: SigningCompletion;
 }
 
 export interface SignPaperworkItemResult {
@@ -104,6 +106,7 @@ export interface SignPaperworkItemResult {
   signedCount: number;
   /** `"hired"` when THIS signature completed the set; else null. */
   applicantStatus: ApplicantStatus | null;
+  completion: SigningCompletion;
 }
 
 /**
@@ -179,6 +182,7 @@ export async function signPaperworkItem(
     requiredCount: rollup.requiredCount,
     signedCount: rollup.signedCount,
     applicantStatus: rollup.applicantStatus,
+    completion: rollup.completion,
   };
 }
 
@@ -269,7 +273,7 @@ export async function recomputeSigningRollups(
     });
   }
 
-  const applicantStatus = await fireHiredIfComplete({
+  const fired = await fireHiredIfComplete({
     applicantId: envelope.applicant_id,
     offerStatus: jobOffer.status,
     requiredCount: paperworks.required_count,
@@ -283,6 +287,7 @@ export async function recomputeSigningRollups(
     items,
     requiredCount: paperworks.required_count,
     signedCount,
-    applicantStatus,
+    applicantStatus: fired.applicantStatus,
+    completion: fired.completion,
   };
 }

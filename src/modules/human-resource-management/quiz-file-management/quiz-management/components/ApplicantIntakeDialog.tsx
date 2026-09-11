@@ -14,7 +14,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, UserPlus, CheckCircle2 } from "lucide-react";
+import { Search, UserPlus, CheckCircle2, Info } from "lucide-react";
+import { pluralize } from "../../utils/pluralize";
 
 interface ApplicantIntakeDialogProps {
     open: boolean;
@@ -131,13 +132,16 @@ export function ApplicantIntakeDialog({ open, onOpenChange, quiz }: ApplicantInt
 
                             {!isSearching && search.trim() && results.length === 0 && (
                                 <p className="text-sm text-muted-foreground">
-                                    No matches found under this name.
+                                    No applicants match &ldquo;{search.trim()}&rdquo;. Try a
+                                    different spelling, or start a new application below.
                                 </p>
                             )}
 
                             {!isSearching && priorAttemptCount > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                    ⓘ {priorAttemptCount} prior attempt(s) found under this name
+                                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Info className="h-3.5 w-3.5 shrink-0" />
+                                    {priorAttemptCount} prior{" "}
+                                    {pluralize(priorAttemptCount, "attempt")} found under this name
                                 </p>
                             )}
 

@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { phaseLabel } from "../rosterData";
 import { HireRosterDetail } from "./HireRosterDetail";
 import type { HireRosterRow } from "../types/hire-roster.schema";
 
@@ -43,6 +45,11 @@ export function HireRosterDialog({
           <DialogTitle className="truncate">
             {row ? row.name : "Hire detail"}
           </DialogTitle>
+          <DialogDescription className="truncate">
+            {row
+              ? `Employee #${row.userId} · ${phaseLabel(row.phase)}`
+              : "Employee onboarding detail"}
+          </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col px-6 py-4">
           {row ? (

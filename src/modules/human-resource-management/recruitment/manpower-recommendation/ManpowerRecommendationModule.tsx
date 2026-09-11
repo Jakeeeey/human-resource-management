@@ -22,10 +22,10 @@ function ManpowerRecommendationContent() {
                     </div>
                     <div>
                         <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-                            Manpower Recommendations
+                            Open Manpower Requests
                         </h1>
                         <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
-                            Recommend applicants to open manpower requests.
+                            Recommend applicants and manage recommendation status for each open request.
                         </p>
                     </div>
                 </div>

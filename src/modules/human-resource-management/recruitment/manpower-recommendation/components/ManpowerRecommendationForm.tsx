@@ -1,22 +1,19 @@
 "use client";
 
 import { useManpowerRecommendation } from "../hooks/useManpowerRecommendation";
-import { isApplicantSlotOccupying } from "../utils/applicantPipeline";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserCheck, ChevronsUpDown } from "lucide-react";
+import { UserCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
 import type { ManpowerRecommendationCreateInput } from "../types";
+import { ApplicantCombobox } from "./ApplicantCombobox";
 
 const ManpowerRecommendationFormSchema = z.object({
     manpower_request_id: z.number({ error: "Please select a manpower request" }),
@@ -27,9 +24,8 @@ const ManpowerRecommendationFormSchema = z.object({
 type ManpowerRecommendationFormValues = z.infer<typeof ManpowerRecommendationFormSchema>;
 
 export function ManpowerRecommendationForm() {
-    const { isCreateOpen, setIsCreateOpen, submitRecommendation, openRequests, applicants, recommendations, pendingRequestId, setPendingRequestId, interviewInitialRows } = useManpowerRecommendation();
+    const { isCreateOpen, setIsCreateOpen, submitRecommendation, openRequests, pendingRequestId, setPendingRequestId } = useManpowerRecommendation();
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [applicantOpen, setApplicantOpen] = useState(false);
     const router = useRouter();
 
     const form = useForm<ManpowerRecommendationFormValues>({
@@ -96,7 +92,7 @@ export function ManpowerRecommendationForm() {
                             Recommend Applicant
                         </DialogTitle>
                         <DialogDescription className="text-sm mt-2">
-                            Select an applicant to recommend for this manpower request.
+                            Candidates who passed their initial interview are listed, grouped by whether they applied for this request&apos;s position.
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -128,57 +124,7 @@ export function ManpowerRecommendationForm() {
                                 render={({ field }) => (
                                     <FormItem className="flex flex-col">
                                         <FormLabel className="text-xs font-bold uppercase text-muted-foreground mb-2">Applicant <span className="text-destructive">*</span></FormLabel>
-                                        <Popover open={applicantOpen} onOpenChange={setApplicantOpen}>
-                                            <PopoverTrigger asChild>
-                                                <FormControl>
-                                                    <Button
-                                                        variant="outline"
-                                                        role="combobox"
-                                                        aria-expanded={applicantOpen}
-                                                        className={cn(
-                                                            "w-full justify-between bg-muted/30 focus:bg-background transition-colors font-normal",
-                                                            !field.value && "text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        <span className="truncate">
-                                                            {field.value
-                                                                ? applicants.find((a) => a.id === field.value)?.full_name || "Select applicant"
-                                                                : "Select applicant"}
-                                                        </span>
-                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                    </Button>
-                                                </FormControl>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
-                                                <Command>
-                                                    <CommandInput placeholder="Search applicant..." />
-                                                    <CommandList className="max-h-64 overflow-y-auto overscroll-contain">
-                                                        <CommandEmpty>No applicant found.</CommandEmpty>
-                                                        <CommandGroup>
-                                                            {/* Already-approved exclusion follows the APPLICANT pipeline (todo 8):
-                                                                `applicant.status` is the truth; the rec row only links request->applicant. */}
-                                                            {applicants.filter((applicant) => !recommendations.some((r) => r.manpower_request_id === pendingRequestId && r.applicant_id === applicant.id) && !isApplicantSlotOccupying(applicant.status) && interviewInitialRows.some((row) => row.applicant_id === applicant.id && row.latestInitialVerdict === "Passed")).map((applicant) => (
-                                                                <CommandItem
-                                                                    value={`${applicant.full_name} ${applicant.id}`}
-                                                                    key={applicant.id}
-                                                                    onSelect={() => {
-                                                                        field.onChange(applicant.id);
-                                                                        setApplicantOpen(false);
-                                                                    }}
-                                                                >
-                                                                    <span className="min-w-0 flex-[55] truncate" title={applicant.full_name}>
-                                                                        {applicant.full_name}
-                                                                    </span>
-                                                                    <span className="flex-[45] shrink-0 truncate pl-4 text-xs text-muted-foreground" title={applicant.position_applied_for || undefined}>
-                                                                        {applicant.position_applied_for || "—"}
-                                                                    </span>
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
+                                        <ApplicantCombobox value={field.value} onChange={field.onChange} />
                                         <FormMessage />
                                     </FormItem>
                                 )}

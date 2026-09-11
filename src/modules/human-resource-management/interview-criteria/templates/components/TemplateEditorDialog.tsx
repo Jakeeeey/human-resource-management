@@ -111,11 +111,14 @@ export function TemplateEditorDialog({
     }, [watchedStage, isEdit]);
 
     const watchedCriteria = useWatch({ control: form.control, name: "criteria" }) || [];
+    const watchedName = useWatch({ control: form.control, name: "name" }) || "";
+    const nameValid = watchedName.trim().length > 0;
     const totalWeight = watchedCriteria.reduce(
         (sum, c) => sum + (parseFloat(c.weight_percentage) || 0),
         0
     );
     const weightIsValid = Math.abs(totalWeight - 100) < 0.01;
+    const saveDisabled = !weightIsValid || !nameValid;
 
     const handleSubmit = async (data: FormData) => {
         if (!weightIsValid) {
@@ -164,7 +167,9 @@ export function TemplateEditorDialog({
                             rules={{ required: "Name is required" }}
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Template Name</FormLabel>
+                                    <FormLabel>
+                                        Template Name <span className="text-destructive">*</span>
+                                    </FormLabel>
                                     <FormControl>
                                         <Input placeholder="e.g. Standard Initial Rubric" {...field} />
                                     </FormControl>
@@ -340,11 +345,23 @@ export function TemplateEditorDialog({
                             )}
                         </div>
 
+                        {saveDisabled && (
+                            <div className="space-y-1 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+                                <p className="font-semibold text-amber-700 dark:text-amber-400">To save this template:</p>
+                                {!nameValid && (
+                                    <p className="text-muted-foreground">Enter a template name.</p>
+                                )}
+                                {!weightIsValid && (
+                                    <p className="text-muted-foreground">Criteria weights must total 100% (currently {totalWeight}%).</p>
+                                )}
+                            </div>
+                        )}
+
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={!weightIsValid}>
+                            <Button type="submit" disabled={saveDisabled}>
                                 {isEdit ? "Update" : "Save"} Template
                             </Button>
                         </DialogFooter>
