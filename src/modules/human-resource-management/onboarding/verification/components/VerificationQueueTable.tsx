@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import {
   CheckCircle2,
+  FileText,
   History,
   PenLine,
   RotateCcw,
@@ -89,6 +90,7 @@ export function VerificationQueueTable({
               <TableHead>Queue</TableHead>
               <TableHead>Return reason</TableHead>
               <TableHead>Ack trail</TableHead>
+              <TableHead>Documents</TableHead>
               <TableHead>Updated</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -96,7 +98,7 @@ export function VerificationQueueTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={7}>
                   <div className="space-y-2 py-4">
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
@@ -106,7 +108,7 @@ export function VerificationQueueTable({
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={7}>
                   <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
                     <p className="text-muted-foreground">
                       No documents awaiting verification.
@@ -148,6 +150,29 @@ export function VerificationQueueTable({
                       <span className="text-sm text-muted-foreground">
                         Not acked
                       </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="max-w-[260px]">
+                    {row.documents.length === 0 ? (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {row.documents.map((doc) => (
+                          <a
+                            key={doc.docKey}
+                            href={`/api/hrm/employee-admin/employee-master-list/assets/${doc.fileId}?filename=${encodeURIComponent(doc.title)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-muted"
+                            title={doc.title}
+                          >
+                            <FileText className="h-3 w-3 shrink-0" />
+                            <span className="max-w-[120px] truncate">
+                              {doc.title}
+                            </span>
+                          </a>
+                        ))}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell

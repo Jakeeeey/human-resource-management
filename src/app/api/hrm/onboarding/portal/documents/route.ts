@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
+  buildChecklist,
+  isChecklistComplete,
   LinkPortalDocumentSchema,
   portalFileMarker,
+  portalMarkerPrefix,
   readPortalToken,
   resolvePortalIdentity,
 } from "@/modules/human-resource-management/employee-portal";
+import {
+  completeOnboardingTask,
+  listOnboardingTasks,
+} from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
+import { findVerificationTasks } from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +36,37 @@ function validationFailed(errors: Record<string, string[] | undefined>) {
     { success: false, message: "Validation failed", errors },
     { status: 400 }
   );
+}
+
+const FiledFilesSchema = z.object({
+  data: z.array(z.object({ id: z.string().min(1), description: z.unknown() })),
+});
+
+async function syncDocumentsSubmitted(userId: number): Promise<void> {
+  try {
+    const key = { kind: "employee" as const, id: userId };
+    const marker = portalMarkerPrefix(key);
+    const body: unknown = await dFetch(
+      `/files?filter[description][_contains]=${encodeURIComponent(marker)}&fields=id,description&limit=100`
+    );
+    const parsed = FiledFilesSchema.safeParse(body);
+    if (!parsed.success) return;
+    if (!isChecklistComplete(buildChecklist(key, parsed.data.data))) return;
+
+    const [tasks, templates] = await Promise.all([
+      listOnboardingTasks({ userId }),
+      listOnboardingTaskTemplates(),
+    ]);
+    const pair = findVerificationTasks(tasks, templates);
+    if (pair.submitted && pair.submitted.status !== "done") {
+      await completeOnboardingTask({
+        taskId: pair.submitted.id,
+        completedBy: userId,
+      });
+    }
+  } catch (error) {
+    console.error("[onboarding-portal] documents-submitted sync failed:", error);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -67,6 +108,10 @@ export async function POST(req: NextRequest) {
       method: "PATCH",
       body: JSON.stringify({ description: portalFileMarker(key, doc_key) }),
     });
+
+    if (key.kind === "employee") {
+      await syncDocumentsSubmitted(key.id);
+    }
 
     return NextResponse.json(
       {

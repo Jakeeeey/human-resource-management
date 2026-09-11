@@ -38,6 +38,16 @@ export const MAX_RETURN_REASON_LENGTH = 41;
 
 export type QueueState = "pending" | "returned" | "approved";
 
+/** One hiree-uploaded portal document filed for the employee. */
+export interface QueueDocument {
+  /** Portal doc slot (e.g. `valid_id`) — the marker's `<doc_key>`. */
+  docKey: string;
+  /** Human title from `PORTAL_DOC_CONFIG` (falls back to the raw key). */
+  title: string;
+  /** Directus file UUID (marker description `onboarding-portal:employee:<id>:<key>`). */
+  fileId: string;
+}
+
 export interface QueueRow {
   /** Employee key (`user.user_id`) — the only scope on this queue. */
   userId: number;
@@ -47,6 +57,8 @@ export interface QueueRow {
   lastAcknowledgedAt: string | null;
   /** Latest change across the two documents tasks. */
   updatedAt: string | null;
+  /** Hiree-uploaded portal documents for this employee (empty = none). */
+  documents: QueueDocument[];
 }
 
 export interface QueueAggregate {
@@ -146,7 +158,8 @@ export function buildQueueRow(
   userId: number,
   tasks: readonly OnboardingTask[],
   templates: readonly OnboardingTaskTemplate[],
-  logs: readonly AcknowledgementLog[]
+  logs: readonly AcknowledgementLog[],
+  documents: readonly QueueDocument[] = []
 ): QueueRow | null {
   const pair = findVerificationTasks(tasks, templates);
   const queueState = deriveQueueState(pair);
@@ -170,6 +183,7 @@ export function buildQueueRow(
       pair.hr?.updated_at ?? null,
       pair.submitted?.updated_at ?? null
     ),
+    documents: [...documents],
   };
 }
 
@@ -178,14 +192,21 @@ export function buildQueueRow(
 export function aggregateQueue(
   tasks: readonly OnboardingTask[],
   templates: readonly OnboardingTaskTemplate[],
-  logs: readonly AcknowledgementLog[]
+  logs: readonly AcknowledgementLog[],
+  documentsByUser: ReadonlyMap<number, readonly QueueDocument[]> = new Map()
 ): QueueAggregate {
   const userIds = [...new Set(tasks.map((task) => task.user_id))].sort(
     (a, b) => a - b
   );
   const rows: QueueRow[] = [];
   for (const userId of userIds) {
-    const row = buildQueueRow(userId, tasks, templates, logs);
+    const row = buildQueueRow(
+      userId,
+      tasks,
+      templates,
+      logs,
+      documentsByUser.get(userId) ?? []
+    );
     if (row) rows.push(row);
   }
 

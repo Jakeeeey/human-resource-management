@@ -25,6 +25,11 @@ import {
   findVerificationTasks,
   VerificationDecisionSchema,
 } from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
+import type { QueueDocument } from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
+import {
+  parsePortalFileMarker,
+  PORTAL_DOC_CONFIG,
+} from "@/modules/human-resource-management/employee-portal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,6 +113,32 @@ function ackFilter(value: string): string {
   return `filter[doc_ref][_contains]=${encodeURIComponent(value)}`;
 }
 
+const PORTAL_EMPLOYEE_MARKER = "onboarding-portal:employee:";
+
+const PortalFilesSchema = z.object({
+  data: z.array(z.object({ id: z.string().min(1), description: z.unknown() })),
+});
+
+async function readPortalDocumentsByUser(): Promise<Map<number, QueueDocument[]>> {
+  const body: unknown = await dFetch(
+    `/files?filter[description][_contains]=${encodeURIComponent(PORTAL_EMPLOYEE_MARKER)}&fields=id,description&limit=-1`
+  );
+  const parsed = PortalFilesSchema.safeParse(body);
+  if (!parsed.success) return new Map();
+  const byUser = new Map<number, QueueDocument[]>();
+  for (const row of parsed.data.data) {
+    const marker = parsePortalFileMarker(row.description);
+    if (!marker || marker.key.kind !== "employee") continue;
+    const title =
+      PORTAL_DOC_CONFIG.find((entry) => entry.key === marker.doc_key)?.title ??
+      marker.doc_key;
+    const list = byUser.get(marker.key.id) ?? [];
+    list.push({ docKey: marker.doc_key, title, fileId: row.id });
+    byUser.set(marker.key.id, list);
+  }
+  return byUser;
+}
+
 // The employee-scoped `onboarding.docs_verified` dispatch context: no
 // applicant<->user link, so the bridge is synthetic and recipient resolution
 // falls back to the `to_email` override; a miss records `skipped`, never a
@@ -132,15 +163,16 @@ function buildDocsVerifiedCtx(
 
 export async function GET() {
   try {
-    const [tasks, templates, logs] = await Promise.all([
+    const [tasks, templates, logs, documentsByUser] = await Promise.all([
       listOnboardingTasks({}),
       listOnboardingTaskTemplates(),
       readAckLogs(ackFilter(NAMESPACE)),
+      readPortalDocumentsByUser(),
     ]);
 
     return NextResponse.json({
       success: true,
-      data: aggregateQueue(tasks, templates, logs),
+      data: aggregateQueue(tasks, templates, logs, documentsByUser),
     });
   } catch (error) {
     console.error("[onboarding-verifications] queue error:", error);

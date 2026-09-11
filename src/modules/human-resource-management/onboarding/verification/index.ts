@@ -20,6 +20,7 @@ export {
 } from "./types/acknowledgement-log.schema";
 export type {
   QueueRow,
+  QueueDocument,
   QueueState,
   QueueAggregate,
   VerificationDecision,
