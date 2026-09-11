@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { JobOfferCombobox } from "./JobOfferCombobox";
 import { FileText, Printer, Upload } from "lucide-react";
+import { buildOfferPdf } from "./offerPdf";
 import { EMPTY_JOB_OFFER, type JobOfferFormData } from "./types";
 
 interface ApplicantOption {
@@ -312,60 +313,11 @@ function JobOfferContent() {
     };
 
     const generateAndUploadOfferPdf = async (): Promise<string | null> => {
-        const el = document.getElementById("job-offer-print");
-        if (!el) {
-            toast.error("Offer letter not found");
-            return null;
-        }
         setUploading(true);
-        const prev = {
-            width: el.style.width,
-            maxWidth: el.style.maxWidth,
-            boxSizing: el.style.boxSizing,
-            margin: el.style.margin,
-        };
-        el.style.width = "794px";
-        el.style.maxWidth = "794px";
-        el.style.boxSizing = "border-box";
-        el.style.margin = "0";
-        void el.offsetHeight;
         try {
-            const [html2canvasModule, jspdfModule] = await Promise.all([
-                import("html2canvas"),
-                import("jspdf"),
-            ]);
-            const html2canvas = html2canvasModule.default;
-            const { jsPDF } = jspdfModule;
-            const canvas = await html2canvas(el, {
-                scale: 2,
-                backgroundColor: "#ffffff",
-                useCORS: true,
-                onclone: (doc: Document) => {
-                    const style = doc.createElement("style");
-                    style.textContent = `
-                        #job-offer-print, #job-offer-print * {
-                            color: rgb(0,0,0) !important;
-                            background-color: rgb(255,255,255) !important;
-                            border-color: rgb(0,0,0) !important;
-                            box-shadow: none !important;
-                            text-shadow: none !important;
-                        }
-                        #job-offer-print .text-neutral-500, #job-offer-print .text-neutral-500 * { color: rgb(115,115,115) !important; }
-                    `;
-                    doc.head.appendChild(style);
-                },
-            });
-            const pxW = canvas.width;
-            const pxH = canvas.height;
-            const pdf = new jsPDF({
-                unit: "px",
-                orientation: pxH >= pxW ? "portrait" : "landscape",
-                format: [pxW, pxH],
-            });
-            pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pxW, pxH);
-
+            const blob = buildOfferPdf(form, selectedLogo?.logo_data_url ?? null);
             const candidateName = form.candidateName.trim() || "Candidate";
-            const file = new File([pdf.output("blob")], `Job-Offer-${candidateName}.pdf`, {
+            const file = new File([blob], `Job-Offer-${candidateName}.pdf`, {
                 type: "application/pdf",
             });
             const body = new FormData();
@@ -387,10 +339,6 @@ function JobOfferContent() {
             toast.error("Failed to generate offer PDF");
             return null;
         } finally {
-            el.style.width = prev.width;
-            el.style.maxWidth = prev.maxWidth;
-            el.style.boxSizing = prev.boxSizing;
-            el.style.margin = prev.margin;
             setUploading(false);
         }
     };
@@ -499,8 +447,6 @@ function JobOfferContent() {
                             onClick={() => void handleUploadOfferPdf()}
                             variant="outline"
                             className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
-                            disabled
-                            title="Temporarily disabled"
                             type="button"
                         >
                             <Upload className="mr-2 h-4 w-4" />

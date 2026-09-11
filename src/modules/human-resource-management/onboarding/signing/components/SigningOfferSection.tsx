@@ -96,8 +96,7 @@ export function SigningOfferSection({
 
   const offerSigned = offer?.status === "signed";
   const offerPdfMissing = offer === null || offer.pdf_file === null;
-  const canUploadOfferPdf =
-    offer !== null && (offer.pdf_file === null || !offerSigned);
+  const canUploadOfferPdf = offer !== null && offer.pdf_file === null;
 
   useEffect(() => {
     setInkPages(seedInkPages(offer?.strokes));
@@ -257,13 +256,14 @@ export function SigningOfferSection({
           {offer?.pdf_file && (
             <a
               href={`/api/hrm/employee-admin/employee-master-list/assets/${offer.pdf_file}?filename=${encodeURIComponent("Job Offer.pdf")}`}
+              download="Job Offer.pdf"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-8 items-center gap-1 rounded-md border px-2 text-xs hover:bg-muted"
-              title="View the uploaded offer document"
+              title="Download the offer document"
             >
               <FileText className="h-3.5 w-3.5 shrink-0" />
-              <span>View offer PDF</span>
+              <span>Download offer</span>
             </a>
           )}
           {canUploadOfferPdf && (
@@ -282,18 +282,10 @@ export function SigningOfferSection({
                 onClick={() => offerFileInputRef.current?.click()}
                 disabled={uploadingOffer}
                 className="min-h-8"
-                title={
-                  offer?.pdf_file
-                    ? "Replace the uploaded offer document"
-                    : "Upload the offer document as PDF"
-                }
+                title="Upload the offer document as PDF"
               >
                 <Upload className="h-3.5 w-3.5 shrink-0" />
-                {uploadingOffer
-                  ? "Uploading…"
-                  : offer?.pdf_file
-                    ? "Replace offer PDF"
-                    : "Upload offer PDF"}
+                {uploadingOffer ? "Uploading…" : "Upload offer PDF"}
               </Button>
             </>
           )}
