@@ -19,7 +19,7 @@ import type {
 //   signing-envelope?applicant_id=  job-offer?applicant_id=
 //   paperworks?applicant_id=        paperwork-item?paperworks_id=
 // Writes answer the two signing routes:
-//   PATCH job-offer/{id}         { signature_file? }  (todo 11)
+//   PATCH job-offer/{id}         { signature_file?, strokes?, signed_pdf_file? } (todo 11)
 //   PATCH paperwork-item/{id}    { strokes, pdf_file } (todo 12)
 // Every mutation delegates to the server services — this layer never
 // recomputes a rollup or writes a status itself.
@@ -39,6 +39,12 @@ export interface SignOfferResult {
   /** `"hired"`/null server truth for the applicant after this call. */
   applicantStatus: string | null;
   completion: SigningCompletion;
+}
+
+export interface SignJobOfferPayload {
+  signature_file?: string | null;
+  strokes?: string | null;
+  signed_pdf_file?: string | null;
 }
 
 export interface SignItemResult {
@@ -61,7 +67,7 @@ interface SigningSetFetchContextType {
   previewHireBlockReason: (applicantId: number) => Promise<string | null>;
   signJobOffer: (
     offerId: number,
-    signatureFile: string | null
+    payload: SignJobOfferPayload | null
   ) => Promise<SignOfferResult>;
   signPaperworkItem: (
     itemId: number,
@@ -133,9 +139,11 @@ export function SigningEnvelopeFetchProvider({
       );
       return data.blockedReason ?? null;
     },
-    signJobOffer: (offerId, signatureFile) =>
+    signJobOffer: (offerId, payload) =>
       patch<SignOfferResult>(`/api/hrm/onboarding/job-offer/${offerId}`, {
-        signature_file: signatureFile,
+        signature_file: payload?.signature_file ?? null,
+        strokes: payload?.strokes ?? null,
+        signed_pdf_file: payload?.signed_pdf_file ?? null,
       }),
     signPaperworkItem: (itemId, strokes, pdfFile) =>
       patch<SignItemResult>(`/api/hrm/onboarding/paperwork-item/${itemId}`, {

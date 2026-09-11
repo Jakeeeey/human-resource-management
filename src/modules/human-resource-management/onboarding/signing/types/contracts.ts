@@ -59,6 +59,7 @@ export const JobOfferSchema = z.object({
   applicant_id: z.number().int().positive(),
   signing_envelope_id: z.number().int().positive().nullable(),
   terms_snapshot: z.json(), // json | nullable — parsed JSON value (incl. null)
+  pdf_file: z.string().nullable(),
   offered_at: z.string().nullable(),
   expires_at: z.string().nullable(),
   status: JobOfferStatusSchema,
@@ -68,6 +69,8 @@ export const JobOfferSchema = z.object({
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),
   updated_by: z.number().int().nullable(),
+  strokes: z.string().nullable(),
+  signed_pdf_file: z.string().nullable(),
 });
 
 export type JobOffer = z.infer<typeof JobOfferSchema>;

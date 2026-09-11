@@ -52,15 +52,31 @@ export const JobOfferCreateSchema = JobOfferSchema.omit(RECORD_MANAGED_KEYS)
   .extend({
     signing_envelope_id: z.number().int().positive().nullable().default(null),
     terms_snapshot: z.json().default(null),
+    pdf_file: z.string().nullable().default(null),
     offered_at: z.string().nullable().default(null),
     expires_at: z.string().nullable().default(null),
     status: JobOfferStatusSchema.default("draft"),
     signature_file: z.string().nullable().default(null),
     signed_at: z.string().nullable().default(null),
+    strokes: z.string().nullable().default(null),
+    signed_pdf_file: z.string().nullable().default(null),
   })
   .strict();
 
 export type JobOfferCreate = z.infer<typeof JobOfferCreateSchema>;
+
+export const JobOfferUpdateSchema = z
+  .object({
+    signing_envelope_id: z.number().int().positive().nullable().optional(),
+    terms_snapshot: z.json().optional(),
+    pdf_file: z.string().nullable().optional(),
+    status: JobOfferStatusSchema.optional(),
+    strokes: z.string().nullable().optional(),
+    signed_pdf_file: z.string().nullable().optional(),
+  })
+  .strict();
+
+export type JobOfferUpdate = z.infer<typeof JobOfferUpdateSchema>;
 
 export const PaperworksCreateSchema = PaperworksSchema.omit(RECORD_MANAGED_KEYS)
   .extend({

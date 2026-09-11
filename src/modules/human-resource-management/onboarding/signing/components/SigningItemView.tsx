@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { PaperworkTemplate } from "../../paperwork/types/paperwork-template.schema";
 import type { PaperworkItem } from "../types/contracts";
@@ -20,8 +27,9 @@ import { useSigningItemModel } from "./useSigningItemModel";
 
 // SigningItemView.tsx — the VIEW for one paperwork_item of an applicant's
 // signing set. All signing state/evidence machinery lives in
-// `useSigningItemModel`; this file renders the header, the per-page PDF+ink
-// stack, and the sign action. "Sign & file" is gated SOLELY on the shared
+// `useSigningItemModel`; this file renders the header, the active PDF page
+// (one page at a time) with a First/Prev/page-number/Next/Last nav control,
+// and the sign action. "Sign & file" is gated SOLELY on the shared
 // validity predicate plus the offer gate; a signed item is read-only.
 //
 // The document body is COLLAPSED by default and only rendered when expanded,
@@ -80,10 +88,31 @@ export function SigningItemView({
     placingStamp,
   } = model;
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [activePage, setActivePage] = useState(1);
+  const [pageDraft, setPageDraft] = useState("1");
+
+  const numPages = Math.max(1, pages.length);
 
   useEffect(() => {
     if (defaultExpanded) setExpanded(true);
   }, [defaultExpanded]);
+
+  useEffect(() => {
+    setActivePage((current) => Math.min(numPages, Math.max(1, current)));
+  }, [numPages]);
+
+  useEffect(() => {
+    setPageDraft(String(activePage));
+  }, [activePage]);
+
+  const commitJump = () => {
+    const parsed = Number.parseInt(pageDraft, 10);
+    const next = Number.isFinite(parsed)
+      ? Math.min(numPages, Math.max(1, parsed))
+      : activePage;
+    setActivePage(next);
+    setPageDraft(String(next));
+  };
 
   const title = template?.title ?? `Template ${item.template_id}`;
 
@@ -193,43 +222,103 @@ export function SigningItemView({
 
           {template && (
             <div className="space-y-4 px-3 py-3 sm:px-4">
-              {pages.map((page) => (
-                <div key={page} className="space-y-2">
-                  <TemplatePageView
-                    template={template}
-                    page={page}
-                    strokes={inkPages[page] ?? []}
-                    stamps={stamps}
-                    placingStamp={placingStamp}
-                    selectedStampId={selectedStampId}
-                    disabled={locked || pdfDoc === null || pdfError !== null}
-                    doc={pdfDoc}
-                    docError={pdfError}
-                    beyondEnd={pdfPages !== null && page > pdfPages}
-                    pageWidth={pageSizes[page]?.width ?? SIGNING_PAGE_W}
-                    pageHeight={pageSizes[page]?.height ?? SIGNING_PAGE_H}
-                    onPdfNaturalSize={model.handlePdfNaturalSize}
-                    onStrokesChange={model.handleStrokesChange}
-                    onTapPlace={model.handleTapPlace}
-                    onStampMove={model.handleStampMove}
-                    onStampSelect={model.setSelectedStampId}
-                    onStampDelete={model.handleStampDelete}
-                    canvasRef={model.registerCanvas}
-                  />
-                  {!locked && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => model.handleClearPage(page)}
-                      className="min-h-8"
-                      aria-label={`Clear ink on page ${page}`}
-                    >
-                      Clear page {page}
-                    </Button>
-                  )}
-                </div>
-              ))}
+              <div className="flex flex-nowrap items-center justify-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActivePage(1)}
+                  disabled={activePage <= 1}
+                  aria-label="First page"
+                  className="min-h-8 min-w-8 px-0"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActivePage((p) => Math.max(1, p - 1))}
+                  disabled={activePage <= 1}
+                  aria-label="Previous page"
+                  className="min-h-8 min-w-8 px-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={numPages}
+                  value={pageDraft}
+                  onChange={(e) => setPageDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitJump();
+                    }
+                    if (e.key === "Escape") setPageDraft(String(activePage));
+                  }}
+                  onBlur={commitJump}
+                  aria-label="Page number"
+                  className="h-8 w-14 px-1 text-center"
+                />
+                <span className="text-xs text-muted-foreground">/ {numPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActivePage((p) => Math.min(numPages, p + 1))}
+                  disabled={activePage >= numPages}
+                  aria-label="Next page"
+                  className="min-h-8 min-w-8 px-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setActivePage(numPages)}
+                  disabled={activePage >= numPages}
+                  aria-label="Last page"
+                  className="min-h-8 min-w-8 px-0"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <TemplatePageView
+                  template={template}
+                  page={activePage}
+                  strokes={inkPages[activePage] ?? []}
+                  stamps={stamps}
+                  placingStamp={placingStamp}
+                  selectedStampId={selectedStampId}
+                  disabled={locked || pdfDoc === null || pdfError !== null}
+                  doc={pdfDoc}
+                  docError={pdfError}
+                  beyondEnd={pdfPages !== null && activePage > pdfPages}
+                  pageWidth={pageSizes[activePage]?.width ?? SIGNING_PAGE_W}
+                  pageHeight={pageSizes[activePage]?.height ?? SIGNING_PAGE_H}
+                  onPdfNaturalSize={model.handlePdfNaturalSize}
+                  onStrokesChange={model.handleStrokesChange}
+                  onTapPlace={model.handleTapPlace}
+                  onStampMove={model.handleStampMove}
+                  onStampSelect={model.setSelectedStampId}
+                  onStampDelete={model.handleStampDelete}
+                  canvasRef={model.registerCanvas}
+                />
+                {!locked && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => model.handleClearPage(activePage)}
+                    className="min-h-8"
+                    aria-label={`Clear ink on page ${activePage}`}
+                  >
+                    Clear page {activePage}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

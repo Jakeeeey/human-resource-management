@@ -2,16 +2,23 @@
 
 import React from "react";
 import Image from "next/image";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { JobOfferCombobox } from "./JobOfferCombobox";
-import { FileText, Printer } from "lucide-react";
+import { FileText, Printer, Upload } from "lucide-react";
 import { EMPTY_JOB_OFFER, type JobOfferFormData } from "./types";
 
 interface ApplicantOption {
     id: number;
     full_name: string;
     position_applied_for: string | null;
+}
+
+interface SigningEnvelopeOption {
+    id: number;
+    applicant_id: number;
+    joboffer_id: number | null;
 }
 
 interface CompanyLogo {
@@ -81,7 +88,13 @@ function JobOfferContent() {
         offerDate: todayInputValue(),
     }));
     const [applicants, setApplicants] = React.useState<ApplicantOption[]>([]);
-    const [applicantsLoading, setApplicantsLoading] = React.useState(true);
+    const [envelopes, setEnvelopes] = React.useState<SigningEnvelopeOption[]>([]);
+    const [envelopesLoading, setEnvelopesLoading] = React.useState(true);
+    const [selectedEnvelopeId, setSelectedEnvelopeId] = React.useState("");
+    const [pdfFileId, setPdfFileId] = React.useState<string | null>(null);
+    const [pdfFileName, setPdfFileName] = React.useState<string | null>(null);
+    const [uploading, setUploading] = React.useState(false);
+    const [saving, setSaving] = React.useState(false);
     const [logos, setLogos] = React.useState<CompanyLogo[]>([]);
     const [selectedLogoId, setSelectedLogoId] = React.useState<number | null>(null);
     const [logosError, setLogosError] = React.useState(false);
@@ -153,26 +166,60 @@ function JobOfferContent() {
         };
     }, []);
 
+    const loadEnvelopes = React.useCallback(async () => {
+        try {
+            const res = await fetch("/api/hrm/onboarding/signing-envelope?status=pending");
+            if (!res.ok) return;
+            const json = await res.json().catch(() => null);
+            if (!Array.isArray(json?.data)) return;
+            setEnvelopes(
+                json.data.map((r: SigningEnvelopeOption) => ({
+                    id: r.id,
+                    applicant_id: r.applicant_id,
+                    joboffer_id: r.joboffer_id,
+                }))
+            );
+        } catch {
+            // Envelope list is required — the save action stays disabled on failure.
+        }
+    }, []);
+
     React.useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch("/api/hrm/applicants");
-                if (!res.ok) return;
-                const json = await res.json();
-                if (!cancelled && Array.isArray(json.data)) {
-                    setApplicants(
-                        json.data.map((r: { id: number; full_name: string; position_applied_for: string | null }) => ({
-                            id: r.id,
-                            full_name: r.full_name,
-                            position_applied_for: r.position_applied_for,
-                        }))
-                    );
+                const [applicantRes, envelopeRes] = await Promise.all([
+                    fetch("/api/hrm/applicants"),
+                    fetch("/api/hrm/onboarding/signing-envelope?status=pending"),
+                ]);
+                if (applicantRes.ok) {
+                    const json = await applicantRes.json().catch(() => null);
+                    if (!cancelled && Array.isArray(json?.data)) {
+                        setApplicants(
+                            json.data.map(
+                                (r: { id: number; full_name: string; position_applied_for: string | null }) => ({
+                                    id: r.id,
+                                    full_name: r.full_name,
+                                    position_applied_for: r.position_applied_for,
+                                })
+                            )
+                        );
+                    }
                 }
-            } catch {
-                // Picker is a convenience — the form stays fully manual on failure.
+                if (envelopeRes.ok) {
+                    const json = await envelopeRes.json().catch(() => null);
+                    if (!cancelled && Array.isArray(json?.data)) {
+                        setEnvelopes(
+                            json.data.map((r: SigningEnvelopeOption) => ({
+                                id: r.id,
+                                applicant_id: r.applicant_id,
+                                joboffer_id: r.joboffer_id,
+                            }))
+                        );
+                    }
+                }
             } finally {
-                if (!cancelled) setApplicantsLoading(false);
+                if (!cancelled) setEnvelopesLoading(false);
             }
         })();
         return () => {
@@ -218,34 +265,202 @@ function JobOfferContent() {
         });
     };
 
-    const handleApplicantPick = (id: string) => {
-        const found = applicants.find((a) => String(a.id) === id);
-        if (!found) return;
+    const handleEnvelopePick = (value: string) => {
+        const envelope = envelopes.find((e) => String(e.id) === value);
+        if (!envelope) return;
+        setSelectedEnvelopeId(value);
+        const applicant = applicants.find((a) => a.id === envelope.applicant_id);
         setForm((f) => ({
             ...f,
-            candidateName: found.full_name,
-            position: found.position_applied_for ?? f.position,
+            candidateName: applicant?.full_name ?? f.candidateName,
+            position: applicant?.position_applied_for ?? f.position,
         }));
-        // Salutation auto-fill: gender + civil status from the application
-        // record (Mrs. only when Female + Married; no civil status falls
-        // back to gender). Field stays editable; untouched when unknown.
+        // Autofill address/contact/salutation from the applicant's latest
+        // application record; every field stays editable and is untouched
+        // when the application is unreachable.
         void (async () => {
             try {
-                const res = await fetch(`/api/hrm/applications/by-applicant?applicant_id=${found.id}`);
+                const res = await fetch(
+                    `/api/hrm/applications/by-applicant?applicant_id=${envelope.applicant_id}`
+                );
                 if (!res.ok) return;
-                const json = await res.json();
-                const app = json?.data?.application;
-                const prefix = salutationPrefix(app?.sex, app?.civil_status);
-                if (!prefix) return;
-                const surname = surnameOf(found.full_name);
-                setForm((f) => ({ ...f, salutationName: surname ? `${prefix} ${surname}` : prefix }));
+                const json = await res.json().catch(() => null);
+                const application = json?.data?.application;
+                if (!application) return;
+                const prefix = salutationPrefix(application.sex, application.civil_status);
+                const surname = surnameOf(applicant?.full_name ?? "");
+                setForm((f) => ({
+                    ...f,
+                    addressLine:
+                        typeof application.address === "string" && application.address.trim()
+                            ? application.address
+                            : f.addressLine,
+                    contactNumber:
+                        typeof application.phone === "string" && application.phone.trim()
+                            ? application.phone
+                            : f.contactNumber,
+                    salutationName: prefix
+                        ? surname
+                            ? `${prefix} ${surname}`
+                            : prefix
+                        : f.salutationName,
+                }));
             } catch {
-                // Salutation is a convenience — the field stays manual on failure.
+                // Autofill is a convenience — the fields stay manual on failure.
             }
         })();
     };
 
+    const generateAndUploadOfferPdf = async (): Promise<string | null> => {
+        const el = document.getElementById("job-offer-print");
+        if (!el) {
+            toast.error("Offer letter not found");
+            return null;
+        }
+        setUploading(true);
+        const prev = {
+            width: el.style.width,
+            maxWidth: el.style.maxWidth,
+            boxSizing: el.style.boxSizing,
+            margin: el.style.margin,
+        };
+        el.style.width = "794px";
+        el.style.maxWidth = "794px";
+        el.style.boxSizing = "border-box";
+        el.style.margin = "0";
+        void el.offsetHeight;
+        try {
+            const [html2canvasModule, jspdfModule] = await Promise.all([
+                import("html2canvas"),
+                import("jspdf"),
+            ]);
+            const html2canvas = html2canvasModule.default;
+            const { jsPDF } = jspdfModule;
+            const canvas = await html2canvas(el, {
+                scale: 2,
+                backgroundColor: "#ffffff",
+                useCORS: true,
+                onclone: (doc: Document) => {
+                    const style = doc.createElement("style");
+                    style.textContent = `
+                        #job-offer-print, #job-offer-print * {
+                            color: rgb(0,0,0) !important;
+                            background-color: rgb(255,255,255) !important;
+                            border-color: rgb(0,0,0) !important;
+                            box-shadow: none !important;
+                            text-shadow: none !important;
+                        }
+                        #job-offer-print .text-neutral-500, #job-offer-print .text-neutral-500 * { color: rgb(115,115,115) !important; }
+                    `;
+                    doc.head.appendChild(style);
+                },
+            });
+            const pxW = canvas.width;
+            const pxH = canvas.height;
+            const pdf = new jsPDF({
+                unit: "px",
+                orientation: pxH >= pxW ? "portrait" : "landscape",
+                format: [pxW, pxH],
+            });
+            pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, pxW, pxH);
+
+            const candidateName = form.candidateName.trim() || "Candidate";
+            const file = new File([pdf.output("blob")], `Job-Offer-${candidateName}.pdf`, {
+                type: "application/pdf",
+            });
+            const body = new FormData();
+            body.append("file", file);
+            const res = await fetch("/api/hrm/onboarding/job-offer/upload", {
+                method: "POST",
+                body,
+            });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || typeof json?.data?.id !== "string") {
+                toast.error(typeof json?.message === "string" ? json.message : "Upload failed");
+                return null;
+            }
+            setPdfFileId(json.data.id);
+            setPdfFileName(file.name);
+            toast.success("Offer PDF uploaded");
+            return json.data.id as string;
+        } catch {
+            toast.error("Failed to generate offer PDF");
+            return null;
+        } finally {
+            el.style.width = prev.width;
+            el.style.maxWidth = prev.maxWidth;
+            el.style.boxSizing = prev.boxSizing;
+            el.style.margin = prev.margin;
+            setUploading(false);
+        }
+    };
+
+    const handleSave = async (pdfFileIdArg?: string) => {
+        const envelope = envelopes.find((e) => String(e.id) === selectedEnvelopeId);
+        if (!envelope) return;
+        const id = pdfFileIdArg ?? pdfFileId;
+        if (!id) return;
+        setSaving(true);
+        try {
+            const res =
+                envelope.joboffer_id !== null
+                    ? await fetch(`/api/hrm/onboarding/job-offer/${envelope.joboffer_id}/offer`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                              pdf_file: id,
+                              terms_snapshot: form,
+                              status: "sent",
+                              signing_envelope_id: envelope.id,
+                          }),
+                      })
+                    : await fetch("/api/hrm/onboarding/job-offer", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                              applicant_id: envelope.applicant_id,
+                              signing_envelope_id: envelope.id,
+                              pdf_file: id,
+                              terms_snapshot: form,
+                              status: "sent",
+                          }),
+                      });
+            const json = await res.json().catch(() => null);
+            if (!res.ok) {
+                toast.error(typeof json?.message === "string" ? json.message : "Failed to save job offer");
+                return;
+            }
+            toast.success("Job offer saved");
+            setPdfFileId(null);
+            setPdfFileName(null);
+            await loadEnvelopes();
+        } catch {
+            toast.error("Failed to save job offer");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleUploadOfferPdf = async () => {
+        const envelope = envelopes.find((e) => String(e.id) === selectedEnvelopeId);
+        if (!envelope) {
+            toast.error("Select an open envelope first");
+            return;
+        }
+        const id = await generateAndUploadOfferPdf();
+        if (id) await handleSave(id);
+    };
+
     const handlePrint = () => window.print();
+
+    const envelopeOptions = envelopes.map((e) => {
+        const applicant = applicants.find((a) => a.id === e.applicant_id);
+        if (!applicant) return { value: String(e.id), label: `Applicant #${e.applicant_id}` };
+        const label = applicant.position_applied_for
+            ? `${applicant.full_name} — ${applicant.position_applied_for}`
+            : applicant.full_name;
+        return { value: String(e.id), label };
+    });
 
     const field = "w-full";
     const label = "text-sm font-medium mb-1 block";
@@ -274,21 +489,45 @@ function JobOfferContent() {
                         </p>
                     </div>
                 </div>
-                <Button onClick={handlePrint} className="w-full sm:w-auto">
-                    <Printer className="mr-2 h-4 w-4" />
-                    Print Offer
-                </Button>
+                <div className="flex flex-col gap-2 w-full sm:w-auto sm:items-end">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Button onClick={handlePrint} className="w-full sm:w-auto" type="button">
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print
+                        </Button>
+                        <Button
+                            onClick={() => void handleUploadOfferPdf()}
+                            variant="outline"
+                            className="w-full sm:w-auto bg-green-600 text-white hover:bg-green-700"
+                            disabled
+                            title="Temporarily disabled"
+                            type="button"
+                        >
+                            <Upload className="mr-2 h-4 w-4" />
+                            {uploading ? "Uploading…" : saving ? "Saving…" : "Upload"}
+                        </Button>
+                    </div>
+                    {pdfFileName ? (
+                        <p
+                            className="text-xs text-muted-foreground truncate max-w-full sm:max-w-[260px]"
+                            title={pdfFileName}
+                        >
+                            {pdfFileName}
+                        </p>
+                    ) : null}
+                </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[400px_1fr] items-start">
                 <div className="bg-card shadow-sm border rounded-xl p-6 space-y-4">
                     <div>
-                        <span className={label}>Pre-fill from applicant (optional)</span>
+                        <span className={label}>Open signing envelope</span>
                         <JobOfferCombobox
-                            options={applicants.map((a) => ({ value: String(a.id), label: a.full_name }))}
-                            onValueChange={handleApplicantPick}
-                            placeholder={applicantsLoading ? "Loading applicants..." : "Pick an applicant"}
-                            disabled={applicantsLoading}
+                            options={envelopeOptions}
+                            value={selectedEnvelopeId}
+                            onValueChange={handleEnvelopePick}
+                            placeholder={envelopesLoading ? "Loading envelopes..." : "Select open envelope"}
+                            disabled={envelopesLoading}
                         />
                     </div>
 

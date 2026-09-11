@@ -17,7 +17,6 @@ import {
   type SignOfferResult,
 } from "../providers/signingEnvelopeProvider";
 import { SigningItemView } from "./SigningItemView";
-import { SigningFilingPanel } from "./SigningFilingPanel";
 import { SigningCompletionBanner } from "./SigningCompletionBanner";
 import { SigningOfferSection } from "./SigningOfferSection";
 import { useSigningSurfaceCompletion } from "./useSigningSurfaceCompletion";
@@ -56,6 +55,7 @@ export function SigningSurface({
   const {
     signPaperworkItem,
     listEnvelopes,
+    listJobOffers,
     listPaperworks,
     listPaperworkItems,
   } = useSigningEnvelopeFetch();
@@ -80,19 +80,6 @@ export function SigningSurface({
         return aTitle.localeCompare(bTitle);
       }),
     [items, templatesById]
-  );
-
-  const filedSummary = useMemo(
-    () =>
-      orderedItems.map((item) => ({
-        id: item.id,
-        templateTitle:
-          templatesById.get(item.template_id)?.title ??
-          `Template ${item.template_id}`,
-        status: item.status,
-        pdfFile: item.pdf_file,
-      })),
-    [orderedItems, templatesById]
   );
 
   const reloadSet = useCallback(async () => {
@@ -136,6 +123,20 @@ export function SigningSurface({
     [onChanged, setCompletion]
   );
 
+  const handleOfferChanged = useCallback(async () => {
+    try {
+      const rows = await listJobOffers(applicantId);
+      const next =
+        rows.find((row) => row.applicant_id === applicantId) ?? rows[0] ?? null;
+      setOffer(next);
+      onChanged?.();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not refresh the offer"
+      );
+    }
+  }, [applicantId, listJobOffers, onChanged]);
+
   const retryItem = useMemo(
     () =>
       items.find(
@@ -178,7 +179,6 @@ export function SigningSurface({
 
   const offerSigned = offer?.status === "signed";
   const complete = envelopeState.status === "complete";
-  const hired = applicantStatus === "hired" || completion?.kind === "hired";
   const nextUnsigned =
     orderedItems.find((item) => item.status !== "signed") ?? null;
 
@@ -237,7 +237,11 @@ export function SigningSurface({
         onRetry={() => void handleRetryCompletion()}
       />
 
-      <SigningOfferSection offer={offer} onAccepted={handleOfferAccepted} />
+      <SigningOfferSection
+        offer={offer}
+        onAccepted={handleOfferAccepted}
+        onOfferChanged={() => void handleOfferChanged()}
+      />
 
       {orderedItems.map((item) => (
         <SigningItemView
@@ -251,12 +255,6 @@ export function SigningSurface({
           onSigned={handleItemSigned}
         />
       ))}
-
-      <SigningFilingPanel
-        applicantId={applicantId}
-        items={filedSummary}
-        filed={hired}
-      />
     </div>
   );
 }

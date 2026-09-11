@@ -24,10 +24,11 @@ export const dynamic = "force-dynamic";
 // reaches the browser.
 //
 // PATCH /api/hrm/onboarding/job-offer/[id] — accept one offer (todo 11):
-// `signature_file` is OPTIONAL (the digital-signature hook is future work).
-// The route writes NOTHING itself — it delegates to `signJobOffer`, which
-// marks the offer signed, calls the todo-12 rollup service, and advances the
-// applicant to `incomplete` while the signing set is not complete.
+// `signature_file` is OPTIONAL (the digital-signature hook is future work);
+// `strokes` (serialized ink) and `signed_pdf_file` (burned output UUID) ride
+// along. The route writes NOTHING itself — it delegates to `signJobOffer`,
+// which marks the offer signed, calls the todo-12 rollup service, and advances
+// the applicant to `incomplete` while the signing set is not complete.
 
 export async function GET(
   req: NextRequest,
@@ -78,6 +79,8 @@ export async function GET(
 const JobOfferSignSchema = z
   .object({
     signature_file: z.string().min(1).nullable().default(null),
+    strokes: z.string().min(1).nullable().default(null),
+    signed_pdf_file: z.string().min(1).nullable().default(null),
   })
   .strict();
 
@@ -107,6 +110,8 @@ export async function PATCH(
       const result = await signJobOffer({
         offerId,
         signatureFile: validation.data.signature_file,
+        strokes: validation.data.strokes,
+        signedPdfFile: validation.data.signed_pdf_file,
       });
       return NextResponse.json({ success: true, data: result });
     } catch (error) {
