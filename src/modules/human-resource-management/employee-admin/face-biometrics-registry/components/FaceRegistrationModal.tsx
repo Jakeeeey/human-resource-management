@@ -86,8 +86,8 @@ export function FaceRegistrationModal({ isOpen, onOpenChange, user }: FaceRegist
   const ASSETS_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") + "/assets";
   
   // Robust name resolution
-  const firstName = user?.firstName || (user as Record<string, unknown>)?.first_name as string || "";
-  const lastName = user?.lastName || (user as Record<string, unknown>)?.last_name as string || "";
+  const firstName = user?.firstName || (user as unknown as Record<string, unknown>)?.first_name as string || "";
+  const lastName = user?.lastName || (user as unknown as Record<string, unknown>)?.last_name as string || "";
   const displayName = (firstName || lastName) 
     ? `${firstName} ${lastName}`.trim() 
     : user?.email 
