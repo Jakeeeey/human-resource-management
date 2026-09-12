@@ -325,3 +325,30 @@ export const manpowerRecommendationService = {
 export function normalizeRecommendation(row: Record<string, unknown>): ManpowerRecommendation {
     return row as unknown as ManpowerRecommendation;
 }
+
+/**
+ * Resolve the manpower request linked to an applicant's newest APPROVED
+ * recommendation (source of the set-once `applicant.manpower_request_id`
+ * stamp written at `final_approved`). Never throws — a missing row or any
+ * read error resolves to null.
+ * @param applicantId - Applicant row ID.
+ * @returns The approved recommendation's manpower_request_id, or null.
+ */
+export async function fetchApprovedRequestIdForApplicant(applicantId: number): Promise<number | null> {
+    try {
+        const url =
+            `${API_BASE_URL}/items/manpower_recommendation` +
+            `?filter[applicant_id][_eq]=${applicantId}` +
+            `&filter[status][_eq]=Approved` +
+            `&sort=-created_at&limit=1` +
+            `&fields=manpower_request_id`;
+        const response = await fetch(url, { headers });
+        if (!response.ok) return null;
+        const result = await response.json();
+        const rows = result.data as { manpower_request_id: number | null }[] | undefined;
+        const requestId = rows?.[0]?.manpower_request_id;
+        return typeof requestId === "number" ? requestId : null;
+    } catch {
+        return null;
+    }
+}

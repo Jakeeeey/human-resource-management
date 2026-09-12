@@ -277,7 +277,8 @@ function JobOfferContent() {
             position: applicant?.position_applied_for ?? f.position,
         }));
         // Autofill address/contact/salutation from the applicant's latest
-        // application record; every field stays editable and is untouched
+        // application record and department/division from their committed
+        // manpower request; every field stays editable and is untouched
         // when the application is unreachable.
         void (async () => {
             try {
@@ -288,6 +289,15 @@ function JobOfferContent() {
                 const json = await res.json().catch(() => null);
                 const application = json?.data?.application;
                 if (!application) return;
+                const committed = json?.data?.committed_request;
+                const committedDepartment =
+                    typeof committed?.department_name === "string" && committed.department_name.trim()
+                        ? committed.department_name
+                        : null;
+                const committedDivision =
+                    typeof committed?.division_name === "string" && committed.division_name.trim()
+                        ? committed.division_name
+                        : null;
                 const prefix = salutationPrefix(application.sex, application.civil_status);
                 const surname = surnameOf(applicant?.full_name ?? "");
                 setForm((f) => ({
@@ -305,6 +315,8 @@ function JobOfferContent() {
                             ? `${prefix} ${surname}`
                             : prefix
                         : f.salutationName,
+                    department: committedDepartment ?? f.department,
+                    division: committedDivision ?? f.division,
                 }));
             } catch {
                 // Autofill is a convenience — the fields stay manual on failure.

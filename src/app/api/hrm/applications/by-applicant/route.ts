@@ -65,6 +65,62 @@ export async function GET(req: NextRequest) {
             })
         );
 
+        // Committed manpower request: the applicant's resolved request carries
+        // the department/division the job-offer envelope prefills. Every hop is
+        // optional — a missing row just yields null names. Any failure here
+        // must never break the resume bundle, so it has its own try/catch.
+        let committed_request: {
+            manpower_request_id: number;
+            department_name: string | null;
+            division_name: string | null;
+            position: string | null;
+        } | null = null;
+        try {
+            const applicantRes = (await dFetch(
+                `/items/applicant/${applicantId}?fields=manpower_request_id`
+            )) as { data?: { manpower_request_id?: unknown } };
+            const manpowerRequestId = applicantRes?.data?.manpower_request_id;
+            if (typeof manpowerRequestId === "number") {
+                const requestRes = (await dFetch(
+                    `/items/manpower_request/${manpowerRequestId}?fields=requesting_department_id,division_id,position`
+                )) as {
+                    data?: {
+                        requesting_department_id?: unknown;
+                        division_id?: unknown;
+                        position?: unknown;
+                    };
+                };
+                const request = requestRes?.data ?? null;
+
+                let department_name: string | null = null;
+                if (typeof request?.requesting_department_id === "number") {
+                    const deptRes = (await dFetch(
+                        `/items/department/${request.requesting_department_id}?fields=department_name`
+                    )) as { data?: { department_name?: unknown } };
+                    department_name =
+                        typeof deptRes?.data?.department_name === "string" ? deptRes.data.department_name : null;
+                }
+
+                let division_name: string | null = null;
+                if (typeof request?.division_id === "number") {
+                    const divRes = (await dFetch(
+                        `/items/division/${request.division_id}?fields=division_name`
+                    )) as { data?: { division_name?: unknown } };
+                    division_name =
+                        typeof divRes?.data?.division_name === "string" ? divRes.data.division_name : null;
+                }
+
+                committed_request = {
+                    manpower_request_id: manpowerRequestId,
+                    department_name,
+                    division_name,
+                    position: typeof request?.position === "string" ? request.position : null,
+                };
+            }
+        } catch {
+            committed_request = null;
+        }
+
         // Stored photo/signature are Directus file UUIDs. The browser can't
         // call /assets with the server static token, so fetch the bytes here
         // and inline them as data URLs HR can view (read-only — nothing to edit).
@@ -96,7 +152,14 @@ export async function GET(req: NextRequest) {
         );
 
         return NextResponse.json({
-            data: { application, ...Object.fromEntries(children), photo_image, signature_image, attachment_files },
+            data: {
+                application,
+                ...Object.fromEntries(children),
+                photo_image,
+                signature_image,
+                attachment_files,
+                committed_request,
+            },
         });
     } catch (err) {
         console.error("[applications/by-applicant]", err);

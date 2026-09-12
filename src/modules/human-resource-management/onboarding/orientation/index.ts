@@ -1,5 +1,8 @@
 export { OrientationTab } from "./components/OrientationTab";
-export { DEFAULT_ORIENTATION_TOPICS } from "./orientationSeed";
+// `DEFAULT_ORIENTATION_TOPICS` is deliberately NOT re-exported here (todo 11):
+// it is the todo-6 SEED source only — `catalogSeed.ts` imports
+// `./orientationSeed` directly. Topics at runtime come from the DB via
+// `./orientationStore`.
 export {
   TRACK_OWNER,
   findTopic,
@@ -14,8 +17,8 @@ export {
   computeOrientationDone,
   getOrientationState,
   isOrientationDone,
-  listOrientationEmployees,
 } from "./orientation-task-service";
+export { listOrientationEmployees } from "./orientationRoster";
 export type {
   CheckOffOrientationResult,
   OrientationState,

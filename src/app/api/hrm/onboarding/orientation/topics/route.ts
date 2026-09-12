@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  OrientationActorSchema,
   CreateOrientationTopicSchema,
   type OrientationTopic,
 } from "@/modules/human-resource-management/onboarding/orientation/types/orientation.schema";
@@ -16,8 +15,8 @@ export const dynamic = "force-dynamic";
 // GET /api/hrm/onboarding/orientation/topics — topic lists (seed + admin
 // overlays), company track first. The hub tab renders from here, never
 // from inline literals.
-// POST — admin add/edit a topic. Admin surface is HR-owned, so the actor
-// must be `hr` (anything else → 403).
+// POST — add/edit a topic. No role gate in app code: access is governed by
+// the platform's external module authorization (plan §12).
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -33,15 +32,11 @@ function normalizeTopic(row: OrientationTopic): OrientationTopic {
   };
 }
 
-const createBodySchema = CreateOrientationTopicSchema.extend({
-  actor: OrientationActorSchema,
-});
-
 export async function GET() {
   try {
     return NextResponse.json({
       success: true,
-      data: listTopics().map(normalizeTopic),
+      data: (await listTopics()).map(normalizeTopic),
     });
   } catch (error) {
     console.error("[onboarding-orientation] topics list error:", error);
@@ -55,18 +50,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body: unknown = await req.json().catch(() => null);
-    const validation = createBodySchema.safeParse(body);
+    const validation = CreateOrientationTopicSchema.safeParse(body);
     if (!validation.success) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
-    if (validation.data.actor.role !== "hr") {
-      return NextResponse.json(
-        { success: false, message: "Only HR can edit orientation topics" },
-        { status: 403 }
-      );
-    }
 
-    const created = upsertTopic({
+    const created = await upsertTopic({
       id: validation.data.id,
       track: validation.data.track,
       title: validation.data.title,

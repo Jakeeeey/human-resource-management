@@ -3,27 +3,28 @@ import {
   TRACK_OWNER,
   orientationTopicCode,
 } from "../orientation/orientationStore";
+import type { OrientationTrack } from "../orientation/types/orientation.schema";
 import type { OnboardingOwnerRole } from "../types/onboarding-task.schema";
 
-// taskTemplateSeed.ts — the post-hire task catalog source (todo 19).
-//
-// ONE seed row per trackable onboarding unit, grouped in the four phases the
-// plan names (documents / orientation / training / equipment). Content is
-// SOURCED, never invented:
+// taskTemplateSeed.ts — the code-owned DEFAULTS for the post-hire task
+// catalog, grouped in the four phases the plan names (documents / orientation /
+// training / equipment). Content is SOURCED, never invented:
 //
 //   - `documents` rows mirror the pdf §10 checklist items `docs` /
 //     `hr_verify` / `ack` (onboarding/completion/completionChecklist.ts);
-//   - `orientation` rows are DERIVED from `DEFAULT_ORIENTATION_TOPICS`
-//     (orientationSeed.ts is the ONLY place topic titles live) with the
-//     responsible party from `TRACK_OWNER` (company -> hr, department ->
-//     department) and the shared `orientationTopicCode` mapping (todo 20);
+//   - `orientation` rows are NO LONGER code-owned (todo 2 of
+//     onboarding-requirements-config): the persisted `orientation_topic`
+//     catalog is the source and `buildOrientationTemplateSeeds` derives one
+//     row per topic with the responsible party from `TRACK_OWNER` (company ->
+//     hr, department -> department). `buildOrientationTemplates` stays as the
+//     PARITY ORACLE of the legacy code-seed output (never used at runtime);
 //   - `training` rows mirror the §10 `training` item (HR assigns, hiree
 //     completes);
 //   - `equipment` rows mirror the §10 `access` + `equipment` items.
 //
-// `ensureOnboardingTaskTemplates` (server/task-template-service.ts) upserts
-// these rows by `code`; this file stays pure data so services + harnesses can
-// import it without side effects.
+// `ensureOnboardingTaskTemplates` (server/task-template-service.ts) CREATES
+// these rows only for codes that are absent; this file stays pure data /
+// derivation so services + harnesses can import it without side effects.
 
 export const ONBOARDING_TASK_PHASES = [
   "documents",
@@ -41,6 +42,12 @@ export interface OnboardingTaskTemplateSeed {
   owner_role: OnboardingOwnerRole;
   is_required: boolean;
   sort_order: number;
+  /**
+   * Applied on CREATE only — an existing row's flag is NEVER overwritten
+   * (create-missing seeding). Orientation rows inherit the topic's current
+   * `is_active`; every other default row is created active.
+   */
+  is_active: boolean;
 }
 
 /** §10 `docs` / `hr_verify` / `ack`, in fixed checklist order. */
@@ -51,6 +58,7 @@ const DOCUMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "documents",
     owner_role: "hiree",
     is_required: true,
+    is_active: true,
     sort_order: 10,
   },
   {
@@ -59,6 +67,7 @@ const DOCUMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "documents",
     owner_role: "hr",
     is_required: true,
+    is_active: true,
     sort_order: 20,
   },
   {
@@ -67,6 +76,7 @@ const DOCUMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "documents",
     owner_role: "hiree",
     is_required: true,
+    is_active: true,
     sort_order: 30,
   },
 ];
@@ -79,6 +89,7 @@ const TRAINING_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "training",
     owner_role: "hr",
     is_required: true,
+    is_active: true,
     sort_order: 300,
   },
   {
@@ -87,6 +98,7 @@ const TRAINING_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "training",
     owner_role: "hiree",
     is_required: true,
+    is_active: true,
     sort_order: 310,
   },
 ];
@@ -99,6 +111,7 @@ const EQUIPMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "equipment",
     owner_role: "system",
     is_required: true,
+    is_active: true,
     sort_order: 400,
   },
   {
@@ -107,6 +120,7 @@ const EQUIPMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "equipment",
     owner_role: "department",
     is_required: true,
+    is_active: true,
     sort_order: 410,
   },
   {
@@ -115,17 +129,57 @@ const EQUIPMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     phase: "equipment",
     owner_role: "hiree",
     is_required: true,
+    is_active: true,
     sort_order: 420,
   },
 ];
 
 const ORIENTATION_SORT_BASE = 100;
 
+/** The persisted `orientation_topic` fields the derivation reads. */
+export interface OrientationTopicSeedSource {
+  /** `orientation_topic.code` (app-level topic id, e.g. `company-background`). */
+  code: string;
+  title: string;
+  track: OrientationTrack;
+  is_required: boolean;
+  sort_order: number;
+  is_active: boolean;
+}
+
 /**
- * One template per orientation topic (company track first, then department),
- * titles taken from the seed so topics never appear as literals elsewhere.
+ * Derives the orientation template rows from the PERSISTED topic catalog —
+ * the create-missing input for todo 2. Company track first, then DB
+ * `sort_order` (mirrors `orientationStore.sortTopics`, so the legacy ordering
+ * survives). The code uses the ONE `orientationTopicCode` mapping; `is_active`
+ * mirrors the topic's current flag.
  */
-function buildOrientationTemplates(): OnboardingTaskTemplateSeed[] {
+export function buildOrientationTemplateSeeds(
+  topics: readonly OrientationTopicSeedSource[]
+): OnboardingTaskTemplateSeed[] {
+  return [...topics]
+    .sort((a, b) => {
+      if (a.track !== b.track) return a.track === "company" ? -1 : 1;
+      return a.sort_order - b.sort_order;
+    })
+    .map((topic, index) => ({
+      code: orientationTopicCode(topic.code),
+      title: topic.title,
+      phase: "orientation",
+      owner_role: TRACK_OWNER[topic.track],
+      is_required: topic.is_required,
+      sort_order: ORIENTATION_SORT_BASE + (index + 1) * 10,
+      is_active: topic.is_active,
+    }));
+}
+
+/**
+ * PARITY ORACLE — the legacy (pre-todo-2) code-seed derivation. NOT used at
+ * runtime; `buildOrientationTemplateSeeds` must produce the same rows for the
+ * default catalog. Kept exported so the parity claim stays executable
+ * (evidence `task-2-seed-reconcile.md`).
+ */
+export function buildOrientationTemplates(): OnboardingTaskTemplateSeed[] {
   return DEFAULT_ORIENTATION_TOPICS.map((topic, index) => ({
     code: orientationTopicCode(topic.id),
     title: topic.title,
@@ -133,15 +187,14 @@ function buildOrientationTemplates(): OnboardingTaskTemplateSeed[] {
     owner_role: TRACK_OWNER[topic.track],
     is_required: topic.required,
     sort_order: ORIENTATION_SORT_BASE + (index + 1) * 10,
+    is_active: true,
   }));
 }
 
-/** The complete seed catalog in phase order, deterministic sort. */
+/**
+ * The code-owned defaults for the non-orientation phases; orientation rows are
+ * derived from the DB topic catalog instead (never seeded from code).
+ */
 export function listOnboardingTaskTemplateSeed(): OnboardingTaskTemplateSeed[] {
-  return [
-    ...DOCUMENT_TEMPLATES,
-    ...buildOrientationTemplates(),
-    ...TRAINING_TEMPLATES,
-    ...EQUIPMENT_TEMPLATES,
-  ];
+  return [...DOCUMENT_TEMPLATES, ...TRAINING_TEMPLATES, ...EQUIPMENT_TEMPLATES];
 }

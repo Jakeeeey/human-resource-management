@@ -6,7 +6,8 @@
 // list, and the per-phase surfaces move into the per-hire workspace (todo 28+).
 // No stage/status is a tab.
 
-import { ClipboardCheck, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { ClipboardCheck, ListChecks, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -31,17 +32,34 @@ export function OnboardingHubModule() {
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full shrink-0 sm:w-auto"
-          onClick={() => window.dispatchEvent(new Event(HIRE_ROSTER_REFRESH_EVENT))}
-          aria-label="Refresh roster"
-          title="Refresh roster"
-        >
-          <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-          Refresh
-        </Button>
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            asChild
+          >
+            <Link
+              href="/hrm/onboarding/requirements"
+              aria-label="Manage onboarding requirements"
+              title="Manage onboarding requirements"
+            >
+              <ListChecks className="mr-2 h-4 w-4" aria-hidden="true" />
+              Requirements
+            </Link>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full shrink-0 sm:w-auto"
+            onClick={() => window.dispatchEvent(new Event(HIRE_ROSTER_REFRESH_EVENT))}
+            aria-label="Refresh roster"
+            title="Refresh roster"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <HireRoster />

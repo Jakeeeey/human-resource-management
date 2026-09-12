@@ -149,7 +149,12 @@ export function runCompletionChecklist(input: CompletionInputs): ChecklistItem[]
   const items = input.tasks.map((task): ChecklistItem => {
     const template =
       task.template_id === null ? undefined : byTemplate.get(task.template_id);
-    const required = template ? template.is_required : true;
+    // Todo-10 soft-delete rule: an INACTIVE catalog row is never required (its
+    // item may still render as informational); a missing template stays
+    // required (fail closed). Existing task rows are never mutated here.
+    const required = template
+      ? template.is_active === true && template.is_required === true
+      : true;
     const phase = template?.phase ?? "custom";
     const label = template?.title ?? `Task #${task.id}`;
     const done = isTaskSatisfied(task.status);

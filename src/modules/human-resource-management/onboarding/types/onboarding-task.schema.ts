@@ -42,10 +42,19 @@ export const OnboardingTaskStatusSchema = z.enum(ONBOARDING_TASK_STATUS);
 // The `tinyint(1)` columns (`onboarding_task_template.is_required`) are
 // reported by `/fields` as `type=boolean` but SERIALIZED by the live Directus
 // API as `0 | 1` (probed live 2026-09-10) — normalize at the boundary so the
-// rest of the app only ever sees a real boolean.
+// rest of the app only ever sees a real boolean. STRICT on purpose: a null
+// `is_required` must be rejected, never silently coerced to `false`.
 const OnboardingFlagSchema = z
   .union([z.boolean(), z.number().int().min(0).max(1)])
   .transform((value) => value === true || value === 1);
+
+// `is_active` is TOLERANT — and only for `is_active` (never shared with
+// `is_required`): legacy rows may serialize it as `null` or omit it, and
+// null/absent means "active". Normalizes to a real boolean without throwing.
+const ActiveFlagSchema = z
+  .union([z.boolean(), z.number().int().min(0).max(1)])
+  .nullish()
+  .transform((value) => value !== false && value !== 0);
 
 export const OnboardingTaskTemplateSchema = z.object({
   id: z.number().int().positive(),
@@ -55,6 +64,7 @@ export const OnboardingTaskTemplateSchema = z.object({
   owner_role: OnboardingOwnerRoleSchema,
   is_required: OnboardingFlagSchema,
   sort_order: z.number().int(),
+  is_active: ActiveFlagSchema,
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),

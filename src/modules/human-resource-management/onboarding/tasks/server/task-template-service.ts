@@ -2,32 +2,41 @@ import {
   ONBOARDING_TASK_ERROR_CODES,
   createTemplateRows,
   listTemplateRows,
-  patchTemplateRow,
   phTimeNow,
   type TemplateWriteRow,
 } from "./onboardingTaskIo";
 import {
+  buildOrientationTemplateSeeds,
   listOnboardingTaskTemplateSeed,
-  type OnboardingTaskTemplateSeed,
 } from "../taskTemplateSeed";
 import type { OnboardingTaskTemplate } from "../../types/onboarding-task.schema";
+import { listTopicRows } from "../../orientation/server/orientationTopicIo";
+import { seedMissingCatalogRows } from "./catalogSeed";
 
-// task-template-service.ts — idempotent template catalog seed (todo 19).
+// task-template-service.ts — CREATE-MISSING-ONLY template catalog seed
+// (todo 2 of onboarding-requirements-config; supersedes the todo-19 upsert).
 //
-// `ensureOnboardingTaskTemplates()` UPSERTS the code-owned catalog by `code`:
-//   - missing code            -> batch create (ONE POST);
-//   - existing code with drift -> PATCH back to the seed (the seed wins for
-//     title / phase / owner_role / is_required / sort_order);
-//   - identical row           -> NO write at all (re-runs are true no-ops);
-//   - read-back verify        -> every seed code MUST be visible after the
-//     writes (never a misleading success).
-// There is no DELETE here: retiring a code is a data decision, not a seed
-// side effect, and old rows must not be resurrected by a later re-run.
+// `ensureOnboardingTaskTemplates()`:
+//   - runs the todo-6 catalog seeder FIRST (orientation_topic /
+//     onboarding_document_slot / onboarding_equipment_item), so a fresh
+//     `orientation_topic` table is populated BEFORE orientation rows derive;
+//   - derives orientation template rows from the PERSISTED topic catalog
+//     (`buildOrientationTemplateSeeds`, code via the ONE `orientationTopicCode`
+//     formula) and takes documents / training / equipment from the code
+//     defaults;
+//   - CREATES only codes that are absent (ONE batch POST when any). An
+//     existing row is NEVER overwritten — title / is_required / phase /
+//     owner_role / sort_order / is_active all stay as the DB holds them: the
+//     DB is authoritative after the first seed;
+//   - re-runs are true no-ops (zero writes);
+//   - read-back verify: every seed code MUST be visible after the writes
+//     (never a misleading success).
+// There is no DELETE and no PATCH here: retiring/editing rows is a human data
+// decision, not a seed side effect.
 
 export interface TemplateSeedSummary {
   total: number;
   created: string[];
-  updated: string[];
   unchanged: number;
 }
 
@@ -44,29 +53,9 @@ export interface TemplateSeedResult {
   templates: OnboardingTaskTemplate[];
 }
 
-function seedPatch(
-  existing: OnboardingTaskTemplate,
-  seed: OnboardingTaskTemplateSeed
-): Record<string, unknown> | null {
-  const patch: Record<string, unknown> = {};
-  if (existing.title !== seed.title) patch.title = seed.title;
-  if (existing.phase !== seed.phase) patch.phase = seed.phase;
-  if (existing.owner_role !== seed.owner_role) {
-    patch.owner_role = seed.owner_role;
-  }
-  if (existing.is_required !== seed.is_required) {
-    patch.is_required = seed.is_required;
-  }
-  if (existing.sort_order !== seed.sort_order) {
-    patch.sort_order = seed.sort_order;
-  }
-  return Object.keys(patch).length > 0 ? patch : null;
-}
-
 /**
- * Seeds/repairs the `onboarding_task_template` catalog from the code-owned
- * `taskTemplateSeed` rows. Safe to call on every hire: a fully seeded catalog
- * produces zero writes.
+ * Creates the template codes that are absent from `onboarding_task_template`.
+ * Safe to call on every hire: a fully seeded catalog produces zero writes.
  * @param input - Optional actor id for `created_by` / `updated_by`.
  * @returns The seed summary + the verified catalog.
  * @throws Error with `ONBOARDING_TASK_ERROR_CODES.templateWriteFailed` when a
@@ -76,21 +65,23 @@ export async function ensureOnboardingTaskTemplates(input?: {
   actorId?: number | null;
 }): Promise<TemplateSeedResult> {
   const actorId = input?.actorId ?? null;
-  const seed = listOnboardingTaskTemplateSeed();
-  const existing = await listTemplateRows();
-  const byCode = new Map(existing.map((row) => [row.code, row]));
+  // Todo 6: seed the three new catalog collections (orientation topics,
+  // document slots, equipment items) BEFORE any template derivation — a fresh
+  // / empty `orientation_topic` table must still yield orientation tasks.
+  await seedMissingCatalogRows({ actorId });
 
+  // Todo 2: orientation rows derive from ALL persisted topics (inactive ones
+  // included; their derived template is created with their current flag).
+  const [topics, existing] = await Promise.all([
+    listTopicRows(),
+    listTemplateRows(),
+  ]);
+  const seed = [
+    ...listOnboardingTaskTemplateSeed(),
+    ...buildOrientationTemplateSeeds(topics),
+  ];
+  const byCode = new Set(existing.map((row) => row.code));
   const missing = seed.filter((row) => !byCode.has(row.code));
-  const changed: Array<{
-    existing: OnboardingTaskTemplate;
-    patch: Record<string, unknown>;
-  }> = [];
-  for (const row of seed) {
-    const current = byCode.get(row.code);
-    if (!current) continue;
-    const patch = seedPatch(current, row);
-    if (patch) changed.push({ existing: current, patch });
-  }
 
   const now = phTimeNow();
   const createdCodes: string[] = [];
@@ -104,16 +95,6 @@ export async function ensureOnboardingTaskTemplates(input?: {
     }));
     const created = await createTemplateRows(rows);
     createdCodes.push(...created.map((row) => row.code));
-  }
-
-  const updatedCodes: string[] = [];
-  for (const { existing: current, patch } of changed) {
-    await patchTemplateRow(current.id, {
-      ...patch,
-      updated_at: now,
-      updated_by: actorId,
-    });
-    updatedCodes.push(current.code);
   }
 
   const verified = await listTemplateRows();
@@ -131,8 +112,7 @@ export async function ensureOnboardingTaskTemplates(input?: {
     summary: {
       total: seed.length,
       created: createdCodes,
-      updated: updatedCodes,
-      unchanged: seed.length - createdCodes.length - updatedCodes.length,
+      unchanged: seed.length - createdCodes.length,
     },
     templates: verified,
   };

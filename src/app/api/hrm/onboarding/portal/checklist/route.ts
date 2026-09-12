@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: buildChecklist(key, parsed.data.data),
+      data: await buildChecklist(key, parsed.data.data),
     });
   } catch (error) {
     console.error("[onboarding-portal] checklist error:", error);

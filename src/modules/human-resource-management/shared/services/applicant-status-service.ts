@@ -14,6 +14,11 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 // `application.status` column. There is NO history/event table — the current
 // `applicant.status` value is the whole truth, and ALLOWED_TRANSITIONS below
 // is the only place transitions are defined.
+//
+// This service is ALSO the single writer of `applicant.manpower_request_id`:
+// the stamp is written atomically with the `final_approved` transition from the
+// applicant's approved manpower recommendation. Provenance — set-once, never
+// cleared (a null/undefined stamp is never written).
 
 export { APPLICANT_STATUS, ApplicantStatusSchema };
 export type { ApplicantStatus };
@@ -57,10 +62,11 @@ export const APPLICANT_STATUS_ERROR_CODES = {
   writeFailed: "APPLICANT_STATUS_WRITE_FAILED",
 } as const;
 
-/** `setApplicantStatus` input: the applicant row id + the target status. */
+/** `setApplicantStatus` input: applicant row id + target status + optional one-time stamp. */
 export const SetApplicantStatusParamsSchema = z.object({
   applicantId: z.number().int().positive(),
   status: ApplicantStatusSchema,
+  manpowerRequestId: z.number().int().positive().optional(),
 });
 
 export type SetApplicantStatusParams = z.infer<typeof SetApplicantStatusParamsSchema>;
@@ -69,6 +75,7 @@ export type SetApplicantStatusParams = z.infer<typeof SetApplicantStatusParamsSc
 export const ApplicantStatusRowSchema = z.looseObject({
   id: z.number().int().positive(),
   status: ApplicantStatusSchema,
+  manpower_request_id: z.number().int().positive().nullable().optional(),
 });
 
 export type ApplicantStatusRow = z.infer<typeof ApplicantStatusRowSchema>;
@@ -94,7 +101,7 @@ function unwrapData(body: unknown): unknown {
 
 async function readApplicantRow(applicantId: number): Promise<ApplicantStatusRow> {
   const body: unknown = await dFetch(
-    `/items/${DIRECTUS_COLLECTION}/${applicantId}?fields=id,status`
+    `/items/${DIRECTUS_COLLECTION}/${applicantId}?fields=id,status,manpower_request_id`
   );
   const errorMessage = directusErrorMessage(body);
   if (errorMessage) {
@@ -115,11 +122,16 @@ async function readApplicantRow(applicantId: number): Promise<ApplicantStatusRow
 
 async function patchApplicantStatus(
   applicantId: number,
-  status: ApplicantStatus
+  status: ApplicantStatus,
+  manpowerRequestId?: number
 ): Promise<ApplicantStatusRow> {
   const body: unknown = await dFetch(`/items/${DIRECTUS_COLLECTION}/${applicantId}`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(
+      manpowerRequestId === undefined
+        ? { status }
+        : { status, manpower_request_id: manpowerRequestId }
+    ),
   });
   const errorMessage = directusErrorMessage(body);
   if (errorMessage) {
@@ -149,14 +161,19 @@ export function canTransition(from: ApplicantStatus, to: ApplicantStatus): boole
 }
 
 /**
- * THE single writer of `applicant.status`. Validates the payload locally
- * (malformed ids/values are rejected BEFORE any network call), reads the
- * applicant's current status, enforces `ALLOWED_TRANSITIONS`, then PATCHes
- * Directus `PATCH /items/applicant/{id}` and returns the read-back row.
- * Re-calling with the CURRENT status is an idempotent no-op (safe for
- * retries/resume — no PATCH is issued).
- * @param params - `{ applicantId, status }` (applicant row id + target status).
- * @returns The Directus read-back row (`{ id, status, ... }`).
+ * THE single writer of `applicant.status` (and of the `final_approved`
+ * `manpower_request_id` stamp). Validates the payload locally (malformed
+ * ids/values are rejected BEFORE any network call), reads the applicant's
+ * current status, enforces `ALLOWED_TRANSITIONS`, then PATCHes Directus
+ * `PATCH /items/applicant/{id}` and returns the read-back row. The optional
+ * `manpowerRequestId` is written ONLY when provided — it is set-once
+ * provenance and is never cleared. Re-calling with the CURRENT status is an
+ * idempotent no-op (safe for retries/resume — no PATCH is issued), unless a
+ * differing `manpowerRequestId` is supplied, in which case only the stamp is
+ * PATCHed.
+ * @param params - `{ applicantId, status, manpowerRequestId? }` (applicant row
+ * id + target status + optional one-time `manpower_request_id` stamp).
+ * @returns The Directus read-back row (`{ id, status, manpower_request_id, ... }`).
  * @throws Error with a code from `APPLICANT_STATUS_ERROR_CODES` on invalid
  * input, unreadable/unparseable current status, disallowed transition, or
  * Directus write failure.
@@ -172,11 +189,14 @@ export async function setApplicantStatus(
     throw new Error(`${APPLICANT_STATUS_ERROR_CODES.invalidInput}: ${issues}`);
   }
 
-  const { applicantId, status } = validation.data;
+  const { applicantId, status, manpowerRequestId } = validation.data;
   const current = await readApplicantRow(applicantId);
 
   if (current.status === status) {
-    return current;
+    if (manpowerRequestId === undefined || manpowerRequestId === current.manpower_request_id) {
+      return current;
+    }
+    return patchApplicantStatus(applicantId, status, manpowerRequestId);
   }
 
   if (!canTransition(current.status, status)) {
@@ -185,7 +205,7 @@ export async function setApplicantStatus(
     );
   }
 
-  return patchApplicantStatus(applicantId, status);
+  return patchApplicantStatus(applicantId, status, manpowerRequestId);
 }
 
 /**

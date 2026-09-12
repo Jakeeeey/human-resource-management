@@ -1,7 +1,3 @@
-import { z } from "zod";
-
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-
 import type {
   OnboardingTask,
   OnboardingTaskTemplate,
@@ -11,15 +7,18 @@ import {
   listOnboardingTasks,
   materializeOnboardingTasks,
 } from "../tasks/server/onboarding-task-service";
-import { listOnboardingTaskTemplates } from "../tasks/server/task-template-service";
+import {
+  ensureOnboardingTaskTemplates,
+  listOnboardingTaskTemplates,
+} from "../tasks/server/task-template-service";
 import {
   findTopic,
+  listAllTopics,
   listTopics,
   orientationTopicCode,
 } from "./orientationStore";
 import type {
   OrientationCheck,
-  OrientationEmployee,
   OrientationTopic,
 } from "./types/orientation.schema";
 
@@ -36,6 +35,16 @@ import type {
 // unknown topic answers `ORIENTATION_TOPIC_NOT_FOUND` /
 // `ORIENTATION_TASK_NOT_FOUND` with ZERO writes; the session actor is only
 // written to `completed_by` (attribution, never impersonation).
+//
+// Todo 7 of onboarding-requirements-config — DB topics + the UNION view:
+// the catalog is read from the DB (`orientation_topic`, async) and the state
+// set is the UNION of (ACTIVE topics) ∪ (topics that already have a
+// per-employee task). The union governs resolution/display/check-off ONLY: an
+// employee who already holds a task for a deactivated topic keeps a visible,
+// check-off-able item. Requiredness does NOT follow the union — an inactive
+// topic is never required and never blocks completion (todo-10 soft-delete
+// rule); new task materialization stays the task engine's concern, where
+// todo 10 restricts `doMaterialize` to ACTIVE templates.
 
 export const ORIENTATION_ERROR_CODES = {
   topicNotFound: "ORIENTATION_TOPIC_NOT_FOUND",
@@ -64,6 +73,30 @@ function orientationTemplatesById(
     if (template.phase === ORIENTATION_PHASE) byCode.set(template.code, template);
   }
   return byCode;
+}
+
+/**
+ * Topic ids that already have a per-employee task: the topic's derived
+ * template row is referenced by one of the employee's `onboarding_task` rows.
+ * This is the "already assigned" half of the todo-7 union — it drives
+ * resolution/display/check-off ONLY, never requiredness.
+ */
+function assignedTopicIds(
+  topics: readonly OrientationTopic[],
+  templatesByCode: Map<string, OnboardingTaskTemplate>,
+  tasks: readonly OnboardingTask[]
+): Set<string> {
+  const templateIdsWithTask = new Set(
+    tasks
+      .map((task) => task.template_id)
+      .filter((id): id is number => id !== null)
+  );
+  const assigned = new Set<string>();
+  for (const topic of topics) {
+    const template = templatesByCode.get(orientationTopicCode(topic.id));
+    if (template && templateIdsWithTask.has(template.id)) assigned.add(topic.id);
+  }
+  return assigned;
 }
 
 function buildChecks(
@@ -110,7 +143,13 @@ export function computeOrientationDone(
 
 /**
  * Reads the full orientation state for one employee (topics + checks + done).
- * Read-only: never materializes tasks.
+ * Read-only: never materializes tasks, never seeds.
+ *
+ * The displayed set is the UNION of the ACTIVE topic catalog and the topics
+ * that already have a per-employee task, so an employee who already holds a
+ * task for a deactivated topic keeps a visible, check-off-able item. The union
+ * governs resolution/display/check-off ONLY: inactive topics are forced
+ * `required: false`, so deactivation never blocks completion.
  * @param userId - `user.user_id`.
  * @returns The state view.
  * @throws Error with `ONBOARDING_TASK_*` codes when a Directus read fails.
@@ -118,17 +157,21 @@ export function computeOrientationDone(
 export async function getOrientationState(
   userId: number
 ): Promise<OrientationState> {
-  const topics = listTopics();
-  const [templates, tasks] = await Promise.all([
+  const [activeTopics, allTopics, templates, tasks] = await Promise.all([
+    listTopics(),
+    listAllTopics(),
     listOnboardingTaskTemplates(),
     listOnboardingTasks({ userId }),
   ]);
-  const checks = buildChecks(
-    userId,
-    topics,
-    orientationTemplatesById(templates),
-    tasks
-  );
+  const templatesByCode = orientationTemplatesById(templates);
+  const activeIds = new Set(activeTopics.map((topic) => topic.id));
+  const assigned = assignedTopicIds(allTopics, templatesByCode, tasks);
+  const topics = allTopics
+    .filter((topic) => activeIds.has(topic.id) || assigned.has(topic.id))
+    .map((topic) =>
+      activeIds.has(topic.id) ? topic : { ...topic, required: false }
+    );
+  const checks = buildChecks(userId, topics, templatesByCode, tasks);
   return { topics, checks, done: computeOrientationDone(topics, checks) };
 }
 
@@ -146,16 +189,19 @@ export interface CheckOffOrientationResult {
 }
 
 /**
- * Completes one orientation topic for one employee. Materializes the
- * employee's task set first when absent (idempotent hire-contract call), then
- * completes the topic's task row and re-reads the state so a 200 can never
- * report a write that is not visible.
+ * Completes one orientation topic for one employee. Ensures the template
+ * catalog FIRST (an HR-added topic must be check-off-able immediately), then
+ * gates on the todo-7 union — the topic must be ACTIVE or the employee must
+ * already hold its task — materializes the employee's missing tasks and
+ * completes the topic's task row. Re-reads the state so a 200 can never report
+ * a write that is not visible.
  * @param input - `{ userId, topicId, actorId }`; `actorId` is the session
  * actor written to `completed_by` (null when the session has no numeric sub).
  * @returns The recorded check + the recomputed done predicate.
  * @throws `ORIENTATION_TOPIC_NOT_FOUND` / `ORIENTATION_TASK_NOT_FOUND` when
- * the topic is unknown or has no orientation task row for that employee (no
- * writes); `ONBOARDING_TASK_USER_NOT_FOUND` when the employee does not exist;
+ * the topic is unknown or has no orientation task row for that employee
+ * (active ∪ already-assigned gate; no writes for that topic);
+ * `ONBOARDING_TASK_USER_NOT_FOUND` when the employee does not exist;
  * `ORIENTATION_WRITE_NOT_VISIBLE` when the completion is not readable back.
  */
 export async function checkOffOrientationTopic(input: {
@@ -163,11 +209,40 @@ export async function checkOffOrientationTopic(input: {
   topicId: string;
   actorId: number | null;
 }): Promise<CheckOffOrientationResult> {
-  const topic = findTopic(input.topicId);
+  await ensureOnboardingTaskTemplates({ actorId: input.actorId });
+
+  const topic = await findTopic(input.topicId);
   if (!topic) {
     fail(
       ORIENTATION_ERROR_CODES.topicNotFound,
       `unknown orientation topic '${input.topicId}'`
+    );
+  }
+
+  const [activeTopics, templates, before] = await Promise.all([
+    listTopics(),
+    listOnboardingTaskTemplates(),
+    listOnboardingTasks({ userId: input.userId }),
+  ]);
+  const templatesByCode = orientationTemplatesById(templates);
+  const template = templatesByCode.get(orientationTopicCode(topic.id));
+  if (!template) {
+    fail(
+      ORIENTATION_ERROR_CODES.taskNotFound,
+      `topic '${topic.id}' has no orientation task template`
+    );
+  }
+
+  const isActive = activeTopics.some((row) => row.id === topic.id);
+  const assignedBefore = assignedTopicIds(
+    [topic],
+    templatesByCode,
+    before
+  ).has(topic.id);
+  if (!isActive && !assignedBefore) {
+    fail(
+      ORIENTATION_ERROR_CODES.taskNotFound,
+      `employee ${input.userId} has no orientation task for deactivated topic '${topic.id}'`
     );
   }
 
@@ -176,16 +251,6 @@ export async function checkOffOrientationTopic(input: {
     actorId: input.actorId,
   });
 
-  const templatesByCode = orientationTemplatesById(
-    await listOnboardingTaskTemplates()
-  );
-  const template = templatesByCode.get(orientationTopicCode(topic.id));
-  if (!template) {
-    fail(
-      ORIENTATION_ERROR_CODES.taskNotFound,
-      `topic '${topic.id}' has no orientation task template`
-    );
-  }
   const tasks = await listOnboardingTasks({ userId: input.userId });
   const task = tasks.find((row) => row.template_id === template.id) ?? null;
   if (!task) {
@@ -211,39 +276,4 @@ export async function checkOffOrientationTopic(input: {
     );
   }
   return { check, done: state.done };
-}
-
-const EmployeeRowSchema = z.object({
-  user_id: z.number().int().positive(),
-  user_fname: z.string().nullable(),
-  user_lname: z.string().nullable(),
-});
-
-/**
- * The tab's employee roster (`user` rows, newest id first). Read-only and
- * lightweight — the transitional picker until the hub roster (todo 27) owns
- * hire selection.
- * @returns One entry per employee with a display name.
- * @throws `ORIENTATION_EMPLOYEE_READ_FAILED` when the read fails (never a
- * silent empty roster).
- */
-export async function listOrientationEmployees(): Promise<
-  OrientationEmployee[]
-> {
-  const body: unknown = await dFetch(
-    "/items/user?fields=user_id,user_fname,user_lname&sort=-user_id&limit=-1"
-  );
-  const parsed = z.object({ data: z.array(EmployeeRowSchema) }).safeParse(body);
-  if (!parsed.success) {
-    fail(
-      ORIENTATION_ERROR_CODES.employeeReadFailed,
-      `user roster read failed (${JSON.stringify(body).slice(0, 300)})`
-    );
-  }
-  return parsed.data.data.map((row) => ({
-    user_id: row.user_id,
-    name:
-      [row.user_fname, row.user_lname].filter(Boolean).join(" ").trim() ||
-      `Employee #${row.user_id}`,
-  }));
 }

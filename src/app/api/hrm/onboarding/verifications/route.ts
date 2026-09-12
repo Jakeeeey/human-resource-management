@@ -26,10 +26,8 @@ import {
   VerificationDecisionSchema,
 } from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
 import type { QueueDocument } from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
-import {
-  parsePortalFileMarker,
-  PORTAL_DOC_CONFIG,
-} from "@/modules/human-resource-management/employee-portal";
+import { parsePortalFileMarker } from "@/modules/human-resource-management/employee-portal";
+import { listActiveDocSlotConfig } from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,18 +118,20 @@ const PortalFilesSchema = z.object({
 });
 
 async function readPortalDocumentsByUser(): Promise<Map<number, QueueDocument[]>> {
-  const body: unknown = await dFetch(
-    `/files?filter[description][_contains]=${encodeURIComponent(PORTAL_EMPLOYEE_MARKER)}&fields=id,description&limit=-1`
-  );
+  const [body, slots] = await Promise.all([
+    dFetch(
+      `/files?filter[description][_contains]=${encodeURIComponent(PORTAL_EMPLOYEE_MARKER)}&fields=id,description&limit=-1`
+    ),
+    listActiveDocSlotConfig(),
+  ]);
   const parsed = PortalFilesSchema.safeParse(body);
   if (!parsed.success) return new Map();
+  const titleByKey = new Map(slots.map((slot) => [slot.key, slot.title]));
   const byUser = new Map<number, QueueDocument[]>();
   for (const row of parsed.data.data) {
     const marker = parsePortalFileMarker(row.description);
     if (!marker || marker.key.kind !== "employee") continue;
-    const title =
-      PORTAL_DOC_CONFIG.find((entry) => entry.key === marker.doc_key)?.title ??
-      marker.doc_key;
+    const title = titleByKey.get(marker.doc_key) ?? marker.doc_key;
     const list = byUser.get(marker.key.id) ?? [];
     list.push({ docKey: marker.doc_key, title, fileId: row.id });
     byUser.set(marker.key.id, list);

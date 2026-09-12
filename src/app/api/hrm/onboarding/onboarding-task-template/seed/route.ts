@@ -13,10 +13,10 @@ import { SeedOnboardingTaskTemplatesSchema } from "@/modules/human-resource-mana
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// POST /api/hrm/onboarding/onboarding-task-template/seed — upserts the
-// code-owned catalog by `code` (idempotent: a fully seeded catalog reports
-// zero creates/updates and performs zero writes). Body is a strict empty
-// object.
+// POST /api/hrm/onboarding/onboarding-task-template/seed — create-missing
+// seeding for the catalog (idempotent: a fully seeded catalog reports zero
+// creates and performs zero writes; existing rows are never overwritten).
+// Body is a strict empty object.
 
 export async function POST(req: NextRequest) {
   try {

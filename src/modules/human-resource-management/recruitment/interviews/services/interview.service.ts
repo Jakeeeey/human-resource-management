@@ -1,5 +1,5 @@
 import { Interview, InterviewCreateInput } from "../types";
-import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
+import { fetchApprovedRequestIdForApplicant, manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import {
     APPLICANT_STATUS_ERROR_CODES,
     canTransition,
@@ -816,7 +816,9 @@ async function fetchApplicantIdForApplication(applicationId: number): Promise<nu
  * applicant before the rec decision. A Final `Passed` that lands on
  * `final_approved` then FIRES the todo-10 signing-set hook, which
  * idempotently materializes the signing set and advances to `for_signing`
- * through the same service.
+ * through the same service. The `final_approved` write also stamps
+ * `applicant.manpower_request_id` from the applicant's approved
+ * recommendation (set-once provenance, resolved lazily at that write).
  * @param input - Stage + owning application id + the persisted verdict.
  * @throws Error with `APPLICANT_STATUS_ERROR_CODES` when the applicant cannot
  * be resolved or the transition sequence is not allowed.
@@ -835,15 +837,25 @@ export async function advanceApplicantForInterviewVerdict(input: {
     let status = await getApplicantStatus(applicantId);
     const path = INTERVIEW_VERDICT_STATUS_PATH[input.stage][input.verdict];
     const finalTarget = path[path.length - 1];
+    let approvedRequestId: number | undefined;
+    let approvedRequestIdResolved = false;
+    const stampFor = async (target: ApplicantStatus): Promise<number | undefined> => {
+        if (target !== "final_approved") return undefined;
+        if (!approvedRequestIdResolved) {
+            approvedRequestId = (await fetchApprovedRequestIdForApplicant(applicantId)) ?? undefined;
+            approvedRequestIdResolved = true;
+        }
+        return approvedRequestId;
+    };
     for (const target of path) {
         if (target === status) continue;
         if (canTransition(status, target)) {
-            await setApplicantStatus({ applicantId, status: target });
+            await setApplicantStatus({ applicantId, status: target, manpowerRequestId: await stampFor(target) });
             status = target;
             continue;
         }
         if (target !== finalTarget) continue;
-        await setApplicantStatus({ applicantId, status: target });
+        await setApplicantStatus({ applicantId, status: target, manpowerRequestId: await stampFor(target) });
     }
     // Final Approved hook (todo 10): the approval that commits this applicant
     // materializes the signing set + advances to `for_signing` (idempotent).

@@ -1,13 +1,16 @@
 import { z } from "zod";
 
 // portal-checklist.schema.ts — Zod source of truth for the hiree portal
-// (todo 25 identity re-key). The portal identity is NO LONGER an
-// `onboarding_profiles` row: the session resolves an APPLICANT before
-// hiring (the applicant-scoped signing key) or an EMPLOYEE after the hire
-// (`user.user_id`). The document checklist keeps its 8-slot hub config
-// (`../portalChecklist`) — uploads travel ONLY via the application-form
-// canon (kind/size/mime server-validated, folder-routed) and the link route
-// persists only the returned `data.id` UUID.
+// (todo 25 identity re-key; todo 8 widened doc-key contract). The portal
+// identity is NO LONGER an `onboarding_profiles` row: the session resolves an
+// APPLICANT before hiring (the applicant-scoped signing key) or an EMPLOYEE
+// after the hire (`user.user_id`). The checklist config is driven by the LIVE
+// `onboarding_document_slot` catalog (`../server/documentSlotIo`); the
+// `PORTAL_DOC_KEYS` list below is the SEED source ONLY (todo-6
+// `catalogSeed.ts` via `PORTAL_DOC_CONFIG`), never the runtime allow-list.
+// Uploads travel ONLY via the application-form canon (kind/size/mime
+// server-validated, folder-routed) and the link route persists only the
+// returned `data.id` UUID.
 
 export const PORTAL_DOC_KEYS = [
   "valid_id",
@@ -20,9 +23,20 @@ export const PORTAL_DOC_KEYS = [
   "government_ids",
 ] as const;
 
-export type PortalDocKey = (typeof PORTAL_DOC_KEYS)[number];
+/** Seed-only key union — NOT the runtime allow-list (the DB is). */
+export type SeedPortalDocKey = (typeof PORTAL_DOC_KEYS)[number];
 
-export const PortalDocKeySchema = z.enum(PORTAL_DOC_KEYS);
+/**
+ * Widened doc-key contract (todo 8): lower-case snake_case, no leading
+ * digit/underscore, max 64 chars. Mirrors `DOC_SLOT_KEY_PATTERN` in
+ * `../server/documentSlotIo.ts` (the DB row contract) — keep them identical.
+ */
+export const PORTAL_DOC_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
+export const PortalDocKeySchema = z.string().regex(PORTAL_DOC_KEY_PATTERN);
+
+/** Runtime doc key — validated by `PortalDocKeySchema`, not a closed enum. */
+export type PortalDocKey = z.infer<typeof PortalDocKeySchema>;
 
 export const PortalChecklistItemSchema = z
   .object({

@@ -65,7 +65,12 @@ function buildRow(
       label: template?.title ?? `Task #${task.id}`,
       phase: template?.phase ?? "custom",
       sortOrder: template?.sort_order ?? UNTEMPLATED_SORT_ORDER,
-      required: template ? template.is_required : true,
+      // Todo-10 soft-delete rule: an inactive catalog row is never required,
+      // so it can neither block the hire nor become the next action; a task
+      // with no template row stays required (fail closed).
+      required: template
+        ? template.is_active === true && template.is_required === true
+        : true,
       satisfied: isTaskSatisfied(task.status),
     };
   });

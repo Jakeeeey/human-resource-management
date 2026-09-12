@@ -24,12 +24,15 @@ import type { OnboardingTaskUpdate } from "../types/onboarding-task-api.schema";
 //
 //   - user must exist   -> else coded `USER_NOT_FOUND` (route 400, NO writes);
 //   - templates seeded  -> `ensureOnboardingTaskTemplates()` (idempotent);
+//   - active templates  -> ONLY `is_active` catalog rows materialize (todo-10
+//     soft-delete rule: an inactive row is not required for NEW hires);
 //   - missing tasks     -> ONE batch create of every (user_id, template_id)
 //     pair absent for this employee;
 //   - in-flight mutex   -> concurrent materializations for the same user
 //     collapse onto ONE run (resume/retry safe);
-//   - read-back verify  -> every template must have a task afterwards, else
-//     coded `TASK_WRITE_FAILED` (never a misleading success).
+//   - read-back verify  -> every ACTIVE template must have a task afterwards,
+//     else coded `TASK_WRITE_FAILED` (never a misleading success). An inactive
+//     template never triggers it — no row is created for it by design.
 //
 // `updateOnboardingTask` / `completeOnboardingTask` are the ONLY status
 // writers and keep `completed_at`/`completed_by` coherent on BOTH paths
@@ -66,7 +69,15 @@ async function doMaterialize(
     );
   }
 
-  const { templates } = await ensureOnboardingTaskTemplates({ actorId });
+  const { templates: allTemplates } = await ensureOnboardingTaskTemplates({
+    actorId,
+  });
+
+  // Todo-10 soft-delete rule: inactive catalog rows do NOT materialize. This
+  // ONE filtered set drives `missing`, `rows`, `templateCount` AND the
+  // read-back below — otherwise an inactive template with no task would throw
+  // TASK_WRITE_FAILED for a row that was intentionally never created.
+  const templates = allTemplates.filter((template) => template.is_active);
 
   const current = await listTaskRows({ userId });
   const currentTemplateIds = new Set(

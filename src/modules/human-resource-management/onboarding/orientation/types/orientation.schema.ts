@@ -49,16 +49,6 @@ export const OrientationEmployeeSchema = z.object({
 
 export type OrientationEmployee = z.infer<typeof OrientationEmployeeSchema>;
 
-// Actor for the HR-owned TOPIC ADMIN surface only (topics routes). Check-offs
-// no longer take an actor — the session supplies `checked_by` server-side.
-export const OrientationActorSchema = z
-  .object({
-    role: OrientationRoleSchema,
-  })
-  .strict();
-
-export type OrientationActor = z.infer<typeof OrientationActorSchema>;
-
 export const CheckOffOrientationSchema = z
   .object({
     user_id: z.number().int().positive(),

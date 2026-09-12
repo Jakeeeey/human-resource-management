@@ -128,16 +128,29 @@ export interface TemplateWriteRow {
   owner_role: OnboardingOwnerRole;
   is_required: boolean;
   sort_order: number;
+  /** Explicit create-time flag; omitted lets the Directus default stand. */
+  is_active?: boolean;
   created_at: string;
   created_by: number | null;
   updated_at: string;
   updated_by: number | null;
 }
 
-/** All templates, phase/sort order. */
-export async function listTemplateRows(): Promise<OnboardingTaskTemplate[]> {
+export interface TemplateListOptions {
+  /** When true, only `is_active=1` rows (the set new hires materialize from). */
+  activeOnly?: boolean;
+}
+
+/** All templates, phase/sort order; `activeOnly` filters `is_active=1`. */
+export async function listTemplateRows(
+  options: TemplateListOptions = {}
+): Promise<OnboardingTaskTemplate[]> {
+  const query = ["sort=sort_order,id", "limit=-1"];
+  if (options.activeOnly === true) {
+    query.push("filter[is_active][_eq]=1");
+  }
   const body: unknown = await dFetch(
-    "/items/onboarding_task_template?sort=sort_order,id&limit=-1"
+    `/items/onboarding_task_template?${query.join("&")}`
   );
   return parseRowList(
     OnboardingTaskTemplateSchema,
@@ -145,6 +158,11 @@ export async function listTemplateRows(): Promise<OnboardingTaskTemplate[]> {
     ONBOARDING_TASK_ERROR_CODES.templateReadFailed,
     "onboarding_task_template"
   );
+}
+
+/** Active templates only (`is_active=1`). */
+export function listActiveTemplateRows(): Promise<OnboardingTaskTemplate[]> {
+  return listTemplateRows({ activeOnly: true });
 }
 
 export async function createTemplateRows(

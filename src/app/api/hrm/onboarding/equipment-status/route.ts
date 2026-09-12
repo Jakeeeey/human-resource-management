@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { loadServerEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentCatalogServer";
+import { loadEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
 import {
   buildEquipmentItemStates,
   isFullyEquipped,
@@ -43,11 +43,11 @@ export async function GET(req: NextRequest) {
 
     let catalog;
     try {
-      catalog = await loadServerEquipmentCatalog();
+      catalog = await loadEquipmentCatalog();
     } catch (error) {
       console.error("[onboarding-equipment-status] catalog error:", error);
       return NextResponse.json(
-        { success: false, message: "Equipment catalog is misconfigured" },
+        { success: false, message: "Could not load the equipment catalog" },
         { status: 500 }
       );
     }

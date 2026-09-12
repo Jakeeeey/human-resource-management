@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import {
-  OrientationActorSchema,
-  UpdateOrientationTopicSchema,
-} from "@/modules/human-resource-management/onboarding/orientation/types/orientation.schema";
+import { UpdateOrientationTopicSchema } from "@/modules/human-resource-management/onboarding/orientation/types/orientation.schema";
 import { patchTopic } from "@/modules/human-resource-management/onboarding/orientation/orientationStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// PATCH /api/hrm/onboarding/orientation/topics/[id] — admin edit of one
-// topic (title / required). Admin surface is HR-owned: actor must be `hr`
-// (anything else → 403). Unknown id → 404.
+// PATCH /api/hrm/onboarding/orientation/topics/[id] — edit of one topic
+// (title / required). No role gate in app code: access is governed by the
+// platform's external module authorization (plan §12). Unknown id → 404.
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -19,10 +16,6 @@ function validationFailed(errors: Record<string, string[]>) {
     { status: 400 }
   );
 }
-
-const patchBodySchema = UpdateOrientationTopicSchema.extend({
-  actor: OrientationActorSchema,
-});
 
 export async function PATCH(
   req: NextRequest,
@@ -38,18 +31,12 @@ export async function PATCH(
     }
 
     const body: unknown = await req.json().catch(() => null);
-    const validation = patchBodySchema.safeParse(body);
+    const validation = UpdateOrientationTopicSchema.safeParse(body);
     if (!validation.success) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
-    if (validation.data.actor.role !== "hr") {
-      return NextResponse.json(
-        { success: false, message: "Only HR can edit orientation topics" },
-        { status: 403 }
-      );
-    }
 
-    const updated = patchTopic(id, {
+    const updated = await patchTopic(id, {
       title: validation.data.title,
       required: validation.data.required,
     });

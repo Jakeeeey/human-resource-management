@@ -42,7 +42,7 @@ export type QueueState = "pending" | "returned" | "approved";
 export interface QueueDocument {
   /** Portal doc slot (e.g. `valid_id`) — the marker's `<doc_key>`. */
   docKey: string;
-  /** Human title from `PORTAL_DOC_CONFIG` (falls back to the raw key). */
+  /** Human title from the live document slot catalog (falls back to the raw key). */
   title: string;
   /** Directus file UUID (marker description `onboarding-portal:employee:<id>:<key>`). */
   fileId: string;
@@ -103,14 +103,17 @@ export interface VerificationTasks {
 }
 
 // Resolves the two verification tasks from the seeded catalog codes. Tasks
-// whose template is not a documents-phase row are ignored.
+// whose template is not an ACTIVE documents-phase row are ignored (todo-10
+// soft-delete rule: an inactive catalog row is not a required verification
+// gate; existing per-employee rows are never mutated — they are only not
+// resolved for the queue).
 export function findVerificationTasks(
   tasks: readonly OnboardingTask[],
   templates: readonly OnboardingTaskTemplate[]
 ): VerificationTasks {
   const codeById = new Map<number, string>();
   for (const template of templates) {
-    if (template.phase === VERIFICATION_PHASE) {
+    if (template.phase === VERIFICATION_PHASE && template.is_active === true) {
       codeById.set(template.id, template.code);
     }
   }

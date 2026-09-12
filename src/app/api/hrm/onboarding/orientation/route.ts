@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import {
-  getOrientationState,
-  listOrientationEmployees,
-} from "@/modules/human-resource-management/onboarding/orientation/orientation-task-service";
+import { getOrientationState } from "@/modules/human-resource-management/onboarding/orientation/orientation-task-service";
+import { listOrientationEmployees } from "@/modules/human-resource-management/onboarding/orientation/orientationRoster";
 import {
   readOnboardingTaskSession,
   serverError,

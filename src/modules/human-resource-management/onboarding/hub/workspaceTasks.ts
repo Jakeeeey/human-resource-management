@@ -57,7 +57,11 @@ function enrichTask(
     ownerUserId: task.owner_user_id,
     status: task.status,
     dueDate: task.due_date,
-    required: template ? template.is_required : true,
+    // Todo-10 soft-delete rule: an inactive catalog row is never required (the
+    // item still renders as informational); a missing template stays required.
+    required: template
+      ? template.is_active === true && template.is_required === true
+      : true,
     satisfied: isTaskSatisfied(task.status),
     notes: task.notes,
     sortOrder: template?.sort_order ?? UNTEMPLATED_SORT_ORDER,

@@ -51,7 +51,8 @@ async function syncDocumentsSubmitted(userId: number): Promise<void> {
     );
     const parsed = FiledFilesSchema.safeParse(body);
     if (!parsed.success) return;
-    if (!isChecklistComplete(buildChecklist(key, parsed.data.data))) return;
+    const checklist = await buildChecklist(key, parsed.data.data);
+    if (!isChecklistComplete(checklist)) return;
 
     const [tasks, templates] = await Promise.all([
       listOnboardingTasks({ userId }),

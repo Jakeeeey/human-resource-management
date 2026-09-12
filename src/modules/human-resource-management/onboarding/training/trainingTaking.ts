@@ -19,15 +19,14 @@ export type OwnerVerdict =
   | { ok: false; status: 403; error: string };
 
 /**
- * IDOR gate: a `hiree` actor may touch ONLY the assignment whose `user_id`
- * matches the actor's (the employee's `user.user_id`). `hr` actors bypass
- * (HR override, logged by the caller).
+ * IDOR gate: an actor may touch ONLY the assignment whose `user_id` matches
+ * the actor's own (the employee's `user.user_id`). PURE OWNERSHIP — no role
+ * branch; HR override is external to the app (plan §12).
  */
 export function assertAssignmentOwner(
   assignment: AssignmentOwner,
   actor: TrainingActor
 ): OwnerVerdict {
-  if (actor.role === "hr") return { ok: true };
   if (actor.user_id === assignment.user_id) {
     return { ok: true };
   }
