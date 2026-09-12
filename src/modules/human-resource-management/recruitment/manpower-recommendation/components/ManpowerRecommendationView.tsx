@@ -130,7 +130,7 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Applicant Name</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 break-words">{applicantName}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate" title={applicantName}>{applicantName}</div>
                             </div>
                             <div className="md:col-span-3">
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
