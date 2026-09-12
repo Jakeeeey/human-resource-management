@@ -6,8 +6,12 @@ import type {
   CreateDocumentSlotInput,
   UpdateDocumentSlotInput,
 } from "../types/requirements-catalog.schema";
+import { humanizeIdentifier } from "../utils/humanizeIdentifier";
 import type { CatalogColumn } from "../components/RequirementsCatalogTable";
-import { RequirementsSection } from "../components/RequirementsSection";
+import {
+  RequirementsSection,
+  type RequirementsTableConfig,
+} from "../components/RequirementsSection";
 
 // DocumentsSection.tsx — `onboarding_document_slot` catalog. The `doc_key` is
 // the marker key referenced by portal uploads, so it is read-only after create.
@@ -16,20 +20,42 @@ const columns: readonly CatalogColumn<DocumentSlotRow>[] = [
   {
     key: "doc_key",
     header: "Key",
-    className: "max-w-[220px]",
+    headerTitle: "Stable identifier referenced by portal uploads",
+    className: "max-w-[220px] truncate",
     render: (row) => (
-      <code className="font-mono text-xs" title={row.doc_key}>
-        {row.doc_key}
+      <code
+        className="block max-w-full truncate font-mono text-xs"
+        title={row.doc_key}
+      >
+        {humanizeIdentifier(row.doc_key)}
       </code>
     ),
   },
   {
     key: "title",
     header: "Title",
+    headerTitle: "Document name shown to new hires",
     className: "max-w-[420px] truncate",
-    render: (row) => <span title={row.title}>{row.title}</span>,
+    render: (row) => (
+      <span className="block max-w-full truncate" title={row.title}>
+        {row.title}
+      </span>
+    ),
   },
 ];
+
+const TABLE_CONFIG: RequirementsTableConfig<DocumentSlotRow> = {
+  searchPlaceholder: "Search documents…",
+  searchText: (row) => `${row.doc_key} ${row.title}`,
+  getRequiredValue: (row) => row.is_required,
+  getActiveValue: (row) => row.is_active,
+  sortAccessors: {
+    doc_key: (row) => row.doc_key,
+    title: (row) => row.title,
+    is_required: (row) => row.is_required,
+    is_active: (row) => row.is_active,
+  },
+};
 
 export function DocumentsSection({ resource }: { resource: DocumentsResource }) {
   return (
@@ -40,10 +66,13 @@ export function DocumentsSection({ resource }: { resource: DocumentsResource }) 
     >
       id="documents"
       title="Documents"
-      description="Hiree uploads required before onboarding is complete."
+      entityLabel="document"
+      description="Documents new hires must upload before onboarding is complete."
       emptyMessage="No document slots yet. Add the first required document."
       resource={resource}
       columns={columns}
+      rowLabel={(row) => row.title}
+      tableConfig={TABLE_CONFIG}
       dialogFields={[
         {
           name: "doc_key",
@@ -53,6 +82,8 @@ export function DocumentsSection({ resource }: { resource: DocumentsResource }) 
           required: true,
           immutable: true,
           hint: "Immutable after create — portal uploads reference this key.",
+          createHint:
+            "Required. Permanent — portal uploads reference this key.",
         },
         {
           name: "title",

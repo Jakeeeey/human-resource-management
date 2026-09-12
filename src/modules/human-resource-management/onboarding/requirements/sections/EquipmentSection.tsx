@@ -1,7 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-
 import type { EquipmentResource } from "../providers/requirementsCatalogProvider";
 import type {
   EquipmentItemRow,
@@ -9,8 +7,16 @@ import type {
   UpdateEquipmentItemInput,
 } from "../types/requirements-catalog.schema";
 import type { EquipmentIssuer } from "../../equipment/types/equipment-issue.schema";
+import { humanizeIdentifier } from "../utils/humanizeIdentifier";
 import type { CatalogColumn } from "../components/RequirementsCatalogTable";
-import { RequirementsSection } from "../components/RequirementsSection";
+import {
+  requirementRoleLabel,
+  RequirementsRoleBadge,
+} from "../components/RequirementsRoleBadge";
+import {
+  RequirementsSection,
+  type RequirementsTableConfig,
+} from "../components/RequirementsSection";
 
 // EquipmentSection.tsx — `onboarding_equipment_item` catalog. `item_key` is
 // referenced by issue/ack doc_refs, so it is read-only after create; `issuer`
@@ -20,26 +26,34 @@ const columns: readonly CatalogColumn<EquipmentItemRow>[] = [
   {
     key: "item_key",
     header: "Key",
-    className: "max-w-[240px]",
+    headerTitle: "Internal identifier referenced by issue records",
+    className: "max-w-[240px] truncate",
     render: (row) => (
-      <code className="font-mono text-xs" title={row.item_key}>
-        {row.item_key}
+      <code
+        className="block max-w-full truncate font-mono text-xs"
+        title={row.item_key}
+      >
+        {humanizeIdentifier(row.item_key)}
       </code>
     ),
   },
   {
     key: "label",
     header: "Label",
+    headerTitle: "Equipment name shown to new hires",
     className: "max-w-[380px] truncate",
-    render: (row) => <span title={row.label}>{row.label}</span>,
+    render: (row) => (
+      <span className="block max-w-full truncate" title={row.label}>
+        {row.label}
+      </span>
+    ),
   },
   {
     key: "issuer",
     header: "Issuer",
+    headerTitle: "Who provides and tracks this item: IT, Admin, or the hire's department",
     render: (row) => (
-      <Badge variant="outline">
-        {row.issuer}
-      </Badge>
+      <RequirementsRoleBadge kind="issuer" value={row.issuer} />
     ),
   },
 ];
@@ -49,6 +63,23 @@ const ISSUER_OPTIONS = [
   { value: "Admin", label: "Admin" },
   { value: "Department", label: "Department" },
 ] as const;
+
+const TABLE_CONFIG: RequirementsTableConfig<EquipmentItemRow> = {
+  searchPlaceholder: "Search equipment…",
+  searchText: (row) =>
+    `${row.item_key} ${row.label} ${requirementRoleLabel("issuer", row.issuer)}`,
+  getFacetValue: (row) => row.issuer,
+  facet: { label: "Issuer", options: ISSUER_OPTIONS },
+  getRequiredValue: (row) => row.is_required,
+  getActiveValue: (row) => row.is_active,
+  sortAccessors: {
+    item_key: (row) => row.item_key,
+    label: (row) => row.label,
+    issuer: (row) => requirementRoleLabel("issuer", row.issuer),
+    is_required: (row) => row.is_required,
+    is_active: (row) => row.is_active,
+  },
+};
 
 export function EquipmentSection({
   resource,
@@ -63,10 +94,13 @@ export function EquipmentSection({
     >
       id="equipment"
       title="Equipment"
-      description="Assets issued and acknowledged during onboarding."
+      entityLabel="equipment item"
+      description="Equipment issued to new hires during onboarding."
       emptyMessage="No equipment items yet. Add the first item."
       resource={resource}
       columns={columns}
+      rowLabel={(row) => row.label}
+      tableConfig={TABLE_CONFIG}
       dialogFields={[
         {
           name: "item_key",
@@ -76,6 +110,8 @@ export function EquipmentSection({
           required: true,
           immutable: true,
           hint: "Immutable after create — issue/ack records reference this key.",
+          createHint:
+            "Required. Permanent — issue records reference this key.",
         },
         {
           name: "label",
@@ -88,11 +124,13 @@ export function EquipmentSection({
           name: "issuer",
           label: "Issuer",
           kind: "select",
+          placeholder: "Select issuer…",
           required: true,
+          hint: "Who provides and tracks this item: IT, Admin, or the hire's department.",
           options: ISSUER_OPTIONS,
         },
       ]}
-      createInitial={{ item_key: "", label: "", issuer: "IT" }}
+      createInitial={{ item_key: "", label: "", issuer: "" }}
       rowToInitial={(row) => ({
         item_key: row.item_key,
         label: row.label,

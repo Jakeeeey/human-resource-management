@@ -14,19 +14,14 @@ import {
   SortableContext,
   arrayMove,
   sortableKeyboardCoordinates,
-  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -34,13 +29,24 @@ import {
 } from "@/components/ui/table";
 
 import type { RequirementsReorderEntry } from "../types/requirements-catalog.schema";
+import type { SortDirection, TableControls } from "../hooks/useTableControls";
+import { RequirementsCatalogRow } from "./RequirementsCatalogRow";
+import { RequirementsSortableHead } from "./RequirementsSortableHead";
+import { RequirementsTablePagination } from "./RequirementsTablePagination";
 
 // RequirementsCatalogTable.tsx — the shared table shell for every requirements
-// section. This is the FIRST `@dnd-kit` usage in `src` (todo 16 of
-// onboarding-requirements-config): rows are vertically sortable and a drop
-// emits the pinned `{ id, sort_order }` batch the section forwards to
-// `PATCH .../requirements/<catalog>/reorder`. Kept module-local — nothing here
-// mirrors an existing drag implementation.
+// section. Rows are vertically sortable and a drop emits the pinned
+// `{ id, sort_order }` batch the section forwards to
+// `PATCH .../requirements/<catalog>/reorder`. Keyboard reordering is provided
+// by the configured `KeyboardSensor` + `sortableKeyboardCoordinates` (Space/
+// Enter to pick up, arrows to move, Escape to cancel). Headers sort through the
+// shared `TableControls`; the pagination footer always renders, and reorder is
+// gated to the untouched default `sort_order` view so a drag always maps to a
+// globally correct index. The per-row markup lives in RequirementsCatalogRow.
+
+/** Tooltip explaining why a row's grip is inert while the view is narrowed. */
+export const REORDER_DISABLED_REASON =
+  "Clear search, filters, and sorting to reorder";
 
 /** Minimum a row needs for the table's toggles + sortable identity. */
 export interface RequirementRow {
@@ -53,54 +59,27 @@ export interface RequirementRow {
 export interface CatalogColumn<T> {
   key: string;
   header: string;
+  /** Optional explanation surfaced as the header's native tooltip. */
+  headerTitle?: string;
   className?: string;
   render: (row: T) => React.ReactNode;
 }
 
 interface RequirementsCatalogTableProps<T extends RequirementRow> {
-  rows: T[];
+  /** The full catalog list in fetched `sort_order` — the reorder source. */
+  rows: readonly T[];
   isLoading: boolean;
   columns: readonly CatalogColumn<T>[];
   emptyMessage: string;
+  caption: string;
   disabled: boolean;
+  /** Human label per row, used to scope every control's accessible name. */
+  rowLabel: (row: T) => string;
   onEdit: (row: T) => void;
   onToggleRequired: (row: T) => void;
   onToggleActive: (row: T) => void;
   onReorder: (order: RequirementsReorderEntry[]) => void;
-}
-
-/** One sortable table row; the grip handle owns the drag listeners. */
-function SortableRequirementRow({
-  id,
-  dragging,
-  children,
-}: {
-  id: number;
-  dragging: boolean;
-  children: React.ReactNode;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id });
-  return (
-    <TableRow
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={dragging ? "relative z-10 bg-muted/60" : undefined}
-    >
-      <TableCell className="w-10">
-        <button
-          type="button"
-          aria-label="Drag to reorder"
-          className="flex h-8 w-6 cursor-grab items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:cursor-grabbing"
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-      </TableCell>
-      {children}
-    </TableRow>
-  );
+  controls: TableControls<T>;
 }
 
 /**
@@ -113,11 +92,14 @@ export function RequirementsCatalogTable<T extends RequirementRow>({
   isLoading,
   columns,
   emptyMessage,
+  caption,
   disabled,
+  rowLabel,
   onEdit,
   onToggleRequired,
   onToggleActive,
   onReorder,
+  controls,
 }: RequirementsCatalogTableProps<T>) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -135,7 +117,7 @@ export function RequirementsCatalogTable<T extends RequirementRow>({
     );
   }
 
-  if (rows.length === 0) {
+  if (controls.totalCount === 0 && !controls.isFiltered) {
     return (
       <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
         {emptyMessage}
@@ -145,16 +127,25 @@ export function RequirementsCatalogTable<T extends RequirementRow>({
 
   const handleDragEnd = (event: DragEndEvent) => {
     setDraggingId(null);
+    if (!controls.canReorder) return;
     const { active, over } = event;
     if (over === null || active.id === over.id) return;
+    // `from`/`to` come from the FULL ordered list, never the page slice, so a
+    // page-1 drag still emits a globally correct `sort_order`.
     const from = rows.findIndex((row) => row.id === active.id);
     const to = rows.findIndex((row) => row.id === over.id);
     if (from < 0 || to < 0) return;
-    const next = arrayMove(rows, from, to);
+    const next = arrayMove([...rows], from, to);
     onReorder(
       next.map((row, index) => ({ id: row.id, sort_order: (index + 1) * 10 }))
     );
   };
+
+  const directionFor = (key: string): SortDirection | null =>
+    controls.sort?.key === key ? controls.sort.direction : null;
+
+  const visibleRows = controls.visibleRows;
+  const columnCount = columns.length + 4;
 
   return (
     <DndContext
@@ -164,77 +155,101 @@ export function RequirementsCatalogTable<T extends RequirementRow>({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setDraggingId(null)}
     >
-      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-card to-transparent sm:hidden"
+        />
         <Table className="min-w-[720px]">
+          <TableCaption className="sr-only">{caption}</TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10" />
+              <TableHead scope="col" className="w-10">
+                <span className="sr-only">Reorder</span>
+              </TableHead>
               {columns.map((column) => (
-                <TableHead key={column.key} className={column.className}>
-                  {column.header}
-                </TableHead>
+                <RequirementsSortableHead
+                  key={column.key}
+                  label={column.header}
+                  title={column.headerTitle}
+                  className={column.className}
+                  direction={directionFor(column.key)}
+                  onToggle={
+                    controls.canSort(column.key)
+                      ? () => controls.toggleSort(column.key)
+                      : undefined
+                  }
+                />
               ))}
-              <TableHead className="w-24">Required</TableHead>
-              <TableHead className="w-28">Active</TableHead>
-              <TableHead className="w-24 text-right">Actions</TableHead>
+              <RequirementsSortableHead
+                label="Required"
+                title="Whether every new hire must complete this row"
+                className="w-24"
+                direction={directionFor("is_required")}
+                onToggle={() => controls.toggleSort("is_required")}
+              />
+              <RequirementsSortableHead
+                label="Active"
+                title="Whether this row is currently in use"
+                className="w-28"
+                direction={directionFor("is_active")}
+                onToggle={() => controls.toggleSort("is_active")}
+              />
+              <TableHead scope="col" className="w-24 text-right">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <SortableContext
-              items={rows.map((row) => row.id)}
+              items={visibleRows.map((row) => row.id)}
               strategy={verticalListSortingStrategy}
             >
-              {rows.map((row) => (
-                <SortableRequirementRow
-                  key={row.id}
-                  id={row.id}
-                  dragging={draggingId === row.id}
-                >
-                  {columns.map((column) => (
-                    <TableCell key={column.key} className={column.className}>
-                      {column.render(row)}
-                    </TableCell>
-                  ))}
-                  <TableCell>
-                    <Switch
-                      size="sm"
-                      checked={row.is_required}
-                      disabled={disabled}
-                      aria-label="Required for new hires"
-                      onCheckedChange={() => onToggleRequired(row)}
-                    />
+              {visibleRows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columnCount}
+                    className="py-8 text-center text-sm text-muted-foreground"
+                  >
+                    No rows match your current search and filters.
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        size="sm"
-                        checked={row.is_active}
-                        disabled={disabled}
-                        aria-label="Active"
-                        onCheckedChange={() => onToggleActive(row)}
-                      />
-                      <Badge variant={row.is_active ? "default" : "secondary"}>
-                        {row.is_active ? "active" : "inactive"}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={disabled}
-                      onClick={() => onEdit(row)}
-                      className="min-h-8"
-                    >
-                      <Pencil className="mr-1 h-4 w-4" />
-                      Edit
-                    </Button>
-                  </TableCell>
-                </SortableRequirementRow>
-              ))}
+                </TableRow>
+              ) : (
+                visibleRows.map((row) => (
+                  <RequirementsCatalogRow
+                    key={row.id}
+                    row={row}
+                    dragging={draggingId === row.id}
+                    disabled={disabled}
+                    reorderDisabled={!controls.canReorder}
+                    reorderDisabledReason={REORDER_DISABLED_REASON}
+                    rowLabel={rowLabel(row)}
+                    onEdit={onEdit}
+                    onToggleRequired={onToggleRequired}
+                    onToggleActive={onToggleActive}
+                  >
+                    {columns.map((column) => (
+                      <TableCell key={column.key} className={column.className}>
+                        {column.render(row)}
+                      </TableCell>
+                    ))}
+                  </RequirementsCatalogRow>
+                ))
+              )}
             </SortableContext>
           </TableBody>
         </Table>
+
+        <RequirementsTablePagination
+          page={controls.page}
+          pageSize={controls.pageSize}
+          totalPages={controls.totalPages}
+          filteredCount={controls.filteredCount}
+          rangeStart={controls.rangeStart}
+          rangeEnd={controls.rangeEnd}
+          onPageChange={controls.setPage}
+          onPageSizeChange={controls.setPageSize}
+        />
       </div>
     </DndContext>
   );

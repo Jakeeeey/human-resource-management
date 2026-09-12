@@ -36,9 +36,12 @@ export interface RequirementDialogField {
   label: string;
   kind: "text" | "select";
   placeholder?: string;
+  /** Helper text shown while editing. */
   hint?: string;
+  /** Helper text shown while creating (falls back to `hint`). */
+  createHint?: string;
   required?: boolean;
-  /** Rendered disabled when editing (create still accepts the value). */
+  /** Rendered read-only when editing (create still accepts the value). */
   immutable?: boolean;
   options?: readonly { value: string; label: string }[];
 }
@@ -68,6 +71,10 @@ function RequirementForm({
   const [values, setValues] = useState<Record<string, string>>(initial);
   const [error, setError] = useState<string | null>(null);
 
+  const missingRequired = fields.some(
+    (field) => field.required === true && (values[field.name] ?? "").trim() === ""
+  );
+
   const setValue = (name: string, value: string) => {
     setValues((prev) => ({ ...prev, [name]: value }));
     setError(null);
@@ -95,20 +102,31 @@ function RequirementForm({
       <div className="space-y-4">
         {fields.map((field) => {
           const value = values[field.name] ?? "";
-          const locked = saving || (isEdit && field.immutable === true);
+          const immutableInEdit = isEdit && field.immutable === true;
+          const hint = isEdit ? field.hint : (field.createHint ?? field.hint);
+          const hintId = `req-${field.name}-help`;
           return (
             <div key={field.name} className="space-y-2">
-              <Label htmlFor={`req-${field.name}`}>{field.label}</Label>
+              <Label htmlFor={`req-${field.name}`}>
+                {field.label}
+                {field.required === true && (
+                  <span className="text-destructive" aria-hidden="true">
+                    {" *"}
+                  </span>
+                )}
+              </Label>
               {field.kind === "select" ? (
                 <Select
                   value={value}
-                  disabled={locked}
+                  disabled={saving || immutableInEdit}
                   onValueChange={(next) => setValue(field.name, next)}
                 >
                   <SelectTrigger
                     id={`req-${field.name}`}
                     className="w-full"
-                    disabled={locked}
+                    disabled={saving || immutableInEdit}
+                    aria-required={field.required === true || undefined}
+                    aria-describedby={hint === undefined ? undefined : hintId}
                   >
                     <SelectValue placeholder={field.placeholder ?? "Select…"} />
                   </SelectTrigger>
@@ -124,15 +142,21 @@ function RequirementForm({
                 <Input
                   id={`req-${field.name}`}
                   value={value}
-                  disabled={locked}
+                  disabled={saving}
+                  readOnly={immutableInEdit}
                   placeholder={field.placeholder}
+                  aria-required={field.required === true || undefined}
+                  aria-describedby={hint === undefined ? undefined : hintId}
+                  className="read-only:bg-muted/40 read-only:text-muted-foreground"
                   onChange={(event) =>
                     setValue(field.name, event.target.value)
                   }
                 />
               )}
-              {field.hint !== undefined && (
-                <p className="text-xs text-muted-foreground">{field.hint}</p>
+              {hint !== undefined && (
+                <p id={hintId} className="text-xs text-muted-foreground">
+                  {hint}
+                </p>
               )}
             </div>
           );
@@ -151,7 +175,7 @@ function RequirementForm({
         </Button>
         <Button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || missingRequired}
           className="w-full sm:w-auto"
         >
           {saving ? "Saving…" : "Save"}

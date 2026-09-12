@@ -1,36 +1,51 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, Plus, RefreshCw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 
 import type { CatalogResource } from "../hooks/useCatalogResource";
+import {
+  useTableControls,
+  type TableControlsConfig,
+} from "../hooks/useTableControls";
 import type { RequirementsReorderEntry } from "../types/requirements-catalog.schema";
+import { RequirementFieldDialog, type RequirementDialogField } from "./RequirementFieldDialog";
+import type { CatalogColumn, RequirementRow } from "./RequirementsCatalogTable";
+import { RequirementsCatalogTable } from "./RequirementsCatalogTable";
 import {
-  RequirementFieldDialog,
-  type RequirementDialogField,
-} from "./RequirementFieldDialog";
-import {
-  RequirementsCatalogTable,
-  type CatalogColumn,
-  type RequirementRow,
-} from "./RequirementsCatalogTable";
+  RequirementsTableFilters,
+  type FacetConfig,
+} from "./RequirementsTableFilters";
+import { RequirementsSectionHeader } from "./RequirementsSectionHeader";
 
 // RequirementsSection.tsx — one catalog section: heading + toolbar, the
-// sortable table, and the create/edit dialog. All four sections share this
-// shell; each supplies its columns, dialog fields, and typed input mappers.
-// Mutations go only through the todo-15 catalog resource (never Directus).
+// filterable/sortable/paginated table, and the create/edit dialog. All four
+// sections share this shell; each supplies its columns, dialog fields, table
+// controls config, and typed input mappers. Mutations go only through the
+// todo-15 catalog resource (never Directus).
+
+/** Per-catalog search/facet/sort accessors plus the search placeholder. */
+export interface RequirementsTableConfig<T> extends TableControlsConfig<T> {
+  searchPlaceholder: string;
+  facet?: FacetConfig;
+}
 
 export interface RequirementsSectionProps<T extends RequirementRow, C, U> {
   id: string;
   title: string;
+  /** Singular noun for dialog copy, e.g. "document". */
+  entityLabel: string;
   description: string;
   emptyMessage: string;
   resource: CatalogResource<T, C, U>;
   columns: readonly CatalogColumn<T>[];
+  /** Human label per row, used to scope every control's accessible name. */
+  rowLabel: (row: T) => string;
+  /** Search/facet/sort accessors driving this section's table controls. */
+  tableConfig: RequirementsTableConfig<T>;
   dialogFields: readonly RequirementDialogField[];
   createInitial: Record<string, string>;
   rowToInitial: (row: T) => Record<string, string>;
@@ -48,10 +63,13 @@ export interface RequirementsSectionProps<T extends RequirementRow, C, U> {
 export function RequirementsSection<T extends RequirementRow, C, U>({
   id,
   title,
+  entityLabel,
   description,
   emptyMessage,
   resource,
   columns,
+  rowLabel,
+  tableConfig,
   dialogFields,
   createInitial,
   rowToInitial,
@@ -65,6 +83,11 @@ export function RequirementsSection<T extends RequirementRow, C, U>({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selected, setSelected] = useState<T | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const controls = useTableControls(rows, tableConfig);
+  const countLabel = controls.isFiltered
+    ? `Showing ${controls.filteredCount} of ${rows.length}`
+    : `${rows.length} row${rows.length === 1 ? "" : "s"}`;
 
   const openCreate = () => {
     setSelected(null);
@@ -84,7 +107,9 @@ export function RequirementsSection<T extends RequirementRow, C, U>({
         : update(selected.id, toUpdateInput(values, selected));
     void request
       .then(() => {
-        toast.success(selected === null ? `${title} row created` : `${title} row updated`);
+        toast.success(
+          selected === null ? `${title} row created` : `${title} row updated`
+        );
         setDialogOpen(false);
       })
       .catch((err: unknown) =>
@@ -93,10 +118,20 @@ export function RequirementsSection<T extends RequirementRow, C, U>({
       .finally(() => setSaving(false));
   };
 
-  const runToggle = (request: Promise<unknown>) => {
-    void request.catch((err: unknown) =>
-      toast.error(err instanceof Error ? err.message : "Update failed")
-    );
+  const runToggle = (
+    request: Promise<unknown>,
+    undo?: () => Promise<unknown>
+  ) => {
+    void request
+      .then(() => {
+        if (undo === undefined) return;
+        toast.success("Row updated", {
+          action: { label: "Undo", onClick: () => runToggle(undo()) },
+        });
+      })
+      .catch((err: unknown) =>
+        toast.error(err instanceof Error ? err.message : "Update failed")
+      );
   };
 
   const handleReorder = (order: RequirementsReorderEntry[]) => {
@@ -105,34 +140,15 @@ export function RequirementsSection<T extends RequirementRow, C, U>({
 
   return (
     <section id={id} className="scroll-mt-20 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-baseline gap-2">
-            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              {title}
-            </h2>
-            <span className="text-sm text-muted-foreground">
-              {rows.length} row{rows.length === 1 ? "" : "s"}
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground">{description}</p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            variant="outline"
-            onClick={() => void refetch()}
-            disabled={isLoading}
-            className="w-full sm:w-auto"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-          <Button onClick={openCreate} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            New
-          </Button>
-        </div>
-      </div>
+      <RequirementsSectionHeader
+        title={title}
+        description={description}
+        countLabel={countLabel}
+        entityLabel={entityLabel}
+        isLoading={isLoading}
+        onRefresh={() => void refetch()}
+        onCreate={openCreate}
+      />
 
       {isError && (
         <Alert variant="destructive">
@@ -144,21 +160,53 @@ export function RequirementsSection<T extends RequirementRow, C, U>({
         </Alert>
       )}
 
+      <RequirementsTableFilters
+        search={controls.search}
+        onSearchChange={controls.setSearch}
+        searchPlaceholder={tableConfig.searchPlaceholder}
+        searchLabel={`Search ${title.toLowerCase()}`}
+        facet={tableConfig.facet}
+        facetValue={controls.facet}
+        onFacetChange={controls.setFacet}
+        required={controls.required}
+        onRequiredChange={controls.setRequired}
+        active={controls.active}
+        onActiveChange={controls.setActive}
+        showClear={controls.isFiltered}
+        onClear={controls.clearFilters}
+      />
+
       <RequirementsCatalogTable
         rows={rows}
         isLoading={isLoading}
         columns={columns}
         emptyMessage={emptyMessage}
+        caption={`${title} requirement rows`}
         disabled={saving}
+        rowLabel={rowLabel}
         onEdit={openEdit}
-        onToggleRequired={(row) => runToggle(update(row.id, toRequiredInput(row)))}
-        onToggleActive={(row) => runToggle(update(row.id, toActiveInput(row)))}
+        onToggleRequired={(row) =>
+          runToggle(update(row.id, toRequiredInput(row)), () =>
+            update(row.id, toRequiredInput({ ...row, is_required: !row.is_required }))
+          )
+        }
+        onToggleActive={(row) =>
+          runToggle(update(row.id, toActiveInput(row)), () =>
+            update(row.id, toActiveInput({ ...row, is_active: !row.is_active }))
+          )
+        }
         onReorder={handleReorder}
+        controls={controls}
       />
 
       <RequirementFieldDialog
         open={dialogOpen}
-        heading={selected === null ? `New ${title} row` : `Edit ${title} row`}
+        heading={selected === null ? `New ${entityLabel}` : `Edit ${entityLabel}`}
+        description={
+          selected === null
+            ? `Add a new ${entityLabel} to this catalog.`
+            : `Update this ${entityLabel}. Required and Active are toggled directly in the table.`
+        }
         isEdit={selected !== null}
         saving={saving}
         fields={dialogFields}
