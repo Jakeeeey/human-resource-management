@@ -631,7 +631,7 @@ function JobOfferContent() {
                     className="bg-white text-black shadow-sm border rounded-xl p-8 sm:p-12 max-w-[800px] w-full mx-auto text-[15px] leading-relaxed font-serif"
                 >
                     <div className="flex items-center justify-start gap-3">
-                        <Image src={selectedLogo?.logo_data_url ?? "/men2-logo.jpg"} alt={`${selectedLogo?.company_name ?? "MEN2 Marketing"} logo`} width={220} height={80} className="h-20 w-auto shrink-0" priority />
+                        <Image src={selectedLogo?.logo_data_url ?? "/men2-logo.jpg"} alt={`${selectedLogo?.company_name ?? "MEN2 Marketing"} logo`} width={220} height={80} className="h-20 w-[220px] object-contain shrink-0" priority />
                         <div className="text-sm leading-relaxed text-neutral-500">
                         <p className="text-xs font-normal">Address: {blank(form.headerAddress)}</p>
                         <p className="text-xs font-normal">Contact #: {blank(form.headerContact)}</p>
