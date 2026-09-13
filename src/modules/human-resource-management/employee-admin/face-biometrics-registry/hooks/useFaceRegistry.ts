@@ -72,7 +72,9 @@ export function useFaceRegistry() {
 
   // Extend employees with biometric status
   const employeesWithFace = employees.map(emp => {
-    const activeBiometric = faceBiometrics.find(fb => fb.user_id === emp.id && fb.is_active);
+    const activeBiometric = faceBiometrics.find(
+      fb => fb.user_id === emp.id && (fb.is_active === true || fb.is_active === 1 || String(fb.is_active) === "true")
+    );
     return {
       ...emp,
       hasFaceBiometric: !!activeBiometric,
