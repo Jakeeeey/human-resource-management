@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useManpowerRecommendation } from "../hooks/useManpowerRecommendation";
-import { isApplicantHired, isApplicantSlotOccupying } from "../utils/applicantPipeline";
+import { countRequestApplicants, deriveRequestEffectiveStatus } from "../utils/requestStatus";
+import { RequestStatusPill } from "./RequestStatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,12 +28,6 @@ type RequestView = {
     displayStatus: string;
 };
 
-const STATUS_PILL_TINTS: Record<string, string> = {
-    Closed: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-    Full: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-    Open: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-};
-
 /**
  * T1 provider contract (pendingRequestId + openRecommendForm + detail-dialog
  * state land in providers/ManpowerRecommendationProvider.tsx via T1; F1 resolves).
@@ -41,15 +36,6 @@ const STATUS_PILL_TINTS: Record<string, string> = {
 interface OpenRequestsListT1Contract {
     setSelectedRequest: (request: OpenRequestRow | null) => void;
     setIsDetailOpen: (isOpen: boolean) => void;
-}
-
-function RequestStatusPill({ status }: { status: string }) {
-    const tint = STATUS_PILL_TINTS[status] ?? "bg-zinc-500/10 text-zinc-600 border-zinc-500/20";
-    return (
-        <span className={`inline-block w-[110px] rounded-full border px-3 py-1.5 text-center text-xs font-bold uppercase tracking-wider ${tint}`}>
-            {status}
-        </span>
-    );
 }
 
 export function OpenManpowerRequestsList() {
@@ -62,29 +48,22 @@ export function OpenManpowerRequestsList() {
         return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
     }
 
-    const requestRecs = (requestId: number) =>
-        recommendations.filter((r) => r.manpower_request_id === requestId);
-    const applicantById = new Map(applicants.map((a) => [a.id, a]));
-    // Pending recommendation ARTIFACTS (the rec lifecycle display, not a pipeline count).
-    const recommendedCount = (requestId: number) =>
-        requestRecs(requestId).filter((r) => r.status === "Recommended").length;
-    // Approved/hired counts (and the Closed/Full display status) follow the
-    // APPLICANT pipeline (todo 8 reconciliation): `applicant.status` is the
-    // truth; the rec row only links request->applicant. A rejected/withdrawn
-    // applicant frees its slot even when the rec row still reads Approved.
-    const approvedCount = (requestId: number) =>
-        requestRecs(requestId).filter((r) => isApplicantSlotOccupying(applicantById.get(r.applicant_id)?.status)).length;
-    const hiredCount = (requestId: number) =>
-        requestRecs(requestId).filter((r) => isApplicantHired(applicantById.get(r.applicant_id)?.status)).length;
+    // Effective status + applicant counts come from the shared derivation
+    // (utils/requestStatus.ts) — the SAME source the request/recommendation
+    // detail views use, so the list pill can never disagree with the details.
+    const applicantStatusById = new Map(applicants.map((a) => [a.id, a.status]));
     const divisionName = (req: OpenRequestRow) =>
         req.division_id == null ? "N/A" : (divisions.find((d) => d.id === req.division_id)?.name ?? String(req.division_id));
 
     const toView = (request: OpenRequestRow): RequestView => {
-        const total = request.no_manpower_needed ?? 0;
-        const approved = approvedCount(request.id);
-        const hired = hiredCount(request.id);
-        const displayStatus = total > 0 && hired >= total ? "Closed" : total > 0 && approved >= total ? "Full" : request.status === "Approved" ? "Open" : request.status;
-        return { request, division: divisionName(request), recommended: recommendedCount(request.id), approved, displayStatus };
+        const counts = countRequestApplicants(recommendations, request.id, applicantStatusById);
+        return {
+            request,
+            division: divisionName(request),
+            recommended: counts.recommended,
+            approved: counts.approved,
+            displayStatus: deriveRequestEffectiveStatus(request.status, request.no_manpower_needed ?? 0, counts),
+        };
     };
 
     const query = search.trim().toLowerCase();

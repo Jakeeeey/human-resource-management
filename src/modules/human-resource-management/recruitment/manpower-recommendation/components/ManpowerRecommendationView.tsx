@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useManpowerRecommendationContext } from "../providers/ManpowerRecommendationProvider";
-import { isApplicantHired } from "../utils/applicantPipeline";
+import { countRequestApplicants, deriveRequestEffectiveStatus } from "../utils/requestStatus";
+import { RequestStatusPill } from "./RequestStatusPill";
 import type { ManpowerRecommendation } from "../types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -69,8 +70,13 @@ export function ManpowerRecommendationView() {
     // The hire count follows the APPLICANT pipeline (todo 8 reconciliation):
     // `applicant.status` is the truth; the rec row only links applicant->request.
     const applicantStatusById = new Map(applicants.map((a) => [a.id, a.status]));
-    const hiredForRequest = recommendations.filter((r) => r.manpower_request_id === selectedRecommendation.manpower_request_id && isApplicantHired(applicantStatusById.get(r.applicant_id))).length;
+    // Counts and the effective status come from the shared derivation
+    // (utils/requestStatus.ts) — the SAME source the open-requests list pill uses,
+    // so this view and the list can never disagree.
+    const requestCounts = countRequestApplicants(recommendations, selectedRecommendation.manpower_request_id, applicantStatusById);
+    const hiredForRequest = requestCounts.hired;
     const requestNeed = matchedRequest?.no_manpower_needed ?? 0;
+    const effectiveStatus = deriveRequestEffectiveStatus(matchedRequest?.status, requestNeed, requestCounts);
     const isRequestClosed = requestNeed > 0 && hiredForRequest >= requestNeed;
     const isStatusEditable =
         !isRequestClosed && toStatusOption(selectedRecommendation.status) === "Recommended";
@@ -147,8 +153,14 @@ export function ManpowerRecommendationView() {
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Applicant Name</label>
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate" title={applicantName}>{applicantName}</div>
                             </div>
-                            <div className="md:col-span-3">
+                            <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
+                                <div className="flex items-center p-1">
+                                    <RequestStatusPill status={effectiveStatus} />
+                                </div>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommendation status</label>
                                 <div className="flex flex-wrap items-center gap-2">
                                     {isEditingStatus ? (
                                         <Select value={newStatus} onValueChange={(v) => setNewStatus(toStatusOption(v))}>
@@ -168,13 +180,12 @@ export function ManpowerRecommendationView() {
                                             {newStatus}
                                         </span>
                                     )}
-                {isStatusEditable && (
-                <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
+                                    {isStatusEditable && (
+                                        <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit recommendation status">
                                             <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>
                                     )}
-                                    <Button variant="outline"               size="lg"
-              className="w-full sm:w-auto sm:ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
+                                    <Button variant="outline" size="lg" className="w-full sm:w-auto sm:ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         Application Form
                                     </Button>
