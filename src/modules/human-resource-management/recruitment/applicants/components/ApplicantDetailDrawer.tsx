@@ -11,24 +11,17 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, History, Users } from "lucide-react";
+import { FileText, Users } from "lucide-react";
 import { APPLICANT_STATUS_LABELS, type ApplicantRow } from "../types";
 import { ApplicationViewDialog } from "@/modules/human-resource-management/recruitment/manpower-recommendation/components/ApplicationViewDialog";
 import { getApplicantStatusColor } from "./columns";
-import { formatDateLong, formatDateTime } from "@/lib/utils";
+import { formatDateLong } from "@/lib/utils";
 
 function formatSubmitted(value: string | null | undefined) {
     if (!value) return "—";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "—";
     return formatDateLong(date);
-}
-
-function formatTimelineAt(value: string | null | undefined) {
-    if (!value) return "Time unknown";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "Time unknown";
-    return formatDateTime(date);
 }
 
 interface ApplicantDetailDrawerProps {
@@ -47,7 +40,7 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="detail-drawer w-[95vw] sm:w-full sm:max-w-lg p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
+            <DialogContent showCloseButton={false} className="detail-drawer w-[95vw] sm:w-full sm:max-w-lg p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-extrabold flex items-center gap-3 pr-8">
@@ -114,39 +107,6 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                                 )}
                             </div>
                         </div>
-                    </div>
-
-                    <div className="bg-card shadow-sm border border-border/50 rounded-xl p-6 space-y-4">
-                        <div className="flex items-center gap-2 pb-2 border-b border-border/50">
-                            <History className="w-5 h-5 text-primary/70" />
-                            <div className="min-w-0">
-                                <h3 className="text-lg font-semibold tracking-tight">Timeline</h3>
-                                <p className="text-xs text-muted-foreground">
-                                    Recorded history — may lag the current status above.
-                                </p>
-                            </div>
-                        </div>
-                        {row && row.timeline.length > 0 ? (
-                            <ol className="space-y-4">
-                                {row.timeline.map((event) => (
-                                    <li
-                                        key={`${event.kind}-${event.id}`}
-                                        className="border-l-2 border-primary/30 pl-3"
-                                    >
-                                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                            {formatTimelineAt(event.at)}
-                                        </div>
-                                        <div className="text-sm font-medium text-foreground">
-                                            {event.detail}
-                                        </div>
-                                    </li>
-                                ))}
-                            </ol>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                No recorded interview or recommendation activity yet.
-                            </p>
-                        )}
                     </div>
                 </div>
 
