@@ -86,7 +86,6 @@ export function VerificationQueueTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
-              <TableHead>Employee</TableHead>
               <TableHead>Queue</TableHead>
               <TableHead>Return reason</TableHead>
               <TableHead>Ack trail</TableHead>
@@ -98,7 +97,7 @@ export function VerificationQueueTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7}>
+                <TableCell colSpan={6}>
                   <div className="space-y-2 py-4">
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
@@ -108,7 +107,7 @@ export function VerificationQueueTable({
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7}>
+                <TableCell colSpan={6}>
                   <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
                     <p className="text-muted-foreground">
                       No documents awaiting verification.
@@ -122,12 +121,6 @@ export function VerificationQueueTable({
             ) : (
               rows.map((row) => (
                 <TableRow key={row.userId}>
-                  <TableCell
-                    className="max-w-[140px] truncate font-medium"
-                    title={String(row.userId)}
-                  >
-                    #{row.userId}
-                  </TableCell>
                   <TableCell>{stateBadge(row.queueState)}</TableCell>
                   <TableCell
                     className="max-w-[220px] truncate text-sm text-muted-foreground"
@@ -190,7 +183,7 @@ export function VerificationQueueTable({
                             size="sm"
                             disabled={working}
                             onClick={() => onApprove(row)}
-                            aria-label={`Approve documents for employee ${row.userId}`}
+                            aria-label="Approve documents"
                             title="Approve"
                           >
                             <CheckCircle2 className="h-4 w-4" />
@@ -200,7 +193,7 @@ export function VerificationQueueTable({
                             size="sm"
                             disabled={working}
                             onClick={() => onReturn(row)}
-                            aria-label={`Return documents for employee ${row.userId} for resubmit`}
+                            aria-label="Return documents for resubmit"
                             title="Return for resubmit"
                           >
                             <Undo2 className="h-4 w-4" />
@@ -213,7 +206,7 @@ export function VerificationQueueTable({
                           size="sm"
                           disabled={working}
                           onClick={() => onResubmit(row)}
-                          aria-label={`Resubmit documents for employee ${row.userId}`}
+                          aria-label="Resubmit documents"
                           title="Resubmit"
                         >
                           <RotateCcw className="h-4 w-4" />
@@ -232,7 +225,7 @@ export function VerificationQueueTable({
                         size="sm"
                         disabled={working}
                         onClick={() => onRecordAck(row)}
-                        aria-label={`Record acknowledgement for employee ${row.userId}`}
+                        aria-label="Record acknowledgement"
                         title="Record acknowledgement"
                       >
                         <PenLine className="h-4 w-4" />
@@ -241,7 +234,7 @@ export function VerificationQueueTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onTrail(row)}
-                        aria-label={`View acknowledgement trail for employee ${row.userId}`}
+                        aria-label="View acknowledgement trail"
                         title="Acknowledgement trail"
                       >
                         <ScrollText className="h-4 w-4" />

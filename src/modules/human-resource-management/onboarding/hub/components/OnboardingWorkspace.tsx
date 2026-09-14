@@ -65,7 +65,7 @@ export function OnboardingWorkspace({
     void refresh();
   };
 
-  const title = row?.name ?? `Employee #${userId}`;
+  const title = row?.name ?? "Unnamed employee";
 
   return (
     <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
@@ -89,7 +89,7 @@ export function OnboardingWorkspace({
               ) : null}
             </div>
             <p className="text-base text-muted-foreground sm:text-lg">
-              Employee #{userId} · {row ? phaseLabel(row.phase) : "Onboarding"} · workspace
+              {row ? phaseLabel(row.phase) : "Onboarding"} · workspace
             </p>
           </div>
         </div>
@@ -142,7 +142,6 @@ export function OnboardingWorkspace({
             operator={operator}
             loading={loading}
             error={error}
-            onRefresh={() => void refresh()}
           />
         </TabsContent>
 
@@ -159,7 +158,13 @@ export function OnboardingWorkspace({
         </TabsContent>
 
         <TabsContent value="training" className="m-0">
-          <TrainingTab key={`training-${userId}`} userId={userId} />
+          <TrainingTab
+            key={`training-${userId}`}
+            groups={phaseGroups}
+            loading={loading}
+            error={error}
+            onRefresh={() => void refresh()}
+          />
         </TabsContent>
 
         <TabsContent value="equipment" className="m-0">

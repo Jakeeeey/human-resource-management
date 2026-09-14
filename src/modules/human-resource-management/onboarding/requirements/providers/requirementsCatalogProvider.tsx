@@ -10,20 +10,17 @@ import type {
   CreateDocumentSlotInput,
   CreateEquipmentItemInput,
   CreateOrientationTopicInput,
-  CreateTaskTemplateInput,
   DocumentSlotRow,
   EquipmentItemRow,
   OrientationTopicCatalogRow,
   RequirementsListQuery,
-  TaskTemplateRow,
   UpdateDocumentSlotInput,
   UpdateEquipmentItemInput,
   UpdateOrientationTopicInput,
-  UpdateTaskTemplateInput,
 } from "../types/requirements-catalog.schema";
 import { createCatalogClient } from "./requirementsCatalogClient";
 
-// requirementsCatalogProvider.tsx — client fetch layer for the four
+// requirementsCatalogProvider.tsx — client fetch layer for the three
 // requirements catalogs, mirroring the paperwork template provider. Each
 // catalog is an independent `CatalogResource` over the shared CRUD client, so
 // a failure in one catalog surfaces as that catalog's error state (never a
@@ -46,11 +43,6 @@ const equipmentClient = createCatalogClient<
   CreateEquipmentItemInput,
   UpdateEquipmentItemInput
 >("equipment");
-const taskTemplatesClient = createCatalogClient<
-  TaskTemplateRow,
-  CreateTaskTemplateInput,
-  UpdateTaskTemplateInput
->("task-templates");
 
 // The admin surface manages deactivated rows too, so the active toggle is
 // reversible without the row disappearing on soft delete.
@@ -71,17 +63,11 @@ export type EquipmentResource = CatalogResource<
   CreateEquipmentItemInput,
   UpdateEquipmentItemInput
 >;
-export type TaskTemplatesResource = CatalogResource<
-  TaskTemplateRow,
-  CreateTaskTemplateInput,
-  UpdateTaskTemplateInput
->;
 
 export interface RequirementsCatalogFetchContextType {
   documents: DocumentsResource;
   orientation: OrientationResource;
   equipment: EquipmentResource;
-  taskTemplates: TaskTemplatesResource;
 }
 
 const RequirementsCatalogFetchContext = createContext<
@@ -96,11 +82,10 @@ export function RequirementsCatalogFetchProvider({
   const documents = useCatalogResource(documentsClient, LIST_ALL);
   const orientation = useCatalogResource(orientationClient, LIST_ALL);
   const equipment = useCatalogResource(equipmentClient, LIST_ALL);
-  const taskTemplates = useCatalogResource(taskTemplatesClient, LIST_ALL);
 
   const value = useMemo(
-    () => ({ documents, orientation, equipment, taskTemplates }),
-    [documents, orientation, equipment, taskTemplates]
+    () => ({ documents, orientation, equipment }),
+    [documents, orientation, equipment]
   );
 
   return (
@@ -112,7 +97,7 @@ export function RequirementsCatalogFetchProvider({
 
 /**
  * Raw per-catalog access to the requirements fetch provider.
- * @returns The four catalog resources.
+ * @returns The three catalog resources.
  * @throws When used outside `RequirementsCatalogFetchProvider`.
  */
 export function useRequirementsCatalogFetch(): RequirementsCatalogFetchContextType {

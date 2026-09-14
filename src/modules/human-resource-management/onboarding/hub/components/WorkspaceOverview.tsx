@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, ChevronDown, Inbox, RefreshCw } from "lucide-react";
+import { AlertCircle, ChevronDown, Inbox } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
@@ -30,14 +29,12 @@ export function WorkspaceOverview({
   operator,
   loading,
   error,
-  onRefresh,
 }: {
   row: HireRosterRow | null;
   groups: WorkspacePhaseGroup[];
   operator: WorkspaceOperator;
   loading: boolean;
   error: string | null;
-  onRefresh: () => void;
 }) {
   const needsAttention = buildNeedsAttention(groups, operator);
   const [inboxOpen, setInboxOpen] = useState(false);
@@ -45,19 +42,7 @@ export function WorkspaceOverview({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,10fr)_minmax(0,9fr)]">
       <section className="min-w-0 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Phased task list</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={onRefresh}
-            disabled={loading}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-            Refresh
-          </Button>
-        </div>
+        <h2 className="text-lg font-semibold">Phased task list</h2>
 
         {error ? (
           <Alert variant="destructive">
@@ -115,19 +100,13 @@ export function WorkspaceOverview({
                 </span>
               </button>
               {inboxOpen ? (
-                <WorkspaceNeedsAttention
-                  items={needsAttention}
-                  operator={operator}
-                />
+                <WorkspaceNeedsAttention items={needsAttention} />
               ) : null}
             </div>
 
             {/* lg+: the two-column side-by-side inbox stays a full card. */}
             <div className="hidden lg:block">
-              <WorkspaceNeedsAttention
-                items={needsAttention}
-                operator={operator}
-              />
+              <WorkspaceNeedsAttention items={needsAttention} />
             </div>
           </>
         )}

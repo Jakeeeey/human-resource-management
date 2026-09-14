@@ -1,11 +1,11 @@
 "use client";
 
 // RequirementsRegistryModule.tsx — onboarding requirements admin root: the
-// HR-owned catalogs for documents, orientation, training, and equipment.
+// HR-owned catalogs for documents, orientation, and equipment.
 // Standalone module shell (mirrors PaperworkRegistryModule), mounted at
 // `hrm/onboarding/requirements` — never inside the per-hire OnboardingWorkspace.
 //
-// Todo 14 built this shell; todo 16 adds the four catalog sections, mounted
+// Todo 14 built this shell; todo 16 adds the three catalog sections, mounted
 // under the todo-15 fetch provider. There is no admin/role gate: access is
 // governed externally by the platform module authorization.
 
@@ -26,8 +26,8 @@ export function RequirementsRegistryModule() {
             Onboarding Requirements
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground">
-            Which documents, orientation topics, training, and equipment apply
-            to new hires.
+            Which documents, orientation topics, and equipment apply to new
+            hires.
           </p>
         </div>
       </div>

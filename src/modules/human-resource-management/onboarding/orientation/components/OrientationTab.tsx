@@ -101,7 +101,6 @@ function TrackCard({
                       onClick={() => onCheck(topic.id)}
                       className="shrink-0"
                       aria-label={`Check off ${topic.title}`}
-                      title={`Owned by ${ownerLabel}`}
                     >
                       Check off
                     </Button>
@@ -132,7 +131,7 @@ export function OrientationTab({ userId }: { userId: number }) {
     checkTopic,
   } = useOrientation(userId);
 
-  const employeeLabel = selectedEmployee?.name ?? `Employee #${userId}`;
+  const employeeLabel = selectedEmployee?.name ?? "Unnamed employee";
 
   return (
     <div className="space-y-4">
@@ -164,7 +163,7 @@ export function OrientationTab({ userId }: { userId: number }) {
         <div className="grid gap-4 lg:grid-cols-2">
           <TrackCard
             title="Company Orientation"
-            description="HR-owned track from pdf §7."
+            description="Company orientation track from pdf §7."
             icon={<Building2 className="h-4 w-4 text-muted-foreground shrink-0" />}
             topics={companyTopics}
             checkedIds={checkedIds}
@@ -174,7 +173,7 @@ export function OrientationTab({ userId }: { userId: number }) {
           />
           <TrackCard
             title="Department Orientation"
-            description="Department-owned track; HR checks it off as the department proxy."
+            description="Department track; HR checks it off as the department proxy."
             icon={<Users className="h-4 w-4 text-muted-foreground shrink-0" />}
             topics={departmentTopics}
             checkedIds={checkedIds}

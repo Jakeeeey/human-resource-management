@@ -140,17 +140,14 @@ export type UpdateEquipmentItemBody = z.infer<
 >;
 
 // ---------------------------------------------------------------------------
-// task templates — onboarding_task_template (documents / training / equipment)
+// task templates — onboarding_task_template (documents / equipment)
 // ---------------------------------------------------------------------------
 
 // Orientation-phase templates are DERIVED from the orientation topic catalog
-// (todo 2) and are edited through the orientation section — the requirements
-// task-template catalog manages the other three phases only.
-export const REQUIREMENTS_TASK_PHASES = [
-  "documents",
-  "training",
-  "equipment",
-] as const;
+// (todo 2) and are edited through the orientation section; training-phase
+// templates are DERIVED from the separate training-template catalog. The
+// requirements task-template catalog manages the remaining two phases only.
+export const REQUIREMENTS_TASK_PHASES = ["documents", "equipment"] as const;
 
 export type RequirementsTaskPhase = (typeof REQUIREMENTS_TASK_PHASES)[number];
 

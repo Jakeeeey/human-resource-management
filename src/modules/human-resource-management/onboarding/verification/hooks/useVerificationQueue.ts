@@ -82,7 +82,7 @@ export function useVerificationQueue(userId: number) {
       setWorking(true);
       try {
         await decide({ user_id: row.userId, decision: "approve" });
-        toast.success(`Employee #${row.userId} verified`);
+        toast.success("Documents verified");
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Approval refused");
       } finally {

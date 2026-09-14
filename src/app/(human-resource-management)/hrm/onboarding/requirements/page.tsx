@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Onboarding Requirements | HRM",
-  description: "HR-owned catalogs for documents, orientation, training, and equipment.",
+  description: "HR-owned catalogs for documents, orientation, and equipment.",
 };
 
 const COOKIE_NAME = "vos_access_token";

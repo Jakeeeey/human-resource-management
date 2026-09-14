@@ -40,6 +40,6 @@ export async function listOrientationEmployees(): Promise<
     user_id: row.user_id,
     name:
       [row.user_fname, row.user_lname].filter(Boolean).join(" ").trim() ||
-      `Employee #${row.user_id}`,
+      "Unnamed employee",
   }));
 }

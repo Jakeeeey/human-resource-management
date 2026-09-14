@@ -3,10 +3,6 @@ import type { OnboardingEquipmentItem } from "../../equipment/server/equipmentIt
 import type { EquipmentIssuer } from "../../equipment/types/equipment-issue.schema";
 import type { OrientationTopicRow } from "../../orientation/server/orientationTopicIo";
 import type { OrientationTrack } from "../../orientation/types/orientation.schema";
-import type {
-  OnboardingOwnerRole,
-  OnboardingTaskTemplate,
-} from "../../types/onboarding-task.schema";
 
 // requirements-catalog.schema.ts — CLIENT-SAFE contracts for the requirements
 // admin catalog (todo 15 of onboarding-requirements-config).
@@ -30,8 +26,6 @@ export type DocumentSlotRow = OnboardingDocumentSlot;
 export type OrientationTopicCatalogRow = OrientationTopicRow;
 /** `onboarding_equipment_item` row (equipment catalog). */
 export type EquipmentItemRow = OnboardingEquipmentItem;
-/** `onboarding_task_template` row (documents / training / equipment phases). */
-export type TaskTemplateRow = OnboardingTaskTemplate;
 
 // ---------------------------------------------------------------------------
 // Catalog slugs — the `/api/hrm/onboarding/requirements/<slug>` route segment
@@ -114,34 +108,13 @@ export interface UpdateEquipmentItemInput {
 }
 
 // ---------------------------------------------------------------------------
-// task templates — onboarding_task_template (documents / training / equipment)
+// task templates — onboarding_task_template (documents / equipment)
 // ---------------------------------------------------------------------------
 
 // Orientation-phase templates are DERIVED from orientation topics and edited
-// through the orientation catalog — the task-template catalog manages only
-// these three phases (mirrors `requirements-api.schema.ts`, server-only).
-export const REQUIREMENTS_TASK_PHASES = [
-  "documents",
-  "training",
-  "equipment",
-] as const;
+// through the orientation catalog; training-phase templates are DERIVED from
+// the separate training-template catalog. The task-template catalog manages
+// the remaining two phases (mirrors `requirements-api.schema.ts`, server-only).
+export const REQUIREMENTS_TASK_PHASES = ["documents", "equipment"] as const;
 
 export type RequirementsTaskPhase = (typeof REQUIREMENTS_TASK_PHASES)[number];
-
-export interface CreateTaskTemplateInput {
-  code: string;
-  title: string;
-  phase: RequirementsTaskPhase;
-  owner_role: OnboardingOwnerRole;
-  is_required?: boolean;
-  sort_order?: number;
-}
-
-export interface UpdateTaskTemplateInput {
-  title?: string;
-  phase?: RequirementsTaskPhase;
-  owner_role?: OnboardingOwnerRole;
-  is_required?: boolean;
-  is_active?: boolean;
-  sort_order?: number;
-}

@@ -8,15 +8,14 @@ import { useRequirementsCatalogs } from "../hooks/useRequirementsCatalogs";
 import { DocumentsSection } from "../sections/DocumentsSection";
 import { EquipmentSection } from "../sections/EquipmentSection";
 import { OrientationSection } from "../sections/OrientationSection";
-import { TrainingSection } from "../sections/TrainingSection";
 
-// RequirementsSections.tsx — composes the four catalog sections from the todo-15
-// fetch provider into one tab per catalog (Documents / Orientation / Training /
-// Equipment). Each section owns its own loading/error/reorder lifecycle; this
-// shell only distributes the catalog resources and keeps the active tab in the
-// URL hash so a reload (or a shared link) restores the same view.
+// RequirementsSections.tsx — composes the three catalog sections from the todo-15
+// fetch provider into one tab per catalog (Documents / Orientation / Equipment).
+// Each section owns its own loading/error/reorder lifecycle; this shell only
+// distributes the catalog resources and keeps the active tab in the URL hash so
+// a reload (or a shared link) restores the same view.
 
-const TAB_IDS = ["documents", "orientation", "training", "equipment"] as const;
+const TAB_IDS = ["documents", "orientation", "equipment"] as const;
 type TabId = (typeof TAB_IDS)[number];
 const DEFAULT_TAB: TabId = "documents";
 
@@ -37,8 +36,7 @@ function subscribeHash(onChange: () => void): () => void {
 }
 
 export function RequirementsSections() {
-  const { documents, orientation, taskTemplates, equipment } =
-    useRequirementsCatalogs();
+  const { documents, orientation, equipment } = useRequirementsCatalogs();
   const active = useSyncExternalStore(subscribeHash, readHashTab, getServerTab);
 
   const handleTabChange = useCallback((value: string) => {
@@ -52,11 +50,6 @@ export function RequirementsSections() {
   const tabs: readonly { id: TabId; label: string; count: number }[] = [
     { id: "documents", label: "Documents", count: documents.rows.length },
     { id: "orientation", label: "Orientation", count: orientation.rows.length },
-    {
-      id: "training",
-      label: "Training",
-      count: taskTemplates.rows.filter((row) => row.phase === "training").length,
-    },
     { id: "equipment", label: "Equipment", count: equipment.rows.length },
   ];
 
@@ -76,9 +69,6 @@ export function RequirementsSections() {
       </TabsContent>
       <TabsContent value="orientation" className="m-0">
         <OrientationSection resource={orientation} />
-      </TabsContent>
-      <TabsContent value="training" className="m-0">
-        <TrainingSection resource={taskTemplates} />
       </TabsContent>
       <TabsContent value="equipment" className="m-0">
         <EquipmentSection resource={equipment} />

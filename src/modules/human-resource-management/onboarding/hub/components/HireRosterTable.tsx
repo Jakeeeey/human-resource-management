@@ -16,18 +16,17 @@ import { cn } from "@/lib/utils";
 import {
   formatDueDate,
   isDateOverdue,
-  OWNER_ROLE_LABELS,
   phaseLabel,
   ROSTER_STATUS_LABELS,
   rosterStatusTone,
 } from "../rosterData";
 import type { HireRosterRow } from "../types/hire-roster.schema";
 
-// HireRosterTable.tsx — the roster MASTER pane (todo 27): the six plan columns
-// (hire, status/phase, next action, owner, due, blockers). Presentational only
+// HireRosterTable.tsx — the roster MASTER pane (todo 27): the five plan columns
+// (hire, status/phase, next action, due, blockers). Presentational only
 // — selection and filtering are owned by `HireRoster`. Below `xl` it renders a
 // stacked card list so every decision column stays visible at rest
-// (S6#3/S7#1); the six-column table (min-w-[900px]) only renders once the
+// (S6#3/S7#1); the five-column table (min-w-[900px]) only renders once the
 // content column can actually hold it (S7 NEW-1: the sidebar leaves ~392px at
 // 768px, so `sm` was too early).
 
@@ -60,7 +59,7 @@ export function HireRosterTable({
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
-      {/* Below xl: stacked cards so all six columns are readable at rest. */}
+      {/* Below xl: stacked cards so all five columns are readable at rest. */}
       <ul className="h-[560px] divide-y divide-border overflow-auto xl:hidden">
         {rows.length === 0 ? (
           <li className="px-4 py-10 text-center text-sm text-muted-foreground">
@@ -108,10 +107,6 @@ export function HireRosterTable({
                       <span className="text-muted-foreground">Next: </span>
                       <span className="font-medium">{nextActionLabel(row)}</span>
                     </span>
-                    <span>
-                      <span className="text-muted-foreground">Owner: </span>
-                      {row.ownerRole ? OWNER_ROLE_LABELS[row.ownerRole] : "—"}
-                    </span>
                     <span className={cn(overdue && "font-medium text-destructive")}>
                       <span className="text-muted-foreground">Due: </span>
                       {formatDueDate(row.dueDate)}
@@ -133,7 +128,7 @@ export function HireRosterTable({
         )}
       </ul>
 
-      {/* xl+: the six-column table once the content column can hold it. */}
+      {/* xl+: the five-column table once the content column can hold it. */}
       <div className="hidden h-[560px] overflow-auto xl:block">
         <Table className="min-w-[900px]">
           <TableHeader>
@@ -141,7 +136,6 @@ export function HireRosterTable({
               <TableHead className="max-w-56">Hire</TableHead>
               <TableHead className="max-w-44">Status / Phase</TableHead>
               <TableHead className="max-w-64">Next action</TableHead>
-              <TableHead className="max-w-32">Owner</TableHead>
               <TableHead className="max-w-36">Due</TableHead>
               <TableHead className="max-w-48">Blockers</TableHead>
             </TableRow>
@@ -150,7 +144,7 @@ export function HireRosterTable({
             {rows.length === 0 && (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={5}
                   className="py-10 text-center text-sm text-muted-foreground"
                 >
                   No hires match these filters.
@@ -201,12 +195,6 @@ export function HireRosterTable({
                     title={row.nextAction?.label ?? ""}
                   >
                     {nextActionLabel(row)}
-                  </TableCell>
-                  <TableCell
-                    className="max-w-32 truncate"
-                    title={row.ownerRole ? OWNER_ROLE_LABELS[row.ownerRole] : ""}
-                  >
-                    {row.ownerRole ? OWNER_ROLE_LABELS[row.ownerRole] : "—"}
                   </TableCell>
                   <TableCell
                     className={cn(

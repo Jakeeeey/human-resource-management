@@ -10,7 +10,6 @@ import {
 import type { EquipmentAckMethod } from "../types/equipment-issue.schema";
 import { EquipmentIssueTable } from "./EquipmentIssueTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -25,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, PackageCheck, RefreshCw } from "lucide-react";
+import { AlertCircle, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 
 // EquipmentTab.tsx — workspace Equipment section. Per-EMPLOYEE issue log over
@@ -91,44 +90,33 @@ function EquipmentTabBody({ userId }: { userId: number }) {
         <p className="text-sm text-muted-foreground max-w-[520px]">
           {status
             ? `Handover checklist — ${status.items.filter((i) => i.acked).length}/${status.items.length} items acknowledged`
-            : `Equipment issue log for employee #${userId}`}
+            : "Equipment issue log"}
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <span
-              id="equipment-ack-method-label"
-              className="text-xs text-muted-foreground"
-            >
-              Acknowledgement method
-            </span>
-            <Select
-              value={ackMethod}
-              onValueChange={(v) => setAckMethod(v as EquipmentAckMethod)}
-            >
-              <SelectTrigger
-                aria-labelledby="equipment-ack-method-label"
-                className="h-10 w-full sm:w-[140px]"
-              >
-                <SelectValue placeholder="Ack method" />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                {ACK_METHODS.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => void refetch(userId)}
-            disabled={isLoading}
-            className="w-full sm:w-auto"
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+          <span
+            id="equipment-ack-method-label"
+            className="text-xs text-muted-foreground"
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Retry
-          </Button>
+            Acknowledgement method
+          </span>
+          <Select
+            value={ackMethod}
+            onValueChange={(v) => setAckMethod(v as EquipmentAckMethod)}
+          >
+            <SelectTrigger
+              aria-labelledby="equipment-ack-method-label"
+              className="h-10 w-full sm:w-[140px]"
+            >
+              <SelectValue placeholder="Ack method" />
+            </SelectTrigger>
+            <SelectContent className="max-h-60">
+              {ACK_METHODS.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

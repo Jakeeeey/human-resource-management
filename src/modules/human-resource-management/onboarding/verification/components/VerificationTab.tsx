@@ -5,8 +5,7 @@ import { VerificationQueueTable } from "./VerificationQueueTable";
 import { AckDialog, ReturnDialog } from "./VerificationDialogs";
 import { AcknowledgementTrailDialog } from "./AcknowledgementTrailDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 // VerificationTab.tsx — hub Verification tab body (Todo 10): pending →
 // approved | returned-for-resubmit queue with acknowledgement trail. Toolbar
@@ -30,7 +29,6 @@ export function VerificationTab({ userId }: { userId: number }) {
     isLoading,
     isError,
     error,
-    refetch,
     dialog,
     working,
     openReturn,
@@ -48,23 +46,10 @@ export function VerificationTab({ userId }: { userId: number }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {counts.pending} pending · {counts.returned} returned ·{" "}
-          {counts.approved} approved
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            variant="outline"
-            onClick={() => void refetch()}
-            disabled={isLoading}
-            className="w-full sm:w-auto"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {counts.pending} pending · {counts.returned} returned ·{" "}
+        {counts.approved} approved
+      </p>
 
       {isError && (
         <Alert variant="destructive">

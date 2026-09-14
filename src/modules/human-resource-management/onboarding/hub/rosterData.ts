@@ -1,9 +1,6 @@
 import { formatDateLong, titleCase } from "@/lib/utils";
 
-import type {
-  OnboardingOwnerRole,
-  OnboardingTaskStatus,
-} from "@/modules/human-resource-management/onboarding/types/onboarding-task.schema";
+import type { OnboardingTaskStatus } from "@/modules/human-resource-management/onboarding/types/onboarding-task.schema";
 
 import type {
   HireRosterRow,
@@ -26,13 +23,6 @@ export const PHASE_LABELS: Record<string, string> = {
   orientation: "Orientation",
   training: "Training",
   equipment: "Equipment",
-};
-
-export const OWNER_ROLE_LABELS: Record<OnboardingOwnerRole, string> = {
-  hr: "HR",
-  department: "Department",
-  hiree: "Hiree",
-  system: "System",
 };
 
 export const ROSTER_STATUS_LABELS: Record<HireRosterStatus, string> = {
@@ -105,21 +95,19 @@ export type HireRosterStatusFilter = HireRosterStatus | "all";
 export interface HireRosterFilters {
   query: string;
   status: HireRosterStatusFilter;
-  ownerRole: OnboardingOwnerRole | "all";
   phase: string | "all";
 }
 
 export const EMPTY_HIRE_ROSTER_FILTERS: HireRosterFilters = {
   query: "",
   status: "all",
-  ownerRole: "all",
   phase: "all",
 };
 
 /**
  * Client-side filter over the loaded roster rows (no new API params — the
  * same shape `MailOutboxViewer` uses): name/id substring, roll-up status,
- * next-action owner, and phase membership.
+ * and phase membership.
  */
 export function filterHireRosterRows(
   rows: readonly HireRosterRow[],
@@ -128,9 +116,6 @@ export function filterHireRosterRows(
   const needle = filters.query.trim().toLowerCase();
   return rows.filter((row) => {
     if (filters.status !== "all" && row.status !== filters.status) return false;
-    if (filters.ownerRole !== "all" && row.ownerRole !== filters.ownerRole) {
-      return false;
-    }
     if (filters.phase !== "all" && !row.phases.includes(filters.phase)) {
       return false;
     }

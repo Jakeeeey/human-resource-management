@@ -105,8 +105,7 @@ export function CompletionTab({ userId }: { userId: number }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">Employee #{userId}</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <Button
             variant="outline"
             className="w-full sm:w-auto"

@@ -45,8 +45,8 @@ export function ReturnDialog({ open, row, working, onClose, onSubmit }: ReturnDi
         </DialogHeader>
         <div className="space-y-4 py-2">
           <p className="text-sm text-muted-foreground">
-            Employee #{row?.userId} keeps the HR verification task blocked with
-            this reason attached; resubmit re-queues the row as pending.
+            Returning keeps the HR verification task blocked with this reason
+            attached; resubmit re-queues the row as pending.
           </p>
           <div className="space-y-2">
             <Label htmlFor="onb-return-reason">Reason (required)</Label>

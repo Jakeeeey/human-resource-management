@@ -4,7 +4,7 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 import { listOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
 
-import { buildHireRosterRows } from "../rosterBuilder";
+import { buildHireRosterRows, UNNAMED_EMPLOYEE_LABEL } from "../rosterBuilder";
 import type { HireRosterRow } from "../types/hire-roster.schema";
 
 // hire-roster-service.ts — server-side assembly for the onboarding hub roster
@@ -28,7 +28,7 @@ function displayName(row: z.infer<typeof EmployeeNameRowSchema>): string {
     .filter((part): part is string => part !== null && part.trim() !== "")
     .join(" ")
     .trim();
-  return name || `Employee #${row.user_id}`;
+  return name || UNNAMED_EMPLOYEE_LABEL;
 }
 
 async function listEmployeeNames(): Promise<

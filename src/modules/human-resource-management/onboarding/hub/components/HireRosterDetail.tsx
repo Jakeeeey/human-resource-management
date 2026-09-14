@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   AlertTriangle,
   CalendarClock,
-  CircleUserRound,
   ListChecks,
 } from "lucide-react";
 
@@ -16,17 +15,15 @@ import { cn } from "@/lib/utils";
 import {
   formatDueDate,
   isDateOverdue,
-  OWNER_ROLE_LABELS,
   phaseLabel,
   ROSTER_STATUS_LABELS,
   rosterStatusTone,
 } from "../rosterData";
 import type { HireRosterRow } from "../types/hire-roster.schema";
 
-// HireRosterDetail.tsx — the master-detail right pane (todo 27). Read-only:
-// it renders one enriched roster row (progress, next action, owner, due,
-// blockers, per-phase progress). Shared by the inline lg+ pane and the
-// below-lg dialog so both surfaces show identical information.
+// HireRosterDetail.tsx — the selected hire's summary body (todo 27). Read-only:
+// it renders one enriched roster row (progress, next action, due, blockers,
+// per-phase progress). Rendered by the `HireRosterPanel` slide-over.
 
 function StatCard({
   icon,
@@ -92,7 +89,6 @@ export function HireRosterDetail({
           <h3 className="truncate text-lg font-semibold" title={row.name}>
             {row.name}
           </h3>
-          <p className="text-xs text-muted-foreground">Employee #{row.userId}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <StatusBadge tone={rosterStatusTone(row.status)}>
@@ -125,13 +121,6 @@ export function HireRosterDetail({
           icon={<ListChecks className="h-4 w-4" aria-hidden="true" />}
           label="Phase"
           value={phaseLabel(row.phase)}
-        />
-        <StatCard
-          icon={<CircleUserRound className="h-4 w-4" aria-hidden="true" />}
-          label="Owner"
-          value={
-            row.ownerRole ? OWNER_ROLE_LABELS[row.ownerRole] : "—"
-          }
         />
         <StatCard
           icon={<AlertTriangle className="h-4 w-4" aria-hidden="true" />}

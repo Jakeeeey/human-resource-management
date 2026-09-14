@@ -229,6 +229,31 @@ export async function listTaskRows(
   );
 }
 
+const TaskUserIdRowSchema = z.object({
+  user_id: z.number().int().positive(),
+});
+
+/**
+ * Every DISTINCT `user_id` owning at least one `onboarding_task` row,
+ * ascending. `limit=-1` on purpose: `listTaskRows` caps at 500 rows (roster
+ * page size) and would silently skip employees in a maintenance sweep.
+ * @returns The de-duplicated employee ids.
+ * @throws Coded `taskReadFailed` when the read or the row contract fails
+ * (never a false "no employees").
+ */
+export async function listTaskUserIds(): Promise<number[]> {
+  const body: unknown = await dFetch(
+    "/items/onboarding_task?fields=user_id&limit=-1"
+  );
+  const rows = parseRowList(
+    TaskUserIdRowSchema,
+    body,
+    ONBOARDING_TASK_ERROR_CODES.taskReadFailed,
+    "onboarding_task user_id"
+  );
+  return [...new Set(rows.map((row) => row.user_id))].sort((a, b) => a - b);
+}
+
 export interface TaskWriteRow {
   user_id: number;
   template_id: number;

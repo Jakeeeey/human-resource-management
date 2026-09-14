@@ -14,30 +14,22 @@ import { cn } from "@/lib/utils";
 import {
   formatDueDate,
   isDateOverdue,
-  OWNER_ROLE_LABELS,
   phaseLabel,
   TASK_STATUS_LABELS,
   taskStatusTone,
 } from "../rosterData";
-import type { WorkspaceOperator } from "../taskInbox";
 import type { WorkspaceTaskItem } from "../workspaceTasks";
 
-// WorkspaceNeedsAttention.tsx — the role-scoped "My tasks / needs attention"
-// inbox (todo 29). It renders a projection of the SAME task set the phased list
+// WorkspaceNeedsAttention.tsx — the "My tasks / needs attention" inbox
+// (todo 29). It renders a projection of the SAME task set the phased list
 // shows (passed in as `items`), already filtered by the pure
-// `buildNeedsAttention` helper to the operator's own open tasks. It owns no
-// fetch and no task state, and it never offers a role switch: the operator is
-// the server-resolved session identity.
+// `buildNeedsAttention` helper to the current operator's open tasks.
 
 export function WorkspaceNeedsAttention({
   items,
-  operator,
 }: {
   items: WorkspaceTaskItem[];
-  operator: WorkspaceOperator;
 }) {
-  const roleLabel = OWNER_ROLE_LABELS[operator.role];
-
   return (
     <Card className="shadow-none border-primary/20 bg-primary/5">
       <CardHeader>
@@ -50,16 +42,13 @@ export function WorkspaceNeedsAttention({
             {items.length > 0 ? `${items.length} need attention` : "All clear"}
           </StatusBadge>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Needs attention · owned by {roleLabel}
-          {operator.userId !== null ? ` (user #${operator.userId})` : ""}
-        </p>
+        <p className="text-sm text-muted-foreground">Needs attention</p>
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No {roleLabel}-owned tasks need your attention right now. Other
-            owners remain visible in the full phased task list.
+            Nothing needs your attention right now. Open tasks remain visible
+            in the full phased task list.
           </p>
         ) : (
           <ul className="grid gap-2">
@@ -91,9 +80,6 @@ export function WorkspaceNeedsAttention({
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center rounded-md border border-border px-1.5 py-0.5 font-medium text-foreground">
-                      Owner: {OWNER_ROLE_LABELS[item.ownerRole]}
-                    </span>
                     <span
                       className={
                         overdue ? "font-medium text-destructive" : undefined

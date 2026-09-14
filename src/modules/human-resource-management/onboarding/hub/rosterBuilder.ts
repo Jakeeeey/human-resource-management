@@ -34,6 +34,9 @@ interface EnrichedTask {
   satisfied: boolean;
 }
 
+/** Id-free fallback shown when an employee has no display name. */
+export const UNNAMED_EMPLOYEE_LABEL = "Unnamed employee";
+
 /** Tasks with no template row are required and sorted last (fail closed). */
 const UNTEMPLATED_SORT_ORDER = Number.MAX_SAFE_INTEGER;
 
@@ -114,7 +117,7 @@ function buildRow(
 
   return {
     userId,
-    name: name ?? `Employee #${userId}`,
+    name: name ?? UNNAMED_EMPLOYEE_LABEL,
     status,
     phase: open[0]?.phase ?? null,
     phases: [...new Set(enriched.map((item) => item.phase))],

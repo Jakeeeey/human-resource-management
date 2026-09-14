@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Users } from "lucide-react";
 
@@ -22,28 +22,15 @@ import {
   type HireRosterFilters,
 } from "../rosterData";
 import type { HireRosterRow } from "../types/hire-roster.schema";
-import { HireRosterDetail } from "./HireRosterDetail";
-import { HireRosterDialog } from "./HireRosterDialog";
 import { HireRosterFilterBar } from "./HireRosterFilterBar";
+import { HireRosterPanel } from "./HireRosterPanel";
 import { HireRosterTable } from "./HireRosterTable";
 
-// HireRoster.tsx — the onboarding hub ENTRY (todo 27): a filterable
-// master-detail roster over the enriched hire list, replacing the flat tab
-// navigation. Master = the six-column table; detail = the selected hire's
-// summary. Rows are built from the employee-keyed task engine — never a
-// stage-as-tab.
-
-function useIsLargeScreen(): boolean {
-  const [large, setLarge] = useState(false);
-  useEffect(() => {
-    const query = window.matchMedia("(min-width: 1024px)");
-    const update = () => setLarge(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-  return large;
-}
+// HireRoster.tsx — the onboarding hub ENTRY (todo 27): a filterable roster over
+// the enriched hire list, replacing the flat tab navigation. The six-column
+// table is the full-width primary surface; the selected hire's summary opens in
+// a right-side slide-over (`HireRosterPanel`) at every viewport width. Rows are
+// built from the employee-keyed task engine — never a stage-as-tab.
 
 export function HireRoster() {
   const { rows, loading, error, refresh } = useHireRoster();
@@ -53,12 +40,11 @@ export function HireRoster() {
   const [filters, setFilters] = useState<HireRosterFilters>(
     EMPTY_HIRE_ROSTER_FILTERS
   );
-  const isLarge = useIsLargeScreen();
 
   // The URL (`?selected=<userId>`) is the ONE canonical selected hire: the
   // roster's active row and the workspace route param both read from it, so
   // navigating roster -> workspace -> roster keeps the same hire. There is no
-  // auto-pick — an absent selection renders the empty-detail placeholder.
+  // auto-pick — an absent selection renders no summary panel.
   const selectedUserId = useMemo(() => {
     const raw = searchParams.get("selected");
     if (!raw) return null;
@@ -154,34 +140,21 @@ export function HireRoster() {
         onReset={handleReset}
       />
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,13fr)_minmax(0,9fr)]">
-        <HireRosterTable
-          rows={filtered}
-          activeRow={activeRow}
-          onSelect={handleSelect}
-        />
-        <div className="hidden min-h-0 lg:flex lg:flex-col">
-          <div className="flex h-[560px] flex-col">
-            {activeRow ? (
-              <HireRosterDetail
-                row={activeRow}
-                workspaceHref={`/hrm/onboarding/${activeRow.userId}`}
-              />
-            ) : (
-              <p className="min-h-0 flex-1 text-sm text-muted-foreground">
-                Select a hire to see their onboarding summary.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
+      <HireRosterTable
+        rows={filtered}
+        activeRow={activeRow}
+        onSelect={handleSelect}
+      />
 
-      <HireRosterDialog
-        row={isLarge ? null : activeRow}
+      <HireRosterPanel
+        open={activeRow !== null}
+        onOpenChange={(next) => {
+          if (!next) selectRow(null);
+        }}
+        row={activeRow}
         workspaceHref={
           activeRow ? `/hrm/onboarding/${activeRow.userId}` : undefined
         }
-        onClose={() => selectRow(null)}
       />
     </div>
   );

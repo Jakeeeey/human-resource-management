@@ -67,3 +67,6 @@ export const OnboardingTaskCompleteSchema = z.object({}).strict();
 
 /** Seed takes an EMPTY strict body — the catalog is code-owned. */
 export const SeedOnboardingTaskTemplatesSchema = z.object({}).strict();
+
+/** Backfill takes an EMPTY strict body — the sweep discovers its own users. */
+export const BackfillOnboardingTasksSchema = z.object({}).strict();

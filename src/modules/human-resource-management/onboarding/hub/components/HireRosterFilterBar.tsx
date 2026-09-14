@@ -12,17 +12,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { ONBOARDING_OWNER_ROLE } from "@/modules/human-resource-management/onboarding/types/onboarding-task.schema";
-
 import {
-  OWNER_ROLE_LABELS,
   phaseLabel,
   ROSTER_STATUS_LABELS,
   type HireRosterFilters,
 } from "../rosterData";
 import { HIRE_ROSTER_STATUS } from "../types/hire-roster.schema";
 
-// HireRosterFilterBar.tsx — search + status/owner/phase filters for the
+// HireRosterFilterBar.tsx — search + status/phase filters for the
 // master-detail roster (todo 27). Client-side over the loaded rows (same model
 // as `MailOutboxViewer`): no filter is a stage and no request is triggered.
 
@@ -63,14 +60,6 @@ const STATUS_OPTIONS = [
   })),
 ];
 
-const OWNER_OPTIONS = [
-  { value: "all", label: "All owners" },
-  ...ONBOARDING_OWNER_ROLE.map((role) => ({
-    value: role,
-    label: OWNER_ROLE_LABELS[role],
-  })),
-];
-
 export function HireRosterFilterBar({
   filters,
   phaseOptions,
@@ -85,7 +74,6 @@ export function HireRosterFilterBar({
   const hasActiveFilters =
     filters.query !== "" ||
     filters.status !== "all" ||
-    filters.ownerRole !== "all" ||
     filters.phase !== "all";
 
   const phaseOptionsList = [
@@ -114,7 +102,7 @@ export function HireRosterFilterBar({
           }
         />
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:w-[560px] lg:shrink-0">
+      <div className="grid grid-cols-2 gap-2 lg:w-[380px] lg:shrink-0">
         <FilterSelect
           ariaLabel="Filter by status"
           value={filters.status}
@@ -122,18 +110,6 @@ export function HireRosterFilterBar({
           options={STATUS_OPTIONS}
           onChange={(value) =>
             onChange({ ...filters, status: value as HireRosterFilters["status"] })
-          }
-        />
-        <FilterSelect
-          ariaLabel="Filter by owner"
-          value={filters.ownerRole}
-          placeholder="All owners"
-          options={OWNER_OPTIONS}
-          onChange={(value) =>
-            onChange({
-              ...filters,
-              ownerRole: value as HireRosterFilters["ownerRole"],
-            })
           }
         />
         <FilterSelect
