@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type { EquipmentResource } from "../providers/requirementsCatalogProvider";
 import type {
   EquipmentItemRow,
@@ -83,8 +85,10 @@ const TABLE_CONFIG: RequirementsTableConfig<EquipmentItemRow> = {
 
 export function EquipmentSection({
   resource,
+  tabsSlot,
 }: {
   resource: EquipmentResource;
+  tabsSlot?: ReactNode;
 }) {
   return (
     <RequirementsSection<
@@ -147,6 +151,7 @@ export function EquipmentSection({
       })}
       toRequiredInput={(row) => ({ is_required: !row.is_required })}
       toActiveInput={(row) => ({ is_active: !row.is_active })}
+      tabsSlot={tabsSlot}
     />
   );
 }

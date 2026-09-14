@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type { OrientationResource } from "../providers/requirementsCatalogProvider";
 import type {
   OrientationTopicCatalogRow,
@@ -83,8 +85,10 @@ const TABLE_CONFIG: RequirementsTableConfig<OrientationTopicCatalogRow> = {
 
 export function OrientationSection({
   resource,
+  tabsSlot,
 }: {
   resource: OrientationResource;
+  tabsSlot?: ReactNode;
 }) {
   return (
     <RequirementsSection<
@@ -142,6 +146,7 @@ export function OrientationSection({
       toUpdateInput={(values) => ({ title: values.title.trim() })}
       toRequiredInput={(row) => ({ is_required: !row.is_required })}
       toActiveInput={(row) => ({ is_active: !row.is_active })}
+      tabsSlot={tabsSlot}
     />
   );
 }

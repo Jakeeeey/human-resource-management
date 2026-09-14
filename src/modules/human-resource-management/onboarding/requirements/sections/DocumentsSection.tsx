@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type { DocumentsResource } from "../providers/requirementsCatalogProvider";
 import type {
   DocumentSlotRow,
@@ -57,7 +59,13 @@ const TABLE_CONFIG: RequirementsTableConfig<DocumentSlotRow> = {
   },
 };
 
-export function DocumentsSection({ resource }: { resource: DocumentsResource }) {
+export function DocumentsSection({
+  resource,
+  tabsSlot,
+}: {
+  resource: DocumentsResource;
+  tabsSlot?: ReactNode;
+}) {
   return (
     <RequirementsSection<
       DocumentSlotRow,
@@ -102,6 +110,7 @@ export function DocumentsSection({ resource }: { resource: DocumentsResource }) 
       toUpdateInput={(values) => ({ title: values.title.trim() })}
       toRequiredInput={(row) => ({ is_required: !row.is_required })}
       toActiveInput={(row) => ({ is_active: !row.is_active })}
+      tabsSlot={tabsSlot}
     />
   );
 }

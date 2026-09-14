@@ -11,6 +11,7 @@ import {
   readPortalToken,
   resolvePortalIdentity,
 } from "@/modules/human-resource-management/employee-portal";
+import { resetDocumentVerificationIfPresent } from "@/modules/human-resource-management/employee-portal/server/documentVerificationIo";
 import {
   completeOnboardingTask,
   listOnboardingTasks,
@@ -41,6 +42,35 @@ function validationFailed(errors: Record<string, string[] | undefined>) {
 const FiledFilesSchema = z.object({
   data: z.array(z.object({ id: z.string().min(1), description: z.unknown() })),
 });
+
+const SlotFileIdsSchema = z.object({
+  data: z.array(z.object({ id: z.string().min(1) })),
+});
+
+// One slot holds exactly ONE current file. The marker moves to the newest
+// upload, so any older file still carrying it must be unmarked or the queue
+// renders the same document twice. Best-effort, like the submitted-sync below.
+async function clearSupersededSlotFiles(
+  marker: string,
+  keepFileId: string
+): Promise<void> {
+  try {
+    const body: unknown = await dFetch(
+      `/files?filter[description][_eq]=${encodeURIComponent(marker)}&fields=id&limit=-1`
+    );
+    const parsed = SlotFileIdsSchema.safeParse(body);
+    if (!parsed.success) return;
+    for (const row of parsed.data.data) {
+      if (row.id === keepFileId) continue;
+      await dFetch(`/files/${encodeURIComponent(row.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ description: null }),
+      });
+    }
+  } catch (error) {
+    console.error("[onboarding-portal] slot supersede cleanup failed:", error);
+  }
+}
 
 async function syncDocumentsSubmitted(userId: number): Promise<void> {
   try {
@@ -105,12 +135,15 @@ export async function POST(req: NextRequest) {
     }
 
     const key = { kind: resolved.identity.kind, id: resolved.identity.id };
+    const marker = portalFileMarker(key, doc_key);
     await dFetch(`/files/${encodeURIComponent(file_id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ description: portalFileMarker(key, doc_key) }),
+      body: JSON.stringify({ description: marker }),
     });
+    await clearSupersededSlotFiles(marker, file_id);
 
     if (key.kind === "employee") {
+      await resetDocumentVerificationIfPresent(key.id, doc_key);
       await syncDocumentsSubmitted(key.id);
     }
 

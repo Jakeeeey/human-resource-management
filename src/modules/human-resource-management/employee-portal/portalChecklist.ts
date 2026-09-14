@@ -21,6 +21,7 @@ import {
   type SeedPortalDocKey,
 } from "./types/portal-checklist.schema";
 import { listActiveDocSlotConfig } from "./server/documentSlotIo";
+import type { DocumentVerificationEntry } from "./server/documentVerificationIo";
 
 export interface PortalDocConfig {
   key: SeedPortalDocKey;
@@ -114,7 +115,11 @@ export interface PortalFiledRow {
  */
 export async function buildChecklist(
   key: PortalIdentityKey,
-  filedRows: PortalFiledRow[]
+  filedRows: PortalFiledRow[],
+  verificationByDoc: ReadonlyMap<
+    string,
+    DocumentVerificationEntry
+  > = new Map()
 ): Promise<PortalChecklistItem[]> {
   const slots = await listActiveDocSlotConfig();
   const liveKeys = new Set(slots.map((slot) => slot.key));
@@ -129,13 +134,18 @@ export async function buildChecklist(
       filedByKey.set(parsed.doc_key, row.id);
     }
   }
-  return slots.map((slot) => ({
-    key: slot.key,
-    title: slot.title,
-    required: slot.required,
-    filed: filedByKey.has(slot.key),
-    file_id: filedByKey.get(slot.key) ?? null,
-  }));
+  return slots.map((slot) => {
+    const verification = verificationByDoc.get(slot.key);
+    return {
+      key: slot.key,
+      title: slot.title,
+      required: slot.required,
+      filed: filedByKey.has(slot.key),
+      file_id: filedByKey.get(slot.key) ?? null,
+      state: verification?.state ?? "pending",
+      returnReason: verification?.reason ?? null,
+    };
+  });
 }
 
 /** True when every required slot is filed (checklist-complete predicate). */

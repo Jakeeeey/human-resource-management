@@ -6,6 +6,7 @@ export const DOC_VERIFICATION_STATES = [
   "pending",
   "approved",
   "returned",
+  "resubmitted",
 ] as const;
 
 export type DocumentVerificationState = (typeof DOC_VERIFICATION_STATES)[number];

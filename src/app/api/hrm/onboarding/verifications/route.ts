@@ -124,23 +124,32 @@ async function readPortalDocumentsByUser(): Promise<Map<number, QueueDocument[]>
   const parsed = PortalFilesSchema.safeParse(body);
   if (!parsed.success) return new Map();
   const titleByKey = new Map(slots.map((slot) => [slot.key, slot.title]));
-  const byUser = new Map<number, QueueDocument[]>();
+  const byUser = new Map<number, Map<string, QueueDocument>>();
   for (const row of parsed.data.data) {
     const marker = parsePortalFileMarker(row.description);
     if (!marker || marker.key.kind !== "employee") continue;
-    const title = titleByKey.get(marker.doc_key) ?? marker.doc_key;
-    const list = byUser.get(marker.key.id) ?? [];
-    list.push({
+    const slotMap = byUser.get(marker.key.id) ?? new Map<string, QueueDocument>();
+    const candidate: QueueDocument = {
       docKey: marker.doc_key,
-      title,
+      title: titleByKey.get(marker.doc_key) ?? marker.doc_key,
       fileId: row.id,
       uploadedAt: row.uploaded_on ?? null,
       state: "pending",
       returnReason: null,
-    });
-    byUser.set(marker.key.id, list);
+    };
+    // One slot = one row: a marker left on a superseded file must not render a
+    // duplicate, so the newest upload wins.
+    const current = slotMap.get(marker.doc_key);
+    if (!current || (candidate.uploadedAt ?? "") > (current.uploadedAt ?? "")) {
+      slotMap.set(marker.doc_key, candidate);
+    }
+    byUser.set(marker.key.id, slotMap);
   }
-  return byUser;
+  const documentsByUser = new Map<number, QueueDocument[]>();
+  for (const [userId, slotMap] of byUser) {
+    documentsByUser.set(userId, [...slotMap.values()]);
+  }
+  return documentsByUser;
 }
 
 function joinDocumentVerifications(

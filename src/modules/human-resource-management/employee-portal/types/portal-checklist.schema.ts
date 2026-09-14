@@ -38,6 +38,20 @@ export const PortalDocKeySchema = z.string().regex(PORTAL_DOC_KEY_PATTERN);
 /** Runtime doc key — validated by `PortalDocKeySchema`, not a closed enum. */
 export type PortalDocKey = z.infer<typeof PortalDocKeySchema>;
 
+export const PORTAL_DOC_VERIFICATION_STATES = [
+  "pending",
+  "approved",
+  "returned",
+  "resubmitted",
+] as const;
+
+export type PortalDocVerificationState =
+  (typeof PORTAL_DOC_VERIFICATION_STATES)[number];
+
+export const PortalDocVerificationStateSchema = z
+  .enum(PORTAL_DOC_VERIFICATION_STATES)
+  .catch("pending");
+
 export const PortalChecklistItemSchema = z
   .object({
     key: PortalDocKeySchema,
@@ -45,6 +59,8 @@ export const PortalChecklistItemSchema = z
     required: z.boolean(),
     filed: z.boolean(),
     file_id: z.string().min(1).nullable(),
+    state: PortalDocVerificationStateSchema,
+    returnReason: z.string().nullable(),
   })
   .strict();
 

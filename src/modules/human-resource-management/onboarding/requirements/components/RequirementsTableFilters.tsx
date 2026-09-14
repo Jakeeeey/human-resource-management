@@ -18,11 +18,11 @@ import {
   type StatusFilter,
 } from "../hooks/useTableControls";
 
-// RequirementsTableFilters.tsx — the per-tab filter toolbar rendered between a
-// section heading and its table. One text search plus optional role facet and
-// the shared required/active status selects; every control narrows the same
-// `useTableControls` result set. `Clear filters` appears only when a filter is
-// active and resets them (sorting has its own header cycle).
+// RequirementsTableFilters.tsx — the per-tab filter toolbar rendered beside the
+// catalog tab strip (sharing its row on large screens). One text search plus optional role
+// facet and the shared required/active status selects; every control narrows the
+// same `useTableControls` result set. `Clear filters` appears only when a filter
+// is active and resets them (sorting has its own header cycle).
 
 /** One role facet: label + the catalog's own enum options. */
 export interface FacetConfig {
@@ -68,8 +68,8 @@ export function RequirementsTableFilters({
   onClear,
 }: RequirementsTableFiltersProps) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="relative w-full sm:max-w-xs">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:flex-nowrap xl:min-w-0 xl:items-center">
+      <div className="relative w-full sm:max-w-xs xl:w-[260px] xl:max-w-none xl:min-w-0">
         <Search
           className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden="true"

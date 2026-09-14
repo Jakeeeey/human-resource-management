@@ -8,6 +8,7 @@ import {
   readPortalToken,
   resolvePortalIdentity,
 } from "@/modules/human-resource-management/employee-portal";
+import { listDocumentVerificationsByUser } from "@/modules/human-resource-management/employee-portal/server/documentVerificationIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,9 +51,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const verificationByDoc =
+      resolved.identity.kind === "employee" &&
+      resolved.identity.user_id !== null
+        ? await listDocumentVerificationsByUser(resolved.identity.user_id)
+        : undefined;
+
     return NextResponse.json({
       success: true,
-      data: await buildChecklist(key, parsed.data.data),
+      data: await buildChecklist(key, parsed.data.data, verificationByDoc),
     });
   } catch (error) {
     console.error("[onboarding-portal] checklist error:", error);

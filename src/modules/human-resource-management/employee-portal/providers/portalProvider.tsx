@@ -19,11 +19,16 @@ import type {
   PortalChecklistItem,
   PortalSession,
 } from "@/modules/human-resource-management/employee-portal/types/portal-checklist.schema";
+import {
+  PortalTrainingResponseSchema,
+  type PortalTrainingItem,
+} from "@/modules/human-resource-management/employee-portal/types/portal-training.schema";
 import { uploadApplicationFile } from "@/modules/human-resource-management/application-form/providers/fetchProvider";
 
 interface PortalFetchContextType {
   session: PortalSession | null;
   checklist: PortalChecklistItem[];
+  training: PortalTrainingItem[];
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
@@ -48,6 +53,7 @@ export function PortalFetchProvider({
 }): React.ReactNode {
   const [session, setSession] = useState<PortalSession | null>(null);
   const [checklist, setChecklist] = useState<PortalChecklistItem[]>([]);
+  const [training, setTraining] = useState<PortalTrainingItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -75,6 +81,19 @@ export function PortalFetchProvider({
           ? (checklistBody.data as PortalChecklistItem[])
           : []
       );
+
+      try {
+        const trainingRes = await fetch(`${BASE}/training`, {
+          cache: "no-store",
+        });
+        const trainingBody = await readJson(trainingRes);
+        const parsed = PortalTrainingResponseSchema.safeParse(trainingBody);
+        setTraining(
+          trainingRes.ok && parsed.success ? parsed.data.data ?? [] : []
+        );
+      } catch {
+        setTraining([]);
+      }
     } catch (err) {
       setIsError(true);
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -117,6 +136,7 @@ export function PortalFetchProvider({
       value={{
         session,
         checklist,
+        training,
         isLoading,
         isError,
         error,

@@ -2,7 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useRequirementsCatalogs } from "../hooks/useRequirementsCatalogs";
 import { DocumentsSection } from "../sections/DocumentsSection";
@@ -10,10 +10,11 @@ import { EquipmentSection } from "../sections/EquipmentSection";
 import { OrientationSection } from "../sections/OrientationSection";
 
 // RequirementsSections.tsx — composes the three catalog sections from the todo-15
-// fetch provider into one tab per catalog (Documents / Orientation / Equipment).
-// Each section owns its own loading/error/reorder lifecycle; this shell only
-// distributes the catalog resources and keeps the active tab in the URL hash so
-// a reload (or a shared link) restores the same view.
+// fetch provider. Only the active catalog section renders; it receives the
+// Documents / Orientation / Equipment tab strip and places it between its own
+// filter bar and its table. Each section owns its own loading/error/reorder
+// lifecycle; this shell only distributes the catalog resources and keeps the
+// active tab in the URL hash so a reload (or a shared link) restores the view.
 
 const TAB_IDS = ["documents", "orientation", "equipment"] as const;
 type TabId = (typeof TAB_IDS)[number];
@@ -53,26 +54,28 @@ export function RequirementsSections() {
     { id: "equipment", label: "Equipment", count: equipment.rows.length },
   ];
 
+  const tabsList = (
+    <TabsList className="justify-start">
+      {tabs.map((tab) => (
+        <TabsTrigger key={tab.id} value={tab.id} className="shrink-0">
+          {tab.label}{" "}
+          <span className="text-muted-foreground">({tab.count})</span>
+        </TabsTrigger>
+      ))}
+    </TabsList>
+  );
+
   return (
     <Tabs value={active} onValueChange={handleTabChange} className="space-y-6">
-      <TabsList className="group-data-[orientation=horizontal]/tabs:h-auto w-full flex-wrap justify-start gap-1">
-        {tabs.map((tab) => (
-          <TabsTrigger key={tab.id} value={tab.id} className="shrink-0">
-            {tab.label}{" "}
-            <span className="text-muted-foreground">({tab.count})</span>
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
-      <TabsContent value="documents" className="m-0">
-        <DocumentsSection resource={documents} />
-      </TabsContent>
-      <TabsContent value="orientation" className="m-0">
-        <OrientationSection resource={orientation} />
-      </TabsContent>
-      <TabsContent value="equipment" className="m-0">
-        <EquipmentSection resource={equipment} />
-      </TabsContent>
+      {active === "documents" && (
+        <DocumentsSection resource={documents} tabsSlot={tabsList} />
+      )}
+      {active === "orientation" && (
+        <OrientationSection resource={orientation} tabsSlot={tabsList} />
+      )}
+      {active === "equipment" && (
+        <EquipmentSection resource={equipment} tabsSlot={tabsList} />
+      )}
     </Tabs>
   );
 }

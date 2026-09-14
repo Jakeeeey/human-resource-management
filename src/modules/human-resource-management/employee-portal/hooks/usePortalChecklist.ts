@@ -13,6 +13,7 @@ export function usePortalChecklist() {
   const {
     session,
     checklist,
+    training,
     isLoading,
     isError,
     error,
@@ -45,6 +46,7 @@ export function usePortalChecklist() {
     () => ({
       session,
       checklist,
+      training,
       isLoading,
       isError,
       error,
@@ -55,6 +57,7 @@ export function usePortalChecklist() {
     [
       session,
       checklist,
+      training,
       isLoading,
       isError,
       error,

@@ -1,7 +1,8 @@
 "use client";
 
-// PortalModule.tsx — hiree portal root (todo 25 identity re-key). Checklist
-// + upload + the post-hire Training taking view (todo 31). The session
+// PortalModule.tsx — hiree portal root (todo 25 identity re-key). Documents /
+// Training tabs: the uploadable document checklist and the read-only hub
+// training checklist. The session
 // resolves the caller's own applicant (pre-hire) or employee (post-hire)
 // identity server-side, so training only appears after the hire. Signing runs
 // on the HR-operated, applicant-scoped signing desk (`hrm/onboarding/signing`)
@@ -12,12 +13,17 @@
 import { PortalFetchProvider } from "./providers/portalProvider";
 import { usePortalChecklist } from "./hooks/usePortalChecklist";
 import { ChecklistTable } from "./components/ChecklistTable";
-import { TrainingSection } from "./components/TrainingSection";
+import { TrainingChecklist } from "./components/TrainingChecklist";
 import { FileCheck2 } from "lucide-react";
+import { useState } from "react";
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function PortalBody() {
   const {
+    session,
     checklist,
+    training,
     isLoading,
     isError,
     error,
@@ -25,6 +31,21 @@ function PortalBody() {
     upload,
     uploadingKey,
   } = usePortalChecklist();
+  const [tab, setTab] = useState("documents");
+
+  const isPostHire = session !== null && session.user_id !== null;
+
+  const checklistTable = (
+    <ChecklistTable
+      items={checklist}
+      isLoading={isLoading}
+      isError={isError}
+      error={error}
+      uploadingKey={uploadingKey}
+      onRefresh={() => void refetch()}
+      onUpload={(docKey, file) => void upload(docKey, file)}
+    />
+  );
 
   return (
     <div className="p-2 sm:p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen space-y-8">
@@ -42,17 +63,27 @@ function PortalBody() {
         </div>
       </div>
 
-      <ChecklistTable
-        items={checklist}
-        isLoading={isLoading}
-        isError={isError}
-        error={error}
-        uploadingKey={uploadingKey}
-        onRefresh={() => void refetch()}
-        onUpload={(docKey, file) => void upload(docKey, file)}
-      />
+      {isPostHire ? (
+        <Tabs value={tab} onValueChange={setTab} className="grid gap-6">
+          <TabsList className="justify-start">
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="training">Training</TabsTrigger>
+          </TabsList>
 
-      <TrainingSection />
+          <TabsContent value="documents">{checklistTable}</TabsContent>
+
+          <TabsContent value="training">
+            <TrainingChecklist
+              items={training}
+              isLoading={isLoading}
+              isError={isError}
+              error={error}
+            />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        checklistTable
+      )}
     </div>
   );
 }

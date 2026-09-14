@@ -40,6 +40,17 @@ export function VerificationStateBadge({
       </Badge>
     );
   }
+  if (state === "resubmitted") {
+    return (
+      <Badge
+        variant="outline"
+        className="max-w-[160px] truncate border-sky-300 text-sky-700"
+        title="resubmitted"
+      >
+        Resubmitted
+      </Badge>
+    );
+  }
   return (
     <Badge variant="outline" className="max-w-[160px] truncate" title="pending">
       Pending

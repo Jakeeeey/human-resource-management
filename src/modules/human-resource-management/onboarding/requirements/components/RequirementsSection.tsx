@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { TabsContent } from "@/components/ui/tabs";
 
 import type { CatalogResource } from "../hooks/useCatalogResource";
 import {
@@ -53,6 +54,7 @@ export interface RequirementsSectionProps<T extends RequirementRow, C, U> {
   toUpdateInput: (values: Record<string, string>, row: T) => U;
   toRequiredInput: (row: T) => U;
   toActiveInput: (row: T) => U;
+  tabsSlot?: ReactNode;
 }
 
 /**
@@ -77,6 +79,7 @@ export function RequirementsSection<T extends RequirementRow, C, U>({
   toUpdateInput,
   toRequiredInput,
   toActiveInput,
+  tabsSlot,
 }: RequirementsSectionProps<T, C, U>) {
   const { rows, isLoading, isError, error, refetch, create, update, reorder } =
     resource;
@@ -160,44 +163,49 @@ export function RequirementsSection<T extends RequirementRow, C, U>({
         </Alert>
       )}
 
-      <RequirementsTableFilters
-        search={controls.search}
-        onSearchChange={controls.setSearch}
-        searchPlaceholder={tableConfig.searchPlaceholder}
-        searchLabel={`Search ${title.toLowerCase()}`}
-        facet={tableConfig.facet}
-        facetValue={controls.facet}
-        onFacetChange={controls.setFacet}
-        required={controls.required}
-        onRequiredChange={controls.setRequired}
-        active={controls.active}
-        onActiveChange={controls.setActive}
-        showClear={controls.isFiltered}
-        onClear={controls.clearFilters}
-      />
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        {tabsSlot}
+        <RequirementsTableFilters
+          search={controls.search}
+          onSearchChange={controls.setSearch}
+          searchPlaceholder={tableConfig.searchPlaceholder}
+          searchLabel={`Search ${title.toLowerCase()}`}
+          facet={tableConfig.facet}
+          facetValue={controls.facet}
+          onFacetChange={controls.setFacet}
+          required={controls.required}
+          onRequiredChange={controls.setRequired}
+          active={controls.active}
+          onActiveChange={controls.setActive}
+          showClear={controls.isFiltered}
+          onClear={controls.clearFilters}
+        />
+      </div>
 
-      <RequirementsCatalogTable
-        rows={rows}
-        isLoading={isLoading}
-        columns={columns}
-        emptyMessage={emptyMessage}
-        caption={`${title} requirement rows`}
-        disabled={saving}
-        rowLabel={rowLabel}
-        onEdit={openEdit}
-        onToggleRequired={(row) =>
-          runToggle(update(row.id, toRequiredInput(row)), () =>
-            update(row.id, toRequiredInput({ ...row, is_required: !row.is_required }))
-          )
-        }
-        onToggleActive={(row) =>
-          runToggle(update(row.id, toActiveInput(row)), () =>
-            update(row.id, toActiveInput({ ...row, is_active: !row.is_active }))
-          )
-        }
-        onReorder={handleReorder}
-        controls={controls}
-      />
+      <TabsContent value={id} className="m-0">
+        <RequirementsCatalogTable
+          rows={rows}
+          isLoading={isLoading}
+          columns={columns}
+          emptyMessage={emptyMessage}
+          caption={`${title} requirement rows`}
+          disabled={saving}
+          rowLabel={rowLabel}
+          onEdit={openEdit}
+          onToggleRequired={(row) =>
+            runToggle(update(row.id, toRequiredInput(row)), () =>
+              update(row.id, toRequiredInput({ ...row, is_required: !row.is_required }))
+            )
+          }
+          onToggleActive={(row) =>
+            runToggle(update(row.id, toActiveInput(row)), () =>
+              update(row.id, toActiveInput({ ...row, is_active: !row.is_active }))
+            )
+          }
+          onReorder={handleReorder}
+          controls={controls}
+        />
+      </TabsContent>
 
       <RequirementFieldDialog
         open={dialogOpen}
