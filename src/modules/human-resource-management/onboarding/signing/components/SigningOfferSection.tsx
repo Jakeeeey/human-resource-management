@@ -51,14 +51,6 @@ interface SigningOfferSectionProps {
   onOfferChanged?: () => void;
 }
 
-function offerLabel(offer: JobOffer | null): string {
-  if (!offer) return "No offer on file";
-  if (offer.status === "signed") {
-    return offer.signed_at ? `Signed — ${offer.signed_at}` : "Signed";
-  }
-  return offer.status;
-}
-
 function parseInkSafe(raw: string | null | undefined): SigningInk | null {
   if (!raw || raw.trim() === "") return null;
   try {
@@ -245,9 +237,6 @@ export function SigningOfferSection({
           <h3 className="truncate text-sm font-semibold sm:text-base">
             Job offer
           </h3>
-          <p className="truncate text-xs text-muted-foreground">
-            {offerLabel(offer)}
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={offerSigned ? "default" : "outline"}>

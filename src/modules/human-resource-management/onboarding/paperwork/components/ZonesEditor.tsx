@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -516,6 +517,9 @@ export function ZonesEditor({
           <DialogTitle>
             {template ? `Mark zones — ${template.title}` : "Mark zones"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Drag on the PDF page to place the signing zones for this template.
+          </DialogDescription>
         </DialogHeader>
         {open && template && (
           <ZonesEditorBody

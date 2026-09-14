@@ -4,6 +4,7 @@ import {
   orientationTopicCode,
 } from "../orientation/orientationStore";
 import type { OrientationTrack } from "../orientation/types/orientation.schema";
+import { trainingItemCode } from "../training/server/trainingCatalogService";
 import type { OnboardingOwnerRole } from "../types/onboarding-task.schema";
 
 // taskTemplateSeed.ts — the code-owned DEFAULTS for the post-hire task
@@ -18,8 +19,10 @@ import type { OnboardingOwnerRole } from "../types/onboarding-task.schema";
 //     row per topic with the responsible party from `TRACK_OWNER` (company ->
 //     hr, department -> department). `buildOrientationTemplates` stays as the
 //     PARITY ORACLE of the legacy code-seed output (never used at runtime);
-//   - `training` rows mirror the §10 `training` item (HR assigns, hiree
-//     completes);
+//   - `training` rows are NO LONGER a fixed pair: the persisted training
+//     catalog is the source and `buildTrainingTemplateSeeds` derives one row
+//     per item. ONE code-owned fallback row (`training_recorded`) always seeds
+//     so a hire with no applicable training template still has a task;
 //   - `equipment` rows mirror the §10 `access` + `equipment` items.
 //
 // `ensureOnboardingTaskTemplates` (server/task-template-service.ts) CREATES
@@ -81,25 +84,23 @@ const DOCUMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
   },
 ];
 
-/** §10 `training`: assignment is an HR action, completion belongs to the hiree. */
+/**
+ * The ONE code-owned training row: the fallback for a hire whose department has
+ * no applicable training template. The per-item training rows are DERIVED from
+ * the persisted catalog (`buildTrainingTemplateSeeds`), never listed here. The
+ * retired `training_assigned` / `training_completed` codes are intentionally
+ * gone — removing them from the seed never deletes an existing DB row (the seed
+ * is create-missing only); they are filtered out at materialization instead.
+ */
 const TRAINING_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
   {
-    code: "training_assigned",
-    title: "Assign required training",
+    code: "training_recorded",
+    title: "Training completed by department",
     phase: "training",
     owner_role: "hr",
     is_required: true,
     is_active: true,
-    sort_order: 300,
-  },
-  {
-    code: "training_completed",
-    title: "Complete assigned training",
-    phase: "training",
-    owner_role: "hiree",
-    is_required: true,
-    is_active: true,
-    sort_order: 310,
+    sort_order: 399,
   },
 ];
 
@@ -170,6 +171,39 @@ export function buildOrientationTemplateSeeds(
       is_required: topic.is_required,
       sort_order: ORIENTATION_SORT_BASE + (index + 1) * 10,
       is_active: topic.is_active,
+    }));
+}
+
+const TRAINING_SORT_BASE = 300;
+
+/** The persisted `onboarding_training_item` fields the derivation reads. */
+export interface TrainingItemSeedSource {
+  id: number;
+  title: string;
+  is_required: boolean;
+  sort_order: number;
+  is_active: boolean;
+}
+
+/**
+ * Derives the training template rows from the PERSISTED training-item catalog —
+ * one row per item, code via the ONE `trainingItemCode` mapping, owned by HR.
+ * `is_active` mirrors the item's current flag; the owning template's flag is
+ * reconciled separately by `syncTrainingDerivedTemplates`.
+ */
+export function buildTrainingTemplateSeeds(
+  items: readonly TrainingItemSeedSource[]
+): OnboardingTaskTemplateSeed[] {
+  return [...items]
+    .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id)
+    .map((item) => ({
+      code: trainingItemCode(item.id),
+      title: item.title,
+      phase: "training",
+      owner_role: "hr",
+      is_required: item.is_required,
+      is_active: item.is_active,
+      sort_order: TRAINING_SORT_BASE + item.sort_order,
     }));
 }
 

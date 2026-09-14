@@ -9,6 +9,8 @@ import {
   type TaskWriteRow,
 } from "./onboardingTaskIo";
 import { ensureOnboardingTaskTemplates } from "./task-template-service";
+import { readUserDepartmentId } from "../../training/server/trainingCatalogIo";
+import { filterMaterializableTrainingTemplates } from "../../training/server/trainingCatalogService";
 import type {
   OnboardingOwnerRole,
   OnboardingTask,
@@ -73,11 +75,18 @@ async function doMaterialize(
     actorId,
   });
 
-  // Todo-10 soft-delete rule: inactive catalog rows do NOT materialize. This
-  // ONE filtered set drives `missing`, `rows`, `templateCount` AND the
-  // read-back below — otherwise an inactive template with no task would throw
-  // TASK_WRITE_FAILED for a row that was intentionally never created.
-  const templates = allTemplates.filter((template) => template.is_active);
+  // Todo-10 soft-delete rule: inactive catalog rows do NOT materialize. The
+  // hire's department then narrows the training phase (see
+  // `filterMaterializableTrainingTemplates`). This ONE filtered set drives
+  // `missing`, `rows`, `templateCount` AND the read-back below — otherwise a
+  // template intentionally excluded would throw TASK_WRITE_FAILED for a row
+  // that was never meant to be created.
+  const activeTemplates = allTemplates.filter((template) => template.is_active);
+  const departmentId = await readUserDepartmentId(userId);
+  const templates = await filterMaterializableTrainingTemplates(
+    activeTemplates,
+    departmentId
+  );
 
   const current = await listTaskRows({ userId });
   const currentTemplateIds = new Set(

@@ -1,0 +1,1 @@
+export { TrainingTemplatesModule } from "./TrainingTemplatesModule";

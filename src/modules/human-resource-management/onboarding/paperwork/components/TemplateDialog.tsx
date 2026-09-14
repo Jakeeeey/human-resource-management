@@ -11,12 +11,14 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 // TemplateDialog.tsx — create/edit for paperwork templates (PDF-ONLY: every
 // template is an admin-uploaded PDF picked below; zones are marked in the
@@ -57,12 +59,17 @@ function TemplateDialogForm({
   const [pdfFile, setPdfFile] = useState<string | null>(
     template?.pdf_file ?? null
   );
+  // Existing templates store only the UUID, so show the title; uploads show the picked name.
+  const [pdfFileName, setPdfFileName] = useState<string | null>(
+    template?.pdf_file ? template.title : null
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [fileKey, setFileKey] = useState(0);
 
   const directoryUp = companyOptions.length > 0;
+  const fileChanged = (template?.pdf_file ?? null) !== pdfFile;
 
   const handlePdfSelected = (file: File | undefined) => {
     setUploadError(null);
@@ -83,7 +90,10 @@ function TemplateDialogForm({
     }
     setUploading(true);
     void uploadPaperworkPdf(file)
-      .then((id) => setPdfFile(id))
+      .then((id) => {
+        setPdfFile(id);
+        setPdfFileName(file.name);
+      })
       .catch((err: unknown) =>
         setUploadError(err instanceof Error ? err.message : "PDF upload failed")
       )
@@ -127,6 +137,10 @@ function TemplateDialogForm({
         source: "pdf",
         pdf_file: pdfFile,
         is_active: isActive,
+        // Zones are positioned against the old file, so a changed/removed
+        // source clears them atomically with the save instead of leaving stale
+        // zones on the new PDF.
+        ...(fileChanged ? { zones: [] } : {}),
       },
       ids
     );
@@ -180,18 +194,21 @@ function TemplateDialogForm({
             )}
             {pdfFile && (
               <div className="flex items-center gap-2">
-                <code
-                  className="block max-w-[280px] flex-1 truncate font-mono text-xs"
-                  title={pdfFile}
+                <span
+                  className="block max-w-[280px] flex-1 truncate text-sm"
+                  title={pdfFileName ?? undefined}
                 >
-                  {pdfFile}
-                </code>
+                  {pdfFileName ?? "Attached PDF"}
+                </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   disabled={saving || uploading}
-                  onClick={() => setPdfFile(null)}
+                  onClick={() => {
+                    setPdfFile(null);
+                    setPdfFileName(null);
+                  }}
                   className="min-h-8"
                 >
                   Remove
@@ -202,20 +219,17 @@ function TemplateDialogForm({
               <p className="text-sm text-destructive">{uploadError}</p>
             )}
           </div>
-        <label
-          htmlFor="pw-is-active"
-          className="flex min-h-8 cursor-pointer items-center gap-2 text-sm"
-        >
-          <input
+        <div className="flex items-center gap-2">
+          <Switch
             id="pw-is-active"
-            type="checkbox"
-            className="h-4 w-4"
+            size="sm"
             checked={isActive}
             disabled={saving}
-            onChange={(e) => setIsActive(e.target.checked)}
+            aria-label="Active"
+            onCheckedChange={setIsActive}
           />
-          Active (inactive templates stay on file but leave the registry)
-        </label>
+          <Label htmlFor="pw-is-active">Active</Label>
+        </div>
         {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       </div>
       <DialogFooter className="flex-col gap-2 sm:flex-row">
@@ -255,6 +269,9 @@ export function TemplateDialog({
           <DialogTitle>
             {template ? "Edit paperwork template" : "New paperwork template"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Set the title, source PDF, and companies for this paperwork template.
+          </DialogDescription>
         </DialogHeader>
         {open && (
           <TemplateDialogForm

@@ -178,7 +178,6 @@ export function SigningSurface({
   ]);
 
   const offerSigned = offer?.status === "signed";
-  const complete = envelopeState.status === "complete";
   const nextUnsigned =
     orderedItems.find((item) => item.status !== "signed") ?? null;
 
@@ -200,15 +199,8 @@ export function SigningSurface({
             >
               {applicantName}
             </h2>
-            <p className="truncate text-xs text-muted-foreground sm:text-sm">
-              Applicant #{applicantId} — sign the offer and every required
-              document.
-            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={complete ? "default" : "secondary"}>
-              Envelope: {envelopeState.status}
-            </Badge>
             <Badge variant="outline">
               Paperworks: {paperworks?.status ?? "pending"} (
               {paperworks?.signed_count ?? 0}/

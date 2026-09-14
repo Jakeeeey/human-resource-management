@@ -68,6 +68,7 @@ export function usePaperworkTemplates() {
           };
           if (data.source !== undefined) patch.source = data.source;
           if (data.pdf_file !== undefined) patch.pdf_file = data.pdf_file;
+          if (data.zones !== undefined) patch.zones = data.zones;
           await updateTemplate(selected.id, patch);
           if (companyIds !== null) {
             await replaceTemplateCompanies(selected.id, companyIds);

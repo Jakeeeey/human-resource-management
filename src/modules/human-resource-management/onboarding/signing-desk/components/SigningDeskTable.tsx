@@ -12,7 +12,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PenLine } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { isCompletionPending } from "../../signing/signingCopy";
+import { paperworksBadge } from "./paperworksBadge";
+import { signingDeskJobFields } from "./signingDeskFields";
 import type { SigningQueueRow } from "./SigningDeskQueueCards";
 
 // SigningDeskTable.tsx — the lg+ queue table for the signing desk. Below lg
@@ -22,10 +25,9 @@ import type { SigningQueueRow } from "./SigningDeskQueueCards";
 const THEAD = (
   <TableRow className="bg-muted/30">
     <TableHead>Applicant</TableHead>
-    <TableHead>Applicant status</TableHead>
-    <TableHead>Offer</TableHead>
+    <TableHead>Department</TableHead>
+    <TableHead>Position</TableHead>
     <TableHead>Paperworks</TableHead>
-    <TableHead>Envelope</TableHead>
     <TableHead className="text-right">Action</TableHead>
   </TableRow>
 );
@@ -50,7 +52,7 @@ export function SigningDeskTable({
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={6}>
+              <TableCell colSpan={5}>
                 <div className="space-y-2 py-4">
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
@@ -59,7 +61,7 @@ export function SigningDeskTable({
             </TableRow>
           ) : rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6}>
+              <TableCell colSpan={5}>
                 <p className="py-6 text-center text-muted-foreground">
                   No applicants have a signing set yet.
                 </p>
@@ -70,6 +72,11 @@ export function SigningDeskTable({
               const hirePending = isCompletionPending(
                 row.envelope.status,
                 row.applicant.status
+              );
+              const paperworkBadge = paperworksBadge(row.paperworks);
+              const fields = signingDeskJobFields(
+                row.applicant.position_applied_for,
+                row.offer
               );
               return (
                 <TableRow key={row.envelope.id}>
@@ -82,56 +89,28 @@ export function SigningDeskTable({
                   >
                     {row.applicant.full_name}
                   </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className="max-w-[180px] truncate"
-                      title={row.applicant.status ?? "unknown"}
-                    >
-                      {row.applicant.status ?? "—"}
-                    </Badge>
-                  </TableCell>
                   <TableCell
-                    className="max-w-[160px] truncate"
-                    title={row.offer ? row.offer.status : "No offer"}
+                    className="max-w-[200px] truncate"
+                    title={fields.department ?? "No department on record"}
                   >
-                    {row.offer ? row.offer.status : "—"}
+                    {fields.department ?? "—"}
                   </TableCell>
                   <TableCell
                     className="max-w-[200px] truncate"
-                    title={
-                      row.paperworks
-                        ? `${row.paperworks.status} (${row.paperworks.signed_count}/${row.paperworks.required_count})`
-                        : "No paperworks"
-                    }
+                    title={fields.position ?? "No position on record"}
                   >
-                    {row.paperworks
-                      ? `${row.paperworks.status} (${row.paperworks.signed_count}/${row.paperworks.required_count})`
-                      : "—"}
+                    {fields.position ?? "—"}
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={
-                        hirePending
-                          ? "outline"
-                          : row.envelope.status === "complete"
-                            ? "default"
-                            : "secondary"
-                      }
-                      className={
-                        hirePending
-                          ? "max-w-[180px] truncate border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                          : "max-w-[140px] truncate"
-                      }
-                      title={
-                        hirePending
-                          ? "Signing complete — the employee record has not been created yet"
-                          : row.envelope.status
-                      }
+                      variant={paperworkBadge.variant}
+                      className={cn(
+                        "max-w-[160px] truncate",
+                        paperworkBadge.className
+                      )}
+                      title={paperworkBadge.label}
                     >
-                      {hirePending
-                        ? "complete — hire pending"
-                        : row.envelope.status}
+                      {paperworkBadge.label}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">

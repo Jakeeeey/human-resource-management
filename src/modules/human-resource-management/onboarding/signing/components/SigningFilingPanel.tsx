@@ -56,12 +56,6 @@ export function SigningFilingPanel({
               {item.templateTitle}
             </span>
             <span className="flex shrink-0 items-center gap-2">
-              <span
-                className="hidden max-w-[180px] truncate text-xs text-muted-foreground sm:inline"
-                title={item.pdfFile ?? "Not signed yet"}
-              >
-                {item.pdfFile ?? "Not signed"}
-              </span>
               <Badge
                 variant={item.status === "signed" ? "default" : "outline"}
                 title={

@@ -142,11 +142,11 @@ export function SigningItemView({
             >
               {title}
             </span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {locked
-                ? `Signed${item.signed_at ? ` — ${item.signed_at}` : ""}`
-                : requiredZoneCountLabel(model.requiredZoneCount)}
-            </span>
+            {!locked && (
+              <span className="block truncate text-xs text-muted-foreground">
+                {requiredZoneCountLabel(model.requiredZoneCount)}
+              </span>
+            )}
           </span>
         </button>
         <div className="flex flex-wrap items-center gap-2">

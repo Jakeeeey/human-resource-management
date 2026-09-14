@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PenLine } from "lucide-react";
 import { isCompletionPending } from "../../signing/signingCopy";
+import { paperworksBadge } from "./paperworksBadge";
+import { signingDeskJobFields } from "./signingDeskFields";
 import type {
   JobOffer,
   Paperworks,
@@ -62,55 +64,49 @@ export function SigningDeskQueueCards({
           row.envelope.status,
           row.applicant.status
         );
+        const paperworkBadge = paperworksBadge(row.paperworks);
+        const fields = signingDeskJobFields(
+          row.applicant.position_applied_for,
+          row.offer
+        );
         return (
           <div
             key={row.envelope.id}
             className="space-y-2 rounded-xl border border-border/60 bg-card p-3"
           >
-            <div className="flex items-start justify-between gap-2">
-              <p
-                className="min-w-0 truncate text-sm font-semibold"
-                title={row.applicant.full_name}
-              >
-                {row.applicant.full_name}
-              </p>
-              <Badge variant="outline" className="shrink-0">
-                {row.applicant.status ?? "—"}
-              </Badge>
-            </div>
-            {row.applicant.position_applied_for && (
-              <p
-                className="truncate text-xs text-muted-foreground"
-                title={row.applicant.position_applied_for}
-              >
-                {row.applicant.position_applied_for}
-              </p>
-            )}
+            <p
+              className="min-w-0 truncate text-sm font-semibold"
+              title={row.applicant.full_name}
+            >
+              {row.applicant.full_name}
+            </p>
+            <dl className="space-y-0.5 text-xs text-muted-foreground">
+              <div className="flex min-w-0 gap-1">
+                <dt className="shrink-0">Department:</dt>
+                <dd
+                  className="min-w-0 truncate"
+                  title={fields.department ?? "No department on record"}
+                >
+                  {fields.department ?? "—"}
+                </dd>
+              </div>
+              <div className="flex min-w-0 gap-1">
+                <dt className="shrink-0">Position:</dt>
+                <dd
+                  className="min-w-0 truncate"
+                  title={fields.position ?? "No position on record"}
+                >
+                  {fields.position ?? "—"}
+                </dd>
+              </div>
+            </dl>
             <div className="flex flex-wrap gap-1.5">
-              <Badge variant="secondary">
-                Offer: {row.offer?.status ?? "—"}
-              </Badge>
-              <Badge variant="secondary">
-                Paperworks:{" "}
-                {row.paperworks
-                  ? `${row.paperworks.signed_count}/${row.paperworks.required_count}`
-                  : "—"}
-              </Badge>
               <Badge
-                variant={
-                  hirePending
-                    ? "outline"
-                    : row.envelope.status === "complete"
-                      ? "default"
-                      : "secondary"
-                }
-                className={
-                  hirePending
-                    ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-                    : undefined
-                }
+                variant={paperworkBadge.variant}
+                className={paperworkBadge.className}
+                title={paperworkBadge.label}
               >
-                {hirePending ? "complete — hire pending" : row.envelope.status}
+                {paperworkBadge.label}
               </Badge>
             </div>
             <Button

@@ -7,10 +7,13 @@ import {
 } from "./onboardingTaskIo";
 import {
   buildOrientationTemplateSeeds,
+  buildTrainingTemplateSeeds,
   listOnboardingTaskTemplateSeed,
 } from "../taskTemplateSeed";
 import type { OnboardingTaskTemplate } from "../../types/onboarding-task.schema";
 import { listTopicRows } from "../../orientation/server/orientationTopicIo";
+import { listAllTrainingItemRows } from "../../training/server/trainingCatalogIo";
+import { syncTrainingDerivedTemplates } from "../../training/server/trainingCatalogService";
 import { seedMissingCatalogRows } from "./catalogSeed";
 
 // task-template-service.ts — CREATE-MISSING-ONLY template catalog seed
@@ -22,8 +25,11 @@ import { seedMissingCatalogRows } from "./catalogSeed";
 //     `orientation_topic` table is populated BEFORE orientation rows derive;
 //   - derives orientation template rows from the PERSISTED topic catalog
 //     (`buildOrientationTemplateSeeds`, code via the ONE `orientationTopicCode`
-//     formula) and takes documents / training / equipment from the code
-//     defaults;
+//     formula) and derives one training row per PERSISTED training item
+//     (`buildTrainingTemplateSeeds`, code via the ONE `trainingItemCode`
+//     formula), then reconciles training flags via
+//     `syncTrainingDerivedTemplates`; documents / the training fallback /
+//     equipment come from the code defaults;
 //   - CREATES only codes that are absent (ONE batch POST when any). An
 //     existing row is NEVER overwritten — title / is_required / phase /
 //     owner_role / sort_order / is_active all stay as the DB holds them: the
@@ -72,13 +78,15 @@ export async function ensureOnboardingTaskTemplates(input?: {
 
   // Todo 2: orientation rows derive from ALL persisted topics (inactive ones
   // included; their derived template is created with their current flag).
-  const [topics, existing] = await Promise.all([
+  const [topics, existing, trainingItems] = await Promise.all([
     listTopicRows(),
     listTemplateRows(),
+    listAllTrainingItemRows({ includeInactive: true }),
   ]);
   const seed = [
     ...listOnboardingTaskTemplateSeed(),
     ...buildOrientationTemplateSeeds(topics),
+    ...buildTrainingTemplateSeeds(trainingItems),
   ];
   const byCode = new Set(existing.map((row) => row.code));
   const missing = seed.filter((row) => !byCode.has(row.code));
@@ -96,6 +104,10 @@ export async function ensureOnboardingTaskTemplates(input?: {
     const created = await createTemplateRows(rows);
     createdCodes.push(...created.map((row) => row.code));
   }
+
+  // Every derived training row now exists (seeded above); reconcile
+  // `is_active` so an owning template's deactivation reaches its derived rows.
+  await syncTrainingDerivedTemplates(actorId);
 
   const verified = await listTemplateRows();
   const verifiedCodes = new Set(verified.map((row) => row.code));
