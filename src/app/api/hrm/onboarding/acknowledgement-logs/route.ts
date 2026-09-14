@@ -125,16 +125,19 @@ export async function POST(req: NextRequest) {
     }
 
     const now = getPhilippineTime();
+    const payload: Record<string, string> = {
+      doc_ref: docRef,
+      signer,
+      acknowledged_at: at,
+      created_at: now,
+      updated_at: now,
+    };
+    if (validation.data.method !== undefined) {
+      payload.method = validation.data.method;
+    }
     const created = (await dFetch("/items/acknowledgement_logs", {
       method: "POST",
-      body: JSON.stringify({
-        doc_ref: docRef,
-        signer,
-        acknowledged_at: at,
-        method: validation.data.method,
-        created_at: now,
-        updated_at: now,
-      }),
+      body: JSON.stringify(payload),
     })) as { data?: AcknowledgementLog };
 
     if (created?.data) {

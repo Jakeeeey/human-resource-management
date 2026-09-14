@@ -18,6 +18,7 @@ import type { WorkspaceOperator } from "./taskInbox";
 export interface OperatorClaims {
   sub?: unknown;
   role?: unknown;
+  [claim: string]: unknown;
 }
 
 const ONBOARDING_ROLE_SET = new Set<string>(ONBOARDING_OWNER_ROLE);

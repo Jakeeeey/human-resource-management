@@ -3,21 +3,22 @@
 // useVerificationQueue.ts — selection + dialog + decision intents over the
 // verification fetch provider. Machine-gate refusals (400 reason strings from
 // the verifications route) surface as-is so HR sees why a decision was
-// refused. Trail open/fetch/close intents mirror the memo-ack view-details
-// shape (port, never import).
+// refused.
 
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { buildDocRef } from "../types/acknowledgement-log.schema";
-import type { AckMethod } from "../types/acknowledgement-log.schema";
-import type { QueueRow } from "../types/verification-queue.schema";
+import type { QueueDocument, QueueRow } from "../types/verification-queue.schema";
 import { useVerificationFetch } from "../providers/verificationProvider";
 
 export type VerificationDialog =
   | { kind: "none" }
-  | { kind: "return"; row: QueueRow }
-  | { kind: "ack"; row: QueueRow }
-  | { kind: "trail"; row: QueueRow };
+  | { kind: "return"; row: QueueRow; doc: QueueDocument }
+  | { kind: "details"; row: QueueRow; doc: QueueDocument };
+
+export interface VerificationPreview {
+  row: QueueRow;
+  doc: QueueDocument;
+}
 
 /**
  * @param userId - The canonical selected hire from the workspace route. The
@@ -30,15 +31,11 @@ export function useVerificationQueue(userId: number) {
     isError,
     error,
     refetch,
-    decide,
-    recordAck,
-    trail,
-    fetchTrail,
-    retryTrail,
-    clearTrail,
+    decideDocument,
   } = useVerificationFetch();
 
   const [dialog, setDialog] = useState<VerificationDialog>({ kind: "none" });
+  const [preview, setPreview] = useState<VerificationPreview | null>(null);
   const [working, setWorking] = useState(false);
 
   const scopedRows = useMemo(
@@ -46,58 +43,57 @@ export function useVerificationQueue(userId: number) {
     [queue, userId]
   );
 
-  const scopedCounts = useMemo(() => {
-    const counts = { pending: 0, returned: 0, approved: 0 };
-    for (const row of scopedRows) counts[row.queueState] += 1;
-    return counts;
-  }, [scopedRows]);
-
   const closeDialog = useCallback(() => {
     setDialog({ kind: "none" });
   }, []);
 
-  const openReturn = useCallback((row: QueueRow) => {
-    setDialog({ kind: "return", row });
+  const openReturn = useCallback((row: QueueRow, doc: QueueDocument) => {
+    setDialog({ kind: "return", row, doc });
   }, []);
 
-  const openAck = useCallback((row: QueueRow) => {
-    setDialog({ kind: "ack", row });
+  const openPreview = useCallback((row: QueueRow, doc: QueueDocument) => {
+    setPreview({ row, doc });
   }, []);
 
-  const openTrail = useCallback(
-    (row: QueueRow) => {
-      setDialog({ kind: "trail", row });
-      void fetchTrail(buildDocRef(row.userId));
-    },
-    [fetchTrail]
-  );
+  const closePreview = useCallback(() => {
+    setPreview(null);
+  }, []);
 
-  const closeTrail = useCallback(() => {
+  const openDetails = useCallback((row: QueueRow, doc: QueueDocument) => {
+    setDialog({ kind: "details", row, doc });
+  }, []);
+
+  const closeDetails = useCallback(() => {
     setDialog({ kind: "none" });
-    clearTrail();
-  }, [clearTrail]);
+  }, []);
 
-  const approve = useCallback(
-    async (row: QueueRow) => {
+  const approveDocument = useCallback(
+    async (row: QueueRow, doc: QueueDocument) => {
       setWorking(true);
       try {
-        await decide({ user_id: row.userId, decision: "approve" });
-        toast.success("Documents verified");
+        await decideDocument({
+          user_id: row.userId,
+          doc_key: doc.docKey,
+          decision: "approve",
+        });
+        toast.success("Document approved");
+        closeDetails();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Approval refused");
       } finally {
         setWorking(false);
       }
     },
-    [decide]
+    [decideDocument, closeDetails]
   );
 
-  const submitReturn = useCallback(
-    async (row: QueueRow, reason: string) => {
+  const returnDocument = useCallback(
+    async (row: QueueRow, doc: QueueDocument, reason: string) => {
       setWorking(true);
       try {
-        await decide({
+        await decideDocument({
           user_id: row.userId,
+          doc_key: doc.docKey,
           decision: "return",
           reason,
         });
@@ -109,86 +105,45 @@ export function useVerificationQueue(userId: number) {
         setWorking(false);
       }
     },
-    [decide, closeDialog]
-  );
-
-  const resubmit = useCallback(
-    async (row: QueueRow) => {
-      setWorking(true);
-      try {
-        await decide({ user_id: row.userId, decision: "resubmit" });
-        toast.success("Resubmitted — back in the pending queue");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Resubmit refused");
-      } finally {
-        setWorking(false);
-      }
-    },
-    [decide]
-  );
-
-  const submitAck = useCallback(
-    async (row: QueueRow, signer: string, method: AckMethod) => {
-      setWorking(true);
-      try {
-        await recordAck({
-          doc_ref: buildDocRef(row.userId),
-          signer,
-          method,
-        });
-        toast.success("Acknowledgement recorded");
-        closeDialog();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Record failed");
-      } finally {
-        setWorking(false);
-      }
-    },
-    [recordAck, closeDialog]
+    [decideDocument, closeDialog]
   );
 
   return useMemo(
     () => ({
       rows: scopedRows,
-      counts: scopedCounts,
       isLoading,
       isError,
       error,
       refetch,
       dialog,
+      preview,
       working,
       openReturn,
-      openAck,
-      openTrail,
+      openPreview,
+      openDetails,
       closeDialog,
-      closeTrail,
-      approve,
-      submitReturn,
-      resubmit,
-      submitAck,
-      trail,
-      retryTrail,
+      closeDetails,
+      closePreview,
+      approveDocument,
+      returnDocument,
     }),
     [
       scopedRows,
-      scopedCounts,
       isLoading,
       isError,
       error,
       refetch,
       dialog,
+      preview,
       working,
       openReturn,
-      openAck,
-      openTrail,
+      openPreview,
+      openDetails,
       closeDialog,
-      closeTrail,
-      approve,
-      submitReturn,
-      resubmit,
-      submitAck,
-      trail,
-      retryTrail,
+      closeDetails,
+      closePreview,
+      approveDocument,
+      returnDocument,
     ]
   );
 }

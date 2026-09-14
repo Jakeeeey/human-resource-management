@@ -18,7 +18,17 @@ import {
   sessionActorId,
 } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
 import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
-import type { AcknowledgementLog } from "@/modules/human-resource-management/onboarding/verification/types/acknowledgement-log.schema";
+import {
+  DocumentDecisionSchema,
+  rollupDocumentState,
+  type DocumentDecision,
+  type DocumentVerificationState,
+} from "@/modules/human-resource-management/onboarding/verification/types/document-verification.schema";
+import {
+  listDocumentVerificationsByUser,
+  upsertDocumentDecision,
+  type DocumentVerificationEntry,
+} from "@/modules/human-resource-management/onboarding/verification/server/documentVerificationIo";
 import {
   aggregateQueue,
   buildQueueRow,
@@ -36,16 +46,13 @@ export const dynamic = "force-dynamic";
 //
 // GET — queue read: every employee owning `documents`-phase `onboarding_task`
 // rows, aggregated into pending / returned / approved from the
-// `documents_hr_verified` task (see verification-queue.schema.ts) and joined to
-// the acknowledgement audit store by the `onboarding:employee:<id>` doc_ref.
+// `documents_hr_verified` task (see verification-queue.schema.ts).
 // There is no `onboarding_profiles` read and no profile status gate.
 // POST — one decision per call: approve | return(reason) | resubmit. The
 // decision writes the `documents_hr_verified` task through the todo-19 task
 // engine (the ONLY status writer) and re-reads before answering, so a 200 can
 // never report a write that is not visible. Approve dispatches the frozen
 // `onboarding.docs_verified` event keyed to the employee (never awaited).
-
-const NAMESPACE = "onboarding:employee:";
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -95,32 +102,22 @@ async function readEmployee(userId: number): Promise<VerificationEmployee | null
   return { user_id: row.user_id, user_email: email };
 }
 
-/**
- * @param filter - Directus query-string filter (already namespace-scoped).
- * @returns Ack-log rows, or [] when the read returns no data array.
- * @throws When dFetch itself fails (a swallowed read must not read as empty).
- */
-async function readAckLogs(filter: string): Promise<AcknowledgementLog[]> {
-  const body = (await dFetch(
-    `/items/acknowledgement_logs?${filter}&fields=doc_ref,signer,acknowledged_at,method&limit=500`
-  )) as { data?: AcknowledgementLog[] };
-  return Array.isArray(body?.data) ? body.data : [];
-}
-
-function ackFilter(value: string): string {
-  return `filter[doc_ref][_contains]=${encodeURIComponent(value)}`;
-}
-
 const PORTAL_EMPLOYEE_MARKER = "onboarding-portal:employee:";
 
 const PortalFilesSchema = z.object({
-  data: z.array(z.object({ id: z.string().min(1), description: z.unknown() })),
+  data: z.array(
+    z.object({
+      id: z.string().min(1),
+      description: z.unknown(),
+      uploaded_on: z.string().nullish(),
+    })
+  ),
 });
 
 async function readPortalDocumentsByUser(): Promise<Map<number, QueueDocument[]>> {
   const [body, slots] = await Promise.all([
     dFetch(
-      `/files?filter[description][_contains]=${encodeURIComponent(PORTAL_EMPLOYEE_MARKER)}&fields=id,description&limit=-1`
+      `/files?filter[description][_contains]=${encodeURIComponent(PORTAL_EMPLOYEE_MARKER)}&fields=id,description,uploaded_on&limit=-1`
     ),
     listActiveDocSlotConfig(),
   ]);
@@ -133,10 +130,37 @@ async function readPortalDocumentsByUser(): Promise<Map<number, QueueDocument[]>
     if (!marker || marker.key.kind !== "employee") continue;
     const title = titleByKey.get(marker.doc_key) ?? marker.doc_key;
     const list = byUser.get(marker.key.id) ?? [];
-    list.push({ docKey: marker.doc_key, title, fileId: row.id });
+    list.push({
+      docKey: marker.doc_key,
+      title,
+      fileId: row.id,
+      uploadedAt: row.uploaded_on ?? null,
+      state: "pending",
+      returnReason: null,
+    });
     byUser.set(marker.key.id, list);
   }
   return byUser;
+}
+
+function joinDocumentVerifications(
+  documentsByUser: Map<number, QueueDocument[]>,
+  verificationsByUser: ReadonlyMap<
+    number,
+    ReadonlyMap<string, DocumentVerificationEntry>
+  >
+): void {
+  for (const [userId, docs] of documentsByUser) {
+    const byDoc = verificationsByUser.get(userId);
+    if (!byDoc) continue;
+    for (const doc of docs) {
+      const entry = byDoc.get(doc.docKey);
+      if (entry) {
+        doc.state = entry.state;
+        doc.returnReason = entry.reason;
+      }
+    }
+  }
 }
 
 // The employee-scoped `onboarding.docs_verified` dispatch context: no
@@ -163,21 +187,131 @@ function buildDocsVerifiedCtx(
 
 export async function GET() {
   try {
-    const [tasks, templates, logs, documentsByUser] = await Promise.all([
-      listOnboardingTasks({}),
-      listOnboardingTaskTemplates(),
-      readAckLogs(ackFilter(NAMESPACE)),
-      readPortalDocumentsByUser(),
-    ]);
+    const [tasks, templates, documentsByUser, verificationsByUser] =
+      await Promise.all([
+        listOnboardingTasks({}),
+        listOnboardingTaskTemplates(),
+        readPortalDocumentsByUser(),
+        listDocumentVerificationsByUser(),
+      ]);
+
+    joinDocumentVerifications(documentsByUser, verificationsByUser);
 
     return NextResponse.json({
       success: true,
-      data: aggregateQueue(tasks, templates, logs, documentsByUser),
+      data: aggregateQueue(tasks, templates, documentsByUser),
     });
   } catch (error) {
     console.error("[onboarding-verifications] queue error:", error);
     return serverError();
   }
+}
+
+async function handleDocumentDecision(input: {
+  userId: number;
+  docKey: string;
+  decision: DocumentDecision;
+  reason: string | undefined;
+  actorId: number | null;
+}): Promise<NextResponse> {
+  const { userId, docKey, decision, reason, actorId } = input;
+  const [tasks, templates, employee, documentsByUser] = await Promise.all([
+    listOnboardingTasks({ userId }),
+    listOnboardingTaskTemplates(),
+    readEmployee(userId),
+    readPortalDocumentsByUser(),
+  ]);
+  if (!employee) {
+    return NextResponse.json(
+      { success: false, message: "The employee does not exist" },
+      { status: 400 }
+    );
+  }
+  const docs = documentsByUser.get(userId) ?? [];
+  if (!docs.some((doc) => doc.docKey === docKey)) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Document "${docKey}" is not a document on employee #${userId}`,
+      },
+      { status: 400 }
+    );
+  }
+  const pair = findVerificationTasks(tasks, templates);
+  if (!pair.hr) {
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Employee #${userId} has no onboarding documents tasks`,
+      },
+      { status: 400 }
+    );
+  }
+  if (pair.submitted?.status !== "done") {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          "Documents are not submitted yet — only submitted documents can be verified",
+      },
+      { status: 400 }
+    );
+  }
+
+  const state: DocumentVerificationState =
+    decision === "approve" ? "approved" : "returned";
+  const cleanReason = decision === "return" ? (reason ?? "").trim() : null;
+
+  await upsertDocumentDecision({
+    userId,
+    docKey,
+    state,
+    reason: cleanReason,
+    decidedBy: actorId,
+  });
+
+  const verificationsByUser = await listDocumentVerificationsByUser();
+  joinDocumentVerifications(documentsByUser, verificationsByUser);
+  const verByDoc = verificationsByUser.get(userId);
+  const rollup = rollupDocumentState(
+    docs.map((doc) => verByDoc?.get(doc.docKey)?.state ?? "pending")
+  );
+
+  if (rollup === "approved") {
+    await completeOnboardingTask({ taskId: pair.hr.id, completedBy: actorId });
+  } else if (rollup === "returned") {
+    const returnedReason = docs
+      .map((doc) => verByDoc?.get(doc.docKey))
+      .find((entry) => entry?.state === "returned")?.reason;
+    await updateOnboardingTask({
+      taskId: pair.hr.id,
+      patch: { status: "blocked", notes: returnedReason ?? cleanReason },
+    });
+  } else {
+    await updateOnboardingTask({
+      taskId: pair.hr.id,
+      patch: { status: "pending", notes: null },
+    });
+  }
+
+  const afterTasks = await listOnboardingTasks({ userId });
+  const row = buildQueueRow(userId, afterTasks, templates, docs);
+  if (!row || row.queueState !== rollup) {
+    console.error("[onboarding-verifications] document decision not visible:", {
+      userId,
+      docKey,
+      decision,
+      rollup,
+      row,
+    });
+    return serverError();
+  }
+
+  const message =
+    decision === "approve"
+      ? "Document approved"
+      : "Document returned for resubmit with reason";
+  return NextResponse.json({ success: true, data: row, message });
 }
 
 export async function POST(req: NextRequest) {
@@ -188,9 +322,23 @@ export async function POST(req: NextRequest) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
 
-    const { user_id: userId, decision, reason } = validation.data;
+    const { user_id: userId, doc_key: docKey, decision, reason } = validation.data;
     const session = readOnboardingTaskSession(req);
     const actorId = session ? sessionActorId(session) : null;
+
+    if (docKey !== undefined) {
+      const docValidation = DocumentDecisionSchema.safeParse(body);
+      if (!docValidation.success) {
+        return validationFailed(docValidation.error.flatten().fieldErrors);
+      }
+      return handleDocumentDecision({
+        userId,
+        docKey: docValidation.data.doc_key,
+        decision: docValidation.data.decision,
+        reason: docValidation.data.reason,
+        actorId,
+      });
+    }
 
     const [tasks, templates, employee] = await Promise.all([
       listOnboardingTasks({ userId }),
@@ -270,11 +418,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Re-read: a 200 must never report a write that is not visible.
-    const [afterTasks, afterLogs] = await Promise.all([
-      listOnboardingTasks({ userId }),
-      readAckLogs(ackFilter(`${NAMESPACE}${userId}`)),
-    ]);
-    const row = buildQueueRow(userId, afterTasks, templates, afterLogs);
+    const afterTasks = await listOnboardingTasks({ userId });
+    const row = buildQueueRow(userId, afterTasks, templates);
     const expected =
       decision === "approve"
         ? "approved"
