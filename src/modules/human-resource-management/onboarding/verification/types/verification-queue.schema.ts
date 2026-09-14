@@ -4,10 +4,7 @@ import type {
   OnboardingTask,
   OnboardingTaskTemplate,
 } from "../../types/onboarding-task.schema";
-import {
-  parseDocRefEmployeeId,
-  type AcknowledgementLog,
-} from "./acknowledgement-log.schema";
+import type { DocumentVerificationState } from "./document-verification.schema";
 
 // verification-queue.schema.ts — queue read model + decision mutation contract.
 //
@@ -23,9 +20,6 @@ import {
 //                                      done    -> approved (history)
 // Cycle: pending → approved | returned(reason) → resubmit → pending → approved.
 // Approve from returned is refused (resubmit first) so the cycle is provable.
-//
-// The acknowledgement audit trail stays a SEPARATE store keyed by the doc_ref
-// convention `onboarding:employee:<user_id>` (acknowledgement-log.schema.ts).
 
 export const VERIFICATION_PHASE = "documents";
 export const DOCUMENTS_SUBMITTED_CODE = "documents_submitted";
@@ -46,6 +40,10 @@ export interface QueueDocument {
   title: string;
   /** Directus file UUID (marker description `onboarding-portal:employee:<id>:<key>`). */
   fileId: string;
+  /** Directus file `uploaded_on` (ISO) — null when Directus omits it. */
+  uploadedAt: string | null;
+  state: DocumentVerificationState;
+  returnReason: string | null;
 }
 
 export interface QueueRow {
@@ -53,8 +51,6 @@ export interface QueueRow {
   userId: number;
   queueState: QueueState;
   returnReason: string | null;
-  ackCount: number;
-  lastAcknowledgedAt: string | null;
   /** Latest change across the two documents tasks. */
   updatedAt: string | null;
   /** Hiree-uploaded portal documents for this employee (empty = none). */
@@ -78,6 +74,7 @@ export const VerificationDecisionSchema = z
     user_id: z.number().int().positive(),
     decision: z.enum(VERIFICATION_DECISIONS),
     reason: z.string().min(1).max(MAX_RETURN_REASON_LENGTH).optional(),
+    doc_key: z.string().min(1).max(64).optional(),
   })
   .strict()
   .refine((d) => d.decision !== "return" || (d.reason ?? "").trim().length > 0, {
@@ -154,34 +151,23 @@ function latestTimestamp(...values: readonly (string | null)[]): string | null {
   return times.reduce((a, b) => (a > b ? a : b));
 }
 
-// Builds one queue row from an employee's tasks + the shared catalog + the ack
-// logs. Returns null when the employee is not in verification (no submitted
-// gate passed and no HR decision recorded). Pure — the caller supplies rows.
+// Builds one queue row from an employee's tasks + the shared catalog. Returns
+// null when the employee is not in verification (no submitted gate passed and
+// no HR decision recorded). Pure — the caller supplies rows.
 export function buildQueueRow(
   userId: number,
   tasks: readonly OnboardingTask[],
   templates: readonly OnboardingTaskTemplate[],
-  logs: readonly AcknowledgementLog[],
   documents: readonly QueueDocument[] = []
 ): QueueRow | null {
   const pair = findVerificationTasks(tasks, templates);
   const queueState = deriveQueueState(pair);
   if (queueState === null) return null;
 
-  const entries = logs.filter(
-    (log) => parseDocRefEmployeeId((log.doc_ref ?? "").trim()) === userId
-  );
-  const times = entries
-    .map((entry) => entry.acknowledged_at)
-    .filter((time): time is string => typeof time === "string" && time.length > 0)
-    .sort();
-
   return {
     userId,
     queueState,
     returnReason: blockedReason(pair.hr),
-    ackCount: entries.length,
-    lastAcknowledgedAt: times.length > 0 ? times[times.length - 1] : null,
     updatedAt: latestTimestamp(
       pair.hr?.updated_at ?? null,
       pair.submitted?.updated_at ?? null
@@ -190,24 +176,30 @@ export function buildQueueRow(
   };
 }
 
-// Joins the ack-log rows onto every employee that owns documents tasks for
-// the queue read. Pure — shared by the route and the harness.
+// Builds the queue from every employee that owns documents tasks for the
+// queue read. Pure — shared by the route and the harness. The documents pair is
+// resolved from the task list each row is built with, so the tasks are grouped
+// per employee first: passing the global list would derive every row from
+// whichever employee sorts last.
 export function aggregateQueue(
   tasks: readonly OnboardingTask[],
   templates: readonly OnboardingTaskTemplate[],
-  logs: readonly AcknowledgementLog[],
   documentsByUser: ReadonlyMap<number, readonly QueueDocument[]> = new Map()
 ): QueueAggregate {
-  const userIds = [...new Set(tasks.map((task) => task.user_id))].sort(
-    (a, b) => a - b
-  );
+  const tasksByUser = new Map<number, OnboardingTask[]>();
+  for (const task of tasks) {
+    const owned = tasksByUser.get(task.user_id);
+    if (owned) owned.push(task);
+    else tasksByUser.set(task.user_id, [task]);
+  }
+
+  const userIds = [...tasksByUser.keys()].sort((a, b) => a - b);
   const rows: QueueRow[] = [];
   for (const userId of userIds) {
     const row = buildQueueRow(
       userId,
-      tasks,
+      tasksByUser.get(userId) ?? [],
       templates,
-      logs,
       documentsByUser.get(userId) ?? []
     );
     if (row) rows.push(row);

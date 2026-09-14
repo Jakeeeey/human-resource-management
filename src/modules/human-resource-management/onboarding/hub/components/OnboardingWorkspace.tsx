@@ -147,7 +147,10 @@ export function OnboardingWorkspace({
 
         <TabsContent value="documents" className="m-0">
           <VerificationFetchProvider>
-            <VerificationTab key={`documents-${userId}`} userId={userId} />
+            <VerificationTab
+              key={`documents-${userId}`}
+              userId={userId}
+            />
           </VerificationFetchProvider>
         </TabsContent>
 

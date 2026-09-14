@@ -1,7 +1,7 @@
 export { VerificationTab } from "./components/VerificationTab";
 export { VerificationQueueTable } from "./components/VerificationQueueTable";
-export { AckDialog, ReturnDialog } from "./components/VerificationDialogs";
-export { AcknowledgementTrailDialog } from "./components/AcknowledgementTrailDialog";
+export { ReturnDialog } from "./components/VerificationDialogs";
+export { DocumentPreviewDialog } from "./components/DocumentPreviewDialog";
 export { VerificationFetchProvider, useVerificationFetch } from "./providers/verificationProvider";
 export { useVerificationQueue } from "./hooks/useVerificationQueue";
 export type {
@@ -15,8 +15,6 @@ export {
   AckMethodSchema,
   AcknowledgementLogSchema,
   CreateAcknowledgementLogSchema,
-  buildDocRef,
-  parseDocRefEmployeeId,
 } from "./types/acknowledgement-log.schema";
 export type {
   QueueRow,

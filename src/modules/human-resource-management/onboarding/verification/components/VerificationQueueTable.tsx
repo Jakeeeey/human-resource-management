@@ -1,7 +1,7 @@
 "use client";
 
-import type { QueueRow } from "../types/verification-queue.schema";
-import { Badge } from "@/components/ui/badge";
+import type { QueueDocument, QueueRow } from "../types/verification-queue.schema";
+import { formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -12,84 +12,41 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  CheckCircle2,
-  FileText,
-  History,
-  PenLine,
-  RotateCcw,
-  ScrollText,
-  Undo2,
-} from "lucide-react";
+import { Eye, FileText } from "lucide-react";
+import { VerificationStateBadge } from "./DocumentDetailsDialog";
 
-// VerificationQueueTable.tsx — verification queue table family (6 columns):
-// wrapper/header per QA §1.1, every text column capped + truncated with title,
-// loading skeletons, exact colSpan=6 on loading/empty rows, overflow-x-auto
-// guard. Per-row ack status (count + last-ack) is the per-recipient status
-// port; actions gate on queue state (approve/return on pending, resubmit on
-// returned, trail + record-ack everywhere).
+// VerificationQueueTable.tsx — verification queue table family (4 columns):
+// one row per submitted document (flattened across the employee's queue rows),
+// wrapper/header per QA §1.1, loading skeletons, exact colSpan=4 on
+// loading/empty rows, overflow-x-auto guard. Status is the document's own
+// workflow state; the document cell previews and the row action opens document
+// details.
 
 interface VerificationQueueTableProps {
   rows: QueueRow[];
   isLoading: boolean;
-  working: boolean;
-  onApprove: (row: QueueRow) => void;
-  onReturn: (row: QueueRow) => void;
-  onResubmit: (row: QueueRow) => void;
-  onRecordAck: (row: QueueRow) => void;
-  onTrail: (row: QueueRow) => void;
-}
-
-function stateBadge(state: QueueRow["queueState"]) {
-  if (state === "approved") {
-    return (
-      <Badge
-        variant="outline"
-        className="max-w-[160px] truncate border-emerald-300 text-emerald-700"
-        title="approved"
-      >
-        Approved
-      </Badge>
-    );
-  }
-  if (state === "returned") {
-    return (
-      <Badge
-        variant="outline"
-        className="max-w-[160px] truncate border-amber-300 text-amber-700"
-        title="returned-for-resubmit"
-      >
-        Returned
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="outline" className="max-w-[160px] truncate" title="pending">
-      Pending
-    </Badge>
-  );
+  onPreview: (row: QueueRow, doc: QueueDocument) => void;
+  onViewDetails: (row: QueueRow, doc: QueueDocument) => void;
 }
 
 export function VerificationQueueTable({
   rows,
   isLoading,
-  working,
-  onApprove,
-  onReturn,
-  onResubmit,
-  onRecordAck,
-  onTrail,
+  onPreview,
+  onViewDetails,
 }: VerificationQueueTableProps) {
+  const entries = rows.flatMap((row) =>
+    row.documents.map((doc) => ({ row, doc }))
+  );
+
   return (
     <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
-              <TableHead>Queue</TableHead>
-              <TableHead>Return reason</TableHead>
-              <TableHead>Ack trail</TableHead>
-              <TableHead>Documents</TableHead>
+              <TableHead>Document</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Updated</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -97,7 +54,7 @@ export function VerificationQueueTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={4}>
                   <div className="space-y-2 py-4">
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
@@ -107,7 +64,7 @@ export function VerificationQueueTable({
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={4}>
                   <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
                     <p className="text-muted-foreground">
                       No documents awaiting verification.
@@ -118,128 +75,49 @@ export function VerificationQueueTable({
                   </div>
                 </TableCell>
               </TableRow>
+            ) : entries.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4}>
+                  <div className="flex h-48 flex-col items-center justify-center gap-2 text-center">
+                    <p className="text-muted-foreground">
+                      This hire has not uploaded any documents yet.
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : (
-              rows.map((row) => (
-                <TableRow key={row.userId}>
-                  <TableCell>{stateBadge(row.queueState)}</TableCell>
-                  <TableCell
-                    className="max-w-[220px] truncate text-sm text-muted-foreground"
-                    title={row.returnReason ?? ""}
-                  >
-                    {row.returnReason ?? "—"}
+              entries.map(({ row, doc }) => (
+                <TableRow key={`${row.userId}-${doc.docKey}`}>
+                  <TableCell className="max-w-[320px]">
+                    <button
+                      type="button"
+                      onClick={() => onPreview(row, doc)}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline min-w-0 text-left"
+                      title={doc.title}
+                    >
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="max-w-[260px] truncate">{doc.title}</span>
+                    </button>
                   </TableCell>
                   <TableCell>
-                    {row.ackCount > 0 ? (
-                      <span
-                        className="inline-flex items-center gap-1 text-sm text-emerald-600"
-                        title={row.lastAcknowledgedAt ?? ""}
-                      >
-                        <CheckCircle2 className="h-4 w-4 shrink-0" />
-                        <span className="max-w-[140px] truncate">
-                          {row.ackCount} ack{row.ackCount === 1 ? "" : "s"}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        Not acked
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="max-w-[260px]">
-                    {row.documents.length === 0 ? (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {row.documents.map((doc) => (
-                          <a
-                            key={doc.docKey}
-                            href={`/api/hrm/employee-admin/employee-master-list/assets/${doc.fileId}?filename=${encodeURIComponent(doc.title)}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:bg-muted"
-                            title={doc.title}
-                          >
-                            <FileText className="h-3 w-3 shrink-0" />
-                            <span className="max-w-[120px] truncate">
-                              {doc.title}
-                            </span>
-                          </a>
-                        ))}
-                      </div>
-                    )}
+                    <VerificationStateBadge state={doc.state} />
                   </TableCell>
                   <TableCell
-                    className="max-w-[180px] truncate"
-                    title={row.updatedAt ?? ""}
+                    className="max-w-[200px] truncate text-sm text-muted-foreground"
+                    title={doc.uploadedAt ?? ""}
                   >
-                    {row.updatedAt ?? "—"}
+                    {doc.uploadedAt ? formatDateTime(new Date(doc.uploadedAt)) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      {row.queueState === "pending" && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={working}
-                            onClick={() => onApprove(row)}
-                            aria-label="Approve documents"
-                            title="Approve"
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={working}
-                            onClick={() => onReturn(row)}
-                            aria-label="Return documents for resubmit"
-                            title="Return for resubmit"
-                          >
-                            <Undo2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                      {row.queueState === "returned" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={working}
-                          onClick={() => onResubmit(row)}
-                          aria-label="Resubmit documents"
-                          title="Resubmit"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {row.queueState === "approved" && (
-                        <span
-                          className="inline-flex items-center gap-1 px-2 text-xs text-muted-foreground"
-                          title="Approved — read-only history"
-                        >
-                          <History className="h-4 w-4 shrink-0" />
-                        </span>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={working}
-                        onClick={() => onRecordAck(row)}
-                        aria-label="Record acknowledgement"
-                        title="Record acknowledgement"
-                      >
-                        <PenLine className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onTrail(row)}
-                        aria-label="View acknowledgement trail"
-                        title="Acknowledgement trail"
-                      >
-                        <ScrollText className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewDetails(row, doc)}
+                      aria-label="View document details"
+                      title="View details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))

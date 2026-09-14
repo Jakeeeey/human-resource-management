@@ -37,11 +37,13 @@ export type AcknowledgementLog = z.infer<typeof AcknowledgementLogSchema>;
 // POST body: the audit-trail write. `acknowledged_at` is optional — absent
 // means "stamp PH now server-side". Supplying it makes a retry carry the
 // identical triple so the UNIQUE collapses it to one row (never two).
+// `method` is optional too: when omitted the MySQL column default (`ink`)
+// applies and no explicit value is sent on the insert.
 export const CreateAcknowledgementLogSchema = z
   .object({
     doc_ref: z.string().min(1).max(255),
     signer: z.string().min(1).max(120),
-    method: AckMethodSchema,
+    method: AckMethodSchema.optional(),
     acknowledged_at: z.string().min(1).max(32).optional(),
   })
   .strict();
@@ -54,21 +56,4 @@ export interface AcknowledgementLogResponse {
   success: boolean;
   data?: AcknowledgementLog | AcknowledgementLog[] | null;
   message?: string;
-}
-
-// Document-reference convention: `onboarding:employee:<user_id>[:suffix]`.
-// The employee `user_id` is the only identity on this path (no profile); the
-// vault file UUID is NEVER embedded here — vault and ack stay separate.
-export function buildDocRef(userId: number, suffix?: string): string {
-  const base = `onboarding:employee:${userId}`;
-  const clean = (suffix ?? "").trim().replace(/[:\s]+/g, "-");
-  return clean.length > 0 ? `${base}:${clean}` : base;
-}
-
-// Extracts the employee id from a convention-shaped doc_ref, else null.
-export function parseDocRefEmployeeId(docRef: string): number | null {
-  const match = /^onboarding:employee:(\d+)(?::.*)?$/.exec(docRef.trim());
-  if (!match) return null;
-  const id = Number(match[1]);
-  return Number.isInteger(id) && id > 0 ? id : null;
 }
