@@ -53,7 +53,10 @@ export const createColumns = (
             </Button>
         ),
         cell: ({ row }) => (
-            <div className="max-w-[400px] truncate font-medium">
+            <div
+                className="max-w-[220px] truncate font-medium sm:max-w-[400px]"
+                title={String(row.getValue("question_text") ?? "")}
+            >
                 {row.getValue("question_text")}
             </div>
         ),
@@ -61,6 +64,7 @@ export const createColumns = (
     {
         accessorKey: "question_type",
         header: "Type",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => {
             const type = row.getValue("question_type") as string;
             return <Badge variant="secondary">{TYPE_LABELS[type] || type}</Badge>;
@@ -69,6 +73,7 @@ export const createColumns = (
     {
         id: "options",
         header: "Options",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => {
             const count = row.original.options?.length ?? 0;
             return <div className="text-muted-foreground">{count}</div>;
@@ -77,6 +82,7 @@ export const createColumns = (
     {
         accessorKey: "category",
         header: "Category",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => {
             const category = row.getValue("category") as string | null;
             return category ? (
@@ -111,6 +117,7 @@ export const createColumns = (
                 <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
         ),
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => (
             <div>{formatDate(row.getValue("created_at") as string)}</div>
         ),
@@ -123,7 +130,11 @@ export const createColumns = (
             return (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button
+                            variant="ghost"
+                            className="h-8 w-8 p-0"
+                            aria-label={`Open actions for question ${question.id}`}
+                        >
                             <MoreHorizontal className="h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>

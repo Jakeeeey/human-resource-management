@@ -26,7 +26,7 @@
 // assert (`enableScripting` absent-or-false, nothing affirmative in touched
 // files) is airtight.
 
-import type { PDFPageProxy } from "pdfjs-dist";
+import type { PDFPageProxy, RenderTask } from "pdfjs-dist";
 
 export interface PdfNaturalSize {
   width: number;
@@ -96,6 +96,20 @@ export async function loadPdfDocument(
 }
 
 /**
+ * True when a rejected render was merely CANCELLED by a newer render on the
+ * same canvas (expected on effect re-runs) — callers ignore these.
+ */
+export function isPdfRenderCancelled(error: unknown): boolean {
+  return error instanceof Error && error.name === "RenderingCancelledException";
+}
+
+// ONE in-flight render per canvas: pdf.js throws "Cannot use the same canvas
+// during multiple render() operations" when a second render starts before the
+// first settles. A re-run (StrictMode double-effect, resize, retry) cancels
+// the pending task and AWAITS its settlement before painting the same canvas.
+const inFlightByCanvas = new WeakMap<HTMLCanvasElement, RenderTask>();
+
+/**
  * Renders one 1-based page onto `canvas` at exactly `targetWidth` bitmap px
  * (height follows the page aspect, never stretched), then reports the bitmap
  * size. The signing surface feeds the reported size into the InkCanvas bitmap
@@ -110,6 +124,11 @@ export async function renderPdfPageToCanvas(
 ): Promise<PdfNaturalSize> {
   const page = await doc.getPage(pageNumber);
   try {
+    const pending = inFlightByCanvas.get(canvas);
+    if (pending) {
+      pending.cancel();
+      await pending.promise.catch(() => undefined);
+    }
     const natural = page.getViewport({ scale: 1 });
     const scale = natural.width > 0 ? targetWidth / natural.width : 1;
     const viewport = page.getViewport({ scale });
@@ -117,8 +136,16 @@ export async function renderPdfPageToCanvas(
     canvas.height = Math.max(1, Math.round(viewport.height));
     // v6 render takes the canvas element (sizes it from the viewport when
     // unset — set explicitly above so ink shares the exact grid).
-    await page.render({ canvas, viewport }).promise;
-    return { width: canvas.width, height: canvas.height };
+    const task = page.render({ canvas, viewport });
+    inFlightByCanvas.set(canvas, task);
+    try {
+      await task.promise;
+      return { width: canvas.width, height: canvas.height };
+    } finally {
+      if (inFlightByCanvas.get(canvas) === task) {
+        inFlightByCanvas.delete(canvas);
+      }
+    }
   } finally {
     page.cleanup();
   }

@@ -12,15 +12,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Users } from "lucide-react";
-import type { ApplicantRow } from "../types";
+import { APPLICANT_STATUS_LABELS, type ApplicantRow } from "../types";
 import { ApplicationViewDialog } from "@/modules/human-resource-management/recruitment/manpower-recommendation/components/ApplicationViewDialog";
-import { getApplicantStageColor } from "./columns";
+import { getApplicantStatusColor } from "./columns";
+import { formatDateLong } from "@/lib/utils";
 
 function formatSubmitted(value: string | null | undefined) {
     if (!value) return "—";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return formatDateLong(date);
 }
 
 interface ApplicantDetailDrawerProps {
@@ -42,9 +43,11 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
             <DialogContent showCloseButton={false} className="detail-drawer w-[95vw] sm:w-full sm:max-w-lg p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
+                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3 pr-8">
                             <Users className="w-6 h-6 text-primary shrink-0" />
-                            <span className="truncate">{row?.full_name || "Applicant"}</span>
+                            <span className="truncate" title={row?.full_name || "Applicant"}>
+                                {row?.full_name || "Applicant"}
+                            </span>
                         </DialogTitle>
                     </DialogHeader>
                 </div>
@@ -60,7 +63,10 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
                                     Position
                                 </span>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate">
+                                <div
+                                    className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate"
+                                    title={row?.position_applied_for || "—"}
+                                >
                                     {row?.position_applied_for || "—"}
                                 </div>
                             </div>
@@ -75,14 +81,14 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                                 <div className="flex-1">
                                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-1">
-                                        Stage
+                                        Status
                                     </span>
-                                    {row ? (
+                                    {row?.status ? (
                                         <Badge
                                             variant="outline"
-                                            className={`px-3 py-1.5 rounded-full font-bold uppercase tracking-wider ${getApplicantStageColor(row.stage)}`}
+                                            className={`px-3 py-1.5 rounded-full font-bold uppercase tracking-wider ${getApplicantStatusColor(row.status)}`}
                                         >
-                                            {row.stage}
+                                            {APPLICANT_STATUS_LABELS[row.status]}
                                         </Badge>
                                     ) : (
                                         <span className="font-medium">—</span>
@@ -102,7 +108,6 @@ export function ApplicantDetailDrawer({ row, open, onOpenChange }: ApplicantDeta
                             </div>
                         </div>
                     </div>
-
                 </div>
 
                 <div className="p-4 md:p-6 bg-muted/20 border-t border-border/40">

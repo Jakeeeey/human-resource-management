@@ -35,9 +35,14 @@ export const createColumns = (
             const a = row.original;
             return (
                 <div className="min-w-0">
-                    <div className="font-medium truncate max-w-[300px]">{a.applicant?.full_name || "—"}</div>
+                    <div
+                        className="max-w-[120px] truncate font-medium sm:max-w-[300px]"
+                        title={a.applicant?.full_name || undefined}
+                    >
+                        {a.applicant?.full_name || "—"}
+                    </div>
                     {a.applicant?.position_applied_for && (
-                        <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        <div className="max-w-[120px] truncate text-xs text-muted-foreground sm:max-w-[200px]">
                             {a.applicant.position_applied_for}
                         </div>
                     )}
@@ -48,6 +53,7 @@ export const createColumns = (
     {
         id: "quiz",
         header: "Quiz",
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => <div>{row.original.quiz?.name || "—"}</div>,
     },
     {
@@ -85,14 +91,21 @@ export const createColumns = (
                 <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
         ),
+        meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => <div>{formatDateTime(row.getValue("completed_at"))}</div>,
     },
     {
         id: "actions",
         cell: ({ row }) => (
-            <Button variant="ghost" size="sm" onClick={() => onViewDetails(row.original)}>
-                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                View Details
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewDetails(row.original)}
+                aria-label="View answer breakdown"
+                title="View details"
+            >
+                <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">View Details</span>
             </Button>
         ),
     },

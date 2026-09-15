@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -101,7 +100,6 @@ function verdictPill(verdict: string): string {
  * stay on the detail dialog's verdict control.
  */
 export function GradeInterviewClient({ interviewId }: { interviewId: number | null }) {
-    const router = useRouter();
     const [interview, setInterview] = useState<ScheduledInterview | null>(null);
     const [templates, setTemplates] = useState<ScoreTemplate[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<ScoreTemplate | null>(null);
@@ -194,7 +192,10 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                 setQuizAttemptId(attemptId);
                 setTemplates(list);
                 const stagePool = list.filter((t) => t.stage === row.stage);
-                const pool = stagePool.length > 0 ? stagePool : list;
+                // Prefer published (active) rubrics: a draft must never become
+                // the silent default just because it is flagged default-for-stage.
+                const activeStagePool = stagePool.filter((t) => t.status === "active");
+                const pool = activeStagePool.length > 0 ? activeStagePool : stagePool.length > 0 ? stagePool : list;
                 const picked = pool.find((t) => t.is_default_for_stage === true || t.is_default_for_stage === 1)
                     ?? pool[0]
                     ?? null;
@@ -247,6 +248,32 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
         return Math.round((total / 100) * 100) / 100;
     }, [sortedCriteria, watchedScores]);
 
+    const hasAnyScore = (watchedScores ?? []).some((value) => value != null);
+
+    /**
+     * True once the grader has typed at least one non-quiz score. The quiz
+     * row auto-fills from the latest attempt, so `hasAnyScore` is already true
+     * on load; without this the pill would read a real number before any
+     * manual entry and could be mistaken for a partial grade. While only the
+     * quiz prefill is present the pill is labelled preliminary instead.
+     */
+    const hasManualScore = (watchedScores ?? []).some(
+        (value, index) => value != null && !sortedCriteria[index]?.is_quiz_criterion,
+    );
+
+    /**
+     * Stage-scoped template pool plus whether any published rubric exists.
+     * When at least one active template is available, draft/archived options
+     * are disabled so an interview can never be graded against an unpublished
+     * rubric; when none is active the draft stays selectable (nothing to
+     * prefer), which keeps grading unblocked.
+     */
+    const stageTemplates = useMemo(
+        () => (interview ? templates.filter((t) => t.stage === interview.stage) : []),
+        [templates, interview],
+    );
+    const hasActiveStageTemplate = stageTemplates.some((t) => t.status === "active");
+
     const onSubmit = async (values: GradeFormValues) => {
         if (!interview || !selectedTemplate) {
             toast.error("Please select a scoring template before submitting.");
@@ -292,12 +319,6 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
             setGradedVerdict(values.verdict);
             setGradedComposite(composite);
             toast.success("Interview graded successfully!");
-            // Passed Initials flow straight into recommending: the next
-            // workflow step lives in manpower-recommendation, so navigate
-            // there instead of parking on the confirmation screen.
-            if (interview.stage === "Initial" && values.verdict === "Passed") {
-                router.push("/hrm/manpower-recommendation");
-            }
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Could not submit interview grading.");
         } finally {
@@ -334,6 +355,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
     }
 
     if (gradedVerdict) {
+        const passedInitial = interview.stage === "Initial" && gradedVerdict === "Passed";
         return (
             <div className="mx-auto max-w-3xl">
                 <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm p-6 md:p-10">
@@ -341,14 +363,24 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                         <ClipboardCheck className="w-12 h-12 text-emerald-600" />
                         <h1 className="text-2xl font-extrabold text-foreground">Interview graded</h1>
                         <p className="text-muted-foreground">
-                            Composite: <span className="font-bold text-foreground">{gradedComposite}</span>
+                            The {interview.stage} interview verdict and composite have been recorded.
+                        </p>
+                        <p className="text-muted-foreground">
+                            Composite: <span className="font-bold text-foreground">{gradedComposite?.toFixed(2)}</span>
                         </p>
                         <span className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider inline-block w-[110px] text-center ${verdictPill(gradedVerdict)}`}>
                             {gradedVerdict}
                         </span>
-                        <Button asChild className="rounded-full px-8 mt-2">
-                            <Link href="/hrm/interviews">Go Back</Link>
-                        </Button>
+                        <div className="mt-2 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                            <Button asChild variant={passedInitial ? "outline" : "default"} className="rounded-full px-6">
+                                <Link href="/hrm/interviews">Back to Interviews</Link>
+                            </Button>
+                            {passedInitial && (
+                                <Button asChild className="rounded-full px-8 shadow-sm">
+                                    <Link href="/hrm/manpower-recommendation">Continue to Recommendation</Link>
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -419,13 +451,22 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                                 </SelectTrigger>
                                             </FormControl>
                                             <SelectContent className="max-h-80">
-                                                {templates
-                                                    .filter((t) => t.stage === interview.stage)
-                                                    .map((t) => (
-                                                        <SelectItem key={t.id} value={String(t.id)}>
-                                                            {t.name}{t.is_default_for_stage === true || t.is_default_for_stage === 1 ? " (default)" : ""}
+                                                {stageTemplates.map((t) => {
+                                                    const isDefault = t.is_default_for_stage === true || t.is_default_for_stage === 1;
+                                                    const isPublished = t.status === "active";
+                                                    const isBlocked = hasActiveStageTemplate && !isPublished;
+                                                    return (
+                                                        <SelectItem
+                                                            key={t.id}
+                                                            value={String(t.id)}
+                                                            disabled={isBlocked}
+                                                        >
+                                                            {t.name}
+                                                            {isDefault ? " (default)" : ""}
+                                                            {isBlocked ? ` (${t.status} — not selectable)` : !isPublished ? ` (${t.status})` : ""}
                                                         </SelectItem>
-                                                    ))}
+                                                    );
+                                                })}
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -435,7 +476,16 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
 
                             {selectedTemplate && (
                                 <div className="space-y-3">
-                                    <h3 className="text-sm font-semibold">Criteria</h3>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <h3 className="text-sm font-semibold">Criteria</h3>
+                                        <span className="inline-flex items-center rounded-full border border-border/50 bg-muted/40 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                                            {hasManualScore
+                                                ? `Weighted total: ${composite.toFixed(2)} · guideline only`
+                                                : hasAnyScore
+                                                    ? `Weighted total: ${composite.toFixed(2)} · quiz only, preliminary`
+                                                    : "Weighted total: — · guideline only"}
+                                        </span>
+                                    </div>
                                     {sortedCriteria.map((criterion, index) => (
                                         <FormField
                                             key={criterion.id ?? `${criterion.name}-${index}`}

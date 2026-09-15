@@ -21,8 +21,8 @@ export const dynamic = "force-dynamic";
 // PATCH — guarded single-step transition (assigned -> in_progress ->
 // completed) via the Todo 4 adapter guard (`transitionAssignment`).
 // Completing requires `completed_ref`; the completed state is terminal.
-// IDOR: a `hiree` actor may transition ONLY their own assignment (owner
-// mismatch -> 403); `hr` may override.
+// IDOR: an actor may transition ONLY their own assignment (owner
+// mismatch -> 403). No role branch — HR override is external (plan §12).
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(

@@ -34,7 +34,7 @@ function QuizHistoryModuleContent() {
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Quiz History</h1>
                     <p className="text-muted-foreground">
-                        Every completed quiz-taking attempt, permanent and unfiltered by role
+                        All completed quiz attempts, newest first.
                     </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => refetch()} className="w-full sm:w-auto">

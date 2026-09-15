@@ -13,10 +13,11 @@ import { SignaturePad } from "../SignaturePad";
 import type { OnboardingSignaturePadHandle } from "../SignaturePad";
 import type { SigningStroke } from "../signingStrokes";
 
-// SignatureStampPicker.tsx — captured pad → PNG stamp: the hiree draws (or
-// types, but typed-mode yields NO stamp — empty pad is rejected, Todo 3
-// contract) in the pad, captures it into a stamp, then taps a page to place
-// it. Placed stamps stay draggable until Confirm.
+// SignatureStampPicker.tsx — captured pad → PNG stamp: the hiree draws in the
+// pad, captures it into a stamp, then taps a page to place it. Placed stamps
+// stay draggable until Confirm. Typed mode can never become a stamp (Todo 3
+// contract), so it states that inline and routes the user to Draw instead —
+// no disabled dead end.
 
 export interface CapturedStamp {
   pngUrl: string;
@@ -68,7 +69,10 @@ export function SignatureStampPicker({
           <SignaturePad
             ref={padRef}
             typedMode={typedMode}
-            onTypedModeChange={setTypedMode}
+            onTypedModeChange={(typed) => {
+              setTypedMode(typed);
+              setError(null);
+            }}
             typedName={typedName}
             onTypedNameChange={setTypedName}
             onStrokesChange={setPadStrokes}
@@ -92,14 +96,25 @@ export function SignatureStampPicker({
           >
             Cancel
           </Button>
-          <Button
-            onClick={() => void handleCapture()}
-            disabled={capturing || typedMode}
-            className="min-h-8 w-full sm:w-auto"
-            title={typedMode ? "Typed names cannot become stamps" : "Capture stamp"}
-          >
-            {capturing ? "Capturing…" : "Capture stamp"}
-          </Button>
+          {typedMode ? (
+            <Button
+              onClick={() => {
+                setTypedMode(false);
+                setError(null);
+              }}
+              className="min-h-8 w-full sm:w-auto"
+            >
+              Draw instead to sign
+            </Button>
+          ) : (
+            <Button
+              onClick={() => void handleCapture()}
+              disabled={capturing}
+              className="min-h-8 w-full sm:w-auto"
+            >
+              {capturing ? "Capturing…" : "Capture stamp"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

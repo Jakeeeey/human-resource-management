@@ -10,20 +10,19 @@ import {
   normalizeTrainingAssignment,
   getPhilippineTime,
 } from "@/modules/human-resource-management/onboarding/training/trainingTaking";
-import { resolveApplicationBridge } from "@/modules/human-resource-management/onboarding/training/trainingAssignmentAdapter";
+import { readUserExists } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/hrm/onboarding/training-assignments — list (+ `?profile_id=`,
-// `?employee_id=`, `?status=` filters so the hiree taking view and the HR
-// overview share one read path).
+// GET /api/hrm/onboarding/training-assignments — list (+ `?user_id=`,
+// `?status=` filters so the hiree taking view and the HR overview share one
+// read path; `user_id` = the employee's `user.user_id`).
 // POST /api/hrm/onboarding/training-assignments — HR assigns a quiz to a
-// hire: `{ profile_id, employee_id, quiz_id, due?, application_id? }`.
-// The `application_id` bridge resolves HR-explicit first, else the
-// hook-stored onboarding-profile value, else null (never spoofed — the
-// Todo 4 adapter's `resolveApplicationBridge`). New rows open `assigned`
-// with `opened_at` set server-side (PH time).
+// hire: `{ user_id, quiz_id, due?, application_id? }`. The `application_id`
+// bridge is an HR-explicit manual link to the engine's application chain;
+// when absent it stays null (never resolved from a profile, never spoofed).
+// New rows open `assigned` with `opened_at` set server-side (PH time).
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -34,8 +33,7 @@ function validationFailed(errors: Record<string, string[]>) {
 
 const listQuerySchema = z
   .object({
-    profile_id: z.coerce.number().int().positive().optional(),
-    employee_id: z.coerce.number().int().positive().optional(),
+    user_id: z.coerce.number().int().positive().optional(),
     status: z.enum(["assigned", "in_progress", "completed"]).optional(),
   })
   .strict();
@@ -49,11 +47,8 @@ export async function GET(req: NextRequest) {
     }
 
     const filters: string[] = [];
-    if (query.data.profile_id !== undefined) {
-      filters.push(`filter[profile_id][_eq]=${query.data.profile_id}`);
-    }
-    if (query.data.employee_id !== undefined) {
-      filters.push(`filter[employee_id][_eq]=${query.data.employee_id}`);
+    if (query.data.user_id !== undefined) {
+      filters.push(`filter[user_id][_eq]=${query.data.user_id}`);
     }
     if (query.data.status !== undefined) {
       filters.push(`filter[status][_eq]=${query.data.status}`);
@@ -84,32 +79,21 @@ export async function POST(req: NextRequest) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
 
-    const { profile_id, employee_id, quiz_id, due } = validation.data;
+    const { user_id, quiz_id, due } = validation.data;
+    const applicationId = validation.data.application_id ?? null;
 
-    // Bridge: explicit HR link first, else the hook-stored profile value,
-    // else null (never fabricated).
-    let profileApplicationId: number | null = null;
-    try {
-      const profile = (await dFetch(`/items/onboarding_profiles/${profile_id}`)) as {
-        data?: Record<string, unknown>;
-      };
-      const raw = profile?.data?.["application_id"];
-      profileApplicationId =
-        typeof raw === "number" && Number.isInteger(raw) && raw > 0 ? raw : null;
-    } catch {
-      profileApplicationId = null;
+    if (!(await readUserExists(user_id))) {
+      return NextResponse.json(
+        { success: false, message: "Unknown employee — no training assignment was created" },
+        { status: 400 }
+      );
     }
-    const applicationId = resolveApplicationBridge(
-      { application_id: profileApplicationId },
-      validation.data.application_id ?? null
-    );
 
     const now = getPhilippineTime();
     const created = (await dFetch("/items/training_assignments", {
       method: "POST",
       body: JSON.stringify({
-        profile_id,
-        employee_id,
+        user_id,
         quiz_id,
         application_id: applicationId,
         due: due ?? null,

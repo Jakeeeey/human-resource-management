@@ -27,6 +27,13 @@ import { createColumns } from "./columns";
 import { Toolbar } from "./Toolbar";
 import { QuestionDialog } from "./QuestionDialog";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+import { useFileManagementFilterContext } from "../providers/filterProvider";
+import { pluralize } from "../../utils/pluralize";
+
+interface ColumnMetaClasses {
+    headerClassName?: string;
+    cellClassName?: string;
+}
 
 interface FileManagementTableProps {
     data: QuizQuestionWithOptions[];
@@ -45,10 +52,16 @@ export function FileManagementTable({
     onDeleteQuestion,
     onReactivateQuestion,
 }: FileManagementTableProps) {
+    const { filters, resetFilters } = useFileManagementFilterContext();
+    const hasActiveFilters =
+        Boolean(filters.search) ||
+        filters.questionType != null ||
+        filters.category != null ||
+        filters.includeInactive;
+
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-    const [rowSelection, setRowSelection] = React.useState({});
 
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
     const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -97,8 +110,7 @@ export function FileManagementTable({
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
-        onRowSelectionChange: setRowSelection,
-        state: { sorting, columnFilters, columnVisibility, rowSelection },
+        state: { sorting, columnFilters, columnVisibility },
     });
 
     if (isLoading) {
@@ -112,6 +124,11 @@ export function FileManagementTable({
         );
     }
 
+    const totalRows = table.getFilteredRowModel().rows.length;
+    const { pageIndex, pageSize } = table.getState().pagination;
+    const rangeStart = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
+    const rangeEnd = Math.min((pageIndex + 1) * pageSize, totalRows);
+
     return (
         <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -123,48 +140,74 @@ export function FileManagementTable({
             </div>
 
             <div className="text-sm text-muted-foreground">
-                {table.getFilteredRowModel().rows.length} question(s) found
+                {totalRows} {pluralize(totalRows, "question")}
+                {hasActiveFilters ? " match your filters" : ""}
             </div>
 
             <div className="rounded-md border overflow-x-auto">
-                <UiTable className="min-w-[720px]">
+                <UiTable className="w-full min-w-0 sm:min-w-[720px]">
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id}>
-                                        {header.isPlaceholder
-                                            ? null
-                                            : flexRender(
-                                                  header.column.columnDef.header,
-                                                  header.getContext()
-                                              )}
-                                    </TableHead>
-                                ))}
+                                {headerGroup.headers.map((header) => {
+                                    const meta = header.column.columnDef.meta as
+                                        | ColumnMetaClasses
+                                        | undefined;
+                                    return (
+                                        <TableHead key={header.id} className={meta?.headerClassName}>
+                                            {header.isPlaceholder
+                                                ? null
+                                                : flexRender(
+                                                      header.column.columnDef.header,
+                                                      header.getContext()
+                                                  )}
+                                        </TableHead>
+                                    );
+                                })}
                             </TableRow>
                         ))}
                     </TableHeader>
                     <TableBody>
                         {table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                >
-                                    {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
-                                            {flexRender(
-                                                cell.column.columnDef.cell,
-                                                cell.getContext()
-                                            )}
-                                        </TableCell>
-                                    ))}
+                                <TableRow key={row.id}>
+                                    {row.getVisibleCells().map((cell) => {
+                                        const meta = cell.column.columnDef.meta as
+                                            | ColumnMetaClasses
+                                            | undefined;
+                                        return (
+                                            <TableCell key={cell.id} className={meta?.cellClassName}>
+                                                {flexRender(
+                                                    cell.column.columnDef.cell,
+                                                    cell.getContext()
+                                                )}
+                                            </TableCell>
+                                        );
+                                    })}
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    No questions found.
+                                    {hasActiveFilters ? (
+                                        <div className="flex flex-col items-center gap-2">
+                                            <span className="text-muted-foreground">
+                                                No questions match your filters.
+                                            </span>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={resetFilters}
+                                            >
+                                                Clear filters
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <span className="text-muted-foreground">
+                                            No questions yet. Use &ldquo;Add Question&rdquo; to add
+                                            one.
+                                        </span>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -172,10 +215,9 @@ export function FileManagementTable({
                 </UiTable>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
                 <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                    {table.getFilteredRowModel().rows.length} row(s) selected.
+                    Showing {rangeStart}&ndash;{rangeEnd} of {totalRows}
                 </div>
                 <div className="space-x-2">
                     <Button

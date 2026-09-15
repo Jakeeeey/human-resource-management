@@ -2,84 +2,67 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { useOnboardingProfileFetch } from "../../hub/providers/profileProvider";
 import { useOrientationFetch } from "../providers/orientationProvider";
-import type { OrientationRole } from "../types/orientation.schema";
 
-// useOrientation.ts — Orientation tab intent hook: hire selection (from the
-// hub profiles collection-use) + per-hire topic state + role-gated
-// check-off. 403 reasons surface via the returned error as-is.
+// useOrientation.ts — Orientation section intent hook for ONE employee
+// (`user_id`). The employee is the canonical hire from the workspace route, so
+// there is no roster selection here — only per-employee topic state + check-off.
 
-export function useOrientation() {
-  const { profiles } = useOnboardingProfileFetch();
+export function useOrientation(userId: number) {
   const {
+    employees,
+    rosterLoading,
+    rosterError,
     topics,
     checks,
     done,
     isLoading,
     isError,
     error,
-    loadHire,
+    loadEmployee,
     checkOff,
   } = useOrientationFetch();
 
-  const [profileId, setProfileId] = useState<number | null>(null);
-  const [role, setRole] = useState<OrientationRole>("hr");
   const [actionError, setActionError] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (profileId === null && profiles.length > 0) {
-      const first = profiles[0];
-      if (first) {
-        setProfileId(first.employee_id);
-        void loadHire(first.employee_id);
-      }
-    }
-  }, [profiles, profileId, loadHire]);
-
-  const selectHire = useCallback(
-    (id: number) => {
-      setProfileId(id);
-      setActionError(null);
-      void loadHire(id);
-    },
-    [loadHire]
-  );
+    void loadEmployee(userId);
+  }, [userId, loadEmployee]);
 
   const checkTopic = useCallback(
     async (topicId: string) => {
-      if (profileId === null) return;
       setCheckingId(topicId);
       setActionError(null);
       try {
-        await checkOff(profileId, topicId, role);
+        await checkOff(userId, topicId);
       } catch (err) {
         setActionError(err instanceof Error ? err.message : String(err));
       } finally {
         setCheckingId(null);
       }
     },
-    [profileId, role, checkOff]
+    [userId, checkOff]
   );
 
   const checkedIds = new Set(checks.map((c) => c.topic_id));
   const companyTopics = topics.filter((t) => t.track === "company");
   const departmentTopics = topics.filter((t) => t.track === "department");
+  const selectedEmployee =
+    employees.find((e) => e.user_id === userId) ?? null;
 
   return {
-    profiles,
-    profileId,
-    selectHire,
-    role,
-    setRole,
+    employees,
+    selectedEmployee,
+    userId,
     companyTopics,
     departmentTopics,
     checkedIds,
     done,
-    isLoading,
+    isLoading: isLoading || rosterLoading,
     isError,
     error,
+    rosterError,
     actionError,
     checkingId,
     checkTopic,

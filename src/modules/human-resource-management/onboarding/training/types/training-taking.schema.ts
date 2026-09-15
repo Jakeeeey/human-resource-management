@@ -2,17 +2,18 @@ import { z } from "zod";
 
 // training-taking.schema.ts — Zod source of truth for Todo 12 (training taking).
 //
-// Mirrors the live `training_assignments` collection (13 fields, Task 1a):
-// id + profile_id + employee_id (assignee) + quiz_id + application_id bridge
-// (nullable, never spoofed) + due + opened_at + status
-// (assigned|in_progress|completed) + completed_ref + four nullable
-// app-written audit columns (zero DB defaults).
+// Mirrors the live `training_assignments` collection (re-keyed to the
+// employee): id + user_id (assignee = the employee's `user.user_id`) +
+// quiz_id + application_id bridge (nullable, never spoofed) + due +
+// opened_at + status (assigned|in_progress|completed) + completed_ref + four
+// nullable app-written audit columns (zero DB defaults). The path has no
+// profile scope and never reads the retired profile table.
 //
 // Principal rule (plan §12): every taking mutation carries an employee
-// principal (`actor: { employee_id, profile_id, role }`). The schema has NO
-// `applicant_id` field anywhere — the taker is never applicant-shaped by
-// construction. The engine `quiz_attempt` row (persisted server-side on
-// submit) resolves its applicant through the REAL application chain
+// principal (`actor: { user_id, role }`). The schema has NO `applicant_id`
+// field anywhere — the taker is never applicant-shaped by construction. The
+// engine `quiz_attempt` row (persisted server-side on submit) resolves its
+// applicant through the REAL application chain
 // (`assignment.application_id -> application.applicant_id`) or the submit is
 // refused with reason — applicant ids are never accepted from the client.
 
@@ -22,8 +23,7 @@ export type TrainingTakingRole = (typeof TRAINING_TAKING_ROLES)[number];
 
 export const TrainingActorSchema = z
   .object({
-    employee_id: z.number().int().positive(),
-    profile_id: z.number().int().positive(),
+    user_id: z.number().int().positive(),
     role: z.enum(TRAINING_TAKING_ROLES),
   })
   .strict();
@@ -32,8 +32,7 @@ export type TrainingActor = z.infer<typeof TrainingActorSchema>;
 
 export const TrainingAssignmentSchema = z.object({
   id: z.number().int().positive(),
-  profile_id: z.number().int().positive(),
-  employee_id: z.number().int().positive(),
+  user_id: z.number().int().positive(),
   quiz_id: z.number().int().positive(),
   application_id: z.number().int().positive().nullable(),
   due: z.string().nullable(),
@@ -48,14 +47,14 @@ export const TrainingAssignmentSchema = z.object({
 
 export type TrainingTakingAssignment = z.infer<typeof TrainingAssignmentSchema>;
 
-// POST body (HR): assigns a quiz to a hire. `due` is an optional deadline
-// (overdue stays a DERIVED flag — never a stored state). `application_id`
-// is an optional explicit HR link; otherwise the route resolves the bridge
-// from the onboarding profile (hook-stored) or leaves it null.
+// POST body (HR): assigns a quiz to a hire (`user_id` = the employee's
+// `user.user_id`). `due` is an optional deadline (overdue stays a DERIVED
+// flag — never a stored state). `application_id` is an optional explicit HR
+// link to the engine's application chain; when absent it stays null — never
+// resolved from a profile.
 export const CreateTrainingAssignmentSchema = z
   .object({
-    profile_id: z.number().int().positive(),
-    employee_id: z.number().int().positive(),
+    user_id: z.number().int().positive(),
     quiz_id: z.number().int().positive(),
     due: z.string().min(1).nullable().optional(),
     application_id: z.number().int().positive().nullable().optional(),

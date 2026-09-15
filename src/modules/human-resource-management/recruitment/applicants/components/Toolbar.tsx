@@ -11,14 +11,14 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Search, X } from "lucide-react";
-import { APPLICANT_STAGE } from "../lib/deriveApplicantStage";
+import { APPLICANT_STATUS, APPLICANT_STATUS_LABELS, ApplicantStatusSchema } from "../types";
 import { useApplicantFilterContext } from "../providers/filterProvider";
 
 export function Toolbar() {
-    const { filters, updateSearch, updateStage, resetFilters } =
+    const { filters, updateSearch, updateStatus, resetFilters } =
         useApplicantFilterContext();
 
-    const hasActiveFilters = filters.search !== "" || filters.stage !== null;
+    const hasActiveFilters = filters.search !== "" || filters.status !== null;
 
     return (
         <div className="flex flex-col sm:flex-row gap-2">
@@ -35,19 +35,22 @@ export function Toolbar() {
                 </div>
 
                 <Select
-                    value={filters.stage ?? "all"}
-                    onValueChange={(val) =>
-                        updateStage(val === "all" ? null : (val as (typeof APPLICANT_STAGE)[number]))
-                    }
+                    value={filters.status ?? "all"}
+                    onValueChange={(val) => {
+                        // Boundary parse: only canonical ApplicantStatus values
+                        // filter — "all" and any malformed value clear the filter.
+                        const parsed = ApplicantStatusSchema.safeParse(val);
+                        updateStatus(parsed.success ? parsed.data : null);
+                    }}
                 >
                     <SelectTrigger className="w-full sm:w-[180px]">
-                        <SelectValue placeholder="All stages" />
+                        <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">All stages</SelectItem>
-                        {APPLICANT_STAGE.map((stage) => (
-                            <SelectItem key={stage} value={stage}>
-                                {stage}
+                        <SelectItem value="all">All statuses</SelectItem>
+                        {APPLICANT_STATUS.map((status) => (
+                            <SelectItem key={status} value={status}>
+                                {APPLICANT_STATUS_LABELS[status]}
                             </SelectItem>
                         ))}
                     </SelectContent>

@@ -11,12 +11,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // acknowledgement-logs — the audit-trail store (Todo 10 greenfield WRITE).
-// Vault (`signing_envelopes.pdf_file`, Todo 8) is NEVER touched here: the
+// The filed-PDF store (`paperwork_item.pdf_file`) is NEVER touched here: the
 // signed file and the ack log are separate stores, separate writes.
 //
 // GET /api/hrm/onboarding/acknowledgement-logs — read/trail path (exact
 // `?doc_ref=`, optional exact `?signer=`), newest-first.
-// POST — record one ack `{doc_ref, signer, acknowledged_at (PH), method}`.
+// POST — record one ack `{doc_ref, signer, acknowledged_at (PH)}`.
 // Double-ack collapses to ONE row: exact-triple pre-check first, then insert;
 // a UNIQUE-conflict body (Directus answers 400 RECORD_NOT_UNIQUE, never 409)
 // re-reads the triple and returns the single surviving row (Todo 2 precedent).
@@ -125,16 +125,16 @@ export async function POST(req: NextRequest) {
     }
 
     const now = getPhilippineTime();
+    const payload: Record<string, string> = {
+      doc_ref: docRef,
+      signer,
+      acknowledged_at: at,
+      created_at: now,
+      updated_at: now,
+    };
     const created = (await dFetch("/items/acknowledgement_logs", {
       method: "POST",
-      body: JSON.stringify({
-        doc_ref: docRef,
-        signer,
-        acknowledged_at: at,
-        method: validation.data.method,
-        created_at: now,
-        updated_at: now,
-      }),
+      body: JSON.stringify(payload),
     })) as { data?: AcknowledgementLog };
 
     if (created?.data) {

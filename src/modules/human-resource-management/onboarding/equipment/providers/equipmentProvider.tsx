@@ -7,14 +7,12 @@ import {
   useState,
 } from "react";
 
-import type {
-  AcknowledgeEquipmentItemInput,
-  IssueEquipmentItemInput,
-} from "../types/equipment-issue.schema";
+import type { IssueEquipmentItemInput } from "../types/equipment-issue.schema";
 
-// equipmentProvider.tsx — client fetch layer for the equipment issue/ack
-// routes. Thin context provider mirroring the hub profileProvider shape:
-// status + issue + acknowledge + refetch with loading/error flags.
+// equipmentProvider.tsx — client fetch layer for the equipment issue route.
+// Thin context provider: status + issue + refetch with loading/error flags.
+// Everything is keyed to the employee (`user_id`). Acknowledgement is the
+// hiree's own action and lives in the employee portal, never here.
 // Asset assignment is NEVER touched here (Master List owns assets).
 
 export interface EquipmentItemStatus {
@@ -29,11 +27,10 @@ export interface EquipmentItemStatus {
   acked: boolean;
   ackedAt: string | null;
   ackedBy: string | null;
-  ackMethod: string | null;
 }
 
 export interface EquipmentStatus {
-  profileId: number;
+  userId: number;
   items: EquipmentItemStatus[];
   fullyEquipped: boolean;
 }
@@ -43,9 +40,8 @@ interface EquipmentFetchContextType {
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
-  refetch: (profileId: number) => Promise<void>;
+  refetch: (userId: number) => Promise<void>;
   issueItem: (input: IssueEquipmentItemInput) => Promise<void>;
-  acknowledgeItem: (input: AcknowledgeEquipmentItemInput) => Promise<void>;
 }
 
 const EquipmentFetchContext = createContext<
@@ -53,7 +49,6 @@ const EquipmentFetchContext = createContext<
 >(undefined);
 
 const ISSUES_BASE = "/api/hrm/onboarding/equipment-issues";
-const ACKS_BASE = "/api/hrm/onboarding/equipment-acks";
 const STATUS_BASE = "/api/hrm/onboarding/equipment-status";
 
 async function readBody(res: Response): Promise<{
@@ -78,11 +73,11 @@ export function EquipmentFetchProvider({
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const refetch = useCallback(async (profileId: number) => {
+  const refetch = useCallback(async (userId: number) => {
     try {
       setIsLoading(true);
       setIsError(false);
-      const res = await fetch(`${STATUS_BASE}?profile_id=${profileId}`, {
+      const res = await fetch(`${STATUS_BASE}?user_id=${userId}`, {
         cache: "no-store",
       });
       const body = await readBody(res);
@@ -109,23 +104,7 @@ export function EquipmentFetchProvider({
       if (!res.ok || !body.success) {
         throw new Error(body?.message || "Issue failed");
       }
-      await refetch(input.profile_id);
-    },
-    [refetch]
-  );
-
-  const acknowledgeItem = useCallback(
-    async (input: AcknowledgeEquipmentItemInput) => {
-      const res = await fetch(ACKS_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      const body = await readBody(res);
-      if (!res.ok || !body.success) {
-        throw new Error(body?.message || "Acknowledge failed");
-      }
-      await refetch(input.profile_id);
+      await refetch(input.user_id);
     },
     [refetch]
   );
@@ -139,7 +118,6 @@ export function EquipmentFetchProvider({
         error,
         refetch,
         issueItem,
-        acknowledgeItem,
       }}
     >
       {children}

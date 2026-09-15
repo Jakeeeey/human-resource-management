@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useManpowerRecommendationContext } from "../providers/ManpowerRecommendationProvider";
+import { countRequestApplicants, deriveRequestEffectiveStatus } from "../utils/requestStatus";
+import { RequestStatusPill } from "./RequestStatusPill";
+import type { ManpowerRecommendation } from "../types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -64,11 +67,26 @@ export function ManpowerRecommendationView() {
     const position = matchedRequest?.position || `Request #${selectedRecommendation.manpower_request_id}`;
     // Fully closed request (every slot hired): status is immutable here — a hired
     // employee leaving goes through job exit, never by flipping this record back.
-    const hiredForRequest = recommendations.filter((r) => r.manpower_request_id === selectedRecommendation.manpower_request_id && r.status === "Hired").length;
+    // The hire count follows the APPLICANT pipeline (todo 8 reconciliation):
+    // `applicant.status` is the truth; the rec row only links applicant->request.
+    const applicantStatusById = new Map(applicants.map((a) => [a.id, a.status]));
+    // Counts and the effective status come from the shared derivation
+    // (utils/requestStatus.ts) — the SAME source the open-requests list pill uses,
+    // so this view and the list can never disagree.
+    const requestCounts = countRequestApplicants(recommendations, selectedRecommendation.manpower_request_id, applicantStatusById);
+    const hiredForRequest = requestCounts.hired;
     const requestNeed = matchedRequest?.no_manpower_needed ?? 0;
+    const effectiveStatus = deriveRequestEffectiveStatus(matchedRequest?.status, requestNeed, requestCounts);
     const isRequestClosed = requestNeed > 0 && hiredForRequest >= requestNeed;
     const isStatusEditable =
         !isRequestClosed && toStatusOption(selectedRecommendation.status) === "Recommended";
+    const notesEditable = !isRequestClosed;
+    const notesDirty = decisionNotes !== (selectedRecommendation.decision_notes || "");
+    // Nothing is actionable when the status is terminal (Approved/Hired/Rejected/
+    // Withdrawn) AND the notes are untouched — the footer button stays disabled
+    // instead of firing a no-op PATCH that reports success (S4 finding #8).
+    const canSubmit = isStatusEditable || (notesEditable && notesDirty);
+    const submitLabel = isStatusEditable ? "Update Status" : "Save Notes";
     // Status dropdown only on lower-stage (Recommended) records of open requests —
     // Approved/Hired are selection outcomes owned by the interviews flow, never edited here.
     const applicantName = applicants.find(a => a.id === selectedRecommendation.applicant_id)?.full_name || `Applicant #${selectedRecommendation.applicant_id}`;
@@ -83,13 +101,16 @@ export function ManpowerRecommendationView() {
         if (selectedRecommendation.id == null) return;
         setIsSubmitting(true);
         try {
-            // NOTE: send ONLY { status, decision_notes } — decision_by/decision_at
-            // are injected server-side by the Task 5 PATCH route (no userId exists
-            // in client scope; mirrors the updated_by injection pattern).
-            const ok = await updateRecommendation(selectedRecommendation.id, {
-                status: isStatusEditable ? newStatus : toStatusOption(selectedRecommendation.status),
-                decision_notes: isRequestClosed ? selectedRecommendation.decision_notes : decisionNotes.trim() ? decisionNotes : null,
-            });
+            const payload: Partial<ManpowerRecommendation> = {
+                decision_notes: decisionNotes.trim() ? decisionNotes : null,
+            };
+            // Send `status` only for a real change: the PATCH route stamps
+            // decision_by/decision_at whenever status is present, so a notes-only
+            // save must never re-stamp the original decision.
+            if (isStatusEditable && newStatus !== toStatusOption(selectedRecommendation.status)) {
+                payload.status = newStatus;
+            }
+            const ok = await updateRecommendation(selectedRecommendation.id, payload);
             if (ok) setIsViewOpen(false);
         } finally {
             setIsSubmitting(false);
@@ -132,8 +153,14 @@ export function ManpowerRecommendationView() {
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Applicant Name</label>
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate" title={applicantName}>{applicantName}</div>
                             </div>
-                            <div className="md:col-span-3">
+                            <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
+                                <div className="flex items-center p-1">
+                                    <RequestStatusPill status={effectiveStatus} />
+                                </div>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommendation status</label>
                                 <div className="flex flex-wrap items-center gap-2">
                                     {isEditingStatus ? (
                                         <Select value={newStatus} onValueChange={(v) => setNewStatus(toStatusOption(v))}>
@@ -153,13 +180,12 @@ export function ManpowerRecommendationView() {
                                             {newStatus}
                                         </span>
                                     )}
-                {isStatusEditable && (
-                <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
+                                    {isStatusEditable && (
+                                        <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit recommendation status">
                                             <Pencil className="h-4 w-4 text-muted-foreground" />
                                         </Button>
                                     )}
-                                    <Button variant="outline"               size="lg"
-              className="w-full sm:w-auto sm:ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
+                                    <Button variant="outline" size="lg" className="w-full sm:w-auto sm:ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         Application Form
                                     </Button>
@@ -234,10 +260,12 @@ export function ManpowerRecommendationView() {
                             Close
                         </Button>
                     </DialogClose>
-                    <Button onClick={handleUpdateStatus} disabled={isSubmitting} className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm">
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Update Status
-                    </Button>
+                    {notesEditable && (
+                        <Button onClick={handleUpdateStatus} disabled={isSubmitting || !canSubmit} className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm">
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {submitLabel}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

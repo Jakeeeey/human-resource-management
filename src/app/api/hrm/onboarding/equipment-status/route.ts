@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { loadServerEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentCatalogServer";
+import { loadEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
 import {
   buildEquipmentItemStates,
   isFullyEquipped,
@@ -12,10 +12,10 @@ import { EquipmentQuerySchema } from "@/modules/human-resource-management/onboar
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/hrm/onboarding/equipment-status?profile_id= — per-item issue/ack
-// state for one hire plus the FULLY_EQUIPPED verdict. This is the plug point
-// for Todo 5's StageEvidence (`equipmentDone`) and Todo 14's orchestrator:
-// both read `fullyEquipped` here instead of re-deriving it.
+// GET /api/hrm/onboarding/equipment-status?user_id= — per-item issue/ack
+// state for one EMPLOYEE (`user.user_id`) plus the FULLY_EQUIPPED verdict.
+// This is the plug point for the completion checklist (`equipmentDone`):
+// it reads `fullyEquipped` here instead of re-deriving it.
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -29,7 +29,6 @@ interface AckLogRow {
   doc_ref?: string;
   signer?: string;
   acknowledged_at?: string;
-  method?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -39,25 +38,25 @@ export async function GET(req: NextRequest) {
     if (!query.success) {
       return validationFailed(query.error.flatten().fieldErrors);
     }
-    const profileId = query.data.profile_id;
+    const userId = query.data.user_id;
 
     let catalog;
     try {
-      catalog = await loadServerEquipmentCatalog();
+      catalog = await loadEquipmentCatalog();
     } catch (error) {
       console.error("[onboarding-equipment-status] catalog error:", error);
       return NextResponse.json(
-        { success: false, message: "Equipment catalog is misconfigured" },
+        { success: false, message: "Could not load the equipment catalog" },
         { status: 500 }
       );
     }
 
     const [issues, acks] = await Promise.all([
       dFetch(
-        `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(`equipment:issue:${profileId}:`)}&limit=100`
+        `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(`equipment:issue:${userId}:`)}&limit=100`
       ) as Promise<{ data?: AckLogRow[] }>,
       dFetch(
-        `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(`equipment:ack:${profileId}:`)}&limit=100`
+        `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(`equipment:ack:${userId}:`)}&limit=100`
       ) as Promise<{ data?: AckLogRow[] }>,
     ]);
     const issueRows = Array.isArray(issues?.data) ? issues.data : [];
@@ -69,14 +68,14 @@ export async function GET(req: NextRequest) {
     >();
     for (const row of issueRows) {
       const parsed = parseEquipmentDocRef(row.doc_ref);
-      if (!parsed || parsed.profileId !== profileId) continue;
+      if (!parsed || parsed.userId !== userId) continue;
       const slot = byItem.get(parsed.itemKey) ?? { issue: null, ack: null };
       slot.issue = row;
       byItem.set(parsed.itemKey, slot);
     }
     for (const row of ackRows) {
       const parsed = parseEquipmentDocRef(row.doc_ref);
-      if (!parsed || parsed.profileId !== profileId) continue;
+      if (!parsed || parsed.userId !== userId) continue;
       const slot = byItem.get(parsed.itemKey) ?? { issue: null, ack: null };
       const prevAt = slot.ack?.acknowledged_at ?? "";
       const nextAt = row.acknowledged_at ?? "";
@@ -86,7 +85,7 @@ export async function GET(req: NextRequest) {
 
     const docRefs = [...issueRows, ...ackRows].map((r) => r.doc_ref);
     const states = buildEquipmentItemStates(
-      profileId,
+      userId,
       catalog.map((c) => ({ key: c.key, required: c.required })),
       docRefs
     );
@@ -106,14 +105,13 @@ export async function GET(req: NextRequest) {
         acked: state?.acked ?? false,
         ackedAt: slot?.ack?.acknowledged_at ?? null,
         ackedBy: slot?.ack?.signer ?? null,
-        ackMethod: slot?.ack?.method ?? null,
       };
     });
 
     return NextResponse.json({
       success: true,
       data: {
-        profileId,
+        userId,
         items,
         fullyEquipped: isFullyEquipped(states),
       },

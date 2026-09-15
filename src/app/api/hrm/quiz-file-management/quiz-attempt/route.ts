@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { gradeAnswers, persistGradedAttempt, type AnswerInput } from "@/modules/human-resource-management/quiz-file-management/utils/grading";
 import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -120,7 +121,6 @@ export async function POST(req: NextRequest) {
                     body: JSON.stringify({
                         quiz_score: outcome.score,
                         quiz_passed: outcome.passed,
-                        status: "Quiz Completed",
                     }),
                 });
             } catch (writeBackErr) {
@@ -130,6 +130,16 @@ export async function POST(req: NextRequest) {
                     writeBackErr
                 );
             }
+
+            // Quiz completion advances the applicant's single status truth
+            // (`application.status` was dropped). Only the shared status
+            // service may write `applicant.status`; a disallowed transition
+            // (e.g. the applicant is not yet `submitted`) surfaces its coded
+            // error to the caller instead of being bypassed.
+            await setApplicantStatus({
+                applicantId: applicant_id,
+                status: "quiz_completed",
+            });
             // Linear flow: auto-materialize a Pending Initial row (sheetless)
             // so Grade always links to a real row. Guard: skip when an
             // ungraded Initial already exists for the app (double-submit safe).

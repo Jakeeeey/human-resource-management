@@ -18,11 +18,9 @@ import { useTrainingAssignmentFetch } from "../providers/trainingAssignmentProvi
 // view + assignment-scoped routes.
 
 export function TrainingOverviewTab({
-  profileId,
-  employeeId,
+  userId,
 }: {
-  profileId?: number;
-  employeeId?: number;
+  userId?: number;
 }): React.ReactNode {
   const { assigned, inProgress, completed, overdueIds, isLoading, isError } =
     useTrainingAssignments();
@@ -39,15 +37,14 @@ export function TrainingOverviewTab({
       setFormError("Enter a valid quiz id.");
       return;
     }
-    if (profileId === undefined || employeeId === undefined) {
-      setFormError("A hire (profile + employee) is required to assign training.");
+    if (userId === undefined) {
+      setFormError("An employee is required to assign training.");
       return;
     }
     setAssigning(true);
     try {
       await createAssignment({
-        profile_id: profileId,
-        employee_id: employeeId,
+        user_id: userId,
         quiz_id: parsedQuiz,
         due: due.trim() === "" ? null : due.trim(),
       });

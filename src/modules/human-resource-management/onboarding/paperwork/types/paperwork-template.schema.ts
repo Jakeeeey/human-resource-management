@@ -4,8 +4,8 @@ import { z } from "zod";
 //
 // PDF-ONLY (owner order 2026-09-09 — the HTML/Quill path is removed):
 // every template is an admin-uploaded PDF (`pdf_file` UUID) with click-drag
-// zones. `body_html` stays a tolerated string on reads (legacy column) but is
-// never written and never rendered. `source` writes only "pdf".
+// zones. The `body_html` column was dropped in Directus and is gone from
+// writes and reads; `source` writes only "pdf".
 // Zone rule is EXACTLY the Todo 6 contract: `template_id → zones[] {id, page,
 // rect{x,y,w,h} fractions, required}` — rect lives in template FRACTIONS
 // (0..1, resolution-independent) so Todo 7 can map ink points from any bitmap
@@ -26,13 +26,16 @@ export const PaperworkZoneRectSchema = z
 export type PaperworkZoneRect = z.infer<typeof PaperworkZoneRectSchema>;
 
 // One admin-marked zone on a template page (page is 1-based, matching the
-// SigningInk page numbering from `signing/signingStrokes.ts`).
+// SigningInk page numbering from `signing/signingStrokes.ts`). `label` is a
+// display-only rename (ids stay stable for validity + envelopes); blank or
+// absent falls back to the id everywhere.
 export const PaperworkZoneSchema = z
   .object({
     id: z.string().min(1).max(64),
     page: z.number().int().positive(),
     rect: PaperworkZoneRectSchema,
     required: z.boolean(),
+    label: z.string().max(64).optional(),
   })
   .strict();
 
@@ -50,9 +53,7 @@ export type PaperworkTemplateSource = z.infer<
 
 export const PaperworkTemplateSchema = z.object({
   id: z.number().int().positive(),
-  company_key: z.string(),
   title: z.string(),
-  body_html: z.string(),
   zones: z.array(PaperworkZoneSchema),
   is_active: z.boolean(),
   source: PaperworkTemplateSourceSchema,
@@ -65,13 +66,13 @@ export const PaperworkTemplateSchema = z.object({
 
 export type PaperworkTemplate = z.infer<typeof PaperworkTemplateSchema>;
 
-// POST body: PDF-only. `pdf_file` UUID required; `body_html` is accepted but
-// ignored (legacy column, always stored as ""); zones default to [].
+// POST body: PDF-only. `pdf_file` UUID required. (The dropped `body_html`
+// and `company_key` columns are neither accepted nor written — company
+// scoping lives in the `paperwork_template_companies` junction, written via
+// the dedicated `[id]/companies` replace route, never as arrays in cells.)
 const CreatePaperworkTemplateBase = z
   .object({
-    company_key: z.string().min(1, "Company key is required"),
     title: z.string().min(1, "Title is required"),
-    body_html: z.string().optional(),
     zones: PaperworkZonesSchema.optional(),
     is_active: z.boolean().optional(),
     source: PaperworkTemplateSourceSchema.optional(),
@@ -106,14 +107,10 @@ export type CreatePaperworkTemplateInput = z.infer<
   typeof CreatePaperworkTemplateSchema
 >;
 
-// PATCH body: partial update; at least one key. `body_html` is accepted but
-// ignored (legacy). Cross-kind coherence is gone — every template is PDF:
-// a provided `source` must be "pdf" and the resolved row must keep a file.
+// PATCH body: partial update; at least one key.
 export const UpdatePaperworkTemplateSchema = z
   .object({
-    company_key: z.string().min(1).optional(),
     title: z.string().min(1).optional(),
-    body_html: z.string().optional(),
     zones: PaperworkZonesSchema.optional(),
     is_active: z.boolean().optional(),
     source: PaperworkTemplateSourceSchema.optional(),

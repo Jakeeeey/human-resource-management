@@ -2,66 +2,42 @@
 
 import { useVerificationQueue } from "../hooks/useVerificationQueue";
 import { VerificationQueueTable } from "./VerificationQueueTable";
-import { AckDialog, ReturnDialog } from "./VerificationDialogs";
-import { AcknowledgementTrailDialog } from "./AcknowledgementTrailDialog";
+import { ReturnDialog } from "./VerificationDialogs";
+import { DocumentDetailsDialog } from "./DocumentDetailsDialog";
+import { DocumentPreviewDialog } from "./DocumentPreviewDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
 // VerificationTab.tsx — hub Verification tab body (Todo 10): pending →
-// approved | returned-for-resubmit queue with acknowledgement trail. Toolbar
-// (counts + refresh with error-retry), queue table, return/ack dialogs, trail
-// dialog. HR-only; the hiree portal is Todo 9 and lives elsewhere.
+// approved | returned-for-resubmit queue. Document queue table, per-document
+// return dialog, document preview + details dialogs. HR-only; the hiree portal
+// is Todo 9 and lives elsewhere.
 
-function dialogKey(prefix: string, dialog: { kind: string; row?: { profile: { id: number } } }): string {
-  return dialog.kind === prefix
-    ? `${prefix}-${dialog.row?.profile.id ?? 0}`
-    : `${prefix}-closed`;
-}
-
-export function VerificationTab() {
+/**
+ * @param userId - The canonical selected hire from the workspace route; the
+ * surface renders ONLY this employee's documents verification state.
+ */
+export function VerificationTab({ userId }: { userId: number }) {
   const {
     rows,
-    counts,
     isLoading,
     isError,
     error,
-    refetch,
     dialog,
+    preview,
     working,
     openReturn,
-    openAck,
-    openTrail,
+    openPreview,
+    openDetails,
     closeDialog,
-    closeTrail,
-    approve,
-    submitReturn,
-    resubmit,
-    submitAck,
-    trail,
-    retryTrail,
-  } = useVerificationQueue();
+    closeDetails,
+    closePreview,
+    approveDocument,
+    returnDocument,
+  } = useVerificationQueue(userId);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {counts.pending} pending · {counts.returned} returned ·{" "}
-          {counts.approved} approved
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            variant="outline"
-            onClick={() => void refetch()}
-            disabled={isLoading}
-            className="w-full sm:w-auto"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
       {isError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -75,42 +51,49 @@ export function VerificationTab() {
       <VerificationQueueTable
         rows={rows}
         isLoading={isLoading}
-        working={working}
-        onApprove={(r) => void approve(r)}
-        onReturn={openReturn}
-        onResubmit={(r) => void resubmit(r)}
-        onRecordAck={openAck}
-        onTrail={openTrail}
+        onPreview={openPreview}
+        onViewDetails={openDetails}
       />
 
       <ReturnDialog
-        key={dialogKey("return", dialog)}
+        key={
+          dialog.kind === "return"
+            ? `return-${dialog.row.userId}-${dialog.doc.docKey}`
+            : "return-closed"
+        }
         open={dialog.kind === "return"}
         row={dialog.kind === "return" ? dialog.row : null}
+        doc={dialog.kind === "return" ? dialog.doc : null}
         working={working}
         onClose={closeDialog}
-        onSubmit={(r, reason) => void submitReturn(r, reason)}
+        onSubmit={(r, d, reason) => void returnDocument(r, d, reason)}
       />
 
-      <AckDialog
-        key={dialogKey("ack", dialog)}
-        open={dialog.kind === "ack"}
-        row={dialog.kind === "ack" ? dialog.row : null}
+      <DocumentPreviewDialog
+        key={
+          preview
+            ? `preview-${preview.row.userId}-${preview.doc.docKey}`
+            : "preview-closed"
+        }
+        open={preview !== null}
+        doc={preview?.doc ?? null}
+        onClose={closePreview}
+      />
+
+      <DocumentDetailsDialog
+        key={
+          dialog.kind === "details"
+            ? `details-${dialog.row.userId}-${dialog.doc.docKey}`
+            : "details-closed"
+        }
+        open={dialog.kind === "details"}
+        row={dialog.kind === "details" ? dialog.row : null}
+        doc={dialog.kind === "details" ? dialog.doc : null}
         working={working}
-        onClose={closeDialog}
-        onSubmit={(r, signer, method) => void submitAck(r, signer, method)}
-      />
-
-      <AcknowledgementTrailDialog
-        open={dialog.kind === "trail"}
-        row={dialog.kind === "trail" ? dialog.row : null}
-        docRef={trail.docRef}
-        logs={trail.logs}
-        isLoading={trail.isLoading}
-        isError={trail.isError}
-        errorMessage={trail.error?.message ?? null}
-        onRetry={() => void retryTrail()}
-        onClose={closeTrail}
+        onPreview={openPreview}
+        onApprove={(r, d) => void approveDocument(r, d)}
+        onReturn={openReturn}
+        onClose={closeDetails}
       />
     </div>
   );

@@ -5,6 +5,7 @@ import type { TakingQuestion } from "../types";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import Image from "next/image";
 
 interface QuestionCardProps {
@@ -14,7 +15,12 @@ interface QuestionCardProps {
     timeRemainingSeconds: number | null;
     value: string[];
     onChange: (answers: string[]) => void;
+    /** Per-question answered flags, indexed by question position. */
+    answeredFlags: boolean[];
 }
+
+/** At or below this many questions we render the compact dot trail; above it a bar. */
+const MAX_DOTS = 8;
 
 function formatTime(totalSeconds: number): string {
     const m = Math.floor(totalSeconds / 60);
@@ -29,34 +35,81 @@ export function QuestionCard({
     timeRemainingSeconds,
     value,
     onChange,
+    answeredFlags,
 }: QuestionCardProps) {
     const isChoiceType =
         question.question_type === "true_false" || question.question_type === "multiple_choice";
     const isFillInTheBlank = question.question_type === "fill_in_the_blank";
 
+    const answeredCount = answeredFlags.filter(Boolean).length;
+    const timerState =
+        timeRemainingSeconds == null
+            ? "normal"
+            : timeRemainingSeconds <= 30
+              ? "critical"
+              : timeRemainingSeconds <= 120
+                ? "warning"
+                : "normal";
+
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-1.5">
-                    {Array.from({ length: total }, (_, i) => (
-                        <span
-                            key={i}
-                            className={`h-2 w-2 rounded-full ${
-                                i <= index ? "bg-primary" : "bg-muted"
-                            }`}
-                        />
-                    ))}
-                </div>
-                <div className="flex items-center gap-4 shrink-0">
-                    <span className="text-sm text-muted-foreground">
-                        Question {index + 1} of {total}
-                    </span>
-                    {timeRemainingSeconds != null && (
-                        <span className="text-sm font-medium tabular-nums">
-                            {formatTime(timeRemainingSeconds)}
-                        </span>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                    {total <= MAX_DOTS ? (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {answeredFlags.map((isAnswered, i) => (
+                                <span
+                                    key={i}
+                                    title={`Question ${i + 1}: ${
+                                        isAnswered ? "answered" : "not answered"
+                                    }`}
+                                    aria-label={`Question ${i + 1} ${
+                                        isAnswered ? "answered" : "not answered"
+                                    }`}
+                                    className={cn(
+                                        "h-2 w-2 rounded-full transition-colors",
+                                        i === index
+                                            ? "bg-primary ring-2 ring-primary/40 ring-offset-1 ring-offset-background"
+                                            : isAnswered
+                                              ? "bg-primary/60"
+                                              : "bg-muted"
+                                    )}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="h-2 w-40 max-w-[40%] overflow-hidden rounded-full bg-muted">
+                            <div
+                                className="h-full rounded-full bg-primary transition-all"
+                                style={{
+                                    width: `${total ? (answeredCount / total) * 100 : 0}%`,
+                                }}
+                            />
+                        </div>
                     )}
+                    <div className="flex items-center gap-4 shrink-0">
+                        <span className="text-sm text-muted-foreground">
+                            Question {index + 1} of {total}
+                        </span>
+                        {timeRemainingSeconds != null && (
+                            <span className="flex items-center gap-1.5 text-sm">
+                                <span className="text-muted-foreground">Time left</span>
+                                <span
+                                    className={cn(
+                                        "font-medium tabular-nums",
+                                        timerState === "critical" && "text-destructive",
+                                        timerState === "warning" && "text-amber-600 dark:text-amber-500"
+                                    )}
+                                >
+                                    {formatTime(timeRemainingSeconds)}
+                                </span>
+                            </span>
+                        )}
+                    </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                    {answeredCount} of {total} answered
+                </p>
             </div>
 
             <div className="space-y-4">
@@ -84,11 +137,17 @@ export function QuestionCard({
                                 question.question_type === "multiple_choice"
                                     ? `${String.fromCharCode(65 + i)}.`
                                     : null;
+                            const selected = value[0] === String(choice.id);
                             return (
                                 <div
                                     key={choice.id}
                                     onClick={() => onChange([String(choice.id)])}
-                                    className="flex cursor-pointer items-center gap-3 rounded-md border p-3"
+                                    className={cn(
+                                        "flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors",
+                                        selected
+                                            ? "border-primary bg-accent"
+                                            : "hover:bg-accent/50"
+                                    )}
                                 >
                                     <RadioGroupItem
                                         value={String(choice.id)}

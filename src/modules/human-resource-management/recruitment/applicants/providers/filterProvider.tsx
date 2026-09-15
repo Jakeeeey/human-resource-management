@@ -1,15 +1,12 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback } from "react";
-import type { ApplicantFilters } from "../types";
-import type { APPLICANT_STAGE } from "../lib/deriveApplicantStage";
-
-type ApplicantStage = (typeof APPLICANT_STAGE)[number];
+import type { ApplicantFilters, ApplicantStatus } from "../types";
 
 interface ApplicantFilterContextType {
     filters: ApplicantFilters;
     updateSearch: (search: string) => void;
-    updateStage: (stage: ApplicantStage | null) => void;
+    updateStatus: (status: ApplicantStatus | null) => void;
     resetFilters: () => void;
 }
 
@@ -17,7 +14,7 @@ const ApplicantFilterContext = createContext<ApplicantFilterContextType | undefi
 
 const DEFAULT_FILTERS: ApplicantFilters = {
     search: "",
-    stage: null,
+    status: null,
 };
 
 export function ApplicantFilterProvider({
@@ -31,8 +28,8 @@ export function ApplicantFilterProvider({
         setFilters((p) => ({ ...p, search }));
     }, []);
 
-    const updateStage = useCallback((stage: ApplicantStage | null) => {
-        setFilters((p) => ({ ...p, stage }));
+    const updateStatus = useCallback((status: ApplicantStatus | null) => {
+        setFilters((p) => ({ ...p, status }));
     }, []);
 
     const resetFilters = useCallback(() => {
@@ -41,7 +38,7 @@ export function ApplicantFilterProvider({
 
     return React.createElement(
         ApplicantFilterContext.Provider,
-        { value: { filters, updateSearch, updateStage, resetFilters } },
+        { value: { filters, updateSearch, updateStatus, resetFilters } },
         children
     );
 }

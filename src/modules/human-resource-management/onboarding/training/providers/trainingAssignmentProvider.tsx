@@ -56,8 +56,7 @@ interface TrainingAssignmentFetchContextType {
   error: Error | null;
   refetch: () => Promise<void>;
   createAssignment: (data: {
-    profile_id: number;
-    employee_id: number;
+    user_id: number;
     quiz_id: number;
     due?: string | null;
     application_id?: number | null;
@@ -90,12 +89,10 @@ function throwIfFailed(res: Response, body: TrainingTakingResponse): void {
 
 export function TrainingAssignmentFetchProvider({
   children,
-  employeeId,
-  profileId,
+  userId,
 }: {
   children: React.ReactNode;
-  employeeId?: number;
-  profileId?: number;
+  userId?: number;
 }): React.ReactNode {
   const [assignments, setAssignments] = useState<TrainingTakingAssignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,8 +104,7 @@ export function TrainingAssignmentFetchProvider({
       setIsLoading(true);
       setIsError(false);
       const params = new URLSearchParams();
-      if (employeeId !== undefined) params.set("employee_id", String(employeeId));
-      if (profileId !== undefined) params.set("profile_id", String(profileId));
+      if (userId !== undefined) params.set("user_id", String(userId));
       const suffix = params.size > 0 ? `?${params.toString()}` : "";
       const res = await fetch(`${BASE}${suffix}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Fetch failed");
@@ -120,7 +116,7 @@ export function TrainingAssignmentFetchProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [employeeId, profileId]);
+  }, [userId]);
 
   useEffect(() => {
     void fetchData();
@@ -128,8 +124,7 @@ export function TrainingAssignmentFetchProvider({
 
   const createAssignment = useCallback(
     async (data: {
-      profile_id: number;
-      employee_id: number;
+      user_id: number;
       quiz_id: number;
       due?: string | null;
       application_id?: number | null;

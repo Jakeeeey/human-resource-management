@@ -6,9 +6,10 @@ export const dynamic = "force-dynamic";
 // POST /api/hrm/onboarding/paperwork-templates/upload — Task 16 admin PDF
 // intake for file-backed templates. PDF-only (415 otherwise, mime + magic
 // bytes — a client `accept` hint alone is never trusted), 10MB cap (413),
-// filed into the `paperwork_files` Directus folder, returning the file UUID
-// the registry persists as `pdf_file`. Folder + cap flow mirrors
-// `employee-master-list/upload` (metadata-before-binary ordering included);
+// filed into the `paperwork_files` Directus folder (created on first use —
+// the get-or-create flow mirrors `application-form/upload`, as does the
+// metadata-before-binary ordering), returning the file UUID the registry
+// persists as `pdf_file`. The 10MB cap mirrors `employee-master-list/upload`;
 // the mime gate mirrors the `application-form/upload` kind canon.
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const PDF_MIME = "application/pdf";
@@ -63,23 +64,33 @@ export async function POST(req: NextRequest) {
         `${DIRECTUS_URL}/folders?filter[name][_eq]=${FOLDER_NAME}&fields=id`,
         { headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {} }
       );
-      if (folderRes.ok) {
-        const folderData = (await folderRes.json()) as {
-          data?: { id?: string }[];
-        };
-        if (folderData.data && folderData.data.length > 0) {
-          folderId = folderData.data[0].id;
-        } else {
-          console.warn(`[paperwork-upload] Folder "${FOLDER_NAME}" not found in Directus.`);
+      const folderData = folderRes.ok
+        ? ((await folderRes.json()) as { data?: { id?: string }[] })
+        : null;
+      folderId = folderData?.data?.[0]?.id;
+
+      if (!folderId) {
+        const createRes = await fetch(`${DIRECTUS_URL}/folders`, {
+          method: "POST",
+          headers: {
+            ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name: FOLDER_NAME }),
+        });
+        const created = (await createRes.json().catch(() => null)) as {
+          data?: { id?: string };
+        } | null;
+        folderId = created?.data?.id;
+        if (!folderId) {
+          console.error(
+            `[paperwork-upload] Could not create folder "${FOLDER_NAME}":`,
+            created
+          );
         }
-      } else {
-        console.error(
-          `[paperwork-upload] Failed to fetch folder "${FOLDER_NAME}":`,
-          await folderRes.text()
-        );
       }
     } catch (err) {
-      console.error(`[paperwork-upload] Error fetching folder "${FOLDER_NAME}":`, err);
+      console.error(`[paperwork-upload] Error resolving folder "${FOLDER_NAME}":`, err);
     }
 
     // Metadata fields MUST come BEFORE the file binary — Directus processes

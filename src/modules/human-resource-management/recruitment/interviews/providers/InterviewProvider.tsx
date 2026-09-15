@@ -23,6 +23,7 @@ export interface EligibleInitialRow {
     submitted_at: string | null;
     full_name: string;
     latestInitialVerdict: string | null;
+    latestComposite: number | null;
     quiz_attempt_id: number | null;
     quiz_attempt_percentage: number | null;
     quiz_attempt_passed: boolean | null;

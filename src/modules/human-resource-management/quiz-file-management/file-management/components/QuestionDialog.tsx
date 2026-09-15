@@ -544,7 +544,7 @@ export function QuestionDialog({
 
                         {questionType === "identification" && (
                             <FormItem>
-                                <FormLabel>Correct Answer(s)</FormLabel>
+                                <FormLabel>Accepted answers</FormLabel>
                                 <FormDescription>
                                     Add every accepted variant -- e.g. &quot;Manila&quot; and
                                     &quot;City of Manila&quot; can both be marked correct.

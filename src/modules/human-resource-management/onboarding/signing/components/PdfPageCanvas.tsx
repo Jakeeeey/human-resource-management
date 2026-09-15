@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  isPdfRenderCancelled,
   renderPdfPageToCanvas,
   type PdfNaturalSize,
   type SigningPdfDocument,
@@ -12,6 +14,9 @@ import {
 // bitmap at exactly `targetWidth` px (height follows page aspect, never
 // stretched). The reported bitmap size drives the InkCanvas bitmap plus the
 // validity pageSizes upstream, so ink and PDF share ONE pixel grid.
+//
+// Render failures degrade to a human message + "Retry page" (never the raw
+// pdf.js string as the only affordance) — a cancelled render is ignored.
 //
 // Literal discipline: zero affirmative-boolean tokens in this file (see pdfDocument.ts).
 
@@ -28,7 +33,7 @@ type PageState =
   | { kind: "waiting" }
   | { kind: "painting" }
   | { kind: "ready"; aspect: string }
-  | { kind: "refused"; reason: string };
+  | { kind: "refused"; reason: string; retryable: boolean };
 
 export function PdfPageCanvas({
   doc,
@@ -40,6 +45,7 @@ export function PdfPageCanvas({
 }: PdfPageCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [state, setState] = useState<PageState>({ kind: "waiting" });
+  const [attempt, setAttempt] = useState(1);
 
   useEffect(() => {
     let dropped = false;
@@ -49,12 +55,13 @@ export function PdfPageCanvas({
     if (beyondEnd) {
       setState({
         kind: "refused",
+        retryable: false,
         reason: `Page ${page} is beyond the end of the template PDF`,
       });
       return markDropped;
     }
     if (docError !== null) {
-      setState({ kind: "refused", reason: docError });
+      setState({ kind: "refused", retryable: false, reason: docError });
       return markDropped;
     }
     if (!doc) {
@@ -63,7 +70,11 @@ export function PdfPageCanvas({
     }
     const canvas = canvasRef.current;
     if (!canvas) {
-      setState({ kind: "refused", reason: `Page ${page} canvas missing` });
+      setState({
+        kind: "refused",
+        retryable: false,
+        reason: `Page ${page} canvas missing`,
+      });
       return markDropped;
     }
     setState({ kind: "painting" });
@@ -77,9 +88,10 @@ export function PdfPageCanvas({
         });
       })
       .catch((err: unknown) => {
-        if (dropped) return;
+        if (dropped || isPdfRenderCancelled(err)) return;
         setState({
           kind: "refused",
+          retryable: true,
           reason:
             err instanceof Error
               ? err.message
@@ -89,20 +101,36 @@ export function PdfPageCanvas({
     return markDropped;
     // onNaturalSize is a stable callback from the surface (size cache write).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, docError, page, beyondEnd, targetWidth]);
+  }, [doc, docError, page, beyondEnd, targetWidth, attempt]);
 
   if (state.kind === "refused") {
     return (
       <div
-        className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden p-5"
+        className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 overflow-hidden bg-card/95 p-5"
         role="alert"
       >
         <p
           className="max-w-[420px] truncate text-center text-xs text-muted-foreground"
           title={state.reason}
         >
-          {state.reason}
+          {state.retryable
+            ? `Page ${page} did not render.`
+            : `Page ${page} cannot be shown.`}
         </p>
+        {state.retryable && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-8"
+            onClick={() => {
+              setState({ kind: "waiting" });
+              setAttempt((count) => count + 1);
+            }}
+          >
+            Retry page
+          </Button>
+        )}
       </div>
     );
   }

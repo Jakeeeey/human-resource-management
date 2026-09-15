@@ -1,36 +1,39 @@
 "use client";
 
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+
 import type {
   OrientationCheck,
+  OrientationEmployee,
+  OrientationRosterResponse,
   OrientationStateResponse,
   OrientationTopic,
 } from "../types/orientation.schema";
 
 // orientationProvider.tsx — client fetch layer for the orientation API
-// routes. Thin context provider mirroring the hub profileProvider shape:
-// state per hire (topics + checks + done predicate) + check-off + refetch
-// with loading/error flags.
-
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-} from "react";
+// routes. Employee-keyed (todo 20): the roster loads once, per-employee state
+// loads on selection, and check-off posts `{user_id, topic_id}` — no
+// `profile_id`, no client-asserted actor role.
 
 interface OrientationFetchContextType {
+  employees: OrientationEmployee[];
+  rosterLoading: boolean;
+  rosterError: Error | null;
   topics: OrientationTopic[];
   checks: OrientationCheck[];
   done: boolean;
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
-  loadHire: (profileId: number) => Promise<void>;
-  checkOff: (
-    profileId: number,
-    topicId: string,
-    role: "hr" | "department"
-  ) => Promise<void>;
+  loadEmployee: (userId: number) => Promise<void>;
+  checkOff: (userId: number, topicId: string) => Promise<void>;
+  refreshRoster: () => Promise<void>;
 }
 
 const OrientationFetchContext = createContext<
@@ -39,15 +42,14 @@ const OrientationFetchContext = createContext<
 
 const BASE = "/api/hrm/onboarding/orientation";
 
-async function readEnvelope(res: Response): Promise<OrientationStateResponse> {
-  return (await res.json().catch(() => null)) as OrientationStateResponse;
-}
-
 export function OrientationFetchProvider({
   children,
 }: {
   children: React.ReactNode;
 }): React.ReactNode {
+  const [employees, setEmployees] = useState<OrientationEmployee[]>([]);
+  const [rosterLoading, setRosterLoading] = useState(true);
+  const [rosterError, setRosterError] = useState<Error | null>(null);
   const [topics, setTopics] = useState<OrientationTopic[]>([]);
   const [checks, setChecks] = useState<OrientationCheck[]>([]);
   const [done, setDone] = useState(false);
@@ -55,43 +57,61 @@ export function OrientationFetchProvider({
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const applyState = useCallback((body: OrientationStateResponse) => {
-    setTopics(Array.isArray(body.data?.topics) ? body.data.topics : []);
-    setChecks(Array.isArray(body.data?.checks) ? body.data.checks : []);
-    setDone(body.data?.done === true);
+  const refreshRoster = useCallback(async () => {
+    try {
+      setRosterLoading(true);
+      setRosterError(null);
+      const res = await fetch(BASE, { cache: "no-store" });
+      const body = (await res
+        .json()
+        .catch(() => null)) as OrientationRosterResponse | null;
+      if (!res.ok || !body?.success) {
+        throw new Error(body?.message || "Roster fetch failed");
+      }
+      setEmployees(
+        Array.isArray(body.data?.employees) ? body.data.employees : []
+      );
+    } catch (err) {
+      setRosterError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setRosterLoading(false);
+    }
   }, []);
 
-  const loadHire = useCallback(
-    async (profileId: number) => {
-      try {
-        setIsLoading(true);
-        setIsError(false);
-        const res = await fetch(`${BASE}?profile_id=${profileId}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) throw new Error("Fetch failed");
-        const body = await readEnvelope(res);
-        applyState(body);
-      } catch (err) {
-        setIsError(true);
-        setError(err instanceof Error ? err : new Error(String(err)));
-      } finally {
-        setIsLoading(false);
+  useEffect(() => {
+    void refreshRoster();
+  }, [refreshRoster]);
+
+  const loadEmployee = useCallback(async (userId: number) => {
+    try {
+      setIsLoading(true);
+      setIsError(false);
+      const res = await fetch(`${BASE}?user_id=${userId}`, {
+        cache: "no-store",
+      });
+      const body = (await res
+        .json()
+        .catch(() => null)) as OrientationStateResponse | null;
+      if (!res.ok || !body?.success) {
+        throw new Error(body?.message || "Fetch failed");
       }
-    },
-    [applyState]
-  );
+      setTopics(Array.isArray(body.data?.topics) ? body.data.topics : []);
+      setChecks(Array.isArray(body.data?.checks) ? body.data.checks : []);
+      setDone(body.data?.done === true);
+    } catch (err) {
+      setIsError(true);
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const checkOff = useCallback(
-    async (profileId: number, topicId: string, role: "hr" | "department") => {
+    async (userId: number, topicId: string) => {
       const res = await fetch(`${BASE}/check`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile_id: profileId,
-          topic_id: topicId,
-          actor: { role },
-        }),
+        body: JSON.stringify({ user_id: userId, topic_id: topicId }),
       });
       const body = (await res.json().catch(() => null)) as {
         success?: boolean;
@@ -100,22 +120,26 @@ export function OrientationFetchProvider({
       if (!res.ok || !body?.success) {
         throw new Error(body?.message || "Check-off failed");
       }
-      await loadHire(profileId);
+      await loadEmployee(userId);
     },
-    [loadHire]
+    [loadEmployee]
   );
 
   return (
     <OrientationFetchContext.Provider
       value={{
+        employees,
+        rosterLoading,
+        rosterError,
         topics,
         checks,
         done,
         isLoading,
         isError,
         error,
-        loadHire,
+        loadEmployee,
         checkOff,
+        refreshRoster,
       }}
     >
       {children}
