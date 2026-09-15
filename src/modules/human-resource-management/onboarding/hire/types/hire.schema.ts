@@ -76,6 +76,7 @@ export const HIRE_ORCHESTRATOR_ERROR_CODES = {
   applicationNotFound: "HIRE_APPLICATION_NOT_FOUND",
   emailMissing: "HIRE_EMAIL_MISSING",
   positionMissing: "HIRE_POSITION_MISSING",
+  companyMissing: "HIRE_COMPANY_MISSING",
   userCreateFailed: "HIRE_USER_CREATE_FAILED",
   userVerifyFailed: "HIRE_USER_VERIFY_FAILED",
   stepFailed: "HIRE_STEP_FAILED",

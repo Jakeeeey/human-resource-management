@@ -58,11 +58,13 @@ const completionBodySchema = z
 const EmployeeRowSchema = z.object({
   user_id: z.number().int().positive(),
   user_email: z.string().nullable().optional(),
+  personal_email: z.string().nullable().optional(),
 });
 
 interface CompletionEmployee {
   user_id: number;
   user_email: string | null;
+  personal_email: string | null;
 }
 
 interface CompletionSnapshot {
@@ -87,7 +89,7 @@ function employeeNotFound(): NextResponse {
  */
 async function readEmployee(userId: number): Promise<CompletionEmployee | null> {
   const body: unknown = await dFetch(
-    `/items/user?filter[user_id][_eq]=${userId}&fields=user_id,user_email&limit=1`
+    `/items/user?filter[user_id][_eq]=${userId}&fields=user_id,user_email,personal_email&limit=1`
   );
   const parsed = z.object({ data: z.array(EmployeeRowSchema) }).safeParse(body);
   if (!parsed.success) {
@@ -97,11 +99,20 @@ async function readEmployee(userId: number): Promise<CompletionEmployee | null> 
   }
   const row = parsed.data.data[0];
   if (!row) return null;
-  const email =
+  const userEmail =
     typeof row.user_email === "string" && row.user_email.trim().length > 0
       ? row.user_email.trim()
       : null;
-  return { user_id: row.user_id, user_email: email };
+  const personalEmail =
+    typeof row.personal_email === "string" &&
+    row.personal_email.trim().length > 0
+      ? row.personal_email.trim()
+      : null;
+  return {
+    user_id: row.user_id,
+    user_email: userEmail,
+    personal_email: personalEmail,
+  };
 }
 
 /**
@@ -205,7 +216,8 @@ export async function POST(req: NextRequest) {
       "onboarding.completed",
       buildEmployeeCompletionDispatchCtx({
         userId,
-        toEmail: snapshot.employee.user_email,
+        toEmail:
+          snapshot.employee.personal_email ?? snapshot.employee.user_email,
       })
     ).catch(logRedacted);
 

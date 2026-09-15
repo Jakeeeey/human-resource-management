@@ -125,6 +125,7 @@ function JobOfferContent() {
                     setSelectedLogoId(def.id);
                     setForm((f) => ({
                         ...f,
+                        companyId: def.id,
                         companyName: def.company_name,
                         baseLocation: def.company_city?.trim() ? def.company_city : f.baseLocation,
                     }));
@@ -250,6 +251,7 @@ function JobOfferContent() {
         if (row)
             setForm((f) => ({
                 ...f,
+                companyId: id,
                 companyName: row.company_name,
                 baseLocation: row.company_city?.trim() ? row.company_city : f.baseLocation,
             }));
@@ -377,6 +379,7 @@ function JobOfferContent() {
                               terms_snapshot: form,
                               status: "sent",
                               signing_envelope_id: envelope.id,
+                              company_id: form.companyId,
                           }),
                       })
                     : await fetch("/api/hrm/onboarding/job-offer", {
@@ -388,6 +391,7 @@ function JobOfferContent() {
                               pdf_file: id,
                               terms_snapshot: form,
                               status: "sent",
+                              company_id: form.companyId,
                           }),
                       });
             const json = await res.json().catch(() => null);

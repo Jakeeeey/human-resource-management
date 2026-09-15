@@ -57,6 +57,7 @@ export const JobOfferStatusSchema = z.enum(JOB_OFFER_STATUS);
 export const JobOfferSchema = z.object({
   id: z.number().int().positive(),
   applicant_id: z.number().int().positive(),
+  company_id: z.number().int().positive().nullable(),
   signing_envelope_id: z.number().int().positive().nullable(),
   terms_snapshot: z.json(), // json | nullable — parsed JSON value (incl. null)
   pdf_file: z.string().nullable(),

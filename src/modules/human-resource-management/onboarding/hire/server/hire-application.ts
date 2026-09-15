@@ -9,6 +9,7 @@ import {
   type HireApplicationRow,
 } from "../types/hire.schema";
 import { philippineDate } from "./hire-time";
+import { extractEmailDomain } from "./hire-email";
 import type { SpringUserCreatePayload } from "@/modules/human-resource-management/shared/services/spring-user-service";
 
 // hire-application.ts — Directus reads + Spring payload mapping for the
@@ -128,6 +129,68 @@ export function resolveHirePosition(
     application.position_applied_for?.trim() ||
     applicant.position_applied_for?.trim();
   return position ? position : null;
+}
+
+const HireOfferCompanyRowSchema = z.object({
+  company_id: z.number().int().positive().nullable(),
+});
+
+/**
+ * Resolves the login email domain for a hire from the offer's company:
+ * the applicant's `job_offer.company_id` -> `company_list.company_email` ->
+ * the substring after `@`. The company is REQUIRED — a missing offer,
+ * company, or company_email domain fails with
+ * `HIRE_ORCHESTRATOR_ERROR_CODES.companyMissing` rather than guessing one.
+ * @param applicantId - Applicant row id.
+ * @returns The lowercased company email domain.
+ * @throws Error with `readFailed` on a Directus error body and `companyMissing`
+ * when the company/domain cannot be resolved.
+ */
+export async function readHireCompanyDomain(
+  applicantId: number
+): Promise<string> {
+  const offerBody: unknown = await dFetch(
+    `/items/job_offer?filter[applicant_id][_eq]=${applicantId}&fields=company_id&limit=1`
+  );
+  const offerError = directusErrorMessage(offerBody);
+  if (offerError) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: job offer for applicant ${applicantId} could not be read (${offerError})`
+    );
+  }
+  const offerRows = z
+    .array(HireOfferCompanyRowSchema)
+    .safeParse(unwrapData(offerBody));
+  const companyId = offerRows.success
+    ? (offerRows.data[0]?.company_id ?? null)
+    : null;
+  if (companyId === null) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.companyMissing}: applicant ${applicantId} has no job offer company to derive the login domain from`
+    );
+  }
+
+  const companyBody: unknown = await dFetch(
+    `/items/company_list/${companyId}?fields=company_email`
+  );
+  const companyError = directusErrorMessage(companyBody);
+  if (companyError) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: company ${companyId} could not be read (${companyError})`
+    );
+  }
+  const company = z
+    .object({ company_email: z.string().nullable() })
+    .safeParse(unwrapData(companyBody));
+  const domain = extractEmailDomain(
+    company.success ? company.data.company_email : null
+  );
+  if (!domain) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.companyMissing}: company ${companyId} for applicant ${applicantId} has no company_email domain`
+    );
+  }
+  return domain;
 }
 
 const PASSWORD_LASTNAME_FALLBACK = "employee";
@@ -252,6 +315,7 @@ export function buildHirePassword(lastName: string): string {
  * @param application - Linked application row (email + position pre-validated).
  * @param applicant - Applicant row (name fallback).
  * @param position - Resolved position string.
+ * @param loginEmail - The generated company login address Spring creates.
  * @param recruitment - Committed department/position, when resolvable.
  * @returns The payload consumed by `createSpringUser`.
  */
@@ -259,12 +323,15 @@ export function buildSpringUserPayload(
   application: HireApplicationRow,
   applicant: HireApplicantRow,
   position: string,
+  loginEmail: string,
   recruitment: HireRecruitmentProfile = EMPTY_RECRUITMENT_PROFILE
 ): SpringUserCreatePayload {
   const lastName = application.last_name?.trim() || "";
   const password = buildHirePassword(lastName);
+  const personalEmail = (application.email ?? "").trim();
   return {
-    email: (application.email ?? "").trim(),
+    email: loginEmail,
+    personalEmail: personalEmail || undefined,
     hashPassword: password,
     userPassword: password,
     password,

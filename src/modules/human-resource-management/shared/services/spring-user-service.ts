@@ -22,6 +22,7 @@
  */
 export interface SpringUserCreatePayload {
   email: string;
+  personalEmail?: string;
   hashPassword: string;
   userPassword: string;
   password: string;
