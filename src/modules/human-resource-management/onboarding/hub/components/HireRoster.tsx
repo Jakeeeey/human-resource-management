@@ -144,6 +144,7 @@ export function HireRoster() {
         rows={filtered}
         activeRow={activeRow}
         onSelect={handleSelect}
+        unfilteredCount={rows.length}
       />
 
       <HireRosterPanel

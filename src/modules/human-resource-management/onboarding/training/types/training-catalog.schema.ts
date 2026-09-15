@@ -4,9 +4,13 @@ import { z } from "zod";
 // Templates" catalog (per-department, on-site live training), mirroring the
 // LIVE Directus tables EXACTLY:
 //
-//   onboarding_training_template — a per-department (or global) template; a
-//                                  null `department_id` is the GLOBAL template
-//                                  that applies to every department
+//   onboarding_training_template — a template's legacy single `department_id`;
+//                                  null is the GLOBAL template. Kept as a
+//                                  migration-safe fallback read/write column.
+//   onboarding_training_template_department — the junction that carries a
+//                                  template's full department set (no Directus
+//                                  relation; rows read by `template_id`). An
+//                                  EMPTY set is the GLOBAL template.
 //   onboarding_training_item     — one on-site training item inside a template
 //
 // Flag semantics are COPIED from `onboarding-task.schema.ts` (never shared, so
@@ -41,6 +45,22 @@ export const TrainingTemplateSchema = z.object({
 
 export type TrainingTemplate = z.infer<typeof TrainingTemplateSchema>;
 
+export const TrainingTemplateDepartmentSchema = z.object({
+  id: z.number().int().positive(),
+  template_id: z.number().int().positive(),
+  department_id: z.number().int().positive(),
+});
+
+export type TrainingTemplateDepartment = z.infer<
+  typeof TrainingTemplateDepartmentSchema
+>;
+
+export const TrainingTemplateViewSchema = TrainingTemplateSchema.extend({
+  department_ids: z.array(z.number().int().positive()),
+});
+
+export type TrainingTemplateView = z.infer<typeof TrainingTemplateViewSchema>;
+
 export const TrainingItemSchema = z.object({
   id: z.number().int().positive(),
   template_id: z.number().int().positive(),
@@ -63,7 +83,7 @@ export const CreateTrainingTemplateSchema = z
     code: z.string().trim().min(1).max(64),
     title: z.string().trim().min(1).max(255),
     description: z.string().nullable().optional(),
-    department_id: z.number().int().positive().nullable().optional(),
+    department_ids: z.array(z.number().int().positive()).optional(),
   })
   .strict();
 
@@ -71,7 +91,7 @@ export const UpdateTrainingTemplateSchema = z
   .object({
     title: z.string().trim().min(1).max(255).optional(),
     description: z.string().nullable().optional(),
-    department_id: z.number().int().positive().nullable().optional(),
+    department_ids: z.array(z.number().int().positive()).optional(),
     is_active: z.boolean().optional(),
   })
   .strict();

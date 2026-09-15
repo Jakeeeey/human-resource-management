@@ -9,6 +9,7 @@ import {
   buildSpringUserPayload,
   readHireApplicant,
   readHireApplicationByApplicant,
+  readHireRecruitmentProfile,
   resolveHireEmail,
   resolveHirePosition,
 } from "./hire-application";
@@ -144,7 +145,13 @@ export async function runHireOrchestrator(
       );
     }
 
-    const payload = buildSpringUserPayload(application, applicant, position);
+    const recruitment = await readHireRecruitmentProfile(applicantId);
+    const payload = buildSpringUserPayload(
+      application,
+      applicant,
+      position,
+      recruitment
+    );
     const resolved = await resolveHireUser({ email, payload, authToken });
     resolvedUserId = resolved.userId;
 

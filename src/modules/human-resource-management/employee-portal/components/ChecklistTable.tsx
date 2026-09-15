@@ -154,6 +154,12 @@ export function ChecklistTable({
 }: ChecklistTableProps) {
   const required = items.filter((item) => item.required);
   const filedRequired = required.filter((item) => item.filed).length;
+  const approvedRequired = required.filter(
+    (item) => item.filed && item.state === "approved"
+  ).length;
+  const needsResubmission = required.filter(
+    (item) => item.filed && item.state === "returned"
+  ).length;
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -171,7 +177,14 @@ export function ChecklistTable({
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          {filedRequired} of {required.length} required documents filed
+          {filedRequired} of {required.length} required documents filed ·{" "}
+          {approvedRequired} approved
+          {needsResubmission > 0 && (
+            <span className="text-rose-600">
+              {" "}
+              · {needsResubmission} needs resubmission
+            </span>
+          )}
         </p>
         <Button
           variant="outline"

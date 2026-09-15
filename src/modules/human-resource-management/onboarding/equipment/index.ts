@@ -1,18 +1,12 @@
 export type {
   EquipmentIssuer,
-  EquipmentAckMethod,
-  EquipmentAckSigner,
   IssueEquipmentItemInput,
-  AcknowledgeEquipmentItemInput,
   EquipmentQuery,
   EquipmentRouteResponse,
 } from "./types/equipment-issue.schema";
 export {
   EquipmentIssuerSchema,
-  EquipmentAckMethodSchema,
-  EquipmentAckSignerSchema,
   IssueEquipmentItemSchema,
-  AcknowledgeEquipmentItemSchema,
   EquipmentQuerySchema,
 } from "./types/equipment-issue.schema";
 export type { EquipmentCatalogItem } from "./equipmentCatalog";

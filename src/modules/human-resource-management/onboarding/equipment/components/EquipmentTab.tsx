@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { hireeSigner } from "../equipmentPredicate";
 import {
   EquipmentFetchProvider,
   useEquipmentFetch,
 } from "../providers/equipmentProvider";
-import type { EquipmentAckMethod } from "../types/equipment-issue.schema";
 import { EquipmentIssueTable } from "./EquipmentIssueTable";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -17,26 +15,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { AlertCircle, PackageCheck } from "lucide-react";
 import { toast } from "sonner";
 
 // EquipmentTab.tsx — workspace Equipment section. Per-EMPLOYEE issue log over
-// the pdf §9 catalog (+ admin-config extras): HR issues per item, the employee
-// acknowledges per item (HR override allowed, both logged). FULLY_EQUIPPED
-// answers true only at full required ack. The employee is the canonical hire
-// from the route (`user_id`), so there is no hire picker here.
+// the pdf §9 catalog (+ admin-config extras): HR issues per item only —
+// acknowledgement is hiree-only and happens in the employee portal, so no ack
+// action lives here. FULLY_EQUIPPED answers true only at full required ack.
+// The employee is the canonical hire from the route (`user_id`), so there is
+// no hire picker here.
 //
 // BOUNDARY: asset assignment lives in Master List → EmployeeAssetsTab and
 // is NEVER written here — this log references handover, never assets.
-
-const ACK_METHODS: EquipmentAckMethod[] = ["ink", "stamp", "typed"];
 
 function EquipmentTabBody({ userId }: { userId: number }) {
   const {
@@ -46,9 +36,7 @@ function EquipmentTabBody({ userId }: { userId: number }) {
     error,
     refetch,
     issueItem,
-    acknowledgeItem,
   } = useEquipmentFetch();
-  const [ackMethod, setAckMethod] = useState<EquipmentAckMethod>("typed");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,23 +55,6 @@ function EquipmentTabBody({ userId }: { userId: number }) {
     }
   }
 
-  async function handleAcknowledge(itemKey: string) {
-    setPendingAction(`ack:${itemKey}`);
-    try {
-      await acknowledgeItem({
-        user_id: userId,
-        item_key: itemKey,
-        signer: hireeSigner(userId),
-        method: ackMethod,
-      });
-      toast.success("Acknowledgement recorded");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Acknowledge failed");
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -92,32 +63,6 @@ function EquipmentTabBody({ userId }: { userId: number }) {
             ? `Handover checklist — ${status.items.filter((i) => i.acked).length}/${status.items.length} items acknowledged`
             : "Equipment issue log"}
         </p>
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-          <span
-            id="equipment-ack-method-label"
-            className="text-xs text-muted-foreground"
-          >
-            Acknowledgement method
-          </span>
-          <Select
-            value={ackMethod}
-            onValueChange={(v) => setAckMethod(v as EquipmentAckMethod)}
-          >
-            <SelectTrigger
-              aria-labelledby="equipment-ack-method-label"
-              className="h-10 w-full sm:w-[140px]"
-            >
-              <SelectValue placeholder="Ack method" />
-            </SelectTrigger>
-            <SelectContent className="max-h-60">
-              {ACK_METHODS.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {status?.fullyEquipped && (
@@ -155,7 +100,6 @@ function EquipmentTabBody({ userId }: { userId: number }) {
             isLoading={isLoading}
             pendingAction={pendingAction}
             onIssue={(key) => void handleIssue(key)}
-            onAcknowledge={(key) => void handleAcknowledge(key)}
           />
         </CardContent>
       </Card>

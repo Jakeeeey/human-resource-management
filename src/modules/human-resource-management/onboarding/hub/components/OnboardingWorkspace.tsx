@@ -79,7 +79,10 @@ export function OnboardingWorkspace({
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-bold sm:text-4xl">
+              <h1
+                className="line-clamp-2 text-2xl font-bold sm:text-4xl"
+                title={title}
+              >
                 {title}
               </h1>
               {row ? (
@@ -99,14 +102,14 @@ export function OnboardingWorkspace({
             asChild
             variant="outline"
             size="sm"
-            className="w-full sm:w-auto"
+            className="min-h-11 w-full sm:w-auto md:min-h-0"
           >
             <Link href={`/hrm/onboarding?selected=${userId}`}>Back to hub</Link>
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="w-full sm:w-auto"
+            className="min-h-11 w-full sm:w-auto md:min-h-0"
             onClick={() => void refresh()}
             disabled={loading}
             aria-label="Refresh workspace"
@@ -128,7 +131,7 @@ export function OnboardingWorkspace({
             <TabsTrigger
               key={section.value}
               value={section.value}
-              className="shrink-0"
+              className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
             >
               {section.label}
             </TabsTrigger>

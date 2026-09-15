@@ -215,7 +215,9 @@ export interface ApplicationFormValues {
     middle_name: string;
     last_name: string;
     nickname: string;
-    address: string;
+    province: string;
+    city: string;
+    brgy: string;
     phone: string;
     email: string;
     birthdate: string;
@@ -272,7 +274,9 @@ export const DEFAULT_APPLICATION_FORM: ApplicationFormValues = {
     middle_name: "",
     last_name: "",
     nickname: "",
-    address: "",
+    province: "",
+    city: "",
+    brgy: "",
     phone: "",
     email: "",
     birthdate: "",
@@ -396,7 +400,9 @@ export interface SubmitApplicationPayload {
     middle_name: string | null;
     last_name: string;
     nickname: string | null;
-    address: string | null;
+    province: string;
+    city: string;
+    brgy: string;
     phone: string;
     email: string | null;
     birthdate: string;

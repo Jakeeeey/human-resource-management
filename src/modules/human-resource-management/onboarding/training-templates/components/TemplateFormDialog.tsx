@@ -1,23 +1,37 @@
 "use client";
 
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
 import {
-  RequirementFieldDialog,
-  type RequirementDialogField,
-} from "@/modules/human-resource-management/onboarding/requirements/components/RequirementFieldDialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 import { useTrainingTemplatesCatalog } from "../hooks/useTrainingTemplatesCatalog";
-import {
-  GLOBAL_DEPARTMENT_VALUE,
-  type TrainingTemplateRow,
-} from "../types/training-templates.schema";
+import type { TrainingTemplateRow } from "../types/training-templates.schema";
+import { MultiCombobox, type MultiComboboxOption } from "./MultiCombobox";
 
 // TemplateFormDialog.tsx — create/edit dialog for one training template.
-// Reuses the shared config-driven `RequirementFieldDialog` (text fields + the
-// department select); `is_active` is toggled from the template header, never
-// here, so the dialog never needs a boolean or a numeric field.
-//
-// `code` is immutable after create — the dialog renders it read-only in edit
-// mode (see `RequirementFieldDialog`).
+// `code` is immutable after create, so it renders read-only in edit mode. The
+// department picker is the multi-select combobox: ZERO picks means GLOBAL (the
+// template applies to every department) — never a sentinel chip, which would be
+// persisted to the junction as a fake department. `is_active` is toggled from
+// the template table, never here.
+
+export interface TrainingTemplateFormValues {
+  code: string;
+  title: string;
+  description: string;
+  /** Empty = GLOBAL. */
+  departmentIds: number[];
+}
 
 interface TemplateFormDialogProps {
   open: boolean;
@@ -25,13 +39,167 @@ interface TemplateFormDialogProps {
   /** null = create mode; a row = edit mode. */
   row: TrainingTemplateRow | null;
   onClose: () => void;
-  onSave: (values: Record<string, string>) => void;
+  onSave: (values: TrainingTemplateFormValues) => void;
+}
+
+function TemplateForm({
+  row,
+  saving,
+  onClose,
+  onSave,
+}: Omit<TemplateFormDialogProps, "open">) {
+  const { departments } = useTrainingTemplatesCatalog();
+  const isEdit = row !== null;
+  const [code, setCode] = useState(row?.code ?? "");
+  const [title, setTitle] = useState(row?.title ?? "");
+  const [description, setDescription] = useState(row?.description ?? "");
+  const [departmentValues, setDepartmentValues] = useState<string[]>(
+    (row?.department_ids ?? []).map(String)
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const departmentOptions: MultiComboboxOption[] = departments.rows.map(
+    (department) => ({
+      value: String(department.department_id),
+      label: department.department_name,
+    })
+  );
+
+  const handleSave = () => {
+    if (code.trim() === "") {
+      setError("Code is required");
+      return;
+    }
+    if (title.trim() === "") {
+      setError("Title is required");
+      return;
+    }
+    onSave({
+      code: code.trim(),
+      title: title.trim(),
+      description: description.trim(),
+      departmentIds: departmentValues.map(Number),
+    });
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>
+          {isEdit ? "Edit training template" : "New training template"}
+        </DialogTitle>
+        <DialogDescription>
+            {isEdit
+            ? "Update this template. Active is toggled directly in the table."
+            : "Add a training template. Choose the departments that need it, or leave it blank to apply to all departments."}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="training-template-code">
+            Code
+            <span className="text-destructive" aria-hidden="true">
+              {" *"}
+            </span>
+          </Label>
+          <Input
+            id="training-template-code"
+            value={code}
+            disabled={saving}
+            readOnly={isEdit}
+            placeholder="e.g. onsite_safety"
+            aria-required
+            className="read-only:bg-muted/40 read-only:text-muted-foreground"
+            onChange={(event) => {
+              setCode(event.target.value);
+              setError(null);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            {isEdit
+              ? "Immutable after create."
+              : "Required. Permanent — used as the template code."}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="training-template-title">
+            Title
+            <span className="text-destructive" aria-hidden="true">
+              {" *"}
+            </span>
+          </Label>
+          <Input
+            id="training-template-title"
+            value={title}
+            disabled={saving}
+            placeholder="e.g. On-site safety training"
+            aria-required
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setError(null);
+            }}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="training-template-description">Description</Label>
+          <Input
+            id="training-template-description"
+            value={description}
+            disabled={saving}
+            placeholder="Optional summary"
+            onChange={(event) => setDescription(event.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Optional.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Departments</Label>
+          <MultiCombobox
+            options={departmentOptions}
+            values={departmentValues}
+            onValuesChange={setDepartmentValues}
+            placeholder="All Departments"
+            ariaLabel="Departments"
+            searchPlaceholder="Search departments…"
+            emptyMessage="No departments found."
+            disabled={saving}
+          />
+          <p className="text-xs text-muted-foreground">
+            Leave Selection Empty for All Departments
+          </p>
+        </div>
+
+        {error !== null && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+
+      <DialogFooter className="flex-col gap-2 sm:flex-row">
+        <Button
+          variant="outline"
+          onClick={onClose}
+          disabled={saving}
+          className="w-full sm:w-auto"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full sm:w-auto"
+        >
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </DialogFooter>
+    </>
+  );
 }
 
 /**
  * Renders the training-template create/edit dialog.
  * @param props Open/saving state, the row being edited, and the save handler.
- * @returns The dialog wired to the shared field dialog.
+ * @returns The dialog; its form remounts per open so state seeds from props.
  */
 export function TemplateFormDialog({
   open,
@@ -40,84 +208,19 @@ export function TemplateFormDialog({
   onClose,
   onSave,
 }: TemplateFormDialogProps) {
-  const { departments } = useTrainingTemplatesCatalog();
-  const isEdit = row !== null;
-
-  const fields: readonly RequirementDialogField[] = [
-    {
-      name: "code",
-      label: "Code",
-      kind: "text",
-      placeholder: "e.g. onsite_safety",
-      required: true,
-      immutable: true,
-      hint: "Immutable after create.",
-      createHint: "Required. Permanent — used as the template code.",
-    },
-    {
-      name: "title",
-      label: "Title",
-      kind: "text",
-      placeholder: "e.g. On-site safety training",
-      required: true,
-    },
-    {
-      name: "description",
-      label: "Description",
-      kind: "text",
-      placeholder: "Optional summary",
-      hint: "Optional.",
-      createHint: "Optional.",
-    },
-    {
-      name: "department_id",
-      label: "Department",
-      kind: "select",
-      placeholder: "Select department…",
-      hint: "Global applies to every department.",
-      options: [
-        { value: GLOBAL_DEPARTMENT_VALUE, label: "All departments (global)" },
-        ...departments.rows.map((department) => ({
-          value: String(department.department_id),
-          label: department.department_name,
-        })),
-      ],
-    },
-  ];
-
-  const initial: Record<string, string> =
-    row === null
-      ? {
-          code: "",
-          title: "",
-          description: "",
-          department_id: GLOBAL_DEPARTMENT_VALUE,
-        }
-      : {
-          code: row.code,
-          title: row.title,
-          description: row.description ?? "",
-          department_id:
-            row.department_id === null
-              ? GLOBAL_DEPARTMENT_VALUE
-              : String(row.department_id),
-        };
-
   return (
-    <RequirementFieldDialog
-      open={open}
-      heading={isEdit ? "Edit training template" : "New training template"}
-      description={
-        isEdit
-          ? "Update this template. Active is toggled directly in the table."
-          : "Add a per-department or global training template."
-      }
-      isEdit={isEdit}
-      saving={saving}
-      fields={fields}
-      initial={initial}
-      onClose={onClose}
-      onSave={onSave}
-    />
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="max-h-[90vh] w-[95vw] overflow-y-auto rounded-2xl sm:max-w-[560px]">
+        {open && (
+          <TemplateForm
+            key={`${row?.id ?? "new"}:${(row?.department_ids ?? []).join(",")}`}
+            row={row}
+            saving={saving}
+            onClose={onClose}
+            onSave={onSave}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

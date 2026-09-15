@@ -21,7 +21,9 @@ export function hasDraftContent(values: {
     phone?: string;
     email?: string;
     birthdate?: string;
-    address?: string;
+    province?: string;
+    city?: string;
+    brgy?: string;
     special_skills?: string;
     languages?: string;
     signature_typed_name?: string;
@@ -46,7 +48,9 @@ export function hasDraftContent(values: {
         values.phone,
         values.email,
         values.birthdate,
-        values.address,
+        values.province,
+        values.city,
+        values.brgy,
         values.special_skills,
         values.languages,
         values.signature_typed_name,

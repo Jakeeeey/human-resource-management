@@ -41,8 +41,66 @@ export function VerificationQueueTable({
 
   return (
     <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <Table>
+      <ul className="divide-y divide-border xl:hidden">
+        {isLoading ? (
+          <li className="space-y-2 p-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </li>
+        ) : entries.length === 0 ? (
+          <li className="flex h-48 flex-col items-center justify-center gap-2 p-4 text-center">
+            <p className="text-muted-foreground">
+              {rows.length === 0
+                ? "No documents awaiting verification."
+                : "This hire has not uploaded any documents yet."}
+            </p>
+            {rows.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Submitted hire documents queue here for HR approval.
+              </p>
+            )}
+          </li>
+        ) : (
+          entries.map(({ row, doc }) => (
+            <li key={`${row.userId}-${doc.docKey}`} className="space-y-2 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => onPreview(row, doc)}
+                  className="inline-flex min-w-0 items-center gap-1.5 text-left text-sm font-medium hover:underline"
+                  title={doc.title}
+                >
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{doc.title}</span>
+                </button>
+                <VerificationStateBadge state={doc.state} />
+              </div>
+              <p
+                className="text-xs text-muted-foreground"
+                title={doc.uploadedAt ?? ""}
+              >
+                {doc.uploadedAt ? formatDateTime(new Date(doc.uploadedAt)) : "—"}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="min-h-9 w-full sm:w-auto"
+                  onClick={() => onViewDetails(row, doc)}
+                  aria-label="View document details"
+                >
+                  <Eye className="mr-1 h-4 w-4" />
+                  View details
+                </Button>
+              </div>
+            </li>
+          ))
+        )}
+      </ul>
+
+      <div className="hidden overflow-x-auto xl:block">
+        <Table className="min-w-[720px]">
           <TableHeader>
             <TableRow className="bg-muted/30">
               <TableHead>Document</TableHead>

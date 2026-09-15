@@ -26,7 +26,7 @@ const columns: readonly CatalogColumn<DocumentSlotRow>[] = [
     className: "max-w-[220px] truncate",
     render: (row) => (
       <code
-        className="block max-w-full truncate font-mono text-xs"
+                className="block max-w-full break-words font-mono text-xs"
         title={row.doc_key}
       >
         {humanizeIdentifier(row.doc_key)}
@@ -39,7 +39,7 @@ const columns: readonly CatalogColumn<DocumentSlotRow>[] = [
     headerTitle: "Document name shown to new hires",
     className: "max-w-[420px] truncate",
     render: (row) => (
-      <span className="block max-w-full truncate" title={row.title}>
+              <span className="block max-w-full break-words" title={row.title}>
         {row.title}
       </span>
     ),

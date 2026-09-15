@@ -22,7 +22,10 @@ export function RequirementsRegistryModule() {
           <ListChecks className="h-6 w-6 text-primary" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-4xl font-bold truncate">
+          <h1
+            className="text-2xl font-bold sm:text-4xl"
+            title="Onboarding Requirements"
+          >
             Onboarding Requirements
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground">

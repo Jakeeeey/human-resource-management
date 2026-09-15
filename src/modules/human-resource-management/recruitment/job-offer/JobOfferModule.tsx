@@ -300,12 +300,17 @@ function JobOfferContent() {
                         : null;
                 const prefix = salutationPrefix(application.sex, application.civil_status);
                 const surname = surnameOf(applicant?.full_name ?? "");
+                const applicationLocation = [
+                    application.brgy,
+                    application.city,
+                    application.province,
+                ]
+                    .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+                    .map((part) => part.trim())
+                    .join(", ");
                 setForm((f) => ({
                     ...f,
-                    addressLine:
-                        typeof application.address === "string" && application.address.trim()
-                            ? application.address
-                            : f.addressLine,
+                    addressLine: applicationLocation || f.addressLine,
                     contactNumber:
                         typeof application.phone === "string" && application.phone.trim()
                             ? application.phone

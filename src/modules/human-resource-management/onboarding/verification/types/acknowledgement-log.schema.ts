@@ -2,8 +2,8 @@ import { z } from "zod";
 
 // acknowledgement-log.schema.ts — Zod source of truth for `acknowledgement_logs`.
 //
-// Mirrors the Todo 1a contract (9 fields): id (PK) + doc_ref + signer +
-// acknowledged_at (PH) + method + four nullable app-written audit columns
+// Mirrors the Todo 1a contract (8 fields): id (PK) + doc_ref + signer +
+// acknowledged_at (PH) + four nullable app-written audit columns
 // (zero DB defaults). Composite UNIQUE (doc_ref, signer, acknowledged_at) is
 // an owner-DB guarantee — the POST route collapses double-acks to one row via
 // exact-triple pre-check + duplicate-error swallow (Todo 2 precedent).
@@ -14,18 +14,11 @@ import { z } from "zod";
 // import — module boundary); the WRITE path is greenfield (memo-ack is
 // GET-only in-repo).
 
-export const ACK_METHODS = ["ink", "stamp", "typed"] as const;
-
-export type AckMethod = (typeof ACK_METHODS)[number];
-
-export const AckMethodSchema = z.enum(ACK_METHODS);
-
 export const AcknowledgementLogSchema = z.object({
   id: z.number().int().positive(),
   doc_ref: z.string(),
   signer: z.string(),
   acknowledged_at: z.string(),
-  method: AckMethodSchema,
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),
@@ -37,13 +30,10 @@ export type AcknowledgementLog = z.infer<typeof AcknowledgementLogSchema>;
 // POST body: the audit-trail write. `acknowledged_at` is optional — absent
 // means "stamp PH now server-side". Supplying it makes a retry carry the
 // identical triple so the UNIQUE collapses it to one row (never two).
-// `method` is optional too: when omitted the MySQL column default (`ink`)
-// applies and no explicit value is sent on the insert.
 export const CreateAcknowledgementLogSchema = z
   .object({
     doc_ref: z.string().min(1).max(255),
     signer: z.string().min(1).max(120),
-    method: AckMethodSchema.optional(),
     acknowledged_at: z.string().min(1).max(32).optional(),
   })
   .strict();

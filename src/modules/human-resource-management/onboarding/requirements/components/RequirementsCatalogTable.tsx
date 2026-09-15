@@ -28,8 +28,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import { useIsMobile } from "@/hooks/use-mobile";
+
 import type { RequirementsReorderEntry } from "../types/requirements-catalog.schema";
 import type { SortDirection, TableControls } from "../hooks/useTableControls";
+import { RequirementsCatalogCard } from "./RequirementsCatalogCard";
 import { RequirementsCatalogRow } from "./RequirementsCatalogRow";
 import { RequirementsSortableHead } from "./RequirementsSortableHead";
 import { RequirementsTablePagination } from "./RequirementsTablePagination";
@@ -106,6 +109,7 @@ export function RequirementsCatalogTable<T extends RequirementRow>({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const [draggingId, setDraggingId] = useState<number | null>(null);
+  const isMobile = useIsMobile();
 
   if (isLoading) {
     return (
@@ -156,69 +160,22 @@ export function RequirementsCatalogTable<T extends RequirementRow>({
       onDragCancel={() => setDraggingId(null)}
     >
       <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-card to-transparent sm:hidden"
-        />
-        <Table className="min-w-[720px]">
-          <TableCaption className="sr-only">{caption}</TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead scope="col" className="w-10">
-                <span className="sr-only">Reorder</span>
-              </TableHead>
-              {columns.map((column) => (
-                <RequirementsSortableHead
-                  key={column.key}
-                  label={column.header}
-                  title={column.headerTitle}
-                  className={column.className}
-                  direction={directionFor(column.key)}
-                  onToggle={
-                    controls.canSort(column.key)
-                      ? () => controls.toggleSort(column.key)
-                      : undefined
-                  }
-                />
-              ))}
-              <RequirementsSortableHead
-                label="Required"
-                title="Whether every new hire must complete this row"
-                className="w-24"
-                direction={directionFor("is_required")}
-                onToggle={() => controls.toggleSort("is_required")}
-              />
-              <RequirementsSortableHead
-                label="Active"
-                title="Whether this row is currently in use"
-                className="w-28"
-                direction={directionFor("is_active")}
-                onToggle={() => controls.toggleSort("is_active")}
-              />
-              <TableHead scope="col" className="w-24 text-right">
-                Actions
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <SortableContext
-              items={visibleRows.map((row) => row.id)}
-              strategy={verticalListSortingStrategy}
-            >
+        <SortableContext
+          items={visibleRows.map((row) => row.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {isMobile ? (
+            <ul className="divide-y divide-border">
               {visibleRows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={columnCount}
-                    className="py-8 text-center text-sm text-muted-foreground"
-                  >
-                    No rows match your current search and filters.
-                  </TableCell>
-                </TableRow>
+                <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No rows match your current search and filters.
+                </li>
               ) : (
                 visibleRows.map((row) => (
-                  <RequirementsCatalogRow
+                  <RequirementsCatalogCard
                     key={row.id}
                     row={row}
+                    columns={columns}
                     dragging={draggingId === row.id}
                     disabled={disabled}
                     reorderDisabled={!controls.canReorder}
@@ -227,18 +184,93 @@ export function RequirementsCatalogTable<T extends RequirementRow>({
                     onEdit={onEdit}
                     onToggleRequired={onToggleRequired}
                     onToggleActive={onToggleActive}
-                  >
-                    {columns.map((column) => (
-                      <TableCell key={column.key} className={column.className}>
-                        {column.render(row)}
-                      </TableCell>
-                    ))}
-                  </RequirementsCatalogRow>
+                  />
                 ))
               )}
-            </SortableContext>
-          </TableBody>
-        </Table>
+            </ul>
+          ) : (
+            <>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-card to-transparent sm:hidden"
+              />
+              <Table className="min-w-[720px]">
+                <TableCaption className="sr-only">{caption}</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col" className="w-10">
+                      <span className="sr-only">Reorder</span>
+                    </TableHead>
+                    {columns.map((column) => (
+                      <RequirementsSortableHead
+                        key={column.key}
+                        label={column.header}
+                        title={column.headerTitle}
+                        className={column.className}
+                        direction={directionFor(column.key)}
+                        onToggle={
+                          controls.canSort(column.key)
+                            ? () => controls.toggleSort(column.key)
+                            : undefined
+                        }
+                      />
+                    ))}
+                    <RequirementsSortableHead
+                      label="Required"
+                      title="Whether every new hire must complete this row"
+                      className="w-24"
+                      direction={directionFor("is_required")}
+                      onToggle={() => controls.toggleSort("is_required")}
+                    />
+                    <RequirementsSortableHead
+                      label="Active"
+                      title="Whether this row is currently in use"
+                      className="w-28"
+                      direction={directionFor("is_active")}
+                      onToggle={() => controls.toggleSort("is_active")}
+                    />
+                    <TableHead scope="col" className="w-24 text-right">
+                      Actions
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibleRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={columnCount}
+                        className="py-8 text-center text-sm text-muted-foreground"
+                      >
+                        No rows match your current search and filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    visibleRows.map((row) => (
+                      <RequirementsCatalogRow
+                        key={row.id}
+                        row={row}
+                        dragging={draggingId === row.id}
+                        disabled={disabled}
+                        reorderDisabled={!controls.canReorder}
+                        reorderDisabledReason={REORDER_DISABLED_REASON}
+                        rowLabel={rowLabel(row)}
+                        onEdit={onEdit}
+                        onToggleRequired={onToggleRequired}
+                        onToggleActive={onToggleActive}
+                      >
+                        {columns.map((column) => (
+                          <TableCell key={column.key} className={column.className}>
+                            {column.render(row)}
+                          </TableCell>
+                        ))}
+                      </RequirementsCatalogRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </>
+          )}
+        </SortableContext>
 
         <RequirementsTablePagination
           page={controls.page}

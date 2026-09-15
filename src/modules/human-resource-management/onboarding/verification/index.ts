@@ -6,13 +6,10 @@ export { VerificationFetchProvider, useVerificationFetch } from "./providers/ver
 export { useVerificationQueue } from "./hooks/useVerificationQueue";
 export type {
   AcknowledgementLog,
-  AckMethod,
   CreateAcknowledgementLogInput,
   AcknowledgementLogResponse,
 } from "./types/acknowledgement-log.schema";
 export {
-  ACK_METHODS,
-  AckMethodSchema,
   AcknowledgementLogSchema,
   CreateAcknowledgementLogSchema,
 } from "./types/acknowledgement-log.schema";

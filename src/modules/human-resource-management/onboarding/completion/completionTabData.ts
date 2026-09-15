@@ -52,3 +52,53 @@ export function toCheckState(userId: number, body: CompletionBody): CheckState |
     missing: parseChecklist(data.missing),
   };
 }
+
+const PHASE_ORDER = ["documents", "orientation", "training", "equipment"];
+
+const PHASE_LABELS: Record<string, string> = {
+  documents: "Documents",
+  orientation: "Orientation",
+  training: "Training",
+  equipment: "Equipment",
+  custom: "Custom",
+};
+
+function phaseLabel(phase: string): string {
+  const known = PHASE_LABELS[phase];
+  if (known) return known;
+  const spaced = phase.replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+export interface CompletionGroup {
+  phase: string;
+  label: string;
+  items: ChecklistItem[];
+  done: number;
+  total: number;
+}
+
+export function groupChecklistByPhase(
+  items: readonly ChecklistItem[]
+): CompletionGroup[] {
+  const byPhase = new Map<string, ChecklistItem[]>();
+  for (const item of items) {
+    const list = byPhase.get(item.phase);
+    if (list) list.push(item);
+    else byPhase.set(item.phase, [item]);
+  }
+  const known = PHASE_ORDER.filter((phase) => byPhase.has(phase));
+  const extra = [...byPhase.keys()]
+    .filter((phase) => !PHASE_ORDER.includes(phase))
+    .sort();
+  return [...known, ...extra].map((phase) => {
+    const groupItems = byPhase.get(phase) ?? [];
+    return {
+      phase,
+      label: phaseLabel(phase),
+      items: groupItems,
+      done: groupItems.filter((item) => item.done).length,
+      total: groupItems.length,
+    };
+  });
+}

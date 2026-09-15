@@ -32,7 +32,7 @@ const columns: readonly CatalogColumn<EquipmentItemRow>[] = [
     className: "max-w-[240px] truncate",
     render: (row) => (
       <code
-        className="block max-w-full truncate font-mono text-xs"
+                className="block max-w-full break-words font-mono text-xs"
         title={row.item_key}
       >
         {humanizeIdentifier(row.item_key)}
@@ -45,7 +45,7 @@ const columns: readonly CatalogColumn<EquipmentItemRow>[] = [
     headerTitle: "Equipment name shown to new hires",
     className: "max-w-[380px] truncate",
     render: (row) => (
-      <span className="block max-w-full truncate" title={row.label}>
+              <span className="block max-w-full break-words" title={row.label}>
         {row.label}
       </span>
     ),

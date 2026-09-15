@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import {
   MultiCombobox,
   type MultiComboboxOption,
-} from "@/components/ui/multi-combobox";
+} from "./MultiCombobox";
 import {
   Select,
   SelectContent,
@@ -33,7 +33,10 @@ import {
   type TemplateWithItems,
   type TrainingTemplateRow,
 } from "../types/training-templates.schema";
-import { TemplateFormDialog } from "./TemplateFormDialog";
+import {
+  TemplateFormDialog,
+  type TrainingTemplateFormValues,
+} from "./TemplateFormDialog";
 import { TemplateItemsDrawer } from "./TemplateItemsDrawer";
 import { TemplatesTable } from "./TemplatesTable";
 
@@ -60,19 +63,21 @@ const TEMPLATE_TABLE_CONFIG: TableControlsConfig<TemplateWithItems> = {
   },
 };
 
-/** Row's department facet value: the GLOBAL sentinel for null, else the id. */
-function departmentFacetValue(row: TemplateWithItems): string {
-  return row.department_id === null
-    ? GLOBAL_DEPARTMENT_VALUE
-    : String(row.department_id);
-}
-
-/** True for an empty selection, or when the row matches ANY selected department. */
+/**
+ * True for an empty selection, when the row's effective set contains any
+ * selected department, or when a GLOBAL row (empty set) is matched by the
+ * GLOBAL filter token.
+ */
 function matchesDepartmentFilters(
   row: TemplateWithItems,
   selected: readonly string[]
 ): boolean {
-  return selected.length === 0 || selected.includes(departmentFacetValue(row));
+  if (selected.length === 0) return true;
+  const departmentIds = row.department_ids ?? [];
+  if (departmentIds.length === 0) {
+    return selected.includes(GLOBAL_DEPARTMENT_VALUE);
+  }
+  return departmentIds.some((id) => selected.includes(String(id)));
 }
 
 /**
@@ -108,7 +113,7 @@ export function TrainingTemplatesWorkspace() {
     : `${templates.rows.length} row${templates.rows.length === 1 ? "" : "s"}`;
 
   const departmentOptions: MultiComboboxOption[] = [
-    { value: GLOBAL_DEPARTMENT_VALUE, label: "Global (all departments)" },
+    { value: GLOBAL_DEPARTMENT_VALUE, label: "All Departments" },
     ...departments.rows.map((department) => ({
       value: String(department.department_id),
       label: department.department_name,
@@ -135,27 +140,21 @@ export function TrainingTemplatesWorkspace() {
     setDialogOpen(true);
   };
 
-  const handleSaveTemplate = (values: Record<string, string>) => {
-    const department = values.department_id;
-    const departmentId =
-      department === "" || department === GLOBAL_DEPARTMENT_VALUE
-        ? null
-        : Number(department);
-    const description =
-      values.description.trim() === "" ? null : values.description.trim();
+  const handleSaveTemplate = (values: TrainingTemplateFormValues) => {
+    const description = values.description === "" ? null : values.description;
     setSaving(true);
     const request =
       editingTemplate === null
         ? templates.create({
-            code: values.code.trim(),
-            title: values.title.trim(),
+            code: values.code,
+            title: values.title,
             description,
-            department_id: departmentId,
+            department_ids: values.departmentIds,
           } satisfies CreateTrainingTemplateInput)
         : templates.update(editingTemplate.id, {
-            title: values.title.trim(),
+            title: values.title,
             description,
-            department_id: departmentId,
+            department_ids: values.departmentIds,
           });
     void request
       .then(() => {
@@ -189,7 +188,7 @@ export function TrainingTemplatesWorkspace() {
     <section className="min-w-0 space-y-4">
       <RequirementsSectionHeader
         title="Templates"
-        description="One template per department, plus a global default."
+        description="Templates can cover one or more departments, or apply to all departments."
         countLabel={countLabel}
         entityLabel="training template"
         isLoading={templates.isLoading}

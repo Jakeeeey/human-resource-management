@@ -11,7 +11,7 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
@@ -19,6 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { AddressSelectors } from "@/modules/human-resource-management/employee-admin/employee-masterlist/components/AddressSelectors";
 import { CIVIL_STATUS_OPTIONS, type ApplicationFormValues } from "../../types";
 import { checkBirthdate, checkFormat, checkHeightCm, checkUnlikelyAge, checkWeightKg } from "../../lib/softValidation";
 import { SoftWarning } from "../SoftWarning";
@@ -37,6 +38,9 @@ function computeAge(iso: string): number | null {
 
 export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
     const birthdate = useWatch({ control: form.control, name: "birthdate" });
+    const province = useWatch({ control: form.control, name: "province" });
+    const city = useWatch({ control: form.control, name: "city" });
+    const brgy = useWatch({ control: form.control, name: "brgy" });
     const phone = useWatch({ control: form.control, name: "phone" });
     const email = useWatch({ control: form.control, name: "email" });
     const sss = useWatch({ control: form.control, name: "sss_no" });
@@ -113,20 +117,17 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                     )}
                 />
             </div>
-
-            <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                            <Textarea rows={2} placeholder="House/Street, Barangay, City, Province" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
+            <div className="flex flex-col gap-2">
+                <Label>Address</Label>
+                <AddressSelectors
+                    province={province}
+                    city={city}
+                    brgy={brgy}
+                    onProvinceChange={(v) => form.setValue("province", v, { shouldDirty: true, shouldValidate: true })}
+                    onCityChange={(v) => form.setValue("city", v, { shouldDirty: true, shouldValidate: true })}
+                    onBrgyChange={(v) => form.setValue("brgy", v, { shouldDirty: true, shouldValidate: true })}
+                />
+            </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
                 <FormField

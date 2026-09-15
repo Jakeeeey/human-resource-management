@@ -27,8 +27,7 @@ export function OnboardingHubModule() {
               Onboarding Hub
             </h1>
             <p className="text-base sm:text-lg text-muted-foreground">
-              Every hire, their phase, next action, owner, due date, and
-              blockers.
+              Every hire, their phase, and date hired.
             </p>
           </div>
         </div>

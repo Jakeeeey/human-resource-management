@@ -5,13 +5,13 @@
 // definition consumed by the equipment-status route and the completion
 // orchestrator: all required catalog items issued AND acked → equipped.
 //
-// Store mapping (`acknowledgement_logs`, 9 fields), keyed to the employee
+// Store mapping (`acknowledgement_logs`), keyed to the employee
 // (`user.user_id`):
 // - issue row: doc_ref `equipment:issue:<userId>:<itemKey>`,
-//   signer `issuer:<role>`, method `typed` (HR typed handover entry).
+//   signer `issuer:<role>` (HR handover entry).
 // - ack row: doc_ref `equipment:ack:<userId>:<itemKey>`,
-//   signer `hiree:<userId>` (the employee themself) or `hr-override:<userId>`,
-//   method ink|stamp|typed. Ack-without-issue never counts (routes reject it
+//   signer `hiree:<userId>` (the employee themself) or legacy
+//   `hr-override:<userId>`. Ack-without-issue never counts (routes reject it
 //   with 422; the predicate additionally requires issue presence defensively).
 
 export type EquipmentEventKind = "issue" | "ack";

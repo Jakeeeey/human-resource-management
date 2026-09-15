@@ -138,11 +138,11 @@ function parseLocalDate(value: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** Formats a `YYYY-MM-DD` due date for display (PH-friendly, no TZ drift). */
-export function formatDueDate(value: string | null): string {
+/** Formats a `YYYY-MM-DD` hire date for display (PH-friendly, no TZ drift). */
+export function formatHiredDate(value: string | null): string {
   if (!value) return "—";
   const date = parseLocalDate(value);
-  return date ? formatDateLong(date) : value;
+  return date ? formatDateLong(date) : "—";
 }
 
 /** True when a due date is strictly before today (local midnight). */

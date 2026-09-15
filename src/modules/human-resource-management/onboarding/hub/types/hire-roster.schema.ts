@@ -7,8 +7,8 @@ import { OnboardingOwnerRoleSchema } from "@/modules/human-resource-management/o
 // The roster is a DERIVED, read-only view over the employee-keyed task engine:
 // one row per employee that owns `onboarding_task` rows (the post-hire roster —
 // the engine materializes tasks at hire, so a hire IS a user with tasks). The
-// row carries the six hub columns the plan names: hire, status/phase, next
-// action, owner, due, blockers — no profile vocabulary and no stage-as-tab.
+// row carries the hub columns actually rendered: hire, status/phase, and the
+// employee's date of hire.
 //
 // `status` is a DERIVED roll-up over the REQUIRED tasks (done/na satisfied):
 //   complete     -> at least one required task AND every required task done/na
@@ -63,6 +63,8 @@ export type HireRosterPhaseProgress = z.infer<
 export const HireRosterRowSchema = z.object({
   userId: z.number().int().positive(),
   name: z.string(),
+  /** Employee's date of hire (`user.user_dateOfHire`), else null. */
+  dateHired: z.string().nullable(),
   status: HireRosterStatusSchema,
   /** Phase of the first open required task (null when complete/none open). */
   phase: z.string().nullable(),

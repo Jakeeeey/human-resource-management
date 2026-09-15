@@ -1,6 +1,6 @@
 import type {
   TrainingItem,
-  TrainingTemplate,
+  TrainingTemplateView,
 } from "../../training/types/training-catalog.schema";
 
 // training-templates.schema.ts — CLIENT-SAFE contracts for the Training
@@ -14,13 +14,13 @@ import type {
 // route answers 400 on an unknown/missing key either way).
 
 /** `onboarding_training_template` row as returned by the API. */
-export type TrainingTemplateRow = TrainingTemplate;
+export type TrainingTemplateRow = TrainingTemplateView;
 
 /** `onboarding_training_item` row as returned by the API. */
 export type TrainingItemRow = TrainingItem;
 
 /** A template with its child items nested (the list GET shape). */
-export interface TemplateWithItems extends TrainingTemplate {
+export interface TemplateWithItems extends TrainingTemplateView {
   items: TrainingItem[];
 }
 
@@ -33,14 +33,15 @@ export interface CreateTrainingTemplateInput {
   code: string;
   title: string;
   description?: string | null;
-  /** null = GLOBAL template (applies to every department). */
-  department_id?: number | null;
+  /** Empty/absent = GLOBAL template (applies to every department). */
+  department_ids?: number[];
 }
 
 export interface UpdateTrainingTemplateInput {
   title?: string;
   description?: string | null;
-  department_id?: number | null;
+  /** Empty = GLOBAL; absent leaves the current department scope untouched. */
+  department_ids?: number[];
   is_active?: boolean;
 }
 
@@ -67,8 +68,8 @@ export interface DepartmentOption {
 }
 
 /**
- * Sentinel select value for the GLOBAL template. Radix `SelectItem` forbids an
- * empty string value, so "All departments" carries this token and the mapper
- * converts it to `department_id: null`.
+ * Sentinel value for the toolbar's GLOBAL department filter. It is a FILTER
+ * token only — a template's global scope is an EMPTY department set, never a
+ * `__global__` junction row.
  */
 export const GLOBAL_DEPARTMENT_VALUE = "__global__";

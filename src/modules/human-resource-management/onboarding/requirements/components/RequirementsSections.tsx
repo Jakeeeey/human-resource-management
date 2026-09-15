@@ -55,9 +55,9 @@ export function RequirementsSections() {
   ];
 
   const tabsList = (
-    <TabsList className="justify-start">
+    <TabsList className="justify-start group-data-[orientation=horizontal]/tabs:h-auto">
       {tabs.map((tab) => (
-        <TabsTrigger key={tab.id} value={tab.id} className="shrink-0">
+        <TabsTrigger key={tab.id} value={tab.id} className="shrink-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">
           {tab.label}{" "}
           <span className="text-muted-foreground">({tab.count})</span>
         </TabsTrigger>

@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  AlertTriangle,
-  CalendarClock,
-  ListChecks,
-} from "lucide-react";
+import { CalendarClock, ListChecks } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -13,8 +9,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 
 import {
-  formatDueDate,
-  isDateOverdue,
+  formatHiredDate,
   phaseLabel,
   ROSTER_STATUS_LABELS,
   rosterStatusTone,
@@ -22,8 +17,8 @@ import {
 import type { HireRosterRow } from "../types/hire-roster.schema";
 
 // HireRosterDetail.tsx — the selected hire's summary body (todo 27). Read-only:
-// it renders one enriched roster row (progress, next action, due, blockers,
-// per-phase progress). Rendered by the `HireRosterPanel` slide-over.
+// it renders one enriched roster row (progress, date hired, per-phase
+// progress). Rendered by the `HireRosterPanel` slide-over.
 
 function StatCard({
   icon,
@@ -80,7 +75,6 @@ export function HireRosterDetail({
     row.requiredTotal === 0
       ? 0
       : Math.round((row.requiredDone / row.requiredTotal) * 100);
-  const dueOverdue = isDateOverdue(row.dueDate);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-2xl border border-border/50 bg-muted/20 p-4">
@@ -123,22 +117,9 @@ export function HireRosterDetail({
           value={phaseLabel(row.phase)}
         />
         <StatCard
-          icon={<AlertTriangle className="h-4 w-4" aria-hidden="true" />}
-          label="Next action"
-          value={
-            row.nextAction
-              ? row.nextAction.blocked
-                ? `${row.nextAction.label} (blocked)`
-                : row.nextAction.label
-              : "All required tasks done"
-          }
-        />
-        <StatCard
           icon={<CalendarClock className="h-4 w-4" aria-hidden="true" />}
-          label="Due"
-          value={formatDueDate(row.dueDate)}
-          hint={dueOverdue ? "Overdue" : undefined}
-          tone={dueOverdue ? "danger" : "default"}
+          label="Date hired"
+          value={formatHiredDate(row.dateHired)}
         />
       </div>
 
@@ -162,7 +143,7 @@ export function HireRosterDetail({
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium">{phaseLabel(phase.phase)}</span>
                     <span className="text-muted-foreground">
-                      {phase.done} / {phase.total}
+                      {phase.done} / {phase.total} required
                     </span>
                   </div>
                   <Progress
@@ -175,33 +156,6 @@ export function HireRosterDetail({
             })
           )}
         </div>
-      </div>
-
-      <div className="rounded-xl border border-border/50 bg-card p-3">
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Blockers
-        </div>
-        {row.blockers.length === 0 ? (
-          <p className="mt-3 text-sm text-muted-foreground">No blockers.</p>
-        ) : (
-          <ul className="mt-3 grid gap-2">
-            {row.blockers.map((blocker) => (
-              <li
-                key={blocker.taskId}
-                className="rounded-lg border border-destructive/30 bg-destructive/5 p-2.5"
-              >
-                <div className="truncate text-sm font-medium" title={blocker.label}>
-                  {blocker.label}
-                </div>
-                {blocker.notes ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {blocker.notes}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
     </div>
   );

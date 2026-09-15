@@ -38,11 +38,14 @@ export interface SpringUserCreatePayload {
   city: string;
   brgy: string;
   position?: string;
+  department?: string;
+  position_id?: number;
   dateOfHire: string;
   role: string;
   admin: boolean;
   tags: string;
   birthday?: string;
+  placeOfBirth?: string;
   gender?: string;
   civilStatus?: string;
   religion?: string;

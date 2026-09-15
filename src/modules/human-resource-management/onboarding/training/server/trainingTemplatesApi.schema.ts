@@ -16,8 +16,8 @@ import { z } from "zod";
 const CODE_SCHEMA = z.string().trim().min(1).max(64);
 const TITLE_SCHEMA = z.string().trim().min(1).max(255);
 const DESCRIPTION_SCHEMA = z.string().nullable();
-/** null = GLOBAL template (applies to every department). */
-const DEPARTMENT_ID_SCHEMA = z.number().int().positive().nullable();
+/** The template's department set; empty/absent = GLOBAL (every department). */
+const DEPARTMENT_IDS_SCHEMA = z.array(z.number().int().positive());
 
 const nonEmptyPatch = (data: Record<string, unknown>): boolean =>
   Object.keys(data).length > 0;
@@ -31,7 +31,7 @@ export const CreateTrainingTemplateBodySchema = z
     code: CODE_SCHEMA,
     title: TITLE_SCHEMA,
     description: DESCRIPTION_SCHEMA.optional(),
-    department_id: DEPARTMENT_ID_SCHEMA.optional(),
+    department_ids: DEPARTMENT_IDS_SCHEMA.optional(),
     is_active: z.boolean().optional(),
   })
   .strict();
@@ -44,7 +44,7 @@ export const UpdateTrainingTemplateBodySchema = z
   .object({
     title: TITLE_SCHEMA.optional(),
     description: DESCRIPTION_SCHEMA.optional(),
-    department_id: DEPARTMENT_ID_SCHEMA.optional(),
+    department_ids: DEPARTMENT_IDS_SCHEMA.optional(),
     is_active: z.boolean().optional(),
   })
   .strict()

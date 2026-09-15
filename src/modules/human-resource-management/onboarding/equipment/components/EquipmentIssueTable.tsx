@@ -12,13 +12,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatDateTime } from "@/lib/utils";
 
 // EquipmentIssueTable.tsx — issue-log table for the hub equipment tab: one
-// row per catalog item with issue/acknowledge actions. Presentation only —
-// state and mutations stay in EquipmentTab / the provider. Below `xl` it
-// renders stacked cards so the status + Actions columns stay visible at rest
-// (S7#2); the min-w-[760px] table only renders once the content column can
-// hold it (S7 NEW-1: ~344px at 768px, so `sm` was too early).
+// row per catalog item with the HR issue action. Presentation only — state
+// and mutations stay in EquipmentTab / the provider. Below `xl` it renders
+// stacked cards so the status + Actions columns stay visible at rest (S7#2);
+// the min-w-[760px] table only renders once the content column can hold it
+// (S7 NEW-1: ~344px at 768px, so `sm` was too early). Issued/Acknowledged
+// cells show the TZ-safe human-readable date and time of the handover only —
+// never the signer; acknowledgement is hiree-only and lives in the employee
+// portal, so no ack action is offered here.
+
+function formatWallDateTime(value: string | null): string {
+  if (!value) return "—";
+  const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/.exec(
+    value
+  );
+  if (!match) return "—";
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6] ?? 0)
+  );
+  if (Number.isNaN(date.getTime())) return "—";
+  return formatDateTime(date);
+}
 
 function statusBadge(item: {
   issued: boolean;
@@ -48,19 +70,16 @@ interface EquipmentIssueTableProps {
   isLoading: boolean;
   pendingAction: string | null;
   onIssue: (itemKey: string) => void;
-  onAcknowledge: (itemKey: string) => void;
 }
 
-function IssueActions({
+function IssueAction({
   item,
   pendingAction,
   onIssue,
-  onAcknowledge,
 }: {
   item: EquipmentItemStatus;
   pendingAction: string | null;
   onIssue: (itemKey: string) => void;
-  onAcknowledge: (itemKey: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -73,14 +92,6 @@ function IssueActions({
       >
         {pendingAction === `issue:${item.key}` ? "Issuing…" : "Issue"}
       </Button>
-      <Button
-        size="sm"
-        disabled={!item.issued || item.acked || pendingAction !== null}
-        onClick={() => onAcknowledge(item.key)}
-        className="w-full min-h-[32px] sm:w-auto"
-      >
-        {pendingAction === `ack:${item.key}` ? "Saving…" : "Acknowledge"}
-      </Button>
     </div>
   );
 }
@@ -90,7 +101,6 @@ export function EquipmentIssueTable({
   isLoading,
   pendingAction,
   onIssue,
-  onAcknowledge,
 }: EquipmentIssueTableProps) {
   if (isLoading) {
     return (
@@ -139,20 +149,19 @@ export function EquipmentIssueTable({
                 </span>
                 <span>
                   {item.issued
-                    ? `Issued by ${item.issuedBy ?? "issuer"}`
+                    ? `Issued: ${formatWallDateTime(item.issuedAt)}`
                     : "Not issued"}
                 </span>
                 <span>
                   {item.acked
-                    ? `Acknowledged by ${item.ackedBy ?? "hiree"} (${item.ackMethod ?? "—"})`
+                    ? `Acknowledged: ${formatWallDateTime(item.ackedAt)}`
                     : "Not acknowledged"}
                 </span>
               </div>
-              <IssueActions
+              <IssueAction
                 item={item}
                 pendingAction={pendingAction}
                 onIssue={onIssue}
-                onAcknowledge={onAcknowledge}
               />
             </li>
           );
@@ -200,34 +209,21 @@ export function EquipmentIssueTable({
                   </TableCell>
                   <TableCell
                     className="max-w-[220px] truncate text-sm text-muted-foreground"
-                    title={
-                      item.issued
-                        ? `${item.issuedBy ?? "issuer"} · ${item.issuedAt ?? ""}`
-                        : ""
-                    }
+                    title={item.issued ? formatWallDateTime(item.issuedAt) : ""}
                   >
-                    {item.issued
-                      ? `${item.issuedBy ?? "issuer"} · ${item.issuedAt ?? ""}`
-                      : "—"}
+                    {item.issued ? formatWallDateTime(item.issuedAt) : "—"}
                   </TableCell>
                   <TableCell
                     className="max-w-[220px] truncate text-sm text-muted-foreground"
-                    title={
-                      item.acked
-                        ? `${item.ackedBy ?? "hiree"} · ${item.ackMethod ?? ""}`
-                        : ""
-                    }
+                    title={item.acked ? formatWallDateTime(item.ackedAt) : ""}
                   >
-                    {item.acked
-                      ? `${item.ackedBy ?? "hiree"} · ${item.ackMethod ?? ""}`
-                      : "—"}
+                    {item.acked ? formatWallDateTime(item.ackedAt) : "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <IssueActions
+                    <IssueAction
                       item={item}
                       pendingAction={pendingAction}
                       onIssue={onIssue}
-                      onAcknowledge={onAcknowledge}
                     />
                   </TableCell>
                 </TableRow>

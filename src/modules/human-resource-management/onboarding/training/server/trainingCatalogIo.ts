@@ -4,9 +4,11 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 
 import {
   TrainingItemSchema,
+  TrainingTemplateDepartmentSchema,
   TrainingTemplateSchema,
   type TrainingItem,
   type TrainingTemplate,
+  type TrainingTemplateDepartment,
 } from "../types/training-catalog.schema";
 
 // trainingCatalogIo.ts — Directus primitives for the "Onboarding Training
@@ -23,7 +25,8 @@ import {
 //
 // Live columns: onboarding_training_template {id, code, title, description,
 // department_id (nullable int), is_active, created_at, created_by, updated_at,
-// updated_by}; onboarding_training_item {id, template_id, code, title,
+// updated_by}; onboarding_training_template_department {id, template_id,
+// department_id}; onboarding_training_item {id, template_id, code, title,
 // description, is_required, sort_order, is_active, audit cols}.
 
 export const TRAINING_CATALOG_ERROR_CODES = {
@@ -176,6 +179,88 @@ export async function patchTrainingTemplateRow(
     TRAINING_CATALOG_ERROR_CODES.writeFailed,
     `onboarding_training_template/${id} update`
   );
+}
+
+// ---------------------------------------------------------------------------
+// onboarding_training_template_department — template ↔ department junction
+// ---------------------------------------------------------------------------
+//
+// There is NO Directus relation on this junction, so rows are read by an
+// explicit `filter[template_id][_eq]` — never as an expanded relation. The
+// effective department set is the junction rows; when a template has none, the
+// service falls back to the legacy `onboarding_training_template.department_id`.
+
+/** Every junction row (all templates), or one template's rows, `id` order. */
+export async function listTrainingTemplateDepartmentRows(
+  templateId?: number
+): Promise<TrainingTemplateDepartment[]> {
+  const query = ["sort=id", "limit=-1"];
+  if (templateId !== undefined) {
+    query.push(`filter[template_id][_eq]=${templateId}`);
+  }
+  const body: unknown = await dFetch(
+    `/items/onboarding_training_template_department?${query.join("&")}`
+  );
+  return parseRowList(
+    TrainingTemplateDepartmentSchema,
+    body,
+    TRAINING_CATALOG_ERROR_CODES.readFailed,
+    "onboarding_training_template_department"
+  );
+}
+
+/**
+ * Replaces one template's junction rows (delete-then-insert) so the table ends
+ * with EXACTLY `departmentIds`. Duplicate ids collapse to a single row (the
+ * UNIQUE pair). Re-runnable: a partial failure converges on the next save.
+ */
+export async function replaceTrainingTemplateDepartmentRows(
+  templateId: number,
+  departmentIds: readonly number[]
+): Promise<TrainingTemplateDepartment[]> {
+  const existingBody: unknown = await dFetch(
+    `/items/onboarding_training_template_department?filter[template_id][_eq]=${templateId}&limit=-1&fields=id`
+  );
+  const existing = z
+    .object({ data: z.array(z.object({ id: z.number().int().positive() })) })
+    .safeParse(existingBody);
+  if (!existing.success) {
+    fail(
+      TRAINING_CATALOG_ERROR_CODES.readFailed,
+      `onboarding_training_template_department replace read failed (${JSON.stringify(
+        existingBody
+      ).slice(0, 300)})`
+    );
+  }
+  for (const row of existing.data.data) {
+    await dFetch(`/items/onboarding_training_template_department/${row.id}`, {
+      method: "DELETE",
+    });
+  }
+
+  const unique = [...new Set(departmentIds)];
+  const created: TrainingTemplateDepartment[] = [];
+  for (const departmentId of unique) {
+    const body: unknown = await dFetch(
+      "/items/onboarding_training_template_department",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          template_id: templateId,
+          department_id: departmentId,
+        }),
+      }
+    );
+    created.push(
+      parseSingle(
+        TrainingTemplateDepartmentSchema,
+        body,
+        TRAINING_CATALOG_ERROR_CODES.writeFailed,
+        `onboarding_training_template_department (template ${templateId}, department ${departmentId})`
+      )
+    );
+  }
+  return created;
 }
 
 // ---------------------------------------------------------------------------

@@ -134,14 +134,14 @@ export function InterviewEligibleList() {
                 }}
             >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <TabsList aria-label="Interview stage" className="w-full sm:w-auto">
-                        <TabsTrigger value="Initial" className="flex-1 sm:flex-none">
+                    <TabsList aria-label="Interview stage" className="w-full sm:w-auto group-data-[orientation=horizontal]/tabs:h-auto">
+                        <TabsTrigger value="Initial" className="flex-1 sm:flex-none text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">
                             Initial
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
                                 {filteredInitial.length}
                             </span>
                         </TabsTrigger>
-                        <TabsTrigger value="Final" className="flex-1 sm:flex-none">
+                        <TabsTrigger value="Final" className="flex-1 sm:flex-none text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">
                             Final
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
                                 {filteredFinal.length}

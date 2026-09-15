@@ -17,6 +17,7 @@ import type {
 export interface HireRosterEmployee {
   user_id: number;
   name: string;
+  dateHired: string | null;
 }
 
 export interface HireRosterInput {
@@ -56,7 +57,8 @@ function buildRow(
   userId: number,
   userTasks: readonly OnboardingTask[],
   templateById: Map<number, OnboardingTaskTemplate>,
-  name: string | undefined
+  name: string | undefined,
+  dateHired: string | null
 ): HireRosterRow {
   const enriched: EnrichedTask[] = userTasks.map((task) => {
     const template =
@@ -118,6 +120,7 @@ function buildRow(
   return {
     userId,
     name: name ?? UNNAMED_EMPLOYEE_LABEL,
+    dateHired,
     status,
     phase: open[0]?.phase ?? null,
     phases: [...new Set(enriched.map((item) => item.phase))],
@@ -154,8 +157,8 @@ export function buildHireRosterRows(input: HireRosterInput): HireRosterRow[] {
   const templateById = new Map(
     input.templates.map((template) => [template.id, template])
   );
-  const nameByUser = new Map(
-    input.employees.map((employee) => [employee.user_id, employee.name])
+  const byUser = new Map(
+    input.employees.map((employee) => [employee.user_id, employee])
   );
 
   const tasksByUser = new Map<number, OnboardingTask[]>();
@@ -165,9 +168,16 @@ export function buildHireRosterRows(input: HireRosterInput): HireRosterRow[] {
     else tasksByUser.set(task.user_id, [task]);
   }
 
-  const rows = [...tasksByUser.entries()].map(([userId, userTasks]) =>
-    buildRow(userId, userTasks, templateById, nameByUser.get(userId))
-  );
+  const rows = [...tasksByUser.entries()].map(([userId, userTasks]) => {
+    const employee = byUser.get(userId);
+    return buildRow(
+      userId,
+      userTasks,
+      templateById,
+      employee?.name,
+      employee?.dateHired ?? null
+    );
+  });
 
   rows.sort((a, b) => {
     const rank = STATUS_RANK[a.status] - STATUS_RANK[b.status];

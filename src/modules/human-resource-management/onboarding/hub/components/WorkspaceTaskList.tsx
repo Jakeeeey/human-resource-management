@@ -19,64 +19,30 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 
-import {
-  formatDueDate,
-  isDateOverdue,
-  TASK_STATUS_LABELS,
-  taskStatusTone,
-} from "../rosterData";
+import { TASK_STATUS_LABELS, taskStatusTone } from "../rosterData";
 import type { WorkspacePhaseGroup } from "../workspaceTasks";
 
 // WorkspaceTaskList.tsx — the phased task list inside the per-hire workspace
 // (todo 28; enriched todo 29): one collapsible card per phase, each task
-// showing its status, due date, whether it is the current NEXT ACTION, and —
-// when blocked — the blocker reason. Every phase starts CLOSED and the rows
-// inside an expanded phase are paginated. Rendering only; grouping lives in
-// the pure `workspaceTasks.ts` and the next-action id is the same
-// server-derived task the roster row already surfaces.
+// showing its status and — when blocked — the blocker reason. Every phase
+// starts CLOSED and the rows inside an expanded phase are paginated.
+// Rendering only; grouping lives in the pure `workspaceTasks.ts`.
 
 /** Rows shown per expanded phase page. */
 const PAGE_SIZE = 5;
 
-function TaskRow({
-  item,
-  nextTaskId,
-}: {
-  item: WorkspacePhaseGroup["items"][number];
-  nextTaskId?: number | null;
-}) {
-  const overdue = isDateOverdue(item.dueDate);
-  const isNext = item.taskId === nextTaskId;
+function TaskRow({ item }: { item: WorkspacePhaseGroup["items"][number] }) {
   const isBlocked = item.status === "blocked";
 
   return (
     <li className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <p className="truncate text-sm font-medium" title={item.label}>
-            {item.label}
-          </p>
-          {isNext && !item.satisfied ? (
-            <StatusBadge tone="info">Next action</StatusBadge>
-          ) : null}
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          {item.dueDate ? (
-            <span
-              className={
-                overdue && !item.satisfied
-                  ? "font-medium text-destructive"
-                  : undefined
-              }
-            >
-              due {formatDueDate(item.dueDate)}
-            </span>
-          ) : null}
-          {overdue && !item.satisfied ? (
-            <span className="font-medium text-destructive">Overdue</span>
-          ) : null}
-          {item.required ? null : <span>optional</span>}
-        </div>
+        <p className="truncate text-sm font-medium" title={item.label}>
+          {item.label}
+        </p>
+        {item.required ? null : (
+          <p className="mt-1 text-xs text-muted-foreground">optional</p>
+        )}
         {isBlocked ? (
           <p className="mt-1.5 flex items-start gap-1.5 text-xs text-destructive">
             <AlertCircle
@@ -103,13 +69,7 @@ function TaskRow({
 // content, so collapsing unmounts it and re-opening starts back on page 1; the
 // `key` on `itemCount` (set by the parent) resets the page when the phase's
 // item count changes.
-function PhaseItems({
-  group,
-  nextTaskId,
-}: {
-  group: WorkspacePhaseGroup;
-  nextTaskId?: number | null;
-}) {
+function PhaseItems({ group }: { group: WorkspacePhaseGroup }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(group.items.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -120,7 +80,7 @@ function PhaseItems({
     <>
       <ul className="divide-y divide-border">
         {visibleItems.map((item) => (
-          <TaskRow key={item.taskId} item={item} nextTaskId={nextTaskId} />
+          <TaskRow key={item.taskId} item={item} />
         ))}
       </ul>
       {totalPages > 1 ? (
@@ -154,13 +114,7 @@ function PhaseItems({
   );
 }
 
-function PhaseCard({
-  group,
-  nextTaskId,
-}: {
-  group: WorkspacePhaseGroup;
-  nextTaskId?: number | null;
-}) {
+function PhaseCard({ group }: { group: WorkspacePhaseGroup }) {
   const [open, setOpen] = useState(false);
   const percent =
     group.total === 0 ? 0 : Math.round((group.done / group.total) * 100);
@@ -184,7 +138,7 @@ function PhaseCard({
                 </CardTitle>
               </div>
               <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                {group.done}/{group.total} done
+                {group.done}/{group.total} tasks done
                 <ChevronDown
                   className={cn(
                     "h-4 w-4 transition-transform",
@@ -203,11 +157,7 @@ function PhaseCard({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent>
-            <PhaseItems
-              key={group.items.length}
-              group={group}
-              nextTaskId={nextTaskId}
-            />
+            <PhaseItems key={group.items.length} group={group} />
           </CardContent>
         </CollapsibleContent>
       </Card>
@@ -217,10 +167,8 @@ function PhaseCard({
 
 export function WorkspaceTaskList({
   groups,
-  nextTaskId,
 }: {
   groups: WorkspacePhaseGroup[];
-  nextTaskId?: number | null;
 }) {
   if (groups.length === 0) {
     return (
@@ -233,7 +181,7 @@ export function WorkspaceTaskList({
   return (
     <div className="grid gap-4">
       {groups.map((group) => (
-        <PhaseCard key={group.phase} group={group} nextTaskId={nextTaskId} />
+        <PhaseCard key={group.phase} group={group} />
       ))}
     </div>
   );

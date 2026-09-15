@@ -69,10 +69,19 @@ export function PortalTablePagination({
       <p className="text-sm text-muted-foreground" aria-live="polite">
         {filteredCount === 0
           ? "No rows to show"
-          : `Showing ${rangeStart}–${rangeEnd} of ${filteredCount}`}
+          : totalPages > 1
+            ? `Showing ${rangeStart}–${rangeEnd} of ${filteredCount}`
+            : `${filteredCount} row${filteredCount === 1 ? "" : "s"}`}
       </p>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      {/* Single-page lists show the quiet count only — no inert pager chrome. */}
+      <div
+        className={
+          totalPages > 1
+            ? "flex flex-col gap-3 sm:flex-row sm:items-center"
+            : "hidden"
+        }
+      >
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Rows per page</span>
           <Select

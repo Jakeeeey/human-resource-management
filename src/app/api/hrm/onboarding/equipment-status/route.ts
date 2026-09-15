@@ -29,7 +29,6 @@ interface AckLogRow {
   doc_ref?: string;
   signer?: string;
   acknowledged_at?: string;
-  method?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -106,7 +105,6 @@ export async function GET(req: NextRequest) {
         acked: state?.acked ?? false,
         ackedAt: slot?.ack?.acknowledged_at ?? null,
         ackedBy: slot?.ack?.signer ?? null,
-        ackMethod: slot?.ack?.method ?? null,
       };
     });
 

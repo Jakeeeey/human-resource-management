@@ -23,17 +23,23 @@ import {
   PortalTrainingResponseSchema,
   type PortalTrainingItem,
 } from "@/modules/human-resource-management/employee-portal/types/portal-training.schema";
+import {
+  PortalEquipmentResponseSchema,
+  type PortalEquipmentItem,
+} from "@/modules/human-resource-management/employee-portal/types/portal-equipment.schema";
 import { uploadApplicationFile } from "@/modules/human-resource-management/application-form/providers/fetchProvider";
 
 interface PortalFetchContextType {
   session: PortalSession | null;
   checklist: PortalChecklistItem[];
   training: PortalTrainingItem[];
+  equipment: PortalEquipmentItem[];
   isLoading: boolean;
   isError: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
   uploadDocument: (docKey: string, file: File) => Promise<string>;
+  acknowledgeEquipment: (itemKey: string) => Promise<void>;
 }
 
 const PortalFetchContext = createContext<PortalFetchContextType | undefined>(
@@ -54,6 +60,7 @@ export function PortalFetchProvider({
   const [session, setSession] = useState<PortalSession | null>(null);
   const [checklist, setChecklist] = useState<PortalChecklistItem[]>([]);
   const [training, setTraining] = useState<PortalTrainingItem[]>([]);
+  const [equipment, setEquipment] = useState<PortalEquipmentItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -94,6 +101,19 @@ export function PortalFetchProvider({
       } catch {
         setTraining([]);
       }
+
+      try {
+        const equipmentRes = await fetch(`${BASE}/equipment`, {
+          cache: "no-store",
+        });
+        const equipmentBody = await readJson(equipmentRes);
+        const parsed = PortalEquipmentResponseSchema.safeParse(equipmentBody);
+        setEquipment(
+          equipmentRes.ok && parsed.success ? parsed.data.data ?? [] : []
+        );
+      } catch {
+        setEquipment([]);
+      }
     } catch (err) {
       setIsError(true);
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -131,17 +151,36 @@ export function PortalFetchProvider({
     [session, fetchData]
   );
 
+  const acknowledgeEquipment = useCallback(
+    async (itemKey: string): Promise<void> => {
+      if (!session) throw new Error("Hiree session not ready");
+      const res = await fetch(`${BASE}/equipment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_key: itemKey }),
+      });
+      const body = await readJson(res);
+      if (!res.ok || !body.success) {
+        throw new Error((body.message as string) || "Acknowledge failed");
+      }
+      await fetchData();
+    },
+    [session, fetchData]
+  );
+
   return (
     <PortalFetchContext.Provider
       value={{
         session,
         checklist,
         training,
+        equipment,
         isLoading,
         isError,
         error,
         refetch: fetchData,
         uploadDocument,
+        acknowledgeEquipment,
       }}
     >
       {children}

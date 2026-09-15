@@ -14,12 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 
-import {
-  formatDueDate,
-  isDateOverdue,
-  TASK_STATUS_LABELS,
-  taskStatusTone,
-} from "../rosterData";
+import { TASK_STATUS_LABELS, taskStatusTone } from "../rosterData";
 import type {
   WorkspacePhaseGroup,
   WorkspaceTaskItem,
@@ -151,7 +146,6 @@ export function TrainingTab({
               <ul className="divide-y divide-border">
                 {items.map((item) => {
                   const satisfied = isSatisfied(item);
-                  const overdue = isDateOverdue(item.dueDate);
                   const busy = checkingId === item.taskId;
                   return (
                     <li
@@ -172,30 +166,10 @@ export function TrainingTab({
                             </span>
                           ) : null}
                         </div>
-                        {item.dueDate || item.notes ? (
-                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                            {item.dueDate ? (
-                              <span
-                                className={
-                                  overdue && !satisfied
-                                    ? "font-medium text-destructive"
-                                    : undefined
-                                }
-                              >
-                                due {formatDueDate(item.dueDate)}
-                              </span>
-                            ) : null}
-                            {overdue && !satisfied ? (
-                              <span className="font-medium text-destructive">
-                                Overdue
-                              </span>
-                            ) : null}
-                            {item.notes ? (
-                              <span className="min-w-0 break-words">
-                                {item.notes}
-                              </span>
-                            ) : null}
-                          </div>
+                        {item.notes ? (
+                          <p className="mt-1 text-xs text-muted-foreground break-words">
+                            {item.notes}
+                          </p>
                         ) : null}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">

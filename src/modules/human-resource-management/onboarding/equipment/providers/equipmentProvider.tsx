@@ -7,14 +7,12 @@ import {
   useState,
 } from "react";
 
-import type {
-  AcknowledgeEquipmentItemInput,
-  IssueEquipmentItemInput,
-} from "../types/equipment-issue.schema";
+import type { IssueEquipmentItemInput } from "../types/equipment-issue.schema";
 
-// equipmentProvider.tsx — client fetch layer for the equipment issue/ack
-// routes. Thin context provider: status + issue + acknowledge + refetch with
-// loading/error flags. Everything is keyed to the employee (`user_id`).
+// equipmentProvider.tsx — client fetch layer for the equipment issue route.
+// Thin context provider: status + issue + refetch with loading/error flags.
+// Everything is keyed to the employee (`user_id`). Acknowledgement is the
+// hiree's own action and lives in the employee portal, never here.
 // Asset assignment is NEVER touched here (Master List owns assets).
 
 export interface EquipmentItemStatus {
@@ -29,7 +27,6 @@ export interface EquipmentItemStatus {
   acked: boolean;
   ackedAt: string | null;
   ackedBy: string | null;
-  ackMethod: string | null;
 }
 
 export interface EquipmentStatus {
@@ -45,7 +42,6 @@ interface EquipmentFetchContextType {
   error: Error | null;
   refetch: (userId: number) => Promise<void>;
   issueItem: (input: IssueEquipmentItemInput) => Promise<void>;
-  acknowledgeItem: (input: AcknowledgeEquipmentItemInput) => Promise<void>;
 }
 
 const EquipmentFetchContext = createContext<
@@ -53,7 +49,6 @@ const EquipmentFetchContext = createContext<
 >(undefined);
 
 const ISSUES_BASE = "/api/hrm/onboarding/equipment-issues";
-const ACKS_BASE = "/api/hrm/onboarding/equipment-acks";
 const STATUS_BASE = "/api/hrm/onboarding/equipment-status";
 
 async function readBody(res: Response): Promise<{
@@ -114,22 +109,6 @@ export function EquipmentFetchProvider({
     [refetch]
   );
 
-  const acknowledgeItem = useCallback(
-    async (input: AcknowledgeEquipmentItemInput) => {
-      const res = await fetch(ACKS_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      const body = await readBody(res);
-      if (!res.ok || !body.success) {
-        throw new Error(body?.message || "Acknowledge failed");
-      }
-      await refetch(input.user_id);
-    },
-    [refetch]
-  );
-
   return (
     <EquipmentFetchContext.Provider
       value={{
@@ -139,7 +118,6 @@ export function EquipmentFetchProvider({
         error,
         refetch,
         issueItem,
-        acknowledgeItem,
       }}
     >
       {children}

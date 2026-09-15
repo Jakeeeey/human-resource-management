@@ -42,7 +42,7 @@ export async function readHireApplicant(
   applicantId: number
 ): Promise<HireApplicantRow | null> {
   const body: unknown = await dFetch(
-    `/items/applicant/${applicantId}?fields=id,full_name,position_applied_for,status`
+    `/items/applicant/${applicantId}?fields=id,full_name,position_applied_for,manpower_request_id,status`
   );
   const errorMessage = directusErrorMessage(body);
   if (errorMessage) {
@@ -75,9 +75,12 @@ export async function readHireApplicationByApplicant(
     "nickname",
     "email",
     "phone",
-    "address",
+    "province",
+    "city",
+    "brgy",
     "position_applied_for",
     "birthdate",
+    "birthplace",
     "sex",
     "civil_status",
     "religion",
@@ -127,32 +130,139 @@ export function resolveHirePosition(
   return position ? position : null;
 }
 
+const PASSWORD_LASTNAME_FALLBACK = "employee";
+
+/** Work context the committed manpower request carries into the new account. */
+export interface HireRecruitmentProfile {
+  /** `manpower_request.requesting_department_id` — becomes `user_department`. */
+  departmentId: number | null;
+  /** Matching `department_positions.id` for the request's position, when any. */
+  positionId: number | null;
+  /** `manpower_request.position`, when the request names one. */
+  positionTitle: string | null;
+}
+
+const EMPTY_RECRUITMENT_PROFILE: HireRecruitmentProfile = {
+  departmentId: null,
+  positionId: null,
+  positionTitle: null,
+};
+
+function parsePositiveInt(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+async function readDepartmentPositionId(
+  departmentId: number,
+  position: string
+): Promise<number | null> {
+  const body: unknown = await dFetch(
+    `/items/department_positions?filter[department_id][_eq]=${departmentId}&filter[position][_eq]=${encodeURIComponent(
+      position
+    )}&fields=id&limit=1`
+  );
+  const parsed = z
+    .object({ data: z.array(z.object({ id: z.number().int().positive() })) })
+    .safeParse(body);
+  return parsed.success ? (parsed.data.data[0]?.id ?? null) : null;
+}
+
 /**
- * Generates the initial employee password (never surfaced in logs/evidence).
- * @returns A random string satisfying the Spring password rules
- * (>=8 chars, lowercase + uppercase + digit + special).
+ * Resolves the work context the recruitment pipeline already knows for an
+ * applicant: the committed manpower request's department (plus the matching
+ * catalog position id and title) so the auto-created account is not left with
+ * an unassigned department.
+ *
+ * Best-effort by design: every hop is optional and any read failure yields the
+ * empty profile rather than failing the hire — an unassigned department must
+ * never block account creation.
+ * @param applicantId - Applicant row id.
+ * @returns The resolved department/position, or the empty profile.
  */
-function generateHirePassword(): string {
-  const hex = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  return `Hrm#${hex}Aa1`;
+export async function readHireRecruitmentProfile(
+  applicantId: number
+): Promise<HireRecruitmentProfile> {
+  try {
+    const applicantBody: unknown = await dFetch(
+      `/items/applicant/${applicantId}?fields=manpower_request_id`
+    );
+    const parsedApplicant = z
+      .object({ manpower_request_id: z.unknown() })
+      .safeParse(unwrapData(applicantBody));
+    const requestId = parsedApplicant.success
+      ? parsePositiveInt(parsedApplicant.data.manpower_request_id)
+      : null;
+    if (requestId === null) return EMPTY_RECRUITMENT_PROFILE;
+
+    const requestBody: unknown = await dFetch(
+      `/items/manpower_request/${requestId}?fields=requesting_department_id,position`
+    );
+    const parsedRequest = z
+      .object({
+        requesting_department_id: z.unknown(),
+        position: z.unknown(),
+      })
+      .safeParse(unwrapData(requestBody));
+    if (!parsedRequest.success) return EMPTY_RECRUITMENT_PROFILE;
+
+    const departmentId = parsePositiveInt(
+      parsedRequest.data.requesting_department_id
+    );
+    const positionTitle =
+      typeof parsedRequest.data.position === "string" &&
+      parsedRequest.data.position.trim() !== ""
+        ? parsedRequest.data.position.trim()
+        : null;
+    const positionId =
+      departmentId !== null && positionTitle !== null
+        ? await readDepartmentPositionId(departmentId, positionTitle)
+        : null;
+
+    return { departmentId, positionId, positionTitle };
+  } catch {
+    return EMPTY_RECRUITMENT_PROFILE;
+  }
+}
+
+/**
+ * Derives the initial employee password from the hire's last name:
+ * `<lastname>123` in lowercase with every non-alphanumeric character removed
+ * (e.g. "Landingin" -> "landingin123", "Dela Cruz" -> "delacruz123").
+ * Falls back to "employee123" when the last name is absent.
+ * @param lastName - The hire's resolved last name.
+ * @returns The initial password (never surfaced in logs/evidence).
+ */
+export function buildHirePassword(lastName: string): string {
+  const base =
+    lastName.toLowerCase().replace(/[^a-z0-9]/g, "") ||
+    PASSWORD_LASTNAME_FALLBACK;
+  return `${base}123`;
 }
 
 /**
  * Maps the application row to the Spring `/users/create` payload. The
- * application's free-text `address` is NOT split into
- * province/city/brgy (guessing would corrupt data) — HR completes the
- * address in the master list; Spring accepts empty strings (live-proven).
+ * applicant's selected province/city/brgy are carried through verbatim
+ * (trimmed) — never guessed or split from free text, since the application
+ * collects them as PSGC selectors. Missing selections fall back to empty
+ * strings, which Spring accepts (live-proven). The recruitment profile (if
+ * resolved) supplies the department/position the pipeline already committed,
+ * mirroring the field names the manual add form sends.
  * @param application - Linked application row (email + position pre-validated).
  * @param applicant - Applicant row (name fallback).
  * @param position - Resolved position string.
+ * @param recruitment - Committed department/position, when resolvable.
  * @returns The payload consumed by `createSpringUser`.
  */
 export function buildSpringUserPayload(
   application: HireApplicationRow,
   applicant: HireApplicantRow,
-  position: string
+  position: string,
+  recruitment: HireRecruitmentProfile = EMPTY_RECRUITMENT_PROFILE
 ): SpringUserCreatePayload {
-  const password = generateHirePassword();
+  const lastName = application.last_name?.trim() || "";
+  const password = buildHirePassword(lastName);
   return {
     email: (application.email ?? "").trim(),
     hashPassword: password,
@@ -164,18 +274,24 @@ export function buildSpringUserPayload(
     rawPassword: password,
     firstName: application.first_name?.trim() || applicant.full_name?.trim() || "",
     middleName: application.middle_name?.trim() || undefined,
-    lastName: application.last_name?.trim() || "",
+    lastName,
     nickname: application.nickname?.trim() || undefined,
     contact: application.phone?.trim() ?? "",
-    province: "",
-    city: "",
-    brgy: "",
+    province: application.province?.trim() ?? "",
+    city: application.city?.trim() ?? "",
+    brgy: application.brgy?.trim() ?? "",
     position,
+    department:
+      recruitment.departmentId !== null
+        ? String(recruitment.departmentId)
+        : undefined,
+    position_id: recruitment.positionId ?? undefined,
     dateOfHire: philippineDate(),
     role: "USER",
     admin: false,
     tags: "Employee",
     birthday: application.birthdate ?? undefined,
+    placeOfBirth: application.birthplace?.trim() || undefined,
     gender: application.sex ?? undefined,
     civilStatus: application.civil_status ?? undefined,
     religion: application.religion ?? undefined,

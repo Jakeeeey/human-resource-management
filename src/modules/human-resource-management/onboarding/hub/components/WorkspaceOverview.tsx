@@ -56,10 +56,7 @@ export function WorkspaceOverview({
             <Skeleton className="h-32 w-full" />
           </div>
         ) : (
-          <WorkspaceTaskList
-            groups={groups}
-            nextTaskId={row?.nextAction?.taskId ?? null}
-          />
+          <WorkspaceTaskList groups={groups} />
         )}
       </section>
 

@@ -12,8 +12,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 
 import {
-  formatDueDate,
-  isDateOverdue,
   phaseLabel,
   TASK_STATUS_LABELS,
   taskStatusTone,
@@ -53,7 +51,6 @@ export function WorkspaceNeedsAttention({
         ) : (
           <ul className="grid gap-2">
             {items.map((item) => {
-              const overdue = isDateOverdue(item.dueDate);
               const isBlocked = item.status === "blocked";
               return (
                 <li
@@ -78,22 +75,6 @@ export function WorkspaceNeedsAttention({
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {phaseLabel(item.phase)}
                     </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    <span
-                      className={
-                        overdue ? "font-medium text-destructive" : undefined
-                      }
-                    >
-                      {item.dueDate
-                        ? `due ${formatDueDate(item.dueDate)}`
-                        : "no due date"}
-                    </span>
-                    {overdue ? (
-                      <span className="font-medium text-destructive">
-                        Overdue
-                      </span>
-                    ) : null}
                   </div>
                   {isBlocked ? (
                     <p className="mt-1.5 flex items-start gap-1.5 text-xs text-destructive">

@@ -18,8 +18,8 @@ export const dynamic = "force-dynamic";
 // EMPLOYEE (`user.user_id`).
 // POST /api/hrm/onboarding/equipment-issues — HR records handover of one
 // catalog item. Writes an issue row into `acknowledgement_logs`
-// (doc_ref `equipment:issue:<userId>:<itemKey>`, signer `issuer:<role>`,
-// method `typed`). Unknown employees → 400; unknown item keys → 400;
+// (doc_ref `equipment:issue:<userId>:<itemKey>`, signer `issuer:<role>`; no
+// method column). Unknown employees → 400; unknown item keys → 400;
 // double-issue → 409. Asset tables are NEVER written here (Master List owns
 // assets).
 
@@ -46,7 +46,6 @@ interface AckLogRow {
   doc_ref?: string;
   signer?: string;
   acknowledged_at?: string;
-  method?: string;
 }
 
 function issuePrefix(userId: number): string {
@@ -125,7 +124,6 @@ export async function POST(req: NextRequest) {
           doc_ref: docRef,
           signer: issuerSigner(item.issuer),
           acknowledged_at: now,
-          method: "typed",
         }),
       })) as { data?: AckLogRow };
     } catch (error) {

@@ -166,7 +166,7 @@ export function TemplateItemsDrawer({
               </SheetTitle>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <TrainingDepartmentBadge
-                  departmentId={template.department_id}
+                  departmentIds={template.department_ids}
                   departments={departments.rows}
                 />
                 <span className="text-sm text-muted-foreground">

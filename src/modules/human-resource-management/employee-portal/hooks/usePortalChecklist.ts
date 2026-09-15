@@ -14,14 +14,17 @@ export function usePortalChecklist() {
     session,
     checklist,
     training,
+    equipment,
     isLoading,
     isError,
     error,
     refetch,
     uploadDocument,
+    acknowledgeEquipment,
   } = usePortalFetch();
 
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [acknowledgingKey, setAcknowledgingKey] = useState<string | null>(null);
 
   const upload = useCallback(
     async (docKey: string, file: File | null) => {
@@ -42,28 +45,49 @@ export function usePortalChecklist() {
     [uploadDocument]
   );
 
+  const acknowledge = useCallback(
+    async (itemKey: string) => {
+      setAcknowledgingKey(itemKey);
+      try {
+        await acknowledgeEquipment(itemKey);
+        toast.success("Equipment acknowledged");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Acknowledge failed");
+      } finally {
+        setAcknowledgingKey(null);
+      }
+    },
+    [acknowledgeEquipment]
+  );
+
   return useMemo(
     () => ({
       session,
       checklist,
       training,
+      equipment,
       isLoading,
       isError,
       error,
       refetch,
       upload,
       uploadingKey,
+      acknowledge,
+      acknowledgingKey,
     }),
     [
       session,
       checklist,
       training,
+      equipment,
       isLoading,
       isError,
       error,
       refetch,
       upload,
       uploadingKey,
+      acknowledge,
+      acknowledgingKey,
     ]
   );
 }

@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 //
 // GET /api/hrm/onboarding/acknowledgement-logs — read/trail path (exact
 // `?doc_ref=`, optional exact `?signer=`), newest-first.
-// POST — record one ack `{doc_ref, signer, acknowledged_at (PH), method}`.
+// POST — record one ack `{doc_ref, signer, acknowledged_at (PH)}`.
 // Double-ack collapses to ONE row: exact-triple pre-check first, then insert;
 // a UNIQUE-conflict body (Directus answers 400 RECORD_NOT_UNIQUE, never 409)
 // re-reads the triple and returns the single surviving row (Todo 2 precedent).
@@ -132,9 +132,6 @@ export async function POST(req: NextRequest) {
       created_at: now,
       updated_at: now,
     };
-    if (validation.data.method !== undefined) {
-      payload.method = validation.data.method;
-    }
     const created = (await dFetch("/items/acknowledgement_logs", {
       method: "POST",
       body: JSON.stringify(payload),

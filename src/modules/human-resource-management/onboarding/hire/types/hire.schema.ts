@@ -14,6 +14,7 @@ export const HireApplicantRowSchema = z.looseObject({
   id: z.number().int().positive(),
   full_name: z.string().nullish(),
   position_applied_for: z.string().nullish(),
+  manpower_request_id: z.number().int().positive().nullish(),
   status: ApplicantStatusSchema,
 });
 
@@ -33,9 +34,12 @@ export const HireApplicationRowSchema = z.looseObject({
   nickname: z.string().nullish(),
   email: z.string().nullish(),
   phone: z.string().nullish(),
-  address: z.string().nullish(),
+  province: z.string().nullish(),
+  city: z.string().nullish(),
+  brgy: z.string().nullish(),
   position_applied_for: z.string().nullish(),
   birthdate: z.string().nullish(),
+  birthplace: z.string().nullish(),
   sex: z.string().nullish(),
   civil_status: z.string().nullish(),
   religion: z.string().nullish(),

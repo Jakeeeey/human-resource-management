@@ -20,13 +20,14 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 
-// multi-combobox.tsx — the app-wide MULTISELECT combobox. Its chip/toggle/search
-// behaviour is lifted verbatim from the paperwork registry's company multiselect
-// (trigger truncate + v4 popover width + item truncate/title + checkbox toggles
-// per QA.md §5.2) but parameterised so any catalog can drive it: options carry an
-// optional mono `code`, and the search placeholder + empty-state copy are props.
-// Picks stay open, selected values render as removable Badge chips in the
-// trigger, and Backspace/Delete on the closed trigger drops the last pick.
+// MultiCombobox.tsx — the training-templates MULTISELECT combobox. Its
+// chip/toggle/search behaviour is lifted verbatim from the paperwork registry's
+// company multiselect (trigger truncate + v4 popover width + item
+// truncate/title + checkbox toggles per QA.md §5.2) but parameterised so any
+// catalog can drive it: options carry an optional mono `code`, and the search
+// placeholder + empty-state copy are props. Picks stay open, selected values
+// render as removable Badge chips in the trigger, and Backspace/Delete on the
+// closed trigger drops the last pick.
 
 /** One selectable option; `code` renders as a trailing mono value when present. */
 export interface MultiComboboxOption {
@@ -45,6 +46,8 @@ interface MultiComboboxProps {
     searchPlaceholder?: string;
     /** Shown when the search matches no option. */
     emptyMessage?: string;
+    /** Accessible name; falls back to the placeholder when omitted. */
+    ariaLabel?: string;
     disabled?: boolean;
     className?: string;
 }
@@ -61,6 +64,7 @@ export function MultiCombobox({
     placeholder = "Select options…",
     searchPlaceholder = "Search…",
     emptyMessage = "No results found.",
+    ariaLabel,
     disabled = false,
     className,
 }: MultiComboboxProps) {
@@ -96,7 +100,7 @@ export function MultiCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    aria-label={placeholder}
+                    aria-label={ariaLabel ?? placeholder}
                     className={cn(
                         "h-auto min-h-10 w-full min-w-0 max-w-full justify-between gap-2 py-1.5",
                         values.length === 0 && "text-muted-foreground",

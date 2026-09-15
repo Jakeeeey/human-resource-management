@@ -182,7 +182,7 @@ export function TemplatesTable({
                 </TableCell>
                 <TableCell>
                   <TrainingDepartmentBadge
-                    departmentId={row.department_id}
+                    departmentIds={row.department_ids}
                     departments={departments}
                   />
                 </TableCell>

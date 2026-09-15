@@ -21,6 +21,7 @@ const EmployeeNameRowSchema = z.object({
   user_id: z.number().int().positive(),
   user_fname: z.string().nullable(),
   user_lname: z.string().nullable(),
+  user_dateOfHire: z.string().nullish(),
 });
 
 function displayName(row: z.infer<typeof EmployeeNameRowSchema>): string {
@@ -32,10 +33,10 @@ function displayName(row: z.infer<typeof EmployeeNameRowSchema>): string {
 }
 
 async function listEmployeeNames(): Promise<
-  Array<{ user_id: number; name: string }>
+  Array<{ user_id: number; name: string; dateHired: string | null }>
 > {
   const body: unknown = await dFetch(
-    "/items/user?fields=user_id,user_fname,user_lname&sort=-user_id&limit=-1"
+    "/items/user?fields=user_id,user_fname,user_lname,user_dateOfHire&sort=-user_id&limit=-1"
   );
   const parsed = z.object({ data: z.array(EmployeeNameRowSchema) }).safeParse(body);
   if (!parsed.success) {
@@ -48,13 +49,13 @@ async function listEmployeeNames(): Promise<
   return parsed.data.data.map((row) => ({
     user_id: row.user_id,
     name: displayName(row),
+    dateHired: row.user_dateOfHire ?? null,
   }));
 }
 
 /**
  * Builds the enriched hire roster: one row per employee that owns
- * `onboarding_task` rows, with the six hub columns (hire, status/phase, next
- * action, owner, due, blockers).
+ * `onboarding_task` rows, with hire, status/phase, and date hired.
  * @returns Roster rows, "needs attention" first.
  * @throws `HIRE_ROSTER_EMPLOYEE_READ_FAILED` when the user directory read
  * fails (never a silent empty roster); `ONBOARDING_TASK_*` codes propagate
