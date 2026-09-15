@@ -11,6 +11,7 @@ export interface JobOfferFormData {
     contactNumber: string;
     salutationName: string;
     companyName: string;
+    companyId: number | null;
     position: string;
     baseLocation: string;
     department: string;
@@ -34,6 +35,7 @@ export const EMPTY_JOB_OFFER: JobOfferFormData = {
     contactNumber: "",
     salutationName: "",
     companyName: "Men2 Marketing Corporation",
+    companyId: null,
     position: "",
     baseLocation: "",
     department: "",

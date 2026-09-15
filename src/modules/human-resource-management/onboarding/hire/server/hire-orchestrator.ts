@@ -9,11 +9,13 @@ import {
   buildSpringUserPayload,
   readHireApplicant,
   readHireApplicationByApplicant,
+  readHireCompanyDomain,
   readHireRecruitmentProfile,
   resolveHireEmail,
   resolveHirePosition,
 } from "./hire-application";
 import { logHireActivity, placeholderApplicantEmail } from "./hire-log";
+import { buildLoginEmail, buildLoginLocalPart } from "./hire-email";
 import { listHireCompletionSteps } from "./hire-steps";
 import { resolveHireUser } from "./hire-user";
 
@@ -24,8 +26,10 @@ import { resolveHireUser } from "./hire-user";
 // calls this function). It runs the post-hire effects in order, idempotently:
 //
 //   1. read the applicant + its linked application (the prefill source);
-//   2. resolve/create the Spring `user` by the applicant's email — reuse wins,
-//      concurrent duplicates collapse to one create (hire-user.ts);
+//   2. resolve the offer's company domain, synthesize the login address
+//      (`first_last@companydomain`), then resolve/create the Spring `user`
+//      keyed to the applicant's PERSONAL email — reuse wins, concurrent
+//      duplicates collapse to one create (hire-user.ts);
 //   3. run every registered post-hire step with the resolved `user_id` — the
 //      todos 17/19 SEAM (hire-steps.ts). Steps receive `{ applicantId,
 //      applicationId, userId, userCreated, email }`; `userId` IS the
@@ -145,14 +149,28 @@ export async function runHireOrchestrator(
       );
     }
 
+    const domain = await readHireCompanyDomain(applicantId);
+    const localPart = buildLoginLocalPart(
+      application.first_name ?? "",
+      application.last_name ?? ""
+    );
+    const loginEmail = buildLoginEmail(localPart, domain);
+
     const recruitment = await readHireRecruitmentProfile(applicantId);
     const payload = buildSpringUserPayload(
       application,
       applicant,
       position,
+      loginEmail,
       recruitment
     );
-    const resolved = await resolveHireUser({ email, payload, authToken });
+    const resolved = await resolveHireUser({
+      personalEmail: email,
+      localPart,
+      domain,
+      payload,
+      authToken,
+    });
     resolvedUserId = resolved.userId;
 
     const steps = await runHireSteps({

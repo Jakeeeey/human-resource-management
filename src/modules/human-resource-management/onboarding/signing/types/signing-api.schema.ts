@@ -50,6 +50,7 @@ export type SigningEnvelopeCreate = z.infer<typeof SigningEnvelopeCreateSchema>;
 
 export const JobOfferCreateSchema = JobOfferSchema.omit(RECORD_MANAGED_KEYS)
   .extend({
+    company_id: z.number().int().positive().nullable().default(null),
     signing_envelope_id: z.number().int().positive().nullable().default(null),
     terms_snapshot: z.json().default(null),
     pdf_file: z.string().nullable().default(null),
@@ -67,6 +68,7 @@ export type JobOfferCreate = z.infer<typeof JobOfferCreateSchema>;
 
 export const JobOfferUpdateSchema = z
   .object({
+    company_id: z.number().int().positive().nullable().optional(),
     signing_envelope_id: z.number().int().positive().nullable().optional(),
     terms_snapshot: z.json().optional(),
     pdf_file: z.string().nullable().optional(),
