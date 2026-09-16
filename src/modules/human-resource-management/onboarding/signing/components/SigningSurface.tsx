@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +72,23 @@ export function SigningSurface({
     applicantStatus,
   });
   const [retrying, setRetrying] = useState(false);
+  const router = useRouter();
+  const redirectedRef = useRef(false);
+
+  const redirectOnHired = useCallback(
+    (kind: string) => {
+      if (kind === "hired" && !redirectedRef.current) {
+        redirectedRef.current = true;
+        toast.success(
+          "Completion finished — employee record is ready. Opening the onboarding hub…"
+        );
+        window.setTimeout(() => {
+          router.push("/hrm/onboarding");
+        }, 2500);
+      }
+    },
+    [router]
+  );
 
   const orderedItems = useMemo(
     () =>
@@ -105,9 +123,10 @@ export function SigningSurface({
       setEnvelopeState(result.envelope);
       setPaperworks(result.paperworks);
       setCompletion(result.completion);
+      redirectOnHired(result.completion.kind);
       onChanged?.();
     },
-    [onChanged, setCompletion]
+    [onChanged, redirectOnHired, setCompletion]
   );
 
   const handleItemSigned = useCallback(
@@ -118,9 +137,10 @@ export function SigningSurface({
       setEnvelopeState(result.envelope);
       setPaperworks(result.paperworks);
       setCompletion(result.completion);
+      redirectOnHired(result.completion.kind);
       onChanged?.();
     },
-    [onChanged, setCompletion]
+    [onChanged, redirectOnHired, setCompletion]
   );
 
   const handleOfferChanged = useCallback(async () => {
@@ -159,7 +179,7 @@ export function SigningSurface({
       );
       handleItemSigned(result);
       if (result.completion.kind === "hired") {
-        toast.success("Completion finished — employee record is ready");
+        redirectOnHired(result.completion.kind);
       } else {
         toast.warning("Completion is still blocked — see the notice above");
       }
@@ -174,6 +194,7 @@ export function SigningSurface({
     retrying,
     signPaperworkItem,
     handleItemSigned,
+    redirectOnHired,
     reloadSet,
   ]);
 

@@ -18,6 +18,8 @@ export interface HireRosterEmployee {
   user_id: number;
   name: string;
   dateHired: string | null;
+  department: string | null;
+  position: string | null;
 }
 
 export interface HireRosterInput {
@@ -58,7 +60,9 @@ function buildRow(
   userTasks: readonly OnboardingTask[],
   templateById: Map<number, OnboardingTaskTemplate>,
   name: string | undefined,
-  dateHired: string | null
+  dateHired: string | null,
+  department: string | null,
+  position: string | null
 ): HireRosterRow {
   const enriched: EnrichedTask[] = userTasks.map((task) => {
     const template =
@@ -121,6 +125,8 @@ function buildRow(
     userId,
     name: name ?? UNNAMED_EMPLOYEE_LABEL,
     dateHired,
+    department,
+    position,
     status,
     phase: open[0]?.phase ?? null,
     phases: [...new Set(enriched.map((item) => item.phase))],
@@ -175,7 +181,9 @@ export function buildHireRosterRows(input: HireRosterInput): HireRosterRow[] {
       userTasks,
       templateById,
       employee?.name,
-      employee?.dateHired ?? null
+      employee?.dateHired ?? null,
+      employee?.department ?? null,
+      employee?.position ?? null
     );
   });
 

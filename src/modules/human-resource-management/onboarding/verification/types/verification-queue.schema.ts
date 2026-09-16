@@ -15,11 +15,15 @@ import type { DocumentVerificationState } from "./document-verification.schema";
 //
 // Task mapping (the codes are the seeded catalog's `documents` rows):
 // - `documents_submitted` (hiree)      done    -> the row ENTERS the queue;
+// - filed portal documents (any)                -> the row ENTERS as pending,
+//   even when `submitted` is still open, so HR sees partial sets per document;
 // - `documents_hr_verified` (hr)       pending -> pending
 //                                      blocked -> returned (+ reason in notes)
 //                                      done    -> approved (history)
 // Cycle: pending → approved | returned(reason) → resubmit → pending → approved.
-// Approve from returned is refused (resubmit first) so the cycle is provable.
+// The HR task only auto-closes over a FULLY submitted set (see the verifications
+// route); per-document approvals on a partial set are recorded but leave the
+// aggregate open until the hire files everything.
 
 export const VERIFICATION_PHASE = "documents";
 export const DOCUMENTS_SUBMITTED_CODE = "documents_submitted";
@@ -152,8 +156,8 @@ function latestTimestamp(...values: readonly (string | null)[]): string | null {
 }
 
 // Builds one queue row from an employee's tasks + the shared catalog. Returns
-// null when the employee is not in verification (no submitted gate passed and
-// no HR decision recorded). Pure — the caller supplies rows.
+// null when the employee has neither a submitted-or-decided task state nor any
+// filed portal documents. Pure — the caller supplies rows.
 export function buildQueueRow(
   userId: number,
   tasks: readonly OnboardingTask[],
@@ -161,7 +165,8 @@ export function buildQueueRow(
   documents: readonly QueueDocument[] = []
 ): QueueRow | null {
   const pair = findVerificationTasks(tasks, templates);
-  const queueState = deriveQueueState(pair);
+  const queueState =
+    deriveQueueState(pair) ?? (documents.length > 0 ? "pending" : null);
   if (queueState === null) return null;
 
   return {

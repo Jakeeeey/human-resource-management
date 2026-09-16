@@ -73,15 +73,6 @@ const DOCUMENT_TEMPLATES: readonly OnboardingTaskTemplateSeed[] = [
     is_active: true,
     sort_order: 20,
   },
-  {
-    code: "documents_acknowledged",
-    title: "Documents acknowledgement recorded",
-    phase: "documents",
-    owner_role: "hiree",
-    is_required: true,
-    is_active: true,
-    sort_order: 30,
-  },
 ];
 
 /**

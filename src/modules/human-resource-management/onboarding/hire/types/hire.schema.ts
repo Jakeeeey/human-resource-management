@@ -47,6 +47,8 @@ export const HireApplicationRowSchema = z.looseObject({
   tin: z.string().nullish(),
   philhealth_no: z.string().nullish(),
   pagibig_no: z.string().nullish(),
+  photo_file: z.string().nullish(),
+  signature_file: z.string().nullish(),
 });
 
 export type HireApplicationRow = z.infer<typeof HireApplicationRowSchema>;

@@ -267,16 +267,10 @@ async function handleDocumentDecision(input: {
       { status: 400 }
     );
   }
-  if (pair.submitted?.status !== "done") {
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          "Documents are not submitted yet — only submitted documents can be verified",
-      },
-      { status: 400 }
-    );
-  }
+  // No `submitted`-done gate here: filed documents are reviewable per document
+  // even when the hire has not filed the full set yet (the queue shows partial
+  // sets as pending). The aggregate HR task below still only auto-closes over
+  // a fully submitted set.
 
   const state: DocumentVerificationState =
     decision === "approve" ? "approved" : "returned";
@@ -298,7 +292,12 @@ async function handleDocumentDecision(input: {
   );
 
   if (rollup === "approved") {
-    await completeOnboardingTask({ taskId: pair.hr.id, completedBy: actorId });
+    // The HR task closes only over a FULLY submitted set: approvals on a
+    // partial set are recorded per document, but the aggregate stays open
+    // until the portal completes `submitted` (all required docs filed).
+    if (pair.submitted?.status === "done") {
+      await completeOnboardingTask({ taskId: pair.hr.id, completedBy: actorId });
+    }
   } else if (rollup === "returned") {
     const returnedReason = docs
       .map((doc) => verByDoc?.get(doc.docKey))
@@ -316,12 +315,13 @@ async function handleDocumentDecision(input: {
 
   const afterTasks = await listOnboardingTasks({ userId });
   const row = buildQueueRow(userId, afterTasks, templates, docs);
-  if (!row || row.queueState !== rollup) {
+  const visibleDoc = row?.documents.find((doc) => doc.docKey === docKey);
+  if (!row || visibleDoc?.state !== state) {
     console.error("[onboarding-verifications] document decision not visible:", {
       userId,
       docKey,
       decision,
-      rollup,
+      state,
       row,
     });
     return serverError();

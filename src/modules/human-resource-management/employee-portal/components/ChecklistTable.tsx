@@ -15,6 +15,16 @@ import {
 } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, Circle, RefreshCw, Upload } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 import { PortalTablePagination } from "./PortalTablePagination";
 
@@ -34,6 +44,9 @@ interface ChecklistTableProps {
   onUpload: (docKey: string, file: File | null) => void;
 }
 
+const ACCEPTED_UPLOAD_TYPES =
+  "image/jpeg,image/png,image/webp,image/gif,application/pdf";
+
 function UploadCell({
   item,
   uploading,
@@ -43,51 +56,84 @@ function UploadCell({
   uploading: boolean;
   onUpload: (docKey: string, file: File | null) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const needsResubmit = item.filed && item.state === "returned";
 
+  const close = () => {
+    setOpen(false);
+    setFile(null);
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
   return (
-    <div className="flex items-center justify-end gap-1">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-        className="hidden"
-        aria-label={`Choose file for ${item.title}`}
-        onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-      />
+    <div className="flex items-center justify-end">
       <Button
         variant="outline"
         size="sm"
-        onClick={() => inputRef.current?.click()}
+        onClick={() => setOpen(true)}
         disabled={uploading}
         className="min-h-8"
-        title={
-          file
-            ? file.name
-            : needsResubmit
-              ? `Resubmit ${item.title}`
-              : `Choose file for ${item.title}`
-        }
+        title={needsResubmit ? `Resubmit ${item.title}` : `Upload ${item.title}`}
       >
-        <span className="max-w-[140px] truncate">
-          {file ? file.name : needsResubmit ? "Resubmit" : "Choose file"}
-        </span>
+        <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+        {needsResubmit ? "Resubmit" : "Upload"}
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          onUpload(item.key, file);
-          setFile(null);
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) close();
+          else setOpen(true);
         }}
-        disabled={uploading || !file}
-        aria-label={`Upload ${item.title}`}
-        title={file ? `Upload ${file.name}` : "Choose a file first"}
       >
-        <Upload className="h-4 w-4" />
-      </Button>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {needsResubmit ? `Resubmit ${item.title}` : `Upload ${item.title}`}
+            </DialogTitle>
+            <DialogDescription>
+              Choose a JPG, PNG, WebP, GIF, or PDF file. It uploads when you
+              confirm below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor={`portal-upload-${item.key}`}>File</Label>
+            <Input
+              ref={inputRef}
+              id={`portal-upload-${item.key}`}
+              type="file"
+              accept={ACCEPTED_UPLOAD_TYPES}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+            {file && (
+              <p className="truncate text-xs text-muted-foreground" title={file.name}>
+                {file.name} · {(file.size / 1024).toFixed(0)} KB
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={close}
+              disabled={uploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                onUpload(item.key, file);
+                close();
+              }}
+              disabled={!file || uploading}
+            >
+              {uploading ? "Uploading…" : "Upload file"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

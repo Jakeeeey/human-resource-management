@@ -54,6 +54,7 @@ export interface SpringUserCreatePayload {
   philHealthNumber?: string;
   tinNumber?: string;
   pagibigNumber?: string;
+  signature?: string | null;
 }
 
 export interface SpringUserCreateOutcome {

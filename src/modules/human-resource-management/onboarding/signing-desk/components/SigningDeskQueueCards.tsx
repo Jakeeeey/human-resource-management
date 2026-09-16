@@ -33,6 +33,7 @@ interface SigningDeskQueueCardsProps {
   rows: SigningQueueRow[];
   isLoading: boolean;
   launchingId: number | null;
+  emptyCopy?: string;
   onOpen: (row: SigningQueueRow) => void;
 }
 
@@ -40,6 +41,7 @@ export function SigningDeskQueueCards({
   rows,
   isLoading,
   launchingId,
+  emptyCopy,
   onOpen,
 }: SigningDeskQueueCardsProps) {
   if (isLoading) {
@@ -53,7 +55,7 @@ export function SigningDeskQueueCards({
   if (rows.length === 0) {
     return (
       <p className="p-3 text-center text-sm text-muted-foreground lg:hidden">
-        No applicants have a signing set yet.
+        {emptyCopy ?? "No applicants have a signing set yet."}
       </p>
     );
   }
