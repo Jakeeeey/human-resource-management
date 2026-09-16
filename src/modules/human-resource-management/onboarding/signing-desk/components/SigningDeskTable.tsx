@@ -36,6 +36,7 @@ interface SigningDeskTableProps {
   rows: SigningQueueRow[];
   isLoading: boolean;
   launchingId: number | null;
+  emptyCopy?: string;
   onOpen: (row: SigningQueueRow) => void;
 }
 
@@ -43,6 +44,7 @@ export function SigningDeskTable({
   rows,
   isLoading,
   launchingId,
+  emptyCopy,
   onOpen,
 }: SigningDeskTableProps) {
   return (
@@ -63,7 +65,7 @@ export function SigningDeskTable({
             <TableRow>
               <TableCell colSpan={5}>
                 <p className="py-6 text-center text-muted-foreground">
-                  No applicants have a signing set yet.
+                  {emptyCopy ?? "No applicants have a signing set yet."}
                 </p>
               </TableCell>
             </TableRow>

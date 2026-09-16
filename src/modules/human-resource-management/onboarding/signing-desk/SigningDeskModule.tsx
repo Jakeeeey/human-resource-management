@@ -10,25 +10,70 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, PenLine } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  PenLine,
+  Search,
+  X,
+} from "lucide-react";
 import {
   SigningEnvelopeFetchProvider,
   useSigningEnvelopeFetch,
 } from "../signing/providers/signingEnvelopeProvider";
 import { SigningSurface } from "../signing/components/SigningSurface";
+import { isCompletionPending } from "../signing/signingCopy";
 import type { PaperworkTemplate } from "../paperwork/types/paperwork-template.schema";
 import type {
   JobOffer,
   PaperworkItem,
   Paperworks,
   SigningEnvelope,
+  SigningEnvelopeStatus,
 } from "../signing/types/contracts";
 import {
   SigningDeskQueueCards,
   type SigningQueueRow,
 } from "./components/SigningDeskQueueCards";
 import { SigningDeskTable } from "./components/SigningDeskTable";
+import { signingDeskJobFields } from "./components/signingDeskFields";
+
+interface DeskFilters {
+  query: string;
+  envelopeStatus: "all" | SigningEnvelopeStatus;
+  attentionOnly: boolean;
+}
+
+const EMPTY_DESK_FILTERS: DeskFilters = {
+  query: "",
+  envelopeStatus: "all",
+  attentionOnly: false,
+};
+
+const PAGE_SIZE = 10;
+
+const ENVELOPE_STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "pending", label: "Pending" },
+  { value: "complete", label: "Complete" },
+] as const;
+
+const ATTENTION_OPTIONS = [
+  { value: "all", label: "All sets" },
+  { value: "attention", label: "Needs attention" },
+] as const;
 
 interface ApplicantSummary {
   id: number;
@@ -53,6 +98,170 @@ interface OpenSigningSet {
   items: PaperworkItem[];
 }
 
+function FilterSelect({
+  value,
+  onChange,
+  placeholder,
+  options,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  ariaLabel: string;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger aria-label={ariaLabel} title={ariaLabel} className="h-10">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent className="max-h-60">
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function DeskFilterBar({
+  filters,
+  onChange,
+  onReset,
+}: {
+  filters: DeskFilters;
+  onChange: (next: DeskFilters) => void;
+  onReset: () => void;
+}) {
+  const hasActiveFilters =
+    filters.query !== "" ||
+    filters.envelopeStatus !== "all" ||
+    filters.attentionOnly;
+
+  return (
+    <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+      <div className="relative min-w-0 flex-1">
+        <Search
+          className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          className="h-10 pl-8"
+          aria-label="Search signing queue"
+          title="Search signing queue"
+          placeholder="Search applicant, position, or department…"
+          value={filters.query}
+          onChange={(event) =>
+            onChange({ ...filters, query: event.target.value })
+          }
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2 lg:w-[380px] lg:shrink-0">
+        <FilterSelect
+          ariaLabel="Filter by signing status"
+          value={filters.envelopeStatus}
+          placeholder="All statuses"
+          options={ENVELOPE_STATUS_OPTIONS}
+          onChange={(value) =>
+            onChange({
+              ...filters,
+              envelopeStatus: value as DeskFilters["envelopeStatus"],
+            })
+          }
+        />
+        <FilterSelect
+          ariaLabel="Filter by attention"
+          value={filters.attentionOnly ? "attention" : "all"}
+          placeholder="All sets"
+          options={ATTENTION_OPTIONS}
+          onChange={(value) =>
+            onChange({ ...filters, attentionOnly: value === "attention" })
+          }
+        />
+      </div>
+      <Button
+        variant="ghost"
+        className="h-10 w-full shrink-0 px-3 lg:w-auto"
+        onClick={onReset}
+        disabled={!hasActiveFilters}
+      >
+        Reset
+        <X className="ml-2 h-4 w-4" aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
+
+function DeskPager({
+  page,
+  totalPages,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (next: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={page <= 1}
+        onClick={() => onChange(1)}
+        aria-label="First page"
+        title="First page"
+      >
+        <ChevronsLeft className="h-4 w-4" aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={page <= 1}
+        onClick={() => onChange(page - 1)}
+        aria-label="Previous page"
+        title="Previous page"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      </Button>
+      <span className="px-2 text-xs text-muted-foreground" aria-live="polite">
+        Page {page} of {totalPages}
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+        aria-label="Next page"
+        title="Next page"
+      >
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={page >= totalPages}
+        onClick={() => onChange(totalPages)}
+        aria-label="Last page"
+        title="Last page"
+      >
+        <ChevronsRight className="h-4 w-4" aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
+
 function DeskBody() {
   const { listEnvelopes, listJobOffers, listPaperworks, listPaperworkItems } =
     useSigningEnvelopeFetch();
@@ -66,6 +275,8 @@ function DeskBody() {
   const [launching, setLaunching] = useState<number | null>(null);
   const [isError, setIsError] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [filters, setFilters] = useState<DeskFilters>(EMPTY_DESK_FILTERS);
+  const [page, setPage] = useState(1);
 
   const templateById = useMemo(() => {
     const map = new Map<number, PaperworkTemplate>();
@@ -73,26 +284,81 @@ function DeskBody() {
     return map;
   }, [templates]);
 
-  const rows = useMemo<DeskRow[]>(() => {
+  const allRows = useMemo<DeskRow[]>(() => {
     const applicantById = new Map(applicants.map((row) => [row.id, row]));
     const offerByApplicant = new Map(offers.map((row) => [row.applicant_id, row]));
     const paperworksByApplicant = new Map(
       paperworksRows.map((row) => [row.applicant_id, row])
     );
-    return envelopes
-      .map((envelope) => ({
-        applicant: applicantById.get(envelope.applicant_id) ?? {
-          id: envelope.applicant_id,
-          full_name: `Applicant #${envelope.applicant_id}`,
-          position_applied_for: null,
-          status: null,
-        },
-        envelope,
-        offer: offerByApplicant.get(envelope.applicant_id) ?? null,
-        paperworks: paperworksByApplicant.get(envelope.applicant_id) ?? null,
-      }))
-      .sort((a, b) => a.applicant.full_name.localeCompare(b.applicant.full_name));
+    return envelopes.map((envelope) => ({
+      applicant: applicantById.get(envelope.applicant_id) ?? {
+        id: envelope.applicant_id,
+        full_name: `Applicant #${envelope.applicant_id}`,
+        position_applied_for: null,
+        status: null,
+      },
+      envelope,
+      offer: offerByApplicant.get(envelope.applicant_id) ?? null,
+      paperworks: paperworksByApplicant.get(envelope.applicant_id) ?? null,
+    }));
   }, [applicants, envelopes, offers, paperworksRows]);
+
+  const filteredRows = useMemo<DeskRow[]>(() => {
+    const needle = filters.query.trim().toLowerCase();
+    return allRows
+      .filter((row) => {
+        if (
+          filters.envelopeStatus !== "all" &&
+          row.envelope.status !== filters.envelopeStatus
+        ) {
+          return false;
+        }
+        if (
+          filters.attentionOnly &&
+          !isCompletionPending(row.envelope.status, row.applicant.status)
+        ) {
+          return false;
+        }
+        if (needle !== "") {
+          const fields = signingDeskJobFields(
+            row.applicant.position_applied_for,
+            row.offer
+          );
+          const haystack = [
+            row.applicant.full_name,
+            fields.position ?? "",
+            fields.department ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          if (!haystack.includes(needle)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const createdA = a.envelope.created_at ?? "";
+        const createdB = b.envelope.created_at ?? "";
+        if (createdA !== createdB) return createdB.localeCompare(createdA);
+        return b.envelope.id - a.envelope.id;
+      });
+  }, [allRows, filters]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const visibleRows = filteredRows.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+  const rangeStart =
+    filteredRows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(safePage * PAGE_SIZE, filteredRows.length);
+  const hasActiveFilters =
+    filters.query !== "" ||
+    filters.envelopeStatus !== "all" ||
+    filters.attentionOnly;
+  const emptyCopy = hasActiveFilters
+    ? "No signing sets match these filters."
+    : undefined;
 
   const loadQueue = useCallback(async () => {
     try {
@@ -207,6 +473,18 @@ function DeskBody() {
         </Alert>
       )}
 
+      <DeskFilterBar
+        filters={filters}
+        onChange={(next) => {
+          setFilters(next);
+          setPage(1);
+        }}
+        onReset={() => {
+          setFilters(EMPTY_DESK_FILTERS);
+          setPage(1);
+        }}
+      />
+
       <section className="bg-card overflow-hidden rounded-2xl border border-border/50 shadow-sm">
         <div className="border-b border-border px-3 py-2 sm:px-4">
           <h2
@@ -224,17 +502,31 @@ function DeskBody() {
           </p>
         </div>
         <SigningDeskQueueCards
-          rows={rows}
+          rows={visibleRows}
           isLoading={isLoading}
           launchingId={launching}
+          emptyCopy={emptyCopy}
           onOpen={(row) => void openSigningSet(row)}
         />
         <SigningDeskTable
-          rows={rows}
+          rows={visibleRows}
           isLoading={isLoading}
           launchingId={launching}
+          emptyCopy={emptyCopy}
           onOpen={(row) => void openSigningSet(row)}
         />
+        <div className="flex flex-col gap-2 border-t border-border px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {totalPages > 1
+              ? `Showing ${rangeStart}–${rangeEnd} of ${filteredRows.length} sets · newest first`
+              : `${filteredRows.length} set${filteredRows.length === 1 ? "" : "s"} · newest first`}
+          </p>
+          <DeskPager
+            page={safePage}
+            totalPages={totalPages}
+            onChange={setPage}
+          />
+        </div>
       </section>
     </div>
   );
