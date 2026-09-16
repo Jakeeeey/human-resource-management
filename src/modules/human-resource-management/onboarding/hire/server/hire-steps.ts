@@ -1,5 +1,6 @@
 import type { HireCompletionStep } from "../types/hire.schema";
 import { erAccessStep } from "./er-access-step";
+import { hiringDocumentsFilingStep } from "./hiring-documents-filing-step";
 import { onboardingTaskMaterializeStep } from "./onboarding-task-materialize-step";
 import { signingFilingStep } from "./signing-filing-step";
 
@@ -46,3 +47,4 @@ export function listHireCompletionSteps(): readonly HireCompletionStep[] {
 registerHireCompletionStep(onboardingTaskMaterializeStep); // todo 19
 registerHireCompletionStep(signingFilingStep); // todo 17
 registerHireCompletionStep(erAccessStep); // default ER access for every hire
+registerHireCompletionStep(hiringDocumentsFilingStep); // 201 filing for hiring documents

@@ -89,6 +89,8 @@ export async function readHireApplicationByApplicant(
     "tin",
     "philhealth_no",
     "pagibig_no",
+    "photo_file",
+    "signature_file",
   ].join(",");
   const body: unknown = await dFetch(
     `/items/application?filter[applicant_id][_eq]=${applicantId}&fields=${fields}&sort=id&limit=1`
@@ -343,6 +345,7 @@ export function buildSpringUserPayload(
     middleName: application.middle_name?.trim() || undefined,
     lastName,
     nickname: application.nickname?.trim() || undefined,
+    signature: application.signature_file?.trim() || undefined,
     contact: application.phone?.trim() ?? "",
     province: application.province?.trim() ?? "",
     city: application.city?.trim() ?? "",

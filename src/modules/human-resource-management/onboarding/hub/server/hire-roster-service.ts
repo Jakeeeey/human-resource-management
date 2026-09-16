@@ -22,6 +22,8 @@ const EmployeeNameRowSchema = z.object({
   user_fname: z.string().nullable(),
   user_lname: z.string().nullable(),
   user_dateOfHire: z.string().nullish(),
+  user_department: z.number().int().nullable(),
+  user_position: z.string().nullable(),
 });
 
 function displayName(row: z.infer<typeof EmployeeNameRowSchema>): string {
@@ -33,10 +35,16 @@ function displayName(row: z.infer<typeof EmployeeNameRowSchema>): string {
 }
 
 async function listEmployeeNames(): Promise<
-  Array<{ user_id: number; name: string; dateHired: string | null }>
+  Array<{
+    user_id: number;
+    name: string;
+    dateHired: string | null;
+    departmentId: number | null;
+    position: string | null;
+  }>
 > {
   const body: unknown = await dFetch(
-    "/items/user?fields=user_id,user_fname,user_lname,user_dateOfHire&sort=-user_id&limit=-1"
+    "/items/user?fields=user_id,user_fname,user_lname,user_dateOfHire,user_department,user_position&sort=-user_id&limit=-1"
   );
   const parsed = z.object({ data: z.array(EmployeeNameRowSchema) }).safeParse(body);
   if (!parsed.success) {
@@ -50,7 +58,47 @@ async function listEmployeeNames(): Promise<
     user_id: row.user_id,
     name: displayName(row),
     dateHired: row.user_dateOfHire ?? null,
+    departmentId:
+      typeof row.user_department === "number" && row.user_department > 0
+        ? row.user_department
+        : null,
+    position:
+      typeof row.user_position === "string" && row.user_position.trim() !== ""
+        ? row.user_position.trim()
+        : null,
   }));
+}
+
+async function listDepartmentNames(
+  ids: readonly number[]
+): Promise<Map<number, string>> {
+  const names = new Map<number, string>();
+  if (ids.length === 0) return names;
+  const body: unknown = await dFetch(
+    `/items/department?filter[department_id][_in]=${ids.join(",")}&fields=department_id,department_name&limit=-1`
+  );
+  const parsed = z
+    .object({
+      data: z.array(
+        z.object({
+          department_id: z.number().int(),
+          department_name: z.string().nullable(),
+        })
+      ),
+    })
+    .safeParse(body);
+  if (!parsed.success) {
+    throw new Error(
+      `${HIRE_ROSTER_ERROR_CODES.employeeReadFailed}: department directory read failed (${JSON.stringify(
+        body
+      ).slice(0, 300)})`
+    );
+  }
+  for (const row of parsed.data.data) {
+    const name = row.department_name?.trim() || "";
+    if (name) names.set(row.department_id, name);
+  }
+  return names;
 }
 
 /**
@@ -67,5 +115,26 @@ export async function listHireRoster(): Promise<HireRosterRow[]> {
     listOnboardingTaskTemplates(),
     listEmployeeNames(),
   ]);
-  return buildHireRosterRows({ tasks, templates, employees });
+  const departmentIds = [
+    ...new Set(
+      employees
+        .map((employee) => employee.departmentId)
+        .filter((id): id is number => id !== null)
+    ),
+  ];
+  const departmentNames = await listDepartmentNames(departmentIds);
+  return buildHireRosterRows({
+    tasks,
+    templates,
+    employees: employees.map((employee) => ({
+      user_id: employee.user_id,
+      name: employee.name,
+      dateHired: employee.dateHired,
+      department:
+        employee.departmentId !== null
+          ? (departmentNames.get(employee.departmentId) ?? null)
+          : null,
+      position: employee.position,
+    })),
+  });
 }

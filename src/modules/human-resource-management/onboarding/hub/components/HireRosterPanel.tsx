@@ -8,7 +8,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
-import { phaseLabel } from "../rosterData";
 import { HireRosterDetail } from "./HireRosterDetail";
 import type { HireRosterRow } from "../types/hire-roster.schema";
 
@@ -42,6 +41,12 @@ export function HireRosterPanel({
     return null;
   }
 
+  const subtitle = [row.department, row.position]
+    .filter(
+      (part): part is string => typeof part === "string" && part.trim() !== ""
+    )
+    .join(" · ");
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -54,7 +59,7 @@ export function HireRosterPanel({
             {row.name}
           </SheetTitle>
           <SheetDescription className="truncate">
-            Employee #{row.userId} · {phaseLabel(row.phase)}
+            {subtitle === "" ? "—" : subtitle}
           </SheetDescription>
         </SheetHeader>
 

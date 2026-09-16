@@ -12,6 +12,7 @@ import {
   resolvePortalIdentity,
 } from "@/modules/human-resource-management/employee-portal";
 import { resetDocumentVerificationIfPresent } from "@/modules/human-resource-management/employee-portal/server/documentVerificationIo";
+import { filePortalDocumentsForUser } from "@/modules/human-resource-management/onboarding/hire/server/hiring-documents-filing-service";
 import {
   completeOnboardingTask,
   listOnboardingTasks,
@@ -145,6 +146,11 @@ export async function POST(req: NextRequest) {
     if (key.kind === "employee") {
       await resetDocumentVerificationIfPresent(key.id, doc_key);
       await syncDocumentsSubmitted(key.id);
+      try {
+        await filePortalDocumentsForUser(key.id);
+      } catch (error) {
+        console.error("[onboarding-portal] hiring-documents filing failed:", error);
+      }
     }
 
     return NextResponse.json(

@@ -65,6 +65,10 @@ export const HireRosterRowSchema = z.object({
   name: z.string(),
   /** Employee's date of hire (`user.user_dateOfHire`), else null. */
   dateHired: z.string().nullable(),
+  /** Employee's department name (via `user.user_department`), else null. */
+  department: z.string().nullable(),
+  /** Employee's position text (`user.user_position`), else null. */
+  position: z.string().nullable(),
   status: HireRosterStatusSchema,
   /** Phase of the first open required task (null when complete/none open). */
   phase: z.string().nullable(),
