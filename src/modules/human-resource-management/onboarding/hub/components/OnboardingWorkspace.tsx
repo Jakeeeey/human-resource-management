@@ -55,6 +55,7 @@ export function OnboardingWorkspace({
   const { row, phaseGroups, loading, error, refresh } =
     useHireWorkspace(userId);
   const [active, setActive] = useState<string>("overview");
+  const [refreshTick, setRefreshTick] = useState(0);
   const operator: WorkspaceOperator = {
     userId: operatorUserId,
     role: operatorRole,
@@ -62,6 +63,11 @@ export function OnboardingWorkspace({
 
   const handleSectionChange = (value: string) => {
     setActive(value);
+    void refresh();
+  };
+
+  const handleRefresh = () => {
+    setRefreshTick((tick) => tick + 1);
     void refresh();
   };
 
@@ -110,7 +116,7 @@ export function OnboardingWorkspace({
             variant="outline"
             size="sm"
             className="min-h-11 w-full sm:w-auto md:min-h-0"
-            onClick={() => void refresh()}
+            onClick={handleRefresh}
             disabled={loading}
             aria-label="Refresh workspace"
             title="Refresh workspace"
@@ -151,7 +157,7 @@ export function OnboardingWorkspace({
         <TabsContent value="documents" className="m-0">
           <VerificationFetchProvider>
             <VerificationTab
-              key={`documents-${userId}`}
+              key={`documents-${userId}-${refreshTick}`}
               userId={userId}
             />
           </VerificationFetchProvider>
@@ -159,7 +165,7 @@ export function OnboardingWorkspace({
 
         <TabsContent value="orientation" className="m-0">
           <OrientationFetchProvider>
-            <OrientationTab key={`orientation-${userId}`} userId={userId} />
+            <OrientationTab key={`orientation-${userId}-${refreshTick}`} userId={userId} />
           </OrientationFetchProvider>
         </TabsContent>
 
@@ -174,11 +180,11 @@ export function OnboardingWorkspace({
         </TabsContent>
 
         <TabsContent value="equipment" className="m-0">
-          <EquipmentTab key={`equipment-${userId}`} userId={userId} />
+          <EquipmentTab key={`equipment-${userId}-${refreshTick}`} userId={userId} />
         </TabsContent>
 
         <TabsContent value="completion" className="m-0">
-          <CompletionTab key={`completion-${userId}`} userId={userId} />
+          <CompletionTab key={`completion-${userId}-${refreshTick}`} userId={userId} />
         </TabsContent>
       </Tabs>
     </div>

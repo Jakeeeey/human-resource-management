@@ -4,12 +4,18 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 import { loadEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
 import { findCatalogItem } from "@/modules/human-resource-management/onboarding/equipment/equipmentCatalog";
 import {
+  buildEquipmentItemStates,
   equipmentDocRef,
   issuerSigner,
 } from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
 import { IssueEquipmentItemSchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
 import { EquipmentQuerySchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
 import { readUserExists } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+import {
+  completeOnboardingTask,
+  listOnboardingTasks,
+} from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +56,46 @@ interface AckLogRow {
 
 function issuePrefix(userId: number): string {
   return `equipment:issue:${userId}:`;
+}
+
+async function syncEquipmentIssuedTask(userId: number): Promise<void> {
+  try {
+    const [catalog, templates, tasks] = await Promise.all([
+      loadEquipmentCatalog(),
+      listOnboardingTaskTemplates(),
+      listOnboardingTasks({ userId }),
+    ]);
+    const template =
+      templates.find(
+        (t) =>
+          t.phase === "equipment" &&
+          t.code === "equipment_issued" &&
+          t.is_active === true
+      ) ?? null;
+    if (!template) return;
+    const task = tasks.find((t) => t.template_id === template.id) ?? null;
+    if (!task || task.status === "done") return;
+    const body = (await dFetch(
+      `/items/acknowledgement_logs?filter[doc_ref][_contains]=${encodeURIComponent(issuePrefix(userId))}&fields=doc_ref&limit=100`
+    )) as { data?: AckLogRow[] };
+    const docRefs = Array.isArray(body?.data)
+      ? body.data.map((row) => row.doc_ref)
+      : [];
+    const states = buildEquipmentItemStates(
+      userId,
+      catalog.map((entry) => ({ key: entry.key, required: entry.required })),
+      docRefs
+    );
+    const required = states.filter((s) => s.required);
+    if (required.length > 0 && required.every((s) => s.issued)) {
+      await completeOnboardingTask({ taskId: task.id, completedBy: null });
+    }
+  } catch (error) {
+    console.error(
+      "[onboarding-equipment-issues] issued-task sync failed:",
+      error
+    );
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -136,6 +182,8 @@ export async function POST(req: NextRequest) {
       }
       throw error;
     }
+
+    await syncEquipmentIssuedTask(userId);
 
     return NextResponse.json(
       { success: true, data: created?.data ?? null },
