@@ -16,9 +16,10 @@ export const dynamic = "force-dynamic";
 // POST /api/hrm/onboarding/onboarding-task/backfill
 //   Maintenance sweep for employees who already own `onboarding_task` rows:
 //   deactivates retired `training_assigned` / `training_completed` template
-//   rows and materializes every missing task via the same idempotent engine
-//   the hire flow uses (narrowed to the employee's department). Safe to
-//   re-run — a second call creates zero tasks and patches zero templates.
+//   rows, materializes every missing task via the same idempotent engine
+//   the hire flow uses (narrowed to the employee's department), and closes
+//   open `access_provisioned` tasks. Safe to re-run — a second call creates
+//   zero tasks, patches zero templates, and completes zero access rows.
 //   One employee's failure is reported in `errors` without aborting the run.
 // Body is a strict EMPTY object (`{}`); the actor comes from the session.
 

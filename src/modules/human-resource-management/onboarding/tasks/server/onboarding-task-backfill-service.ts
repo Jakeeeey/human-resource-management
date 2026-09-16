@@ -6,6 +6,7 @@ import {
   phTimeNow,
 } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
 import { materializeOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
+import { completeTaskByCode } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { LEGACY_TRAINING_TEMPLATE_CODES } from "@/modules/human-resource-management/onboarding/training/server/trainingCatalogService";
 
 // onboarding-task-backfill-service.ts — maintenance sweep for hires who are
@@ -27,6 +28,9 @@ import { LEGACY_TRAINING_TEMPLATE_CODES } from "@/modules/human-resource-managem
 //   3. MATERIALIZE — call the SAME `materializeOnboardingTasks` the hire flow
 //      uses for each employee (idempotent, create-missing, read-back verified,
 //      training templates narrowed to the hire's department);
+//   3b. PROVISION — complete the employee's open `access_provisioned` task
+//      (same `completeTaskByCode` the hire step uses; every swept employee
+//      holds a Spring account by construction);
 //   4. ISOLATE — one employee's failure is collected per user and never aborts
 //      the sweep; the run is repeatable, so leftovers retry on the next call.
 //
@@ -68,10 +72,12 @@ export interface LegacyTrainingTemplateCleanup {
 export interface BackfillOnboardingTasksResult {
   /** Distinct employees owning `onboarding_task` rows (the sweep size). */
   users: number;
-  /** Task rows created across all employees (0 on a settled re-run). */
+  /** Task rows created across employees (0 on a settled re-run). */
   created: number;
-  /** Task rows that already existed across all employees. */
+  /** Task rows that already existed across employees. */
   existing: number;
+  /** `access_provisioned` tasks flipped to done by this run. */
+  accessProvisioned: number;
   perUser: BackfillUserSummary[];
   /** Per-employee failures — these never abort the sweep. */
   errors: BackfillUserFailure[];
@@ -163,6 +169,7 @@ export async function backfillOnboardingTasks(input: {
   const errors: BackfillUserFailure[] = [];
   let created = 0;
   let existing = 0;
+  let accessProvisioned = 0;
 
   // Sequential on purpose: each employee costs a template ensure + several
   // Directus round trips, so the sweep stays gentle on the backend instead of
@@ -177,6 +184,13 @@ export async function backfillOnboardingTasks(input: {
       });
       created += result.created;
       existing += result.existing;
+      const access = await completeTaskByCode({
+        userId,
+        phase: "equipment",
+        code: "access_provisioned",
+        completedBy: actorId,
+      });
+      if (access.completed) accessProvisioned += 1;
     } catch (error) {
       errors.push({ userId, message: errorMessage(error) });
     }
@@ -186,6 +200,7 @@ export async function backfillOnboardingTasks(input: {
     users: userIds.length,
     created,
     existing,
+    accessProvisioned,
     perUser,
     errors,
     legacyTemplates,

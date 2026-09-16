@@ -9,6 +9,7 @@ import {
   type TaskWriteRow,
 } from "./onboardingTaskIo";
 import { ensureOnboardingTaskTemplates } from "./task-template-service";
+import { listOnboardingTaskTemplates } from "./task-template-service";
 import { readUserDepartmentId } from "../../training/server/trainingCatalogIo";
 import { filterMaterializableTrainingTemplates } from "../../training/server/trainingCatalogService";
 import type {
@@ -240,6 +241,50 @@ export async function updateOnboardingTask(
 export interface CompleteOnboardingTaskInput {
   taskId: number;
   completedBy: number | null;
+}
+
+export interface CompleteTaskByCodeInput {
+  userId: number;
+  phase: string;
+  code: string;
+  completedBy: number | null;
+}
+
+export interface CompleteTaskByCodeResult {
+  completed: boolean;
+  taskId: number | null;
+}
+
+/**
+ * Completes one task resolved by template phase+code for an employee.
+ * Idempotent: an absent or already-done task reports `completed: false`
+ * without writing. Inactive templates never resolve (nothing to complete).
+ * @throws Coded read error when the task or template list cannot be read.
+ */
+export async function completeTaskByCode(
+  input: CompleteTaskByCodeInput
+): Promise<CompleteTaskByCodeResult> {
+  const [templates, tasks] = await Promise.all([
+    listOnboardingTaskTemplates(),
+    listOnboardingTasks({ userId: input.userId }),
+  ]);
+  const template =
+    templates.find(
+      (t) =>
+        t.phase === input.phase &&
+        t.code === input.code &&
+        t.is_active === true
+    ) ?? null;
+  if (!template) return { completed: false, taskId: null };
+  const task = tasks.find((t) => t.template_id === template.id) ?? null;
+  if (!task || task.status === "done") {
+    return { completed: false, taskId: task?.id ?? null };
+  }
+  const result = await completeOnboardingTask({
+    taskId: task.id,
+    completedBy: input.completedBy,
+  });
+  return { completed: !result.alreadyDone, taskId: task.id };
 }
 
 export interface CompleteOnboardingTaskResult {
