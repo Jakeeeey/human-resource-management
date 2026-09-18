@@ -206,12 +206,16 @@ export const SignaturePad = forwardRef<
                         onChange={(e) => onTypedNameChange(e.target.value)}
                         className="max-w-sm font-medium"
                     />
+                    <p className="max-w-sm text-xs text-muted-foreground">
+                        Typed names cannot become a signature stamp — switch to
+                        Draw instead and sign in the pad below.
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-1.5">
                     <Label>Sign below</Label>
                     {/* overflow-hidden wrapper caps the canvas per QA §2. */}
-                    <div className="w-full max-w-md overflow-hidden rounded-md border bg-background">
+                    <div className="relative w-full max-w-md overflow-hidden rounded-md border bg-background">
                         <canvas
                             ref={canvasRef}
                             width={CANVAS_W}
@@ -224,6 +228,13 @@ export const SignaturePad = forwardRef<
                             aria-label="Onboarding signature pad"
                             className="block h-[180px] w-full touch-none dark:invert"
                         />
+                        <div
+                            aria-hidden
+                            className="pointer-events-none absolute inset-x-8 bottom-[22%] border-t border-dashed border-muted-foreground/40"
+                        />
+                        <span className="pointer-events-none absolute bottom-[23%] left-8 text-[10px] text-muted-foreground/70">
+                            Sign above the line
+                        </span>
                     </div>
                 </div>
             )}

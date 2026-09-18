@@ -1,18 +1,22 @@
-// signingVault.ts — Todo 8 vault staging logic (import-safe: no DOM).
+// signingVault.ts — applicant-scoped vault staging logic (import-safe: no DOM).
 //
 // Staging rule: the vault keeps the STAGING copy (uploaded Directus file
-// UUID) until the 201 link confirms — only then does the vault go
-// pointer-only (envelope `pdf_file` UUID + 201 `file_ref` UUID, zero staged
-// bytes retained client-side). When the link fails, the staged upload is
-// deleted (orphan-file cleanup) so no unlinked file lingers in `201_emp_files`.
+// UUID) until the filing link confirms — only then does the vault go
+// pointer-only (the row's `pdf_file` UUID + the target record's `file_ref`
+// UUID, zero staged bytes retained client-side). When the link fails, the
+// staged upload is deleted (orphan-file cleanup) so no unlinked file lingers
+// in `201_emp_files`.
 //
 // Write order (enforced by the filing provider, typed here): upload →
 // persist returned `data.id` → link. `file_ref` is NEVER linked before the
 // upload UUID exists.
 //
+// KEYING (todo 13 re-key): the signing aggregate is applicant-scoped, so the
+// staging/pointer records carry `applicantId` as the single key.
+//
 // Staging TTL: a staged upload unconfirmed after STAGING_TTL_MS is treated
 // as expired — the surface must delete it (orphan cleanup) and re-file from
-// the locked envelope. Documented constant, single definition.
+// the signed item. Documented constant, single definition.
 
 /** Staging TTL: 24h — unconfirmed staged uploads expire and must be cleaned. */
 export const VAULT_STAGING_TTL_MS = 24 * 60 * 60 * 1000;
@@ -28,7 +32,7 @@ export const VAULT_STAGES = ["staged", "linked", "orphaned", "expired"] as const
 export type VaultStage = (typeof VAULT_STAGES)[number];
 
 export interface StagedFiling {
-  envelopeId: number;
+  applicantId: number;
   /** Directus file UUID — present ONLY after upload returns `data.id`. */
   fileId: string | null;
   fileName: string;
@@ -41,27 +45,27 @@ export interface StagedFiling {
 }
 
 export interface VaultPointer {
-  envelopeId: number;
+  applicantId: number;
   fileId: string;
   recordId: number | null;
   version: number;
 }
 
 /**
- * Builds the filed-PDF filename for an envelope (vault versioned).
- * @param {string} envelopeKey - `<profile_id>:<template_id>:<attempt>`.
+ * Builds the filed-PDF filename for an applicant-scoped document.
+ * @param {string} filingKey - Stable key, e.g. `applicant-<id>-item-<itemId>`.
  * @param {number} version - Vault version (1 = first filing).
  * @returns {string} Deterministic filed filename.
  */
-export function buildFilingFilename(envelopeKey: string, version: number): string {
-  const safe = envelopeKey.replace(/[^a-zA-Z0-9_-]+/g, "-");
+export function buildFilingFilename(filingKey: string, version: number): string {
+  const safe = filingKey.replace(/[^a-zA-Z0-9_-]+/g, "-");
   return version <= 1 ? `signed-${safe}.pdf` : `signed-${safe}-v${version}.pdf`;
 }
 
 /**
- * Opens a staging slot for a locked envelope (no UUID yet — link forbidden
- * until the upload returns `data.id`).
- * @param {number} envelopeId - Locked envelope id.
+ * Opens a staging slot for a signed applicant document (no UUID yet — link
+ * forbidden until the upload returns `data.id`).
+ * @param {number} applicantId - Applicant the document belongs to.
  * @param {string} fileName - Filed-PDF filename.
  * @param {number} byteLength - PDF bytes length.
  * @param {number} version - Vault version (default 1).
@@ -69,7 +73,7 @@ export function buildFilingFilename(envelopeKey: string, version: number): strin
  * @returns {StagedFiling} Staging record with `fileId: null`.
  */
 export function stageFiling(
-  envelopeId: number,
+  applicantId: number,
   fileName: string,
   byteLength: number,
   version = 1,
@@ -84,7 +88,7 @@ export function stageFiling(
     throw new Error("RE_FILE_NEEDS_REASON: re-file overwrites only with a new vault version + reason");
   }
   return {
-    envelopeId,
+    applicantId,
     fileId: null,
     fileName,
     byteLength,
@@ -110,10 +114,10 @@ export function persistUploadId(staged: StagedFiling, fileId: string): StagedFil
 }
 
 /**
- * Confirms the 201 link: vault drops the staging copy and goes
- * pointer-only (envelope `pdf_file` + 201 `file_ref` UUIDs).
+ * Confirms the filing link: vault drops the staging copy and goes
+ * pointer-only (the row's `pdf_file` + the target's `file_ref` UUIDs).
  * @param {StagedFiling} staged - Staging record carrying the upload UUID.
- * @param {number | null} recordId - Created 201 record id.
+ * @param {number | null} recordId - Created record id.
  * @returns {VaultPointer} Pointer-only vault record.
  */
 export function confirmLink(staged: StagedFiling, recordId: number | null): VaultPointer {
@@ -121,7 +125,7 @@ export function confirmLink(staged: StagedFiling, recordId: number | null): Vaul
     throw new Error("LINK_BEFORE_UUID: cannot confirm a link with no upload UUID");
   }
   return {
-    envelopeId: staged.envelopeId,
+    applicantId: staged.applicantId,
     fileId: staged.fileId,
     recordId,
     version: staged.version,

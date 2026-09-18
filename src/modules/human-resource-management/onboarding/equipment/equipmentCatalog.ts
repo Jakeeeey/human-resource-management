@@ -1,22 +1,29 @@
-import { z } from "zod";
-
 import type { EquipmentIssuer } from "./types/equipment-issue.schema";
-import { EquipmentIssuerSchema } from "./types/equipment-issue.schema";
 
-// equipmentCatalog.ts — item catalog for Todo 13.
+// equipmentCatalog.ts — the pdf §9 code catalog, retained ONLY as the SEED
+// source (todo 6, `catalogSeed.ts`) and as the shared `EquipmentCatalogItem`
+// contract. It is NOT the runtime source: the live catalog is read from the
+// `onboarding_equipment_item` collection through `./server/equipmentItemIo.ts`
+// (`loadEquipmentCatalog()`), which maps DB rows onto this shape (todo 9).
 //
-// Pdf §9 lists EXACTLY seven handover items; they are seeded here with their
-// §9 issuer roles (IT / Admin / Department). Anything beyond these seven
-// MUST come from the admin config file (`equipment-catalog.config.json`) —
-// never from new code constants. `loadEquipmentCatalog` merges the two and
-// rejects custom keys that shadow a pdf key.
+// The legacy fs/JSON path (`equipmentCatalogServer.ts` +
+// `equipment-catalog.config.json`) was retired with the migration: HR now
+// adds/renames items through the requirements admin surface, and the merge +
+// shadow/duplicate validation that used to live here is gone with it.
 
 export interface EquipmentCatalogItem {
   key: string;
   label: string;
   issuer: EquipmentIssuer;
   required: boolean;
-  source: "pdf-9" | "admin-config";
+  /**
+   * Informational provenance of the row — kept WIDE (`string`) because the
+   * status route forwards it to the client
+   * (`EquipmentItemStatus.source: string`) and the value is now DB-derived:
+   * the item IO stamps a constant (`admin-config`), while the seed rows below
+   * still carry their legacy `pdf-9` marker. Never branch on this value.
+   */
+  source: string;
 }
 
 /** The seven pdf §9 handover items — the ONLY code-constant items allowed. */
@@ -29,57 +36,6 @@ export const PDF_SECTION_9_CATALOG: readonly EquipmentCatalogItem[] = [
   { key: "required_apps", label: "Required applications", issuer: "IT", required: true, source: "pdf-9" },
   { key: "workspace", label: "Workspace", issuer: "Department", required: true, source: "pdf-9" },
 ];
-
-export const CustomEquipmentItemSchema = z
-  .object({
-    key: z
-      .string()
-      .min(1, "Custom item key is required")
-      .max(64, "Custom item key must be at most 64 characters")
-      .regex(
-        /^[a-z0-9_]{1,64}$/,
-        "Custom item key must be lowercase letters, digits, or underscore"
-      ),
-    label: z.string().min(1, "Custom item label is required").max(120),
-    issuer: EquipmentIssuerSchema,
-    required: z.boolean(),
-  })
-  .strict();
-
-export type CustomEquipmentItemInput = z.infer<typeof CustomEquipmentItemSchema>;
-
-/**
- * Merges pdf §9 defaults with admin-config extras.
- * @param customItems - Raw `customItems` array from the admin JSON config.
- * @returns Full catalog (pdf items first, then admin extras).
- * @throws Error when a custom item is invalid or shadows a pdf §9 key.
- */
-export function loadEquipmentCatalog(
-  customItems: unknown
-): EquipmentCatalogItem[] {
-  const list = customItems === undefined ? [] : customItems;
-  const parsed = z.array(CustomEquipmentItemSchema).safeParse(list);
-  if (!parsed.success) {
-    throw new Error("Invalid equipment admin config: customItems mismatch");
-  }
-  const pdfKeys = new Set(PDF_SECTION_9_CATALOG.map((item) => item.key));
-  const seen = new Set<string>();
-  const extras: EquipmentCatalogItem[] = parsed.data.map((item) => {
-    if (pdfKeys.has(item.key)) {
-      throw new Error(
-        `Admin config item "${item.key}" shadows a pdf §9 item — rename it`
-      );
-    }
-    if (seen.has(item.key)) {
-      throw new Error(
-        `Admin config item "${item.key}" is declared more than once`
-      );
-    }
-    seen.add(item.key);
-    return { ...item, source: "admin-config" as const };
-  });
-  return [...PDF_SECTION_9_CATALOG, ...extras];
-}
 
 /** Finds a catalog item by key (undefined when the key is not catalogued). */
 export function findCatalogItem(

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
+import { getApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ export async function GET() {
 
         const [list, quizApps, recommendedRecs, users, allRecs] = await Promise.all([
             interviewService.fetchInterviews(),
-            interviewService.fetchQuizCompletedApplications(),
+            interviewService.fetchInitialStageApplications(),
             interviewService.fetchRecommendedRecommendations(),
             manpowerRecommendationService.fetchUsers(),
             manpowerRecommendationService.fetchAll(),
@@ -73,15 +74,17 @@ export async function GET() {
             if (owner) finalApplicantIds.add(owner.applicant_id);
         }
         const initialApps = quizApps.filter((app) => initialAppIds.has(app.id) && !finalApplicantIds.has(app.applicant_id));
-        const latestAttempts = await Promise.all(
-            initialApps.map((app) => interviewService.fetchLatestQuizAttempt(app.id, app.applicant_id)),
-        );
+        const [latestAttempts, compositeBySheet] = await Promise.all([
+            Promise.all(initialApps.map((app) => interviewService.fetchLatestQuizAttempt(app.id, app.applicant_id))),
+            interviewService.fetchScoreSheetComposites(),
+        ]);
         const eligibleInitial = initialApps.map((app, index) => {
             const initials = interviews
                 .filter((i) => i.stage === "Initial" && i.application_id === app.id)
                 .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
             const latestAttempt = latestAttempts[index];
-            return { ...app, full_name: app.full_name || `Applicant #${app.applicant_id}`, latestInitialVerdict: initials[0]?.verdict ?? null, quiz_attempt_id: latestAttempt?.id ?? null, quiz_attempt_percentage: latestAttempt?.percentage_score ?? null, quiz_attempt_passed: latestAttempt?.passed ?? null };
+            const latestSheetId = initials[0]?.score_sheet_id ?? null;
+            return { ...app, full_name: app.full_name || `Applicant #${app.applicant_id}`, latestInitialVerdict: initials[0]?.verdict ?? null, latestComposite: latestSheetId != null ? compositeBySheet[latestSheetId] ?? null : null, quiz_attempt_id: latestAttempt?.id ?? null, quiz_attempt_percentage: latestAttempt?.percentage_score ?? null, quiz_attempt_passed: latestAttempt?.passed ?? null };
         });
 
         const finalRecIds = new Set<number>();
@@ -137,21 +140,32 @@ export async function POST(req: NextRequest) {
 
         const validated = InterviewSchema.parse(body);
 
-        // Initial guard: only applications with Quiz Completed status are accepted.
+        // Initial guard: only applications whose owning applicant is in the
+        // initial-interview pool (`quiz_completed` awaiting grade, or
+        // `initial_interview` awaiting a definitive verdict) are accepted.
+        // `applicant.status` is the single truth; the pool resolves the join
+        // via application.applicant_id.
         if (validated.stage === "Initial") {
-            const quizApps = await interviewService.fetchQuizCompletedApplications();
-            if (!quizApps.some((a) => a.id === validated.application_id)) {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Application #${validated.application_id} has not completed the quiz. Initial interviews open after quiz completion.` }, { status: 400 });
+            const initialPool = await interviewService.fetchInitialStageApplications();
+            if (!initialPool.some((a) => a.id === validated.application_id)) {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Application #${validated.application_id} is not in the initial interview stage. Initial interviews open after quiz completion.` }, { status: 400 });
             }
         }
 
-        // Final guard: only Recommended recommendations on Approved requests are accepted.
+        // Final guard: the APPLICANT pipeline must be at `recommended`
+        // (`applicant.status` is the pipeline truth; `manpower_recommendation.status`
+        // stays the separate recruitment artifact lifecycle) and the request
+        // must be Approved.
         if (validated.stage === "Final") {
             const rec = validated.recommendation_id
                 ? await manpowerRecommendationService.fetchById(validated.recommendation_id)
                 : null;
-            if (!rec || rec.status !== "Recommended") {
-                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Recommendation #${validated.recommendation_id ?? "?"} is not a pending recommendation. Final interviews open after recommendation.` }, { status: 400 });
+            if (!rec) {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Recommendation #${validated.recommendation_id ?? "?"} does not exist. Final interviews open after recommendation.` }, { status: 400 });
+            }
+            const applicantStatus = rec.applicant_id != null ? await getApplicantStatus(rec.applicant_id) : null;
+            if (applicantStatus !== "recommended") {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: `Applicant #${rec.applicant_id ?? "?"} is not in the recommended stage. Final interviews open after recommendation.` }, { status: 400 });
             }
             const { status, request_no } = await manpowerRecommendationService.fetchRequestStatus(rec.manpower_request_id);
             if (status !== "Approved") {
@@ -173,6 +187,15 @@ export async function POST(req: NextRequest) {
             created.stage === "Final" && created.verdict === "Failed"
                 ? await maybeAutoRejectRecommendation(created.recommendation_id)
                 : false;
+        // Applicant pipeline (todo 8): the persisted verdict advances the single
+        // applicant status truth through the shared status service (mirrors
+        // PATCH [id]/route.ts). Ordering: AFTER auto-approve/reject so request
+        // capacity counting is not self-counted.
+        await advanceApplicantForInterviewVerdict({
+            stage: created.stage,
+            applicationId: created.application_id,
+            verdict: created.verdict,
+        });
         // Mail hook (mailing-module todo 11): stage-routed graded event, never awaited.
         void dispatchMail(created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
             event_key: created.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",

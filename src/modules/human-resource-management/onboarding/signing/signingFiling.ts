@@ -1,12 +1,18 @@
-// signingFiling.ts — Todo 8 client filing orchestrator (browser only).
+// signingFiling.ts — applicant-scoped client filing orchestrator (browser only).
 //
 // Write order (enforced): upload → persist returned `data.id` → link.
 // Upload goes ONLY through the existing `?type=employee_file` route
 // (validation reused, never re-implemented — 413s surface with reason).
-// The link step hits the onboarding file route (server-side Directus;
+// The link step hits an onboarding file route (server-side Directus;
 // DIRECTUS_STATIC_TOKEN never reaches the browser). `file_ref` is never
 // linked before the upload UUID exists — the type flow makes it
 // unrepresentable (`persistUploadId` throws on empty ids).
+//
+// KEYING (todo 13 re-key): the aggregate is applicant-scoped, so the
+// orchestrator carries `applicantId` + a `filingKey` as its keys.
+// `uploadFiledPdf` is the piece the todo-13 signing surface reuses to obtain
+// the per-item `pdf_file` UUID; the link orchestrator below is the retained
+// filing path (todo 17 owns the 201 link).
 
 import {
   buildFilingFilename,
@@ -29,12 +35,13 @@ export interface FilingRecordInput {
   description?: string;
 }
 
-export interface FileFinishedEnvelopeInput {
-  envelopeId: number;
-  envelopeKey: string;
+export interface FileSignedDocumentInput {
+  applicantId: number;
+  /** Stable vault key, e.g. `applicant-<id>-item-<itemId>`. */
+  filingKey: string;
   pdfBytes: Uint8Array;
   record: FilingRecordInput;
-  /** Required when the envelope already carries a `pdf_file` (re-file). */
+  /** Required when the document already carries a `pdf_file` (re-file). */
   reason?: string;
   version?: number;
 }
@@ -81,15 +88,16 @@ export interface LinkFilingResult {
 }
 
 /**
- * Links a staged upload UUID to the envelope + 201 record (LINK step).
- * @param {number} envelopeId - Locked envelope id.
+ * Links a staged upload UUID to the applicant's signing aggregate + 201
+ * record (LINK step).
+ * @param {number} applicantId - Applicant the filing belongs to.
  * @param {string} fileId - Upload UUID (must exist — never link before UUID).
  * @param {FilingRecordInput} record - 201 record payload.
  * @param {string} reason - Re-file reason (empty for first filing).
  * @returns {Promise<LinkFilingResult>} Created record id + vault version.
  */
 export async function linkFiling(
-  envelopeId: number,
+  applicantId: number,
   fileId: string,
   record: FilingRecordInput,
   reason = ""
@@ -98,7 +106,7 @@ export async function linkFiling(
     throw new Error("LINK_BEFORE_UUID: cannot link with no upload UUID");
   }
   const res = await fetch(
-    `/api/hrm/onboarding/signing-envelopes/${envelopeId}/file`,
+    `/api/hrm/onboarding/signing-envelope/${applicantId}/file`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -120,18 +128,18 @@ export async function linkFiling(
 }
 
 /**
- * Files a finished envelope end-to-end (upload → `data.id` → link).
- * @param {FileFinishedEnvelopeInput} input - Filed bytes + 201 record input.
+ * Files a signed applicant document end-to-end (upload → `data.id` → link).
+ * @param {FileSignedDocumentInput} input - Filed bytes + 201 record input.
  * @returns {Promise<{ pointer: VaultPointer; staged: StagedFiling }>} Pointer-only vault record.
  */
-export async function fileFinishedEnvelope(
-  input: FileFinishedEnvelopeInput
+export async function fileSignedDocument(
+  input: FileSignedDocumentInput
 ): Promise<{ pointer: VaultPointer; staged: StagedFiling }> {
   assertUnderCapOrThrow(input.pdfBytes.byteLength, 1);
   const version = input.version ?? 1;
-  const filename = buildFilingFilename(input.envelopeKey, version);
+  const filename = buildFilingFilename(input.filingKey, version);
   let staged = stageFiling(
-    input.envelopeId,
+    input.applicantId,
     filename,
     input.pdfBytes.byteLength,
     version,
@@ -143,10 +151,10 @@ export async function fileFinishedEnvelope(
   staged = persistUploadId(staged, fileId);
   // Step 3: link. On failure the server deletes the staged upload
   // (orphan cleanup); the vault marks the staging orphaned and the caller
-  // retries from the locked envelope.
+  // retries from the signed document.
   try {
     const linked = await linkFiling(
-      input.envelopeId,
+      input.applicantId,
       staged.fileId as string,
       input.record,
       input.reason ?? ""

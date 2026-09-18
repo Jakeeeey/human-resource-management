@@ -29,10 +29,12 @@ export function ApplicationDetailsSection({ form }: { form: UseFormReturn<Applic
             <FormField
                 control={form.control}
                 name="position_applied_for"
-                rules={{ required: "Required" }}
+                rules={{ required: "Enter the position you're applying for." }}
                 render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Position Applied For</FormLabel>
+                        <FormLabel>
+                            Position Applied For <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
                             <Input placeholder="e.g. Warehouse Associate" {...field} />
                         </FormControl>

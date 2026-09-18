@@ -1,35 +1,50 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
-    deriveApplicantStage,
-    type ApplicantStage,
-    type InterviewVerdict,
-    type RecommendationStatus,
-    type StageTimelineEvent,
-} from "@/modules/human-resource-management/recruitment/applicants/lib/deriveApplicantStage";
+    ApplicantStatusSchema,
+    type ApplicantStatus,
+} from "@/modules/human-resource-management/onboarding/types/applicant-status";
 
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
 
+/** One real pipeline event, replayed from an `interview` / `manpower_recommendation` row. */
+export type ApplicantTimelineEvent = {
+    /** Source row id (unique within `kind`). */
+    id: number;
+    kind: "initial_interview" | "final_interview" | "recommendation";
+    /** Row `created_at`, or null when Directus returns none. */
+    at: string | null;
+    detail: string;
+};
+
 /**
  * One row per applicant for the Applicants overview table.
- * `stage`/`timeline` are server-derived via `deriveApplicantStage` only —
- * the client renders `stage` verbatim and never recomputes it.
+ * `status` is `applicant.status` verbatim — the single status truth. There is
+ * no history table, so `timeline` replays the retained `interview` /
+ * `manpower_recommendation` rows only; nothing is derived or fabricated.
  */
 export type ApplicantRow = {
     id: number;
     full_name: string;
-    position_applied_for: string;
+    position_applied_for: string | null;
     /** Latest application id (submitted_at desc, id desc tiebreak); null when never applied. */
     application_id: number | null;
     submitted_at: string | null;
     quiz_score: number | null;
     quiz_passed: boolean | null;
-    stage: ApplicantStage;
-    timeline: StageTimelineEvent[];
+    /** Canonical snake_case `ApplicantStatus`; null when the row's value is not canonical. */
+    status: ApplicantStatus | null;
+    timeline: ApplicantTimelineEvent[];
+};
+
+type RawApplicant = {
+    id: number;
+    full_name: string;
+    position_applied_for: string | null;
+    status: string | null;
 };
 
 type RawApplication = {
@@ -38,15 +53,6 @@ type RawApplication = {
     submitted_at: string | null;
     quiz_score: number | null;
     quiz_passed: boolean | number | null;
-};
-
-type RawQuizAttempt = {
-    id: number;
-    application_id: number | null;
-    applicant_id: number | null;
-    passed: boolean | number | null;
-    completed_at: string | null;
-    created_at: string | null;
 };
 
 type RawInterview = {
@@ -64,6 +70,15 @@ type RawRecommendation = {
     status: string;
     created_at: string | null;
 };
+
+type InterviewVerdict = "Pending" | "Passed" | "Failed";
+
+type RecommendationStatus =
+    | "Recommended"
+    | "Approved"
+    | "Hired"
+    | "Rejected"
+    | "Withdrawn";
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
     try {
@@ -148,19 +163,18 @@ export async function GET() {
             return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
         }
 
-        // Single-pass aggregate: one batched fan-out (same shape as
-        // interviews/route.ts Promise.all), then in-memory joins only.
-        // No per-applicant/per-row service calls.
-        const [applicants, appRes, attemptRes, interviewRes, recRes] = await Promise.all([
-            manpowerRecommendationService.fetchApplicants(),
+        // Single-pass aggregate: one batched fan-out, then in-memory joins only.
+        // `applicant.status` is read directly (the single status truth); the
+        // timeline is built from retained interview / recommendation rows only.
+        const [applicantRes, appRes, interviewRes, recRes] = await Promise.all([
+            dFetch(`/items/applicant?fields=id,full_name,position_applied_for,status&sort=full_name&limit=-1`),
             dFetch(`/items/application?fields=id,applicant_id,submitted_at,quiz_score,quiz_passed&sort=-submitted_at&limit=-1`),
-            dFetch(`/items/quiz_attempt?fields=id,application_id,applicant_id,passed,completed_at,created_at&sort=-completed_at&limit=-1`),
             dFetch(`/items/interview?fields=id,application_id,recommendation_id,stage,verdict,created_at&sort=-created_at&limit=-1`),
             dFetch(`/items/manpower_recommendation?fields=id,applicant_id,status,created_at&sort=-created_at&limit=-1`),
         ]);
 
+        const applicants = ((applicantRes as { data?: RawApplicant[] })?.data ?? []) as RawApplicant[];
         const applications = ((appRes as { data?: RawApplication[] })?.data ?? []) as RawApplication[];
-        const attempts = ((attemptRes as { data?: RawQuizAttempt[] })?.data ?? []) as RawQuizAttempt[];
         const interviews = ((interviewRes as { data?: RawInterview[] })?.data ?? []) as RawInterview[];
         const recommendations = ((recRes as { data?: RawRecommendation[] })?.data ?? []) as RawRecommendation[];
 
@@ -170,21 +184,6 @@ export async function GET() {
             const list = appsByApplicant.get(app.applicant_id);
             if (list) list.push(app);
             else appsByApplicant.set(app.applicant_id, [app]);
-        }
-
-        const attemptsByApplication = new Map<number, RawQuizAttempt[]>();
-        const attemptsByApplicant = new Map<number, RawQuizAttempt[]>();
-        for (const attempt of attempts) {
-            if (typeof attempt.application_id === "number") {
-                const list = attemptsByApplication.get(attempt.application_id);
-                if (list) list.push(attempt);
-                else attemptsByApplication.set(attempt.application_id, [attempt]);
-            }
-            if (typeof attempt.applicant_id === "number") {
-                const list = attemptsByApplicant.get(attempt.applicant_id);
-                if (list) list.push(attempt);
-                else attemptsByApplicant.set(attempt.applicant_id, [attempt]);
-            }
         }
 
         const initialsByApplication = new Map<number, RawInterview[]>();
@@ -214,14 +213,6 @@ export async function GET() {
             // Latest application wins: submitted_at desc, id desc tiebreak.
             const latestApp = pickLatest(appsByApplicant.get(applicant.id) ?? [], (row) => row.submitted_at);
 
-            // Latest quiz attempt for the latest application (application-scoped
-            // match wins; applicant fallback mirrors fetchLatestQuizAttempt).
-            const scopedAttempts =
-                (latestApp !== null ? (attemptsByApplication.get(latestApp.id) ?? []) : []).length > 0
-                    ? (attemptsByApplication.get(latestApp?.id ?? -1) ?? [])
-                    : (attemptsByApplicant.get(applicant.id) ?? []);
-            const latestAttempt = pickLatest(scopedAttempts, (row) => row.completed_at ?? row.created_at);
-
             const applicantRecs = recsByApplicant.get(applicant.id) ?? [];
             const applicantRecIds = new Set(applicantRecs.map((rec) => rec.id));
             const applicantFinals: RawInterview[] = [];
@@ -230,43 +221,43 @@ export async function GET() {
                 if (finals) applicantFinals.push(...finals);
             }
 
-            const { stage, timeline } = deriveApplicantStage({
-                application:
-                    latestApp === null
-                        ? null
-                        : {
-                              id: latestApp.id,
-                              submitted_at: latestApp.submitted_at,
-                              quiz_passed: toNullableBoolean(latestApp.quiz_passed),
-                          },
-                quizAttempt:
-                    latestAttempt === null
-                        ? null
-                        : {
-                              id: latestAttempt.id,
-                              passed: toNullableBoolean(latestAttempt.passed),
-                              created_at: latestAttempt.completed_at ?? latestAttempt.created_at,
-                          },
-                initialInterviews: (latestApp !== null ? (initialsByApplication.get(latestApp.id) ?? []) : []).map(
-                    (row) => ({
+            // Real events only: one entry per retained interview / recommendation
+            // row, oldest-first (`created_at` asc, id asc tiebreak).
+            const timeline: ApplicantTimelineEvent[] = [
+                ...(latestApp !== null ? (initialsByApplication.get(latestApp.id) ?? []) : []).map(
+                    (row): ApplicantTimelineEvent => ({
                         id: row.id,
-                        recommendation_id: row.recommendation_id,
-                        verdict: row.verdict as InterviewVerdict,
-                        created_at: row.created_at,
+                        kind: "initial_interview",
+                        at: row.created_at,
+                        detail: `Initial interview #${row.id}: ${row.verdict}`,
                     }),
                 ),
-                recommendations: applicantRecs.map((rec) => ({
-                    id: rec.id,
-                    status: rec.status as RecommendationStatus,
-                    created_at: rec.created_at,
-                })),
-                finalInterviews: applicantFinals.map((row) => ({
-                    id: row.id,
-                    recommendation_id: row.recommendation_id,
-                    verdict: row.verdict as InterviewVerdict,
-                    created_at: row.created_at,
-                })),
+                ...applicantRecs.map(
+                    (rec): ApplicantTimelineEvent => ({
+                        id: rec.id,
+                        kind: "recommendation",
+                        at: rec.created_at,
+                        detail: `Recommendation #${rec.id}: ${rec.status}`,
+                    }),
+                ),
+                ...applicantFinals.map(
+                    (row): ApplicantTimelineEvent => ({
+                        id: row.id,
+                        kind: "final_interview",
+                        at: row.created_at,
+                        detail: `Final interview #${row.id}: ${row.verdict}`,
+                    }),
+                ),
+            ].sort((a, b) => {
+                const aAt = a.at ?? "";
+                const bAt = b.at ?? "";
+                if (aAt !== bAt) return aAt < bAt ? -1 : 1;
+                return a.id - b.id;
             });
+
+            // Boundary parse: a non-canonical/absent value becomes null (rendered
+            // as a placeholder) instead of leaking an unknown string downstream.
+            const parsedStatus = ApplicantStatusSchema.safeParse(applicant.status);
 
             return {
                 id: applicant.id,
@@ -276,7 +267,7 @@ export async function GET() {
                 submitted_at: latestApp?.submitted_at ?? null,
                 quiz_score: latestApp?.quiz_score ?? null,
                 quiz_passed: toNullableBoolean(latestApp?.quiz_passed ?? null),
-                stage,
+                status: parsedStatus.success ? parsedStatus.data : null,
                 timeline,
             };
         });

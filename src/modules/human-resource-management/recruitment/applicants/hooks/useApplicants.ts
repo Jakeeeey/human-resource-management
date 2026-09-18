@@ -27,8 +27,8 @@ export function useApplicants(): UseApplicantsReturn {
             result = result.filter((a) => a.full_name?.toLowerCase().includes(s));
         }
 
-        if (filters.stage != null) {
-            result = result.filter((a) => a.stage === filters.stage);
+        if (filters.status != null) {
+            result = result.filter((a) => a.status === filters.status);
         }
 
         return result;

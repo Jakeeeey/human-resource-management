@@ -1,16 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Circle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -18,120 +11,177 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { ChecklistItem } from "../completionChecklist";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 
-// CompletionTab.tsx — HR completion surface (Todo 14). Reads the §10
-// checklist through the orchestrator GET (re-check, never writes) and
-// drives the single POST that writes ONBOARDING_COMPLETED. A refused hire
-// renders the missing-item list; a completed hire shows the terminal state.
-// Re-fire collapses server-side (`alreadyCompleted`, no rewrite/notify).
+import {
+  groupChecklistByPhase,
+  readJson,
+  toCheckState,
+  type CheckState,
+  type CompletionGroup,
+} from "../completionTabData";
 
-interface ProfileOption {
-  id: number;
-  employee_id: number;
-  status: string;
+// CompletionTab.tsx — workspace Completion section keyed to the EMPLOYEE
+// (todo 22). Re-checks the employee's task set through the completion GET and
+// drives the POST that reports completion. The employee is the canonical hire
+// from the route, so there is no picker and no roster fetch. The checklist is
+// grouped by onboarding phase; every group is collapsible and paginates its
+// own rows, mirroring the Overview phased task list.
+
+const PAGE_SIZE = 5;
+
+function GroupItems({ group }: { group: CompletionGroup }) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(group.items.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const visibleItems = group.items.slice(start, start + PAGE_SIZE);
+
+  return (
+    <>
+      <ul className="divide-y divide-border">
+        {visibleItems.map((item) => (
+          <li key={item.key} className="flex items-start gap-2 px-3 py-2">
+            {item.done ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium" title={item.label}>
+                {item.label}
+              </p>
+              <p className="text-xs text-muted-foreground break-words">
+                {item.detail}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {totalPages > 1 ? (
+        <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() => setPage(Math.max(1, currentPage - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
 }
 
-interface CheckState {
-  profile: ProfileOption;
-  checklist: ChecklistItem[];
-  ready: boolean;
-  missing: ChecklistItem[];
+function CompletionGroupCard({ group }: { group: CompletionGroup }) {
+  const [open, setOpen] = useState(false);
+  const percent =
+    group.total === 0 ? 0 : Math.round((group.done / group.total) * 100);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card className="shadow-none border-border overflow-hidden">
+        <CollapsibleTrigger
+          type="button"
+          className="w-full rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="truncate" title={group.label}>
+                {group.label}
+              </CardTitle>
+              <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                {group.done}/{group.total} done
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    open && "rotate-180"
+                  )}
+                  aria-hidden="true"
+                />
+              </span>
+            </div>
+            <Progress
+              className="mt-2 h-1.5"
+              value={percent}
+              aria-label={`${group.label} completion progress`}
+            />
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            <div className="overflow-hidden rounded-md border border-border">
+              <GroupItems key={group.items.length} group={group} />
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
 }
 
-async function readJson(res: Response): Promise<{
-  success: boolean;
-  data?: unknown;
-  message?: string;
-  checklist?: ChecklistItem[];
-  missing?: ChecklistItem[];
-  ready?: boolean;
-  alreadyCompleted?: boolean;
-}> {
-  return (await res.json().catch(() => null)) as {
-    success: boolean;
-    data?: unknown;
-    message?: string;
-    checklist?: ChecklistItem[];
-    missing?: ChecklistItem[];
-    ready?: boolean;
-    alreadyCompleted?: boolean;
-  };
-}
-
-export function CompletionTab() {
-  const [profiles, setProfiles] = useState<ProfileOption[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+export function CompletionTab({ userId }: { userId: number }) {
   const [check, setCheck] = useState<CheckState | null>(null);
   const [loading, setLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadProfiles() {
-      try {
-        const res = await fetch("/api/hrm/onboarding/profiles", {
-          cache: "no-store",
-        });
-        const body = await readJson(res);
-        if (cancelled) return;
-        const rows = Array.isArray(body.data) ? body.data : [];
-        setProfiles(
-          rows.filter(
-            (row): row is ProfileOption =>
-              typeof row === "object" &&
-              row !== null &&
-              typeof (row as ProfileOption).id === "number"
-          )
-        );
-      } catch {
-        if (!cancelled) setError("Profiles failed to load. Retry shortly.");
-      }
-    }
-    void loadProfiles();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const runCheck = useCallback(async (profileId: number) => {
+  const runCheck = useCallback(async (id: number) => {
     setLoading(true);
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(
-        `/api/hrm/onboarding/completion?profile_id=${profileId}`,
-        { cache: "no-store" }
-      );
+      const res = await fetch(`/api/hrm/onboarding/completion?user_id=${id}`, {
+        cache: "no-store",
+      });
       const body = await readJson(res);
-      if (!res.ok || !body.success) {
+      const state = toCheckState(id, body);
+      if (!res.ok || body.success !== true || !state) {
         setCheck(null);
-        setError(body.message ?? "Checklist read failed.");
+        setError(
+          typeof body.message === "string"
+            ? body.message
+            : "Completion check failed."
+        );
         return;
       }
-      const data = body.data as CheckState;
-      setCheck({
-        profile: data.profile,
-        checklist: Array.isArray(data.checklist) ? data.checklist : [],
-        ready: body.ready === true,
-        missing: Array.isArray(body.missing) ? body.missing : [],
-      });
+      setCheck(state);
     } catch {
       setCheck(null);
-      setError("Checklist read failed. Retry shortly.");
+      setError("Completion check failed. Retry shortly.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (selectedId !== null) void runCheck(selectedId);
-  }, [selectedId, runCheck]);
+    void runCheck(userId);
+  }, [userId, runCheck]);
 
   const runComplete = useCallback(async () => {
-    if (selectedId === null) return;
     setCompleting(true);
     setError(null);
     setNotice(null);
@@ -139,41 +189,35 @@ export function CompletionTab() {
       const res = await fetch("/api/hrm/onboarding/completion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profile_id: selectedId }),
+        body: JSON.stringify({ user_id: userId }),
       });
       const body = await readJson(res);
-      if (!res.ok || !body.success) {
-        const missing = Array.isArray(body.missing) ? body.missing : [];
-        if (Array.isArray(body.checklist)) {
-          const data = body.data as CheckState | undefined;
-          setCheck({
-            profile: data?.profile ?? check?.profile ?? {
-              id: selectedId,
-              employee_id: 0,
-              status: "",
-            },
-            checklist: (body.checklist as ChecklistItem[]) ?? [],
-            ready: false,
-            missing: (missing as ChecklistItem[]) ?? [],
-          });
-        }
+      const state = toCheckState(userId, body);
+      if (!res.ok || body.success !== true) {
+        if (state) setCheck(state);
         setError(
-          body.message ?? "Completion refused — see the missing items."
+          typeof body.message === "string"
+            ? body.message
+            : "Completion blocked — see the missing tasks."
         );
         return;
       }
-      setNotice(
-        body.alreadyCompleted === true
-          ? "Onboarding already completed — re-fire collapsed."
-          : "Onboarding completed — notification dispatched."
-      );
-      await runCheck(selectedId);
+      setNotice("Onboarding complete — every required task is done.");
+      await runCheck(userId);
     } catch {
       setError("Completion request failed. Retry shortly.");
     } finally {
       setCompleting(false);
     }
-  }, [selectedId, runCheck, check?.profile]);
+  }, [userId, runCheck]);
+
+  const groups = check ? groupChecklistByPhase(check.checklist) : [];
+  const requiredDone = check
+    ? check.checklist.filter((item) => item.required && item.done).length
+    : 0;
+  const requiredTotal = check
+    ? check.checklist.filter((item) => item.required).length
+    : 0;
 
   return (
     <Card className="shadow-none border-border overflow-hidden">
@@ -182,43 +226,16 @@ export function CompletionTab() {
           Completion
         </CardTitle>
         <CardDescription>
-          Section-10 checklist orchestrator into ONBOARDING_COMPLETED.
+          Employee task-set completion — every required onboarding task done.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label
-            htmlFor="onb-completion-profile"
-            className="text-sm font-medium shrink-0"
-          >
-            Hire
-          </label>
-          <Select
-            value={selectedId === null ? "" : String(selectedId)}
-            onValueChange={(v) =>
-              setSelectedId(v === "" ? null : Number(v))
-            }
-          >
-            <SelectTrigger
-              id="onb-completion-profile"
-              className="h-9 w-full sm:max-w-[320px]"
-              aria-label="Select hire"
-            >
-              <SelectValue placeholder="Select a hire…" />
-            </SelectTrigger>
-            <SelectContent className="max-h-60">
-              {profiles.map((profile) => (
-                <SelectItem key={profile.id} value={String(profile.id)}>
-                  #{profile.employee_id} — {profile.status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <Button
             variant="outline"
             className="w-full sm:w-auto"
-            disabled={selectedId === null || loading}
-            onClick={() => selectedId !== null && void runCheck(selectedId)}
+            disabled={loading}
+            onClick={() => void runCheck(userId)}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -238,42 +255,31 @@ export function CompletionTab() {
         )}
 
         {check && (
-          <div className="space-y-2">
-            <div className="overflow-x-auto">
-              <ul className="min-w-[320px] divide-y divide-border rounded-md border border-border">
-                {check.checklist.map((item) => (
-                  <li
-                    key={item.key}
-                    className="flex items-start gap-2 px-3 py-2"
-                  >
-                    {item.done ? (
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                    ) : (
-                      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium" title={item.label}>
-                        {item.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground break-words">
-                        {item.detail}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Required tasks: {requiredDone}/{requiredTotal} done
+              {check.missing.length > 0
+                ? ` · ${check.missing.length} still open`
+                : ""}
+            </p>
+
+            <div className="grid gap-3">
+              {groups.map((group) => (
+                <CompletionGroupCard key={group.phase} group={group} />
+              ))}
             </div>
+
             <Button
               className="w-full sm:w-auto"
-              disabled={!check.ready || completing || check.profile.status === "ONBOARDING_COMPLETED"}
+              disabled={!check.ready || completing}
               onClick={() => void runComplete()}
             >
               {completing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
-              ) : check.profile.status === "ONBOARDING_COMPLETED" ? (
-                "Completed"
+              ) : check.ready ? (
+                "Verify completion"
               ) : (
-                "Mark onboarding completed"
+                "Complete all required tasks first"
               )}
             </Button>
           </div>

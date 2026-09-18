@@ -83,7 +83,7 @@ function computeComposite(items: Pick<ClientSheetItem, "score" | "weight_percent
  * derived from the composite.
  */
 export function InterviewDetail() {
-    const { selectedInterview, setSelectedInterview, interviews, updateInterview, userDisplay } = useInterview();
+    const { selectedInterview, setSelectedInterview, interviews, updateInterview, userDisplay, eligibleInitial, eligibleFinal } = useInterview();
     const router = useRouter();
     const applicationId = selectedInterview?.application_id ?? null;
 
@@ -93,6 +93,23 @@ export function InterviewDetail() {
     }, [interviews, applicationId]);
 
     const latest = history[0] ?? null;
+
+    /**
+     * Human label for the dialog header: the applicant name from the active
+     * row, so the reviewer never has to translate an internal application id.
+     * Initial rows key by application id; Final rows key by recommendation id.
+     */
+    const applicantName = useMemo(() => {
+        if (!selectedInterview) return null;
+        const byApplication = eligibleInitial.find((row) => row.id === selectedInterview.application_id);
+        if (byApplication?.full_name) return byApplication.full_name;
+        const recommendationId = selectedInterview.recommendation_id ?? null;
+        if (recommendationId != null) {
+            const byRecommendation = eligibleFinal.find((row) => row.id === recommendationId);
+            if (byRecommendation?.full_name) return byRecommendation.full_name;
+        }
+        return null;
+    }, [selectedInterview, eligibleInitial, eligibleFinal]);
 
     const [itemsBySheet, setItemsBySheet] = useState<Record<number, ClientSheetItem[]>>({});
     const [itemsLoading, setItemsLoading] = useState(false);
@@ -162,11 +179,13 @@ export function InterviewDetail() {
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
-                            <FileText className="w-6 h-6 text-primary" />
-                            <span className="truncate">Interview History — Application #{applicationId}</span>
+                            <FileText className="w-6 h-6 text-primary shrink-0" />
+                            <span className="truncate" title={applicantName ?? `Application #${applicationId}`}>
+                                Interview History — {applicantName ?? `Application #${applicationId}`}
+                            </span>
                         </DialogTitle>
                         <DialogDescription className="text-sm mt-2">
-                            {history.length} {history.length === 1 ? "grading" : "gradings"}, newest first. The latest grading wins.
+                            Application #{applicationId} · {history.length} {history.length === 1 ? "grading" : "gradings"}, newest first. The latest grading wins.
                         </DialogDescription>
                     </DialogHeader>
                 </div>

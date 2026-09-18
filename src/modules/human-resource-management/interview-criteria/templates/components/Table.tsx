@@ -46,7 +46,6 @@ export function TemplateTable({
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-    const [rowSelection, setRowSelection] = React.useState({});
 
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
     const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -87,9 +86,16 @@ export function TemplateTable({
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         onColumnVisibilityChange: setColumnVisibility,
-        onRowSelectionChange: setRowSelection,
-        state: { sorting, columnFilters, columnVisibility, rowSelection },
+        state: { sorting, columnFilters, columnVisibility },
     });
+
+    // Footer pagination read: rows carry no selection UI, so the slot reports
+    // the visible window ("Showing X–Y of Z") instead of a dead selection count.
+    const rowCount = table.getFilteredRowModel().rows.length;
+    const { pageIndex, pageSize } = table.getState().pagination;
+    const showingFrom = rowCount === 0 ? 0 : pageIndex * pageSize + 1;
+    const showingTo = Math.min(rowCount, (pageIndex + 1) * pageSize);
+    const pageCount = table.getPageCount();
 
     if (isLoading) {
         return (
@@ -113,7 +119,7 @@ export function TemplateTable({
             </div>
 
             <div className="text-sm text-muted-foreground">
-                {table.getFilteredRowModel().rows.length} template(s) found
+                {rowCount} {rowCount === 1 ? "template" : "templates"} found
             </div>
 
             <div className="rounded-md border overflow-x-auto">
@@ -137,10 +143,7 @@ export function TemplateTable({
                     <TableBody>
                         {table.getRowModel().rows?.length ? (
                             table.getRowModel().rows.map((row) => (
-                                <TableRow
-                                    key={row.id}
-                                    data-state={row.getIsSelected() && "selected"}
-                                >
+                                <TableRow key={row.id}>
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
                                             {flexRender(
@@ -162,29 +165,30 @@ export function TemplateTable({
                 </UiTable>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
-                <div className="flex-1 text-sm text-muted-foreground">
-                    {table.getFilteredSelectedRowModel().rows.length} of{" "}
-                    {table.getFilteredRowModel().rows.length} row(s) selected.
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm text-muted-foreground">
+                    Showing {showingFrom}–{showingTo} of {rowCount}
                 </div>
-                <div className="space-x-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                    >
-                        Next
-                    </Button>
-                </div>
+                {pageCount > 1 && (
+                    <div className="space-x-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => table.previousPage()}
+                            disabled={!table.getCanPreviousPage()}
+                        >
+                            Previous
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => table.nextPage()}
+                            disabled={!table.getCanNextPage()}
+                        >
+                            Next
+                        </Button>
+                    </div>
+                )}
             </div>
 
             <TemplateEditorDialog

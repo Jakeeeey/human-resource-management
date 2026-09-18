@@ -1,10 +1,11 @@
-// pdfBurnClient.ts — Todo 18 client caller for the server-side pdf-lib burn.
+// pdfBurnClient.ts — applicant-scoped client caller for the server-side
+// pdf-lib burn.
 //
-// The browser NEVER flattens here: it POSTs the 201 record intent +
-// renderer-owned page sizes (+ optional stamp PNG data URLs) and the server
-// burns the LOCKED envelope strokes into the trusted admin-template PDF,
-// then files upload → `data.id` → link. This replaces the Todo 8
-// `html-to-image`/`jspdf` client flatten path (those files stay for history).
+// The browser NEVER flattens here: it POSTs the applicant's 201 record intent
+// + renderer-owned page sizes (+ optional stamp PNG data URLs) and the server
+// burns the signed strokes into the trusted admin-template PDF, then files
+// upload → `data.id` → link. KEYING (todo 13 re-key): the aggregate is
+// applicant-scoped, so the request/pointer carry `applicantId` as the key.
 
 export interface PdfBurnRecordInput {
   user_id: number;
@@ -19,18 +20,18 @@ export interface PdfBurnStampPngInput {
 }
 
 export interface RequestPdfBurnInput {
-  envelopeId: number;
+  applicantId: number;
   record: PdfBurnRecordInput;
   /** Renderer-owned bitmap size per 1-based page (fraction bridge). */
   pageSizes: Record<number, { width: number; height: number }>;
-  /** Required when the envelope already carries a `pdf_file` (re-file). */
+  /** Required when the document already carries a `pdf_file` (re-file). */
   reason?: string;
   /** Hiree signature PNGs, best-effort (vectors still burn without them). */
   stampPngs?: PdfBurnStampPngInput[];
 }
 
 export interface PdfBurnPointer {
-  envelopeId: number;
+  applicantId: number;
   fileId: string;
   recordId: number | null;
   version: number;
@@ -73,7 +74,7 @@ export async function requestPdfBurn(
   input: RequestPdfBurnInput
 ): Promise<PdfBurnPointer> {
   const res = await fetch(
-    `/api/hrm/onboarding/signing-envelopes/${input.envelopeId}/pdf-burn`,
+    `/api/hrm/onboarding/signing-envelope/${input.applicantId}/pdf-burn`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -96,7 +97,7 @@ export async function requestPdfBurn(
     );
   }
   return {
-    envelopeId: input.envelopeId,
+    applicantId: input.applicantId,
     fileId: body.data.fileId,
     recordId: body.data.recordId ?? null,
     version: body.data.version ?? 1,

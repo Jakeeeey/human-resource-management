@@ -56,19 +56,25 @@ export async function uploadImageToDirectus(formData: FormData): Promise<string>
   return json.data.id;
 }
 
-export async function invalidateUserBiometrics(userId: number): Promise<void> {
+export async function invalidateUserBiometrics(userId: number): Promise<boolean> {
   if (!DIRECTUS_URL || !DIRECTUS_TOKEN) throw new Error("API not configured");
   
-  const fetchRes = await fetch(`${DIRECTUS_URL}/items/user_face_biometrics?filter[user_id][_eq]=${userId}&filter[is_active][_eq]=true`, {
-    headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` }
+  const fetchRes = await fetch(`${DIRECTUS_URL}/items/user_face_biometrics?filter[user_id][_eq]=${userId}&filter[is_active][_neq]=false`, {
+    headers: { Authorization: `Bearer ${DIRECTUS_TOKEN}` },
+    next: { revalidate: 0 }
   });
   
-  if (!fetchRes.ok) return;
+  if (!fetchRes.ok) {
+    const err = await fetchRes.text();
+    console.error("Failed to query user biometrics:", err);
+    return false;
+  }
+  
   const data = await fetchRes.json();
   const existingRecords = data.data || [];
   
   for (const record of existingRecords) {
-    await fetch(`${DIRECTUS_URL}/items/user_face_biometrics/${record.id}`, {
+    const patchRes = await fetch(`${DIRECTUS_URL}/items/user_face_biometrics/${record.id}`, {
       method: "PATCH",
       headers: { 
           Authorization: `Bearer ${DIRECTUS_TOKEN}`,
@@ -76,7 +82,15 @@ export async function invalidateUserBiometrics(userId: number): Promise<void> {
       },
       body: JSON.stringify({ is_active: false })
     });
+    if (!patchRes.ok) {
+      console.error(`Failed to deactivate biometric record ${record.id}`);
+    }
   }
+  return true;
+}
+
+export async function removeFaceBiometric(userId: number): Promise<boolean> {
+  return await invalidateUserBiometrics(userId);
 }
 
 export async function checkDuplicateFace(newDescriptorArray: number[]): Promise<{ isDuplicate: boolean; matchedUserId?: number }> {

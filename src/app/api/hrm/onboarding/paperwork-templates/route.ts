@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
@@ -11,10 +10,11 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/hrm/onboarding/paperwork-templates — list (+ `?company_key=`
-// per-company filter; app-level key, NOT a UNIQUE column).
+// GET /api/hrm/onboarding/paperwork-templates — list.
 // POST /api/hrm/onboarding/paperwork-templates — create; zones default to []
-// (freeform-ink-only template), is_active defaults true.
+// (freeform-ink-only template), is_active defaults true. Company scoping
+// lives in the `paperwork_template_companies` junction via the
+// `[id]/companies` route — this collection carries no company column.
 
 function getPhilippineTime(): string {
   return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
@@ -47,7 +47,6 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     }
   }
   const active = row["is_active"];
-  const rawSource = row["source"];
   const rawPdfFile = row["pdf_file"];
   const pdfFile =
     typeof rawPdfFile === "string" && rawPdfFile !== ""
@@ -61,28 +60,15 @@ function normalize(row: Record<string, unknown>): PaperworkTemplate {
     ...(row as object),
     zones,
     is_active: active === true || active === 1 || active === "1",
-    source: rawSource === "pdf" ? "pdf" : "html",
+    // PDF-only: every template reads as pdf regardless of stored value.
+    source: "pdf",
     pdf_file: pdfFile,
   } as PaperworkTemplate;
 }
 
-const listQuerySchema = z
-  .object({
-    company_key: z.string().min(1).optional(),
-  })
-  .strict();
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const params = Object.fromEntries(req.nextUrl.searchParams.entries());
-    const query = listQuerySchema.safeParse(params);
-    if (!query.success) {
-      return validationFailed(query.error.flatten().fieldErrors);
-    }
-
-    const filter = query.data.company_key
-      ? `?filter[company_key][_eq]=${encodeURIComponent(query.data.company_key)}&limit=100`
-      : "?limit=100";
+    const filter = "?limit=100";
     const result = (await dFetch(`/items/paperwork_templates${filter}`)) as {
       data?: Record<string, unknown>[];
     };
@@ -106,20 +92,18 @@ export async function POST(req: NextRequest) {
     }
 
     const now = getPhilippineTime();
+    const payload: Record<string, unknown> = {
+      title: validation.data.title,
+      zones: validation.data.zones ?? [],
+      is_active: validation.data.is_active ?? true,
+      source: "pdf",
+      pdf_file: validation.data.pdf_file ?? null,
+      created_at: now,
+      updated_at: now,
+    };
     const created = (await dFetch("/items/paperwork_templates", {
       method: "POST",
-      body: JSON.stringify({
-        company_key: validation.data.company_key,
-        title: validation.data.title,
-        // PDF-only: body is always the empty string (legacy column, never rendered).
-        body_html: "",
-        zones: validation.data.zones ?? [],
-        is_active: validation.data.is_active ?? true,
-        source: "pdf",
-        pdf_file: validation.data.pdf_file ?? null,
-        created_at: now,
-        updated_at: now,
-      }),
+      body: JSON.stringify(payload),
     })) as { data?: Record<string, unknown> };
 
     if (!created?.data) {

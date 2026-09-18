@@ -6,21 +6,27 @@ import type {
   PaperworkTemplate,
 } from "../types/paperwork-template.schema";
 import { uploadPaperworkPdf } from "../providers/paperworkPdfUpload";
-import { PaperworkCombobox } from "./PaperworkCombobox";
+import { PaperworkCompanyMultiCombobox } from "./PaperworkCompanyMultiCombobox";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 // TemplateDialog.tsx — create/edit for paperwork templates (PDF-ONLY: every
 // template is an admin-uploaded PDF picked below; zones are marked in the
 // separate zones editor AFTER the template exists).
+// Todo 20: company scoping is a MULTI-pick over the directory — the hook
+// persists the set through the `[id]/companies` junction replace route.
+// When the directory is unreachable saving is blocked (there is no company
+// column left to fall back to); the dialog shows a retry hint instead.
 // Form state initializes from props on mount; the dialog remounts it via
 // `key` per open/template so no set-state-in-effect is needed.
 
@@ -28,27 +34,42 @@ interface TemplateDialogProps {
   open: boolean;
   template: PaperworkTemplate | null;
   saving: boolean;
-  companyOptions: { value: string; label: string }[];
+  companyOptions: { value: string; label: string; code: string }[];
+  initialCompanyIds: number[];
   onClose: () => void;
-  onSave: (data: CreatePaperworkTemplateInput) => void;
+  onSave: (
+    data: CreatePaperworkTemplateInput,
+    companyIds: number[] | null
+  ) => void;
 }
 
 function TemplateDialogForm({
   template,
   saving,
   companyOptions,
+  initialCompanyIds,
   onClose,
   onSave,
 }: Omit<TemplateDialogProps, "open">) {
-  const [companyKey, setCompanyKey] = useState(template?.company_key ?? "");
+  const [companyIds, setCompanyIds] = useState<string[]>(
+    initialCompanyIds.map(String)
+  );
   const [title, setTitle] = useState(template?.title ?? "");
   const [isActive, setIsActive] = useState(template?.is_active ?? true);
   const [pdfFile, setPdfFile] = useState<string | null>(
     template?.pdf_file ?? null
   );
+  // Existing templates store only the UUID, so show the title; uploads show the picked name.
+  const [pdfFileName, setPdfFileName] = useState<string | null>(
+    template?.pdf_file ? template.title : null
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [fileKey, setFileKey] = useState(0);
+
+  const directoryUp = companyOptions.length > 0;
+  const fileChanged = (template?.pdf_file ?? null) !== pdfFile;
 
   const handlePdfSelected = (file: File | undefined) => {
     setUploadError(null);
@@ -69,7 +90,10 @@ function TemplateDialogForm({
     }
     setUploading(true);
     void uploadPaperworkPdf(file)
-      .then((id) => setPdfFile(id))
+      .then((id) => {
+        setPdfFile(id);
+        setPdfFileName(file.name);
+      })
       .catch((err: unknown) =>
         setUploadError(err instanceof Error ? err.message : "PDF upload failed")
       )
@@ -80,41 +104,68 @@ function TemplateDialogForm({
   };
 
   const handleSave = () => {
-    if (companyKey.trim() === "" || title.trim() === "") return;
+    setSaveError(null);
+    if (title.trim() === "") {
+      setSaveError("Title is required");
+      return;
+    }
     if (!pdfFile) {
       setUploadError("Upload a PDF file before saving");
       return;
     }
-    onSave({
-      company_key: companyKey.trim(),
-      title: title.trim(),
-      source: "pdf",
-      pdf_file: pdfFile,
-      is_active: isActive,
-    });
+    if (!directoryUp) {
+      setSaveError(
+        "Company directory is unreachable — close and retry; scoping cannot be saved offline"
+      );
+      return;
+    }
+    // Empty pick is rejected with a reason — never saved.
+    const ids = [
+      ...new Set(
+        companyIds.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+      ),
+    ];
+    if (ids.length === 0) {
+      setSaveError(
+        "Pick at least one company — a template must scope to one or more companies"
+      );
+      return;
+    }
+    onSave(
+      {
+        title: title.trim(),
+        source: "pdf",
+        pdf_file: pdfFile,
+        is_active: isActive,
+        // Zones are positioned against the old file, so a changed/removed
+        // source clears them atomically with the save instead of leaving stale
+        // zones on the new PDF.
+        ...(fileChanged ? { zones: [] } : {}),
+      },
+      ids
+    );
   };
 
   return (
     <>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="pw-company-key">Company</Label>
-          {companyOptions.length > 0 ? (
-            <PaperworkCombobox
+          <Label htmlFor="pw-company-key">Companies</Label>
+          {directoryUp ? (
+            <PaperworkCompanyMultiCombobox
               options={companyOptions}
-              value={companyKey}
-              onValueChange={setCompanyKey}
-              placeholder="Select company…"
-              disabled={template !== null || saving}
+              values={companyIds}
+              onValuesChange={(next) => {
+                setCompanyIds(next);
+                if (next.length > 0) setSaveError(null);
+              }}
+              placeholder="Select companies…"
+              disabled={saving}
             />
           ) : (
-            <Input
-              id="pw-company-key"
-              value={companyKey}
-              disabled={template !== null || saving}
-              onChange={(e) => setCompanyKey(e.target.value)}
-              placeholder="Per-company scope, e.g. acme-ph"
-            />
+            <p className="text-sm text-muted-foreground">
+              Company directory unreachable — close and retry before saving.
+            </p>
           )}
         </div>
         <div className="space-y-2">
@@ -143,18 +194,21 @@ function TemplateDialogForm({
             )}
             {pdfFile && (
               <div className="flex items-center gap-2">
-                <code
-                  className="block max-w-[280px] flex-1 truncate font-mono text-xs"
-                  title={pdfFile}
+                <span
+                  className="block max-w-[280px] flex-1 truncate text-sm"
+                  title={pdfFileName ?? undefined}
                 >
-                  {pdfFile}
-                </code>
+                  {pdfFileName ?? "Attached PDF"}
+                </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   disabled={saving || uploading}
-                  onClick={() => setPdfFile(null)}
+                  onClick={() => {
+                    setPdfFile(null);
+                    setPdfFileName(null);
+                  }}
                   className="min-h-8"
                 >
                   Remove
@@ -165,20 +219,18 @@ function TemplateDialogForm({
               <p className="text-sm text-destructive">{uploadError}</p>
             )}
           </div>
-        <label
-          htmlFor="pw-is-active"
-          className="flex min-h-8 cursor-pointer items-center gap-2 text-sm"
-        >
-          <input
+        <div className="flex items-center gap-2">
+          <Switch
             id="pw-is-active"
-            type="checkbox"
-            className="h-4 w-4"
+            size="sm"
             checked={isActive}
             disabled={saving}
-            onChange={(e) => setIsActive(e.target.checked)}
+            aria-label="Active"
+            onCheckedChange={setIsActive}
           />
-          Active (inactive templates stay on file but leave the registry)
-        </label>
+          <Label htmlFor="pw-is-active">Active</Label>
+        </div>
+        {saveError && <p className="text-sm text-destructive">{saveError}</p>}
       </div>
       <DialogFooter className="flex-col gap-2 sm:flex-row">
         <Button
@@ -206,6 +258,7 @@ export function TemplateDialog({
   template,
   saving,
   companyOptions,
+  initialCompanyIds,
   onClose,
   onSave,
 }: TemplateDialogProps) {
@@ -216,13 +269,17 @@ export function TemplateDialog({
           <DialogTitle>
             {template ? "Edit paperwork template" : "New paperwork template"}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Set the title, source PDF, and companies for this paperwork template.
+          </DialogDescription>
         </DialogHeader>
         {open && (
           <TemplateDialogForm
-            key={template?.id ?? "new"}
+            key={`${template?.id ?? "new"}:${initialCompanyIds.join(",")}`}
             template={template}
             saving={saving}
             companyOptions={companyOptions}
+            initialCompanyIds={initialCompanyIds}
             onClose={onClose}
             onSave={onSave}
           />

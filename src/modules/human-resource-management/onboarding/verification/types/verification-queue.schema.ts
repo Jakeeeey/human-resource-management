@@ -1,37 +1,64 @@
 import { z } from "zod";
 
-import type { OnboardingProfile } from "../../hub/types/onboarding-profile.schema";
-import type { AcknowledgementLog } from "./acknowledgement-log.schema";
+import type {
+  OnboardingTask,
+  OnboardingTaskTemplate,
+} from "../../types/onboarding-task.schema";
+import type { DocumentVerificationState } from "./document-verification.schema";
 
 // verification-queue.schema.ts — queue read model + decision mutation contract.
 //
-// Queue states persist on `onboarding_profiles` with ZERO schema changes:
-// - pending: status DOCUMENTS_SUBMITTED, no return marker.
-// - returned: status DOCUMENTS_SUBMITTED + current_stage RETURNED marker.
-// - approved: status HR_VERIFIED (history; marker wiped by status mirror).
-// Cycle: pending → approved | returned(reason) → resubmit → pending → approved.
-// Approve from returned is refused (resubmit first) so the cycle is provable.
+// Verification is EMPLOYEE-keyed now: the queue is a VIEW over the employee's
+// `documents`-phase `onboarding_task` rows (todo 19 engine). There is no
+// `onboarding_profiles` read and no legacy status vocabulary anywhere on this
+// path — the retired profile statuses gate nothing.
 //
-// The DOCUMENTS_SUBMITTED done-predicate is owned here (statusMachine defers
-// it to Todo 10): the HR approve decision IS the verification evidence. The
-// verifications POST route machine-checks with documentsVerified:true, then
-// PATCHes via dFetch — Todo 5 schema/routes stay frozen.
+// Task mapping (the codes are the seeded catalog's `documents` rows):
+// - `documents_submitted` (hiree)      done    -> the row ENTERS the queue;
+// - filed portal documents (any)                -> the row ENTERS as pending,
+//   even when `submitted` is still open, so HR sees partial sets per document;
+// - `documents_hr_verified` (hr)       pending -> pending
+//                                      blocked -> returned (+ reason in notes)
+//                                      done    -> approved (history)
+// Cycle: pending → approved | returned(reason) → resubmit → pending → approved.
+// The HR task only auto-closes over a FULLY submitted set (see the verifications
+// route); per-document approvals on a partial set are recorded but leave the
+// aggregate open until the hire files everything.
 
-export const RETURNED_STAGE_PREFIX = "RETURNED";
+export const VERIFICATION_PHASE = "documents";
+export const DOCUMENTS_SUBMITTED_CODE = "documents_submitted";
+export const DOCUMENTS_HR_VERIFIED_CODE = "documents_hr_verified";
 
-// DB-derived budget: `onboarding_profiles.current_stage` is VARCHAR(50), so
-// `RETURNED|<reason>` caps the reason at 50 − 9 = 41 chars (VALUE_TOO_LONG
-// asserted live). HR writes concise reasons; the dialog enforces this max.
+// Return reasons persist in `onboarding_task.notes` (TEXT). The 41-char cap is
+// carried over from the profile-era `current_stage` marker budget so the
+// dialog + route contracts stay behavior-equivalent across the re-key.
 export const MAX_RETURN_REASON_LENGTH = 41;
 
 export type QueueState = "pending" | "returned" | "approved";
 
+/** One hiree-uploaded portal document filed for the employee. */
+export interface QueueDocument {
+  /** Portal doc slot (e.g. `valid_id`) — the marker's `<doc_key>`. */
+  docKey: string;
+  /** Human title from the live document slot catalog (falls back to the raw key). */
+  title: string;
+  /** Directus file UUID (marker description `onboarding-portal:employee:<id>:<key>`). */
+  fileId: string;
+  /** Directus file `uploaded_on` (ISO) — null when Directus omits it. */
+  uploadedAt: string | null;
+  state: DocumentVerificationState;
+  returnReason: string | null;
+}
+
 export interface QueueRow {
-  profile: OnboardingProfile;
+  /** Employee key (`user.user_id`) — the only scope on this queue. */
+  userId: number;
   queueState: QueueState;
   returnReason: string | null;
-  ackCount: number;
-  lastAcknowledgedAt: string | null;
+  /** Latest change across the two documents tasks. */
+  updatedAt: string | null;
+  /** Hiree-uploaded portal documents for this employee (empty = none). */
+  documents: QueueDocument[];
 }
 
 export interface QueueAggregate {
@@ -39,50 +66,19 @@ export interface QueueAggregate {
   counts: Record<QueueState, number>;
 }
 
-// Builds the current_stage return marker. Reason is trimmed + capped so the
-// marker stays a short pointer (never a freeform essay field).
-export function buildReturnMarker(reason: string): string {
-  const clean = reason.trim().slice(0, MAX_RETURN_REASON_LENGTH).trim();
-  return `${RETURNED_STAGE_PREFIX}|${clean}`;
-}
-
-export interface ReturnMarker {
-  returned: boolean;
-  reason: string | null;
-}
-
-// Parses current_stage: marker present → returned + reason, else not returned.
-export function parseReturnMarker(
-  currentStage: string | null | undefined
-): ReturnMarker {
-  if (!currentStage || !currentStage.startsWith(`${RETURNED_STAGE_PREFIX}|`)) {
-    return { returned: false, reason: null };
-  }
-  const reason = currentStage.slice(RETURNED_STAGE_PREFIX.length + 1).trim();
-  return { returned: true, reason: reason.length > 0 ? reason : null };
-}
-
-// Derives the queue state of a profile row (call only for verification-stage
-// statuses; other statuses map to approved-history when HR_VERIFIED).
-export function deriveQueueState(
-  status: string,
-  currentStage: string | null | undefined
-): QueueState {
-  if (status === "HR_VERIFIED") return "approved";
-  return parseReturnMarker(currentStage).returned ? "returned" : "pending";
-}
-
 export const VERIFICATION_DECISIONS = ["approve", "return", "resubmit"] as const;
 
 export type VerificationDecision = (typeof VERIFICATION_DECISIONS)[number];
 
 // POST body: exactly one decision per call. `return` requires a reason;
-// approve/resubmit carry none. profile_id targets DOCUMENTS_SUBMITTED rows.
+// approve/resubmit carry none. `user_id` targets the employee's documents
+// task pair — never a profile.
 export const VerificationDecisionSchema = z
   .object({
-    profile_id: z.number().int().positive(),
+    user_id: z.number().int().positive(),
     decision: z.enum(VERIFICATION_DECISIONS),
     reason: z.string().min(1).max(MAX_RETURN_REASON_LENGTH).optional(),
+    doc_key: z.string().min(1).max(64).optional(),
   })
   .strict()
   .refine((d) => d.decision !== "return" || (d.reason ?? "").trim().length > 0, {
@@ -96,46 +92,123 @@ export type VerificationDecisionInput = z.infer<
 
 export interface VerificationQueueResponse {
   success: boolean;
-  data?: QueueAggregate | OnboardingProfile | null;
+  data?: QueueAggregate | QueueRow | null;
   message?: string;
 }
 
-// Joins ack-log rows onto verification-stage profiles for the queue read:
-// per-recipient status port (count + last-ack per profile, keyed by the
-// doc_ref convention). Pure — shared by the route and the harness.
+export interface VerificationTasks {
+  /** `documents_submitted` task — the hiree's submit step (queue gate). */
+  submitted: OnboardingTask | null;
+  /** `documents_hr_verified` task — the target of every HR decision. */
+  hr: OnboardingTask | null;
+}
+
+// Resolves the two verification tasks from the seeded catalog codes. Tasks
+// whose template is not an ACTIVE documents-phase row are ignored (todo-10
+// soft-delete rule: an inactive catalog row is not a required verification
+// gate; existing per-employee rows are never mutated — they are only not
+// resolved for the queue).
+export function findVerificationTasks(
+  tasks: readonly OnboardingTask[],
+  templates: readonly OnboardingTaskTemplate[]
+): VerificationTasks {
+  const codeById = new Map<number, string>();
+  for (const template of templates) {
+    if (template.phase === VERIFICATION_PHASE && template.is_active === true) {
+      codeById.set(template.id, template.code);
+    }
+  }
+  let submitted: OnboardingTask | null = null;
+  let hr: OnboardingTask | null = null;
+  for (const task of tasks) {
+    if (task.template_id === null) continue;
+    const code = codeById.get(task.template_id);
+    if (code === DOCUMENTS_SUBMITTED_CODE) submitted = task;
+    else if (code === DOCUMENTS_HR_VERIFIED_CODE) hr = task;
+  }
+  return { submitted, hr };
+}
+
+// Queue state of one employee: the HR task decides first (done -> approved,
+// blocked -> returned); a submitted-but-unverified row is pending; anything
+// else is NOT in the queue.
+export function deriveQueueState(tasks: VerificationTasks): QueueState | null {
+  if (tasks.hr?.status === "done") return "approved";
+  if (tasks.hr?.status === "blocked") return "returned";
+  return tasks.submitted?.status === "done" ? "pending" : null;
+}
+
+// The return reason lives in the blocked HR task's notes; empty notes read as
+// null (a marker without a reason never renders as blank evidence).
+function blockedReason(task: OnboardingTask | null): string | null {
+  if (!task || task.status !== "blocked") return null;
+  const clean = (task.notes ?? "").trim();
+  return clean.length > 0 ? clean : null;
+}
+
+// ISO-ish Directus timestamps sort lexicographically — max = latest change.
+function latestTimestamp(...values: readonly (string | null)[]): string | null {
+  const times = values.filter(
+    (value): value is string => typeof value === "string" && value.length > 0
+  );
+  if (times.length === 0) return null;
+  return times.reduce((a, b) => (a > b ? a : b));
+}
+
+// Builds one queue row from an employee's tasks + the shared catalog. Returns
+// null when the employee has neither a submitted-or-decided task state nor any
+// filed portal documents. Pure — the caller supplies rows.
+export function buildQueueRow(
+  userId: number,
+  tasks: readonly OnboardingTask[],
+  templates: readonly OnboardingTaskTemplate[],
+  documents: readonly QueueDocument[] = []
+): QueueRow | null {
+  const pair = findVerificationTasks(tasks, templates);
+  const queueState =
+    deriveQueueState(pair) ?? (documents.length > 0 ? "pending" : null);
+  if (queueState === null) return null;
+
+  return {
+    userId,
+    queueState,
+    returnReason: blockedReason(pair.hr),
+    updatedAt: latestTimestamp(
+      pair.hr?.updated_at ?? null,
+      pair.submitted?.updated_at ?? null
+    ),
+    documents: [...documents],
+  };
+}
+
+// Builds the queue from every employee that owns documents tasks for the
+// queue read. Pure — shared by the route and the harness. The documents pair is
+// resolved from the task list each row is built with, so the tasks are grouped
+// per employee first: passing the global list would derive every row from
+// whichever employee sorts last.
 export function aggregateQueue(
-  profiles: OnboardingProfile[],
-  logs: AcknowledgementLog[]
+  tasks: readonly OnboardingTask[],
+  templates: readonly OnboardingTaskTemplate[],
+  documentsByUser: ReadonlyMap<number, readonly QueueDocument[]> = new Map()
 ): QueueAggregate {
-  const byProfile = new Map<number, AcknowledgementLog[]>();
-  for (const log of logs) {
-    const match = /^onboarding:profile:(\d+)(?::.*)?$/.exec(
-      (log.doc_ref ?? "").trim()
-    );
-    if (!match) continue;
-    const id = Number(match[1]);
-    if (!Number.isInteger(id) || id <= 0) continue;
-    const list = byProfile.get(id) ?? [];
-    list.push(log);
-    byProfile.set(id, list);
+  const tasksByUser = new Map<number, OnboardingTask[]>();
+  for (const task of tasks) {
+    const owned = tasksByUser.get(task.user_id);
+    if (owned) owned.push(task);
+    else tasksByUser.set(task.user_id, [task]);
   }
 
-  const rows: QueueRow[] = profiles.map((profile) => {
-    const marker = parseReturnMarker(profile.current_stage);
-    const queueState = deriveQueueState(profile.status, profile.current_stage);
-    const entries = byProfile.get(profile.id) ?? [];
-    const times = entries
-      .map((e) => e.acknowledged_at)
-      .filter((t): t is string => typeof t === "string" && t.length > 0)
-      .sort();
-    return {
-      profile,
-      queueState,
-      returnReason: marker.returned ? marker.reason : null,
-      ackCount: entries.length,
-      lastAcknowledgedAt: times.length > 0 ? times[times.length - 1] : null,
-    };
-  });
+  const userIds = [...tasksByUser.keys()].sort((a, b) => a - b);
+  const rows: QueueRow[] = [];
+  for (const userId of userIds) {
+    const row = buildQueueRow(
+      userId,
+      tasksByUser.get(userId) ?? [],
+      templates,
+      documentsByUser.get(userId) ?? []
+    );
+    if (row) rows.push(row);
+  }
 
   const counts: Record<QueueState, number> = {
     pending: 0,

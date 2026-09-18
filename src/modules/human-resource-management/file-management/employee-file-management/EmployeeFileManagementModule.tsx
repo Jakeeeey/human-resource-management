@@ -35,17 +35,17 @@ export default function EmployeeFileManagementModule() {
       >
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-transparent rounded-xl" />
-          <TabsList className="relative w-full justify-start p-1 bg-background/50 backdrop-blur-xl border border-border/50 rounded-xl shadow-sm overflow-x-auto overflow-y-hidden">
+          <TabsList className="relative w-full justify-start p-1 bg-background/50 backdrop-blur-xl border border-border/50 rounded-xl shadow-sm overflow-x-auto overflow-y-hidden group-data-[orientation=horizontal]/tabs:h-auto">
             <TabsTrigger 
               value="records"
-              className="flex-shrink-0 gap-2 px-6 py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300"
+              className="flex-shrink-0 gap-2 px-6 py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
             >
               <FolderOpen className="h-4 w-4" />
               File Records
             </TabsTrigger>
             <TabsTrigger 
               value="types"
-              className="flex-shrink-0 gap-2 px-6 py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300"
+              className="flex-shrink-0 gap-2 px-6 py-2.5 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
             >
               <Settings2 className="h-4 w-4" />
               File Types

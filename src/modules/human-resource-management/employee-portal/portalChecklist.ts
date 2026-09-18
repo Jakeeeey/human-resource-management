@@ -1,22 +1,30 @@
-// portalChecklist.ts — hub-owned document config + pure checklist builder
-// (Todo 9). Required/optional flags live HERE (the hub config shape Todo 5
-// owns) — the portal only renders what this file declares. Filed state is
-// derived from the Directus file-description markers
-// (`onboarding-portal:<profile_id>:<doc_key>`) stamped by the link route,
-// so checklist GET is a pure function of (config, marker rows).
+// portalChecklist.ts — hub-owned document config + checklist builder
+// (todo 25 identity re-key; todo 8 DB runtime source). Required/optional
+// flags now come from the LIVE `onboarding_document_slot` catalog (active
+// rows, todo-6 seeded) via `listActiveDocSlotConfig()`; the `PORTAL_DOC_CONFIG`
+// constant below is the SEED source ONLY (todo-6 `catalogSeed.ts`), never the
+// runtime source. Filed state is derived from the Directus file-description
+// markers (`onboarding-portal:<applicant|employee>:<id>:<doc_key>`) stamped
+// by the link route, so checklist GET is a function of (identity key, live
+// slots, markers). There is NO `profile_id` marker anymore.
 //
 // Stage 4 seed (onboarding.pdf): government IDs, birth record, clearances,
 // medical fitness, and scholastic records are required; prior-employment
-// and supplementary credentials are optional. Admin-editable later —
-// never hardcoded in components.
+// and supplementary credentials are optional. Admin-editable via the
+// requirements surface — never hardcoded in components.
 
-import type {
-  PortalChecklistItem,
-  PortalDocKey,
+import {
+  PortalDocKeySchema,
+  type PortalChecklistItem,
+  type PortalDocKey,
+  type PortalIdentityKey,
+  type SeedPortalDocKey,
 } from "./types/portal-checklist.schema";
+import { listActiveDocSlotConfig } from "./server/documentSlotIo";
+import type { DocumentVerificationEntry } from "./server/documentVerificationIo";
 
 export interface PortalDocConfig {
-  key: PortalDocKey;
+  key: SeedPortalDocKey;
   title: string;
   required: boolean;
 }
@@ -52,27 +60,43 @@ export const PORTAL_DOC_CONFIG: readonly PortalDocConfig[] = [
   },
 ] as const;
 
-export function isKnownDocKey(key: string): key is PortalDocKey {
-  return PORTAL_DOC_CONFIG.some((entry) => entry.key === key);
+/** Marker prefix filed under one portal identity key. */
+export function portalMarkerPrefix(key: PortalIdentityKey): string {
+  return `onboarding-portal:${key.kind}:${key.id}:`;
 }
 
 /** Description marker stamped on every portal-linked Directus file. */
-export function portalFileMarker(profileId: number, docKey: PortalDocKey): string {
-  return `onboarding-portal:${profileId}:${docKey}`;
+export function portalFileMarker(
+  key: PortalIdentityKey,
+  docKey: PortalDocKey
+): string {
+  return `${portalMarkerPrefix(key)}${docKey}`;
 }
 
-/** Parses a marker back to its (profile_id, doc_key) pair, or null. */
+// The `<doc_key>` capture is widened to `[a-z0-9_]+` (todo 8) and then
+// drift-validated by `PortalDocKeySchema` below — never enum-gated here.
+const PORTAL_MARKER_PATTERN =
+  /^onboarding-portal:(applicant|employee):(\d+):([a-z0-9_]+)$/;
+
+/**
+ * Parses a marker back to its (identity key, doc_key) pair, or null.
+ * SYNCHRONOUS by contract — marker parsing feeds pure builders and must
+ * never become async. The widened capture is validated against
+ * `PortalDocKeySchema` (no leading digit/underscore, max 64 chars);
+ * membership in the live slot catalog is checked by `buildChecklist`.
+ */
 export function parsePortalFileMarker(
   description: unknown
-): { profile_id: number; doc_key: PortalDocKey } | null {
+): { key: PortalIdentityKey; doc_key: PortalDocKey } | null {
   if (typeof description !== "string") return null;
-  const match = /^onboarding-portal:(\d+):([a-z_]+)$/.exec(description.trim());
+  const match = PORTAL_MARKER_PATTERN.exec(description.trim());
   if (!match) return null;
-  const profileId = Number(match[1]);
-  const docKey = match[2] ?? "";
-  if (!Number.isInteger(profileId) || profileId <= 0) return null;
-  if (!isKnownDocKey(docKey)) return null;
-  return { profile_id: profileId, doc_key: docKey };
+  const kind = match[1] === "employee" ? "employee" : "applicant";
+  const identityId = Number(match[2]);
+  const docKey = match[3] ?? "";
+  if (!Number.isInteger(identityId) || identityId <= 0) return null;
+  if (!PortalDocKeySchema.safeParse(docKey).success) return null;
+  return { key: { kind, id: identityId }, doc_key: docKey };
 }
 
 export interface PortalFiledRow {
@@ -81,28 +105,47 @@ export interface PortalFiledRow {
 }
 
 /**
- * Builds the per-hire checklist: every config entry exactly once, filed
- * iff a marker row exists for (profile_id, doc_key). Pure — unit-tested
- * in the Todo 9 harness (required-missing → unchecked; optional-only +
- * one marker → checked).
+ * Builds the checklist for one identity key from the LIVE active document
+ * slots (todo 8 — the DB is the runtime source; `PORTAL_DOC_CONFIG` is seed
+ * only). Every active slot appears exactly once, filed iff a marker row
+ * exists for (kind, id, doc_key). A marker whose key has no live slot is
+ * ignored — never an error; an empty pre-seed catalog degrades to `[]`.
+ * @throws Coded error when the slot read itself fails (a failure must never
+ * read as an empty checklist).
  */
-export function buildChecklist(
-  profileId: number,
-  filedRows: PortalFiledRow[]
-): PortalChecklistItem[] {
+export async function buildChecklist(
+  key: PortalIdentityKey,
+  filedRows: PortalFiledRow[],
+  verificationByDoc: ReadonlyMap<
+    string,
+    DocumentVerificationEntry
+  > = new Map()
+): Promise<PortalChecklistItem[]> {
+  const slots = await listActiveDocSlotConfig();
+  const liveKeys = new Set(slots.map((slot) => slot.key));
   const filedByKey = new Map<PortalDocKey, string>();
   for (const row of filedRows) {
     const parsed = parsePortalFileMarker(row.description);
-    if (!parsed || parsed.profile_id !== profileId) continue;
-    if (!filedByKey.has(parsed.doc_key)) filedByKey.set(parsed.doc_key, row.id);
+    if (!parsed || parsed.key.kind !== key.kind || parsed.key.id !== key.id) {
+      continue;
+    }
+    if (!liveKeys.has(parsed.doc_key)) continue;
+    if (!filedByKey.has(parsed.doc_key)) {
+      filedByKey.set(parsed.doc_key, row.id);
+    }
   }
-  return PORTAL_DOC_CONFIG.map((entry) => ({
-    key: entry.key,
-    title: entry.title,
-    required: entry.required,
-    filed: filedByKey.has(entry.key),
-    file_id: filedByKey.get(entry.key) ?? null,
-  }));
+  return slots.map((slot) => {
+    const verification = verificationByDoc.get(slot.key);
+    return {
+      key: slot.key,
+      title: slot.title,
+      required: slot.required,
+      filed: filedByKey.has(slot.key),
+      file_id: filedByKey.get(slot.key) ?? null,
+      state: verification?.state ?? "pending",
+      returnReason: verification?.reason ?? null,
+    };
+  });
 }
 
 /** True when every required slot is filed (checklist-complete predicate). */

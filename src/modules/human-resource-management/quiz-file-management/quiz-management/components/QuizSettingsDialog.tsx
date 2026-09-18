@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { X } from "lucide-react";
+import { pluralize } from "../../utils/pluralize";
 
 interface FormData {
     name: string;
@@ -159,7 +160,10 @@ export function QuizSettingsDialog({
                 : activeQuestionCategories.length;
             if (pool < need) {
                 form.setError("is_applicant_quiz", {
-                    message: `This quiz draws ${need} questions but only ${pool} active question(s) match its pool. Add questions or lower the draw count first.`,
+                    message: `This quiz needs ${need} ${pluralize(
+                        need,
+                        "question"
+                    )}, but its pool only has ${pool} active ${pluralize(pool, "question")}. Add questions or lower the draw count first.`,
                 });
                 return;
             }
@@ -291,14 +295,16 @@ export function QuizSettingsDialog({
                                                     className="w-full justify-start font-normal"
                                                 >
                                                     {field.value.length
-                                                        ? `${field.value.length} categor${
-                                                              field.value.length > 1 ? "ies" : "y"
-                                                          } selected`
+                                                        ? `${field.value.length} ${pluralize(
+                                                              field.value.length,
+                                                              "category",
+                                                              "categories"
+                                                          )} selected`
                                                         : "All categories"}
                                                 </Button>
                                             </FormControl>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                                        <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
                                             {categoryOptions.length === 0 && (
                                                 <p className="px-2 py-1.5 text-sm text-muted-foreground">
                                                     No categories found.
@@ -384,7 +390,10 @@ export function QuizSettingsDialog({
                                         {" "}
                                         {watchedStatus !== "active"
                                             ? "Set the status to Active to enable this."
-                                            : `${poolSize} active question(s) currently match this quiz's pool (needs ${requiredCount}).`}
+                                            : `This quiz's pool has ${poolSize} active ${pluralize(
+                                                  poolSize,
+                                                  "question"
+                                              )} (needs ${requiredCount}).`}
                                     </FormDescription>
                                     <FormMessage />
                                 </FormItem>

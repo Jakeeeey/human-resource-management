@@ -85,11 +85,11 @@ export function MailingModule() {
             </div>
             <Tabs value={tab} onValueChange={handleTabChange} className="grid gap-4">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                    <TabsList className="justify-start">
-                        <TabsTrigger value="outbox">Outbox</TabsTrigger>
-                        <TabsTrigger value="send">Compose</TabsTrigger>
-                        <TabsTrigger value="templates">Templates</TabsTrigger>
-                        <TabsTrigger value="bindings">Bindings</TabsTrigger>
+                    <TabsList className="justify-start group-data-[orientation=horizontal]/tabs:h-auto">
+                        <TabsTrigger value="outbox" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Outbox</TabsTrigger>
+                        <TabsTrigger value="send" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Compose</TabsTrigger>
+                        <TabsTrigger value="templates" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Templates</TabsTrigger>
+                        <TabsTrigger value="bindings" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Bindings</TabsTrigger>
                     </TabsList>
                     {tab === "templates" && (
                         <Button className="w-full sm:w-auto" onClick={() => router.push("/hrm/mailing/templates/new")}>

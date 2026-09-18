@@ -11,9 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+/** Shared with the section that renders the error text, so canvas/input can point at it. */
+export const SIGNATURE_ERROR_ID = "signature-error";
+
 export interface SignaturePadHandle {
     exportBlob: () => Promise<Blob | null>;
     isEmpty: () => boolean;
+    /** Moves focus to whichever control is active, so a submit error can reveal it. */
+    focus: () => void;
 }
 
 interface SignaturePadProps {
@@ -21,6 +26,10 @@ interface SignaturePadProps {
     onTypedModeChange: (typed: boolean) => void;
     typedName: string;
     onTypedNameChange: (name: string) => void;
+    /** Fired the moment the first ink lands, letting the parent clear a prior "signature required" error. */
+    onStrokeChange?: () => void;
+    /** Applies the error styling + `aria-invalid` when the required-signature error is showing. */
+    invalid?: boolean;
 }
 
 const CANVAS_W = 600;
@@ -28,10 +37,18 @@ const CANVAS_H = 180;
 
 export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
     function SignaturePad(
-        { typedMode, onTypedModeChange, typedName, onTypedNameChange },
+        {
+            typedMode,
+            onTypedModeChange,
+            typedName,
+            onTypedNameChange,
+            onStrokeChange,
+            invalid = false,
+        },
         ref
     ) {
         const canvasRef = useRef<HTMLCanvasElement | null>(null);
+        const typedInputRef = useRef<HTMLInputElement | null>(null);
         const drawingRef = useRef(false);
         const lastRef = useRef<{ x: number; y: number } | null>(null);
         const [hasStroke, setHasStroke] = useState(false);
@@ -77,9 +94,12 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
                 ctx.lineTo(p.x, p.y);
                 ctx.stroke();
                 lastRef.current = p;
-                if (!hasStroke) setHasStroke(true);
+                if (!hasStroke) {
+                    setHasStroke(true);
+                    onStrokeChange?.();
+                }
             },
-            [pointFromEvent, hasStroke]
+            [pointFromEvent, hasStroke, onStrokeChange]
         );
 
         const endStroke = useCallback(() => {
@@ -98,6 +118,10 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
             ref,
             () => ({
                 isEmpty: () => typedMode || !hasStroke,
+                focus: () => {
+                    if (typedMode) typedInputRef.current?.focus();
+                    else canvasRef.current?.focus();
+                },
                 exportBlob: () =>
                     new Promise<Blob | null>((resolve) => {
                         if (typedMode || !hasStroke || !canvasRef.current) {
@@ -116,27 +140,40 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
                     <div className="space-y-1.5">
                         <Label htmlFor="signature-typed-name">Type your full name as your signature</Label>
                         <Input
+                            ref={typedInputRef}
                             id="signature-typed-name"
                             placeholder="e.g. Juan Dela Cruz"
                             value={typedName}
                             onChange={(e) => onTypedNameChange(e.target.value)}
-                            className="max-w-sm font-medium"
+                            aria-invalid={invalid || undefined}
+                            aria-describedby={invalid ? SIGNATURE_ERROR_ID : undefined}
+                            className={`max-w-sm font-medium ${
+                                invalid ? "border-destructive focus-visible:ring-destructive" : ""
+                            }`}
                         />
                     </div>
                 ) : (
                     <div className="space-y-1.5">
                         <Label>Sign below</Label>
-                        <div className="w-full max-w-md overflow-hidden rounded-md border bg-background">
+                        <div
+                            className={`w-full max-w-md overflow-hidden rounded-md border bg-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 ${
+                                invalid ? "border-destructive" : ""
+                            }`}
+                        >
                             <canvas
                                 ref={canvasRef}
                                 width={CANVAS_W}
                                 height={CANVAS_H}
+                                tabIndex={0}
+                                aria-label="Signature drawing area"
+                                aria-invalid={invalid || undefined}
+                                aria-describedby={invalid ? SIGNATURE_ERROR_ID : undefined}
                                 onPointerDown={handlePointerDown}
                                 onPointerMove={handlePointerMove}
                                 onPointerUp={endStroke}
                                 onPointerLeave={endStroke}
                                 onPointerCancel={endStroke}
-                                className="block h-[180px] w-full touch-none dark:invert"
+                                className="block h-[180px] w-full touch-none rounded-md outline-none dark:invert"
                             />
                         </div>
                     </div>
