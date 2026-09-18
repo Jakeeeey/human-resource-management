@@ -29,8 +29,8 @@ function DoneContent() {
     // neutral, truthful state instead of the green "Assessment Complete" splash.
     if (!hasVerdict) {
         return (
-            <main className="flex min-h-dvh flex-col items-center justify-center p-6">
-                <div className="mx-auto w-full max-w-md space-y-6 py-8">
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-6">
+                <div className="m-auto w-full max-w-md space-y-6 py-8">
                     <div className="flex flex-col items-center gap-2 text-center">
                         <AlertCircle className="h-12 w-12 text-amber-600" />
                         <h1 className="text-lg font-semibold">Assessment not completed</h1>
@@ -59,8 +59,8 @@ function DoneContent() {
     }
 
     return (
-        <main className="flex min-h-dvh flex-col items-center justify-center p-6">
-            <div className="mx-auto w-full max-w-md space-y-6 py-8">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-6">
+            <div className="m-auto w-full max-w-md space-y-6 py-8">
                 <div className="flex flex-col items-center gap-2 text-center">
                     {passed ? (
                         <CheckCircle2 className="h-12 w-12 text-green-600" />
