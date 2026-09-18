@@ -199,7 +199,7 @@ export function ApplicantIntakeDialog({ open, onOpenChange, quiz }: ApplicantInt
                                 onClick={() => {
                                     onOpenChange(false);
                                     router.push(
-                                        `/apply/quiz?quiz_id=${quiz?.id}&applicant_id=${selectedApplicant?.id}`
+                                        `/hrm/apply/quiz?quiz_id=${quiz?.id}&applicant_id=${selectedApplicant?.id}`
                                     );
                                 }}
                             >

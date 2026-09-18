@@ -174,7 +174,7 @@ export function ApplicationFormModule() {
             if (warning) toast.warning(warning);
             toast.success("Application submitted. Starting the assessment...");
             router.push(
-                `/apply/quiz?quiz_id=${quizId}&applicant_id=${applicant_id}&application_id=${application_id}`
+                `/hrm/apply/quiz?quiz_id=${quizId}&applicant_id=${applicant_id}&application_id=${application_id}`
             );
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Something went wrong. Please try again.");
