@@ -2,7 +2,6 @@ import { runHireOrchestrator } from "@/modules/human-resource-management/onboard
 import {
   readHireApplicant,
   readHireApplicationByApplicant,
-  resolveHireEmail,
   resolveHirePosition,
 } from "@/modules/human-resource-management/onboarding/hire/server/hire-application";
 import {
@@ -21,10 +20,12 @@ import { canSigningSetFireHired } from "./signing-set-service";
 //
 // Called from `recomputeSigningRollups` (the todo-12 rollup path) after both
 // rollup writes. When the todo-10 completion predicate holds it:
-//   1. GATES on the hire prerequisites (linked application + usable email +
-//      position) BEFORE any applicant write — a set signed against an
-//      application with no email must never leave the applicant terminal
-//      `hired` without an employee (the S5 wedge);
+//   1. GATES on the hire prerequisites (linked application + position)
+//      BEFORE any applicant write — a set signed against an application with
+//      no position must never leave the applicant terminal `hired` without
+//      an employee (the S5 wedge). A missing application email is NOT a
+//      prerequisite: the orchestrator falls back to the applicant-scoped
+//      synthetic identity and the company login is still created;
 //   2. flips the applicant to `hired` via the SINGLE status writer;
 //   3. runs the todo-16 post-hire orchestrator in the SAME call.
 //
@@ -49,7 +50,7 @@ export interface FireHiredIfCompleteResult {
 
 /**
  * Resolves the FIRST missing hire prerequisite, or null when the
- * orchestrator has everything it needs (application row, email, position).
+ * orchestrator has everything it needs (application row, position).
  * Read-only — the caller writes nothing when this answers non-null.
  *
  * Exported so the read-only completion PREVIEW route
@@ -68,9 +69,6 @@ export async function readMissingHirePrerequisite(
   if (!applicant) return "the applicant record could not be read";
   const application = await readHireApplicationByApplicant(applicantId);
   if (!application) return "the applicant has no linked application record";
-  if (!resolveHireEmail(application)) {
-    return `application #${application.id} has no email address`;
-  }
   if (!resolveHirePosition(application, applicant)) {
     return `application #${application.id} has no job position`;
   }

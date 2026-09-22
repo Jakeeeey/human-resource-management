@@ -11,7 +11,7 @@ import {
   readHireApplicationByApplicant,
   readHireCompanyDomain,
   readHireRecruitmentProfile,
-  resolveHireEmail,
+  resolveHireIdentity,
   resolveHirePosition,
 } from "./hire-application";
 import { logHireActivity, placeholderApplicantEmail } from "./hire-log";
@@ -79,8 +79,10 @@ async function runHireSteps(
  * @returns The resolved employee id, whether it was created, and the step
  * outcomes.
  * @throws Error with `HIRE_ORCHESTRATOR_ERROR_CODES` on invalid input, a
- * non-hired/absent applicant, a missing application/email/position, a Spring
- * create/verify failure, or a failed post-hire step.
+ * non-hired/absent applicant, a missing application/position, a Spring
+ * create/verify failure, or a failed post-hire step. A missing application
+ * email does NOT throw: the identity falls back to the applicant-scoped
+ * synthetic so the hire proceeds and the company login is still created.
  */
 export async function runHireOrchestrator(
   rawInput: unknown
@@ -136,12 +138,7 @@ export async function runHireOrchestrator(
       userName ||
       `Applicant #${applicantId}`;
 
-    email = resolveHireEmail(application);
-    if (!email) {
-      throw new Error(
-        `${HIRE_ORCHESTRATOR_ERROR_CODES.emailMissing}: application ${application.id} carries no email to resolve the employee by`
-      );
-    }
+    email = resolveHireIdentity(application);
     const position = resolveHirePosition(application, applicant);
     if (!position) {
       throw new Error(

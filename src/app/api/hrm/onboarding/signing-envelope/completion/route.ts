@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 // hire-prerequisite preview (S5 re-QA finding N1).
 //
 // A completed signing set whose applicant is not yet `hired` needs to name the
-// EXACT missing prerequisite (e.g. "application #90 has no email address") the
+// EXACT missing prerequisite (e.g. "application #90 has no job position") the
 // moment a reviewer opens it cold — not only after pressing Retry. This route
 // reuses the same read-only gate `fireHiredIfComplete` applies before any
 // applicant write, so it can never disagree with the retry outcome, and it
