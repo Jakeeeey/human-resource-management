@@ -158,7 +158,7 @@ export function blockPaddingFallback(type: CanvasNodeType): string | undefined {
     }
 }
 
-function isAbsoluteHttpsImageSrc(value: unknown): boolean {
+function isAbsoluteHttpImageSrc(value: unknown): boolean {
     if (typeof value !== "string" || value !== value.trim()) return false;
     let url: URL;
     try {
@@ -166,7 +166,10 @@ function isAbsoluteHttpsImageSrc(value: unknown): boolean {
     } catch {
         return false;
     }
-    if (url.protocol !== "https:") return false;
+    // http allowed alongside https: our own Directus host is http-only on dev,
+    // and uploads store absolute http URLs. Mixed-content risk in external
+    // inboxes is surfaced as an http-image export warning instead of a block.
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
     return !url.pathname.toLowerCase().endsWith(".svg");
 }
 
@@ -185,11 +188,11 @@ export const canvasNodeSchema = z
         props: z.record(z.string(), z.unknown()),
     })
     .superRefine((node, ctx) => {
-        if (node.type === "image" && !isAbsoluteHttpsImageSrc(node.props.src)) {
+        if (node.type === "image" && !isAbsoluteHttpImageSrc(node.props.src)) {
             ctx.addIssue({
                 code: "custom",
                 message:
-                    "Image src must be an absolute https URL (cid:, data:, http: and .svg are not allowed)",
+                    "Image src must be an absolute http(s) URL (cid:, data: and .svg are not allowed)",
                 path: ["props", "src"],
             });
         }

@@ -107,15 +107,32 @@ function NodeBody({ node }: { readonly node: CanvasNode }) {
                 </div>
             );
         }
-        case "image":
+        case "image": {
+            const src = typeof node.props.src === "string" ? node.props.src : "";
+            const alt = typeof node.props.alt === "string" ? node.props.alt : "Image";
+            if (src === "") {
+                return (
+                    <div
+                        className="flex h-full w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted text-[11px] text-muted-foreground"
+                        style={blockStyle(node)}
+                    >
+                        Image
+                    </div>
+                );
+            }
             return (
-                <div
-                    className="flex h-full w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted text-[11px] text-muted-foreground"
+                // Plain img: canvas renders arbitrary user-pasted remote URLs
+                // that next/image remotePatterns cannot allowlist per host.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    alt={alt}
+                    className="h-full w-full rounded-md object-cover"
+                    draggable={false}
+                    src={src}
                     style={blockStyle(node)}
-                >
-                    Image
-                </div>
+                />
             );
+        }
         case "box":
             return (
                 <div
@@ -126,6 +143,71 @@ function NodeBody({ node }: { readonly node: CanvasNode }) {
         case "spacer":
             return null;
     }
+}
+
+export interface SnapMateBox {
+    readonly id: string;
+    readonly x: number;
+    readonly y: number;
+    readonly w: number;
+    readonly h: number;
+}
+
+interface SnapGuidesOverlayProps {
+    readonly xLines: readonly number[];
+    readonly yLines: readonly number[];
+    readonly mates: readonly SnapMateBox[];
+    readonly rowLabel: string | null;
+}
+
+/**
+ * Snap guides on both axes + live row-grouping indicator. Pure
+ * presentational: CanvasMoveable owns the drag math and passes the active
+ * vertical/horizontal snap lines, the row-mate boxes sharing the dragged
+ * block's export row, and the row label.
+ */
+export function SnapGuidesOverlay({ xLines, yLines, mates, rowLabel }: SnapGuidesOverlayProps) {
+    if (xLines.length === 0 && yLines.length === 0 && mates.length === 0) return null;
+    const [firstY] = yLines;
+    return (
+        <div
+            className="pointer-events-none absolute inset-0 z-40"
+            data-testid="snap-guides"
+        >
+            {xLines.map((line) => (
+                <div
+                    className="absolute top-0 bottom-0 bg-primary"
+                    data-testid="snap-guide-vline"
+                    key={`x-${line}`}
+                    style={{ left: line - 0.5, width: 1 }}
+                />
+            ))}
+            {yLines.map((line) => (
+                <div
+                    className="absolute left-0 right-0 bg-primary"
+                    data-testid="snap-guide-line"
+                    key={`y-${line}`}
+                    style={{ top: line - 0.5, height: 1 }}
+                />
+            ))}
+            {rowLabel && firstY !== undefined ? (
+                <span
+                    className="badge-info absolute left-1 rounded-full border px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide shadow-sm"
+                    style={{ top: firstY - 20 }}
+                >
+                    {rowLabel}
+                </span>
+            ) : null}
+            {mates.map((mate) => (
+                <div
+                    className="absolute rounded-sm border border-dashed border-primary"
+                    data-testid={`snap-row-mate-${mate.id}`}
+                    key={mate.id}
+                    style={{ left: mate.x, top: mate.y, width: mate.w, height: mate.h }}
+                />
+            ))}
+        </div>
+    );
 }
 
 /**

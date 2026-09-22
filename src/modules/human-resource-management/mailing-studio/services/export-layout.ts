@@ -6,8 +6,140 @@ import {
     type CanvasNode,
 } from "../types/canvas-doc.schema";
 
-/** y-center bucketing tolerance in px (±8 per plan). */
-export const ROW_Y_TOLERANCE = 8;
+/**
+ * y-center bucketing tolerance in px. ±8 was impossible to hit by hand, so
+ * side-by-side blocks silently collapsed into solo rows on export. ±24 is
+ * hand-reachable yet still well below a real stacked-row gap, and the canvas
+ * snap uses this same constant so WYSIWYG holds.
+ */
+export const ROW_Y_TOLERANCE = 24;
+
+/**
+ * Snap tolerance for the full edge/center guide set (px). Deliberately
+ * tighter than the row bucket: guides feel magnetic without sticking, while
+ * the y-center row pull still uses ROW_Y_TOLERANCE so canvas rows match
+ * export bucketing.
+ */
+export const SNAP_TOLERANCE = 8;
+
+export interface SnapRect {
+    readonly x: number;
+    readonly y: number;
+    readonly w: number;
+    readonly h: number;
+}
+
+export interface SnapLines {
+    readonly dx: number;
+    readonly dy: number;
+    readonly xLines: readonly number[];
+    readonly yLines: readonly number[];
+}
+
+function uniqueSorted(values: readonly number[]): number[] {
+    return Array.from(new Set(values)).sort((a, b) => a - b);
+}
+
+/**
+ * Full standard snap set for a drag offset. X matches left edge, x-center,
+ * right edge against sibling edges plus stage lines (default 0 / center /
+ * full width); Y matches top edge, y-center, bottom edge against sibling
+ * edges plus stage top (default y = 0), with y-center-vs-sibling-center
+ * additionally eligible at ROW_Y_TOLERANCE so the row pull shares export
+ * bucketing. Returns the adjusted offset plus the active guide lines.
+ */
+export function matchSnap(
+    dragged: readonly SnapRect[],
+    statics: readonly SnapRect[],
+    rawDx: number,
+    rawDy: number,
+    stageX: readonly number[] = [0, CANVAS_WIDTH / 2, CANVAS_WIDTH],
+    stageY: readonly number[] = [0],
+    tolerance = SNAP_TOLERANCE,
+): SnapLines {
+    const staticX = [...stageX];
+    const staticY = [...stageY];
+    const staticCentersY: number[] = [];
+    for (const rect of statics) {
+        staticX.push(rect.x, rect.x + rect.w / 2, rect.x + rect.w);
+        staticY.push(rect.y, rect.y + rect.h);
+        staticCentersY.push(rect.y + rect.h / 2);
+    }
+    let adjustX = 0;
+    let foundX = false;
+    for (const rect of dragged) {
+        const edges = [rect.x + rawDx, rect.x + rawDx + rect.w / 2, rect.x + rawDx + rect.w];
+        for (const edge of edges) {
+            for (const line of staticX) {
+                const delta = line - edge;
+                if (
+                    Math.abs(delta) <= tolerance &&
+                    (!foundX || Math.abs(delta) < Math.abs(adjustX))
+                ) {
+                    adjustX = delta;
+                    foundX = true;
+                }
+            }
+        }
+    }
+    let adjustY = 0;
+    let foundY = false;
+    for (const rect of dragged) {
+        const edges: Array<{ value: number; limit: number }> = [
+            { value: rect.y + rawDy, limit: tolerance },
+            { value: rect.y + rawDy + rect.h / 2, limit: tolerance },
+            { value: rect.y + rawDy + rect.h, limit: tolerance },
+        ];
+        for (const edge of edges) {
+            for (const line of staticY) {
+                const delta = line - edge.value;
+                if (
+                    Math.abs(delta) <= edge.limit &&
+                    (!foundY || Math.abs(delta) < Math.abs(adjustY))
+                ) {
+                    adjustY = delta;
+                    foundY = true;
+                }
+            }
+        }
+        const center = rect.y + rawDy + rect.h / 2;
+        for (const siblingCenter of staticCentersY) {
+            const delta = siblingCenter - center;
+            if (
+                Math.abs(delta) <= ROW_Y_TOLERANCE &&
+                (!foundY || Math.abs(delta) < Math.abs(adjustY))
+            ) {
+                adjustY = delta;
+                foundY = true;
+            }
+        }
+    }
+    const dx = rawDx + Math.round(adjustX);
+    const dy = rawDy + Math.round(adjustY);
+    const xLines: number[] = [];
+    if (foundX) {
+        for (const rect of dragged) {
+            const edges = [rect.x + dx, rect.x + dx + rect.w / 2, rect.x + dx + rect.w];
+            for (const edge of edges) {
+                for (const line of staticX) {
+                    if (Math.abs(line - edge) <= 1) xLines.push(line);
+                }
+            }
+        }
+    }
+    const yLines: number[] = [];
+    if (foundY) {
+        for (const rect of dragged) {
+            const edges = [rect.y + dy, rect.y + dy + rect.h / 2, rect.y + dy + rect.h];
+            for (const edge of edges) {
+                for (const line of [...staticY, ...staticCentersY]) {
+                    if (Math.abs(line - edge) <= 1) yLines.push(line);
+                }
+            }
+        }
+    }
+    return { dx, dy, xLines: uniqueSorted(xLines), yLines: uniqueSorted(yLines) };
+}
 
 function centerY(node: CanvasNode): number {
     return node.y + node.h / 2;

@@ -26,6 +26,14 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -35,7 +43,7 @@ import { PropertyPanel } from "./components/PropertyPanel";
 import { StageCanvas } from "./components/StageCanvas";
 import { useCanvasDoc } from "./hooks/useCanvasDoc";
 import { useDesignAutosave, type DesignAutosaveStatus } from "./hooks/useDesignAutosave";
-import { getDesign, previewDesign } from "./providers/designService";
+import { getDesign, previewDesign, sendCompiledTest } from "./providers/designService";
 import { canvasDocSchema, defaultBlockProps, type CanvasNodeType } from "./types/canvas-doc.schema";
 
 /**
@@ -398,6 +406,8 @@ export function MailingStudioPage() {
     const [previewError, setPreviewError] = useState<string | null>(null);
     const savedSelectionRef = useRef<string[]>([]);
     const [sending, setSending] = useState(false);
+    const [sendOpen, setSendOpen] = useState(false);
+    const [sendEmail, setSendEmail] = useState("");
     const [hydrating, setHydrating] = useState(true);
     const { canUndo, canRedo } = useHistoryCounts();
 
@@ -523,37 +533,51 @@ export function MailingStudioPage() {
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [handleSave]);
 
-    const handleSendTest = async (): Promise<void> => {
+    // Send test = compile the LIVE doc in-memory (never saves), then send the
+    // compiled output through the existing dry_run dispatch path (send-only
+    // overrides — the template row is never rewritten, nothing is emailed).
+    // Template identity is a read-only getDesign lookup; a never-saved design
+    // has no id to address, so the run fails honestly with an error toast
+    // instead of forcing a save. Success/failure via the existing
+    // success/error toasts only.
+    const handleSendTest = useCallback(async (): Promise<void> => {
+        const toEmail = sendEmail.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
+            toast.error("Enter a valid recipient email for the test send.");
+            return;
+        }
         if (sending) return;
         setSending(true);
         try {
-            const response = await fetch("/api/hrm/mailing-studio/test-send", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ template_key: DEFAULT_DESIGN_META.templateKey }),
+            const store = useCanvasDoc.getState();
+            const design_json = JSON.stringify({
+                version: 1,
+                width: 600,
+                nodes: store.nodes,
+                rootIds: store.rootIds,
             });
-            if (!response.ok) {
-                throw new Error(`Test send failed (HTTP ${response.status})`);
+            const compiled = await previewDesign(design_json, subject);
+            const row = await getDesign(DEFAULT_DESIGN_META.templateKey);
+            if (row?.id === undefined || row.id === null) {
+                throw new Error("Save your design once before sending a test.");
             }
-            const payload = (await response.json().catch(() => null)) as {
-                success?: boolean;
-                message?: string;
-                data?: { ok?: boolean; reason?: string };
-            } | null;
-            if (payload && payload.success === false) {
-                throw new Error(payload.message ?? "Test send failed");
+            const result = await sendCompiledTest({
+                template_id: row.id,
+                to_email: toEmail,
+                subject,
+                body_html: compiled.html,
+            });
+            if (!result.ok) {
+                throw new Error(result.reason ?? "Test send was not recorded");
             }
-            if (payload?.data?.ok) {
-                toast.success("Test send recorded (dry-run) — nothing was emailed.");
-            } else {
-                toast.info(`Test send: ${payload?.data?.reason ?? "no outcome"}`);
-            }
+            toast.success("Test send recorded (dry-run) — nothing was emailed.");
+            setSendOpen(false);
         } catch (cause) {
             toast.error(cause instanceof Error ? cause.message : "Test send failed");
         } finally {
             setSending(false);
         }
-    };
+    }, [sendEmail, sending, subject]);
 
     if (hydrating) {
         return (
@@ -650,7 +674,7 @@ export function MailingStudioPage() {
                 onPreview={() => void handlePreview()}
                 onRedo={() => useCanvasDoc.getState().redo()}
                 onSave={() => void handleSave()}
-                onSendTest={() => void handleSendTest()}
+                onSendTest={() => setSendOpen(true)}
                 onUndo={() => useCanvasDoc.getState().undo()}
             />
             <div className="flex min-h-0 flex-1">
@@ -719,6 +743,49 @@ export function MailingStudioPage() {
                 <PropertyPanel />
             </div>
             <StudioStatusStrip width={EDITOR_WIDTH} />
+            <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Send test</DialogTitle>
+                        <DialogDescription>
+                            Compiles the live canvas — unsaved edits included —
+                            and records a dry-run. Nothing is emailed.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-2">
+                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="send-test-email">
+                            Recipient
+                        </Label>
+                        <Input
+                            aria-label="Test recipient email"
+                            className="h-8 text-xs"
+                            id="send-test-email"
+                            inputMode="email"
+                            placeholder="you@example.com"
+                            value={sendEmail}
+                            onChange={(event) => setSendEmail(event.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSendOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            aria-label="Send test now"
+                            disabled={sending}
+                            size="sm"
+                            onClick={() => void handleSendTest()}
+                        >
+                            <Send />
+                            {sending ? "Sending…" : "Send test"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

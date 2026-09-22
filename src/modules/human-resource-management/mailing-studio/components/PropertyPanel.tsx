@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
+import { MS_IMAGE_UPLOAD_TYPES, uploadImage } from "../providers/designService";
 import {
     CANVAS_TEXT_MAX,
     defaultBlockProps,
@@ -135,8 +136,61 @@ function StringField({
     );
 }
 
-function ImageSrcField({ node }: { readonly node: CanvasNode }) {
-    const id = useId();
+function ImageUploadField({ node }: { readonly node: CanvasNode }) {
+    const pickerId = useId();
+    const updateProps = useCanvasDoc((state) => state.updateProps);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    return (
+        <div className="col-span-2 space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground" htmlFor={pickerId}>
+                Upload
+            </Label>
+            <Input
+                accept={MS_IMAGE_UPLOAD_TYPES.join(",")}
+                aria-invalid={error !== null}
+                className={cn("h-8 text-xs", error && "border-destructive")}
+                data-testid="image-upload-input"
+                disabled={uploading}
+                id={pickerId}
+                type="file"
+                onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!file) return;
+                    setUploading(true);
+                    setError(null);
+                    void uploadImage(file)
+                        .then(({ url }) => {
+                            updateProps(node.id, { src: url });
+                            setUploading(false);
+                        })
+                        .catch((uploadError: unknown) => {
+                            setUploading(false);
+                            setError(
+                                uploadError instanceof Error
+                                    ? uploadError.message
+                                    : "Image upload failed",
+                            );
+                        });
+                }}
+            />
+            {uploading ? (
+                <p aria-live="polite" className="text-[11px] leading-snug text-muted-foreground">
+                    Uploading…
+                </p>
+            ) : null}
+            {error !== null ? (
+                <p className="text-[11px] leading-snug text-destructive" role="alert">
+                    {error}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+function ImageSrcField({ node }: { readonly node: CanvasNode }) {    const id = useId();
     const updateProps = useCanvasDoc((state) => state.updateProps);
     const beginGesture = useCanvasDoc((state) => state.beginGesture);
     const endGesture = useCanvasDoc((state) => state.endGesture);
@@ -377,6 +431,7 @@ export function PropertyPanel() {
 
                 {node.type === "image" ? (
                     <Section title="Content">
+                        <ImageUploadField key={`upload-${node.id}`} node={node} />
                         <ImageSrcField key={node.id} node={node} />
                         <StringField
                             label="Alt text"

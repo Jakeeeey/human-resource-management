@@ -12,6 +12,8 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
+import { OutboxTab } from "@/modules/human-resource-management/mailing-studio/outbox";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -97,8 +99,8 @@ export default async function Page() {
             </header>
 
             <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-                <div className="flex flex-1 items-center justify-center p-6">
-                    <p className="text-sm text-muted-foreground">Outbox</p>
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6">
+                    <OutboxTab />
                 </div>
             </main>
         </div>

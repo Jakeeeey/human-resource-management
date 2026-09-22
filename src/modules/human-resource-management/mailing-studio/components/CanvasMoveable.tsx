@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import Moveable from "react-moveable";
 import Selecto from "react-selecto";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
+import { bucketRows, matchSnap, ROW_Y_TOLERANCE } from "../services/export-layout";
+import type { CanvasNode } from "../types/canvas-doc.schema";
+import { SnapGuidesOverlay, type SnapMateBox } from "./CanvasNodeView";
 
 interface CanvasMoveableProps {
     readonly stageEl: HTMLDivElement | null;
@@ -17,6 +20,84 @@ interface ResizeCommit {
     readonly width?: number;
     readonly height?: number;
     readonly drag?: { readonly left?: number; readonly top?: number };
+}
+
+interface RowSnapOverlay {
+    readonly xLines: readonly number[];
+    readonly yLines: readonly number[];
+    readonly mates: readonly SnapMateBox[];
+    readonly rowLabel: string | null;
+}
+
+interface RowSnapResult {
+    readonly dx: number;
+    readonly dy: number;
+    readonly overlay: RowSnapOverlay | null;
+}
+
+// Full snap set (matchSnap: X left/center/right + Y top/center/bottom vs
+// siblings and stage bounds, y-center row pull at ROW_Y_TOLERANCE) with the
+// live export row (same bucketRows) driving the mate highlight, so canvas
+// grouping is exactly what export emits.
+function applyRowSnap(
+    nodes: Readonly<Record<string, CanvasNode>>,
+    draggedIds: readonly string[],
+    primaryId: string,
+    dx: number,
+    dy: number,
+): RowSnapResult {
+    const primary = nodes[primaryId];
+    if (!primary) return { dx, dy, overlay: null };
+    const dragged = new Set(draggedIds);
+    const siblings = Object.values(nodes).filter(
+        (node) => node.parentId === primary.parentId && !dragged.has(node.id),
+    );
+    const draggedRects = draggedIds.flatMap((id) => {
+        const node = nodes[id];
+        return node ? [{ x: node.x, y: node.y, w: node.w, h: node.h }] : [];
+    });
+    const snapped = matchSnap(draggedRects, siblings, dx, dy);
+    const placed: CanvasNode[] = [
+        ...siblings,
+        ...draggedIds.flatMap((id) => {
+            const node = nodes[id];
+            return node
+                ? [{ ...node, x: node.x + snapped.dx, y: node.y + snapped.dy }]
+                : [];
+        }),
+    ];
+    const row = bucketRows(placed, ROW_Y_TOLERANCE).find((members) =>
+        members.some((member) => member.id === primaryId),
+    );
+    const mates: SnapMateBox[] =
+        row === undefined
+            ? []
+            : row
+                  .filter((member) => !dragged.has(member.id))
+                  .map((member) => ({
+                      id: member.id,
+                      x: member.x,
+                      y: member.y,
+                      w: member.w,
+                      h: member.h,
+                  }));
+    if (
+        snapped.xLines.length === 0 &&
+        snapped.yLines.length === 0 &&
+        mates.length === 0
+    ) {
+        return { dx: snapped.dx, dy: snapped.dy, overlay: null };
+    }
+    return {
+        dx: snapped.dx,
+        dy: snapped.dy,
+        overlay: {
+            xLines: snapped.xLines,
+            yLines: snapped.yLines,
+            mates,
+            rowLabel: row !== undefined && row.length > 1 ? `row of ${row.length}` : null,
+        },
+    };
 }
 
 /**
@@ -40,6 +121,7 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
     const selection = useCanvasDoc((state) => state.selection);
     const selectoRef = useRef<Selecto>(null);
     const moveableRef = useRef<Moveable>(null);
+    const [snap, setSnap] = useState<RowSnapOverlay | null>(null);
 
     const targetX = useCanvasDoc((state) => (targetId ? state.nodes[targetId]?.x : undefined));
     const targetY = useCanvasDoc((state) => (targetId ? state.nodes[targetId]?.y : undefined));
@@ -141,18 +223,29 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                     draggable
                     flushSync={flushSync}
                     onDragGroup={(event) => {
-                        // Snapping is off for the group so every member event
-                        // carries the same delta; the first one drives the
-                        // whole selection identically.
                         const first = event.events[0];
                         if (!first) return;
-                        const dx = Math.round(first.delta[0] ?? 0);
-                        const dy = Math.round(first.delta[1] ?? 0);
-                        if (dx === 0 && dy === 0) return;
                         const store = useCanvasDoc.getState();
-                        store.moveNodesBy(store.selection, dx, dy);
+                        const primaryId = store.selection[0];
+                        if (!primaryId) return;
+                        const rawDx = Math.round(first.delta[0] ?? 0);
+                        const rawDy = Math.round(first.delta[1] ?? 0);
+                        if (rawDx === 0 && rawDy === 0) return;
+                        const snapped = applyRowSnap(
+                            store.nodes,
+                            store.selection,
+                            primaryId,
+                            rawDx,
+                            rawDy,
+                        );
+                        if (snapped.dx === 0 && snapped.dy === 0) return;
+                        store.moveNodesBy(store.selection, snapped.dx, snapped.dy);
+                        setSnap(snapped.overlay);
                     }}
-                    onDragGroupEnd={() => endGesture()}
+                    onDragGroupEnd={() => {
+                        setSnap(null);
+                        endGesture();
+                    }}
                     onDragGroupStart={() => beginGesture()}
                     ref={moveableRef}
                     snappable={false}
@@ -168,15 +261,19 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                         const store = useCanvasDoc.getState();
                         const primary = store.nodes[targetId];
                         if (!primary) return;
-                        const dx = Math.round(event.left) - primary.x;
-                        const dy = Math.round(event.top) - primary.y;
-                        store.moveNodesBy(
-                            store.selection.includes(targetId) ? store.selection : [targetId],
-                            dx,
-                            dy,
-                        );
+                        const ids = store.selection.includes(targetId)
+                            ? store.selection
+                            : [targetId];
+                        const rawDx = Math.round(event.left) - primary.x;
+                        const rawDy = Math.round(event.top) - primary.y;
+                        const snapped = applyRowSnap(store.nodes, ids, targetId, rawDx, rawDy);
+                        store.moveNodesBy(ids, snapped.dx, snapped.dy);
+                        setSnap(snapped.overlay);
                     }}
-                    onDragEnd={() => endGesture()}
+                    onDragEnd={() => {
+                        setSnap(null);
+                        endGesture();
+                    }}
                     onDragStart={() => beginGesture()}
                     onResize={(event) => {
                         event.target.style.width = `${event.width}px`;
@@ -224,10 +321,16 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                     ref={moveableRef}
                     resizable
                     rotatable
-                    snappable={true}
+                    snappable={false}
                     target={`[data-id="${targetId}"]`}
                 />
             ) : null}
+            <SnapGuidesOverlay
+                mates={snap?.mates ?? []}
+                rowLabel={snap?.rowLabel ?? null}
+                xLines={snap?.xLines ?? []}
+                yLines={snap?.yLines ?? []}
+            />
         </>
     );
 }

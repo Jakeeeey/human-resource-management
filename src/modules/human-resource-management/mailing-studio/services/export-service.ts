@@ -274,6 +274,16 @@ export async function compileCanvasDoc(
         }
     }
 
+    // (e) http:// image src loads on canvas but risks mixed-content blocking
+    // in external inboxes — warn, don't block (schema already gates schemes).
+    for (const node of displayOrder) {
+        if (node.type !== "image") continue;
+        const src = node.props.src;
+        if (typeof src === "string" && src.toLowerCase().startsWith("http://")) {
+            warnings.push(`http-image:${node.id} non-https src may block in external inboxes`);
+        }
+    }
+
     // (e) bbox overlap after y-bucketing → unstacked (flow order wins).
     for (const id of findOverlaps(rows)) {
         warnings.push(`overlap:${id} unstacked`);
