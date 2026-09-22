@@ -206,9 +206,13 @@ export function PropertyPanel() {
     const resizeNode = useCanvasDoc((state) => state.resizeNode);
     const rotateNode = useCanvasDoc((state) => state.rotateNode);
 
-    const node = selection[0] !== undefined ? nodes[selection[0]] : undefined;
+    const node =
+        selection.length === 1 && selection[0] !== undefined
+            ? nodes[selection[0]]
+            : undefined;
 
     if (!node) {
+        const multi = selection.length > 1;
         return (
             <aside className="hidden w-[280px] shrink-0 flex-col border-l bg-card xl:flex">
                 <div className="flex h-11 shrink-0 items-center border-b px-4">
@@ -217,9 +221,13 @@ export function PropertyPanel() {
                     </span>
                 </div>
                 <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-                    <p className="text-xs font-medium text-foreground">No block selected</p>
+                    <p className="text-xs font-medium text-foreground">
+                        {multi ? `${selection.length} blocks selected` : "No block selected"}
+                    </p>
                     <p className="text-[11px] leading-relaxed text-muted-foreground">
-                        Click a block on the canvas — or a row in Layers — to edit it here.
+                        {multi
+                            ? "Select a single block — on the canvas or in Layers — to edit it here."
+                            : "Click a block on the canvas — or a row in Layers — to edit it here."}
                     </p>
                 </div>
             </aside>
