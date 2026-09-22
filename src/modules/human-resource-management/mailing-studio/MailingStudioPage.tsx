@@ -1,7 +1,7 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useStore } from "zustand";
 
@@ -37,7 +37,8 @@ import { PropertyPanel } from "./components/PropertyPanel";
 import { StageCanvas } from "./components/StageCanvas";
 import { useCanvasDoc } from "./hooks/useCanvasDoc";
 import { useDesignAutosave, type DesignAutosaveStatus } from "./hooks/useDesignAutosave";
-import type { CanvasNodeType } from "./types/canvas-doc.schema";
+import { getDesign, previewDesign } from "./providers/designService";
+import { canvasDocSchema, type CanvasNodeType } from "./types/canvas-doc.schema";
 
 /**
  * Mailing Studio — Wave-0 chrome + T8 live freeform canvas + T8c control matrix.
@@ -121,8 +122,6 @@ function insertChipNode(type: CanvasNodeType): void {
 function StudioTopBar({
     name,
     onNameChange,
-    device,
-    onDeviceChange,
     onUndo,
     onRedo,
     canUndo,
@@ -132,11 +131,11 @@ function StudioTopBar({
     sending,
     onSave,
     saveStatus,
+    dirty,
+    savedAt,
 }: {
     readonly name: string;
     readonly onNameChange: (next: string) => void;
-    readonly device: DeviceKind;
-    readonly onDeviceChange: (next: DeviceKind) => void;
     readonly onUndo: () => void;
     readonly onRedo: () => void;
     readonly canUndo: boolean;
@@ -146,15 +145,9 @@ function StudioTopBar({
     readonly sending: boolean;
     readonly onSave: () => void;
     readonly saveStatus: DesignAutosaveStatus;
+    readonly dirty: boolean;
+    readonly savedAt: string | null;
 }) {
-    const deviceSegmentClass = (active: boolean) =>
-        cn(
-            "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-            active
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-        );
-
     return (
         <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -172,32 +165,7 @@ function StudioTopBar({
                 </span>
             </div>
 
-            <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                <div
-                    aria-label="Device preview"
-                    className="flex h-8 items-center gap-0.5 rounded-lg bg-muted p-0.5"
-                    role="group"
-                >
-                    <button
-                        aria-pressed={device === "desktop"}
-                        className={deviceSegmentClass(device === "desktop")}
-                        type="button"
-                        onClick={() => onDeviceChange("desktop")}
-                    >
-                        <Monitor aria-hidden="true" />
-                        Desktop
-                    </button>
-                    <button
-                        aria-pressed={device === "mobile"}
-                        className={deviceSegmentClass(device === "mobile")}
-                        type="button"
-                        onClick={() => onDeviceChange("mobile")}
-                    >
-                        <Smartphone aria-hidden="true" />
-                        Mobile
-                    </button>
-                </div>
-
+            <div className="flex shrink-0 items-center gap-2">
                 <div className="flex items-center">
                     <Button
                         aria-label="Undo"
@@ -222,24 +190,50 @@ function StudioTopBar({
 
             <div className="flex flex-1 items-center justify-end gap-2">
                 <Button
-                    className="hidden sm:inline-flex"
+                    aria-label="Preview"
                     size="sm"
                     variant="outline"
                     onClick={onPreview}
                 >
                     <Eye />
-                    Preview
+                    <span className="hidden sm:inline">Preview</span>
                 </Button>
                 <Button
-                    className="hidden md:inline-flex"
+                    aria-label="Send test"
                     disabled={sending}
                     size="sm"
                     variant="outline"
                     onClick={onSendTest}
                 >
                     <Send />
-                    {sending ? "Sending…" : "Send test"}
+                    <span className="hidden md:inline">{sending ? "Sending…" : "Send test"}</span>
                 </Button>
+                {saveStatus === "error" ? (
+                    <button
+                        aria-live="polite"
+                        className="shrink-0 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive"
+                        data-testid="save-status"
+                        type="button"
+                        onClick={onSave}
+                    >
+                        Save failed — Retry
+                    </button>
+                ) : (
+                    <span
+                        aria-live="polite"
+                        className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums"
+                        data-testid="save-status"
+                        role="status"
+                    >
+                        {saveStatus === "saving"
+                            ? "Saving…"
+                            : dirty
+                              ? "Unsaved changes"
+                              : savedAt
+                                ? `Saved ${savedAt}`
+                                : null}
+                    </span>
+                )}
                 <Button
                     aria-label="Save design"
                     disabled={saveStatus === "saving"}
@@ -340,13 +334,7 @@ function InfoRow({ label, value }: { readonly label: string; readonly value: str
     );
 }
 
-function SettingsPanel({
-    width,
-    device,
-}: {
-    readonly width: number;
-    readonly device: DeviceKind;
-}) {
+function SettingsPanel({ width }: { readonly width: number }) {
     const nodeCount = useCanvasDoc((state) => Object.keys(state.nodes).length);
     const selectionCount = useCanvasDoc((state) => state.selection.length);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
@@ -366,7 +354,6 @@ function SettingsPanel({
                     </h3>
                     <div className="flex flex-col gap-2.5">
                         <InfoRow label="Stage" value={`${width} px`} />
-                        <InfoRow label="Device" value={device === "mobile" ? "Mobile" : "Desktop"} />
                         <InfoRow label="Blocks" value={String(nodeCount)} />
                         <InfoRow label="Selected" value={String(selectionCount)} />
                     </div>
@@ -390,7 +377,7 @@ function SettingsPanel({
     );
 }
 
-function StudioStatusStrip({ width, device }: { readonly width: number; readonly device: DeviceKind }) {
+function StudioStatusStrip({ width }: { readonly width: number }) {
     const nodeCount = useCanvasDoc((state) => Object.keys(state.nodes).length);
     const selectionCount = useCanvasDoc((state) => state.selection.length);
 
@@ -398,7 +385,6 @@ function StudioStatusStrip({ width, device }: { readonly width: number; readonly
         <footer className="flex h-8 shrink-0 items-center justify-between border-t bg-card px-3 text-[11px] text-muted-foreground">
             <div className="flex items-center gap-3">
                 <span className="tabular-nums">{width} px</span>
-                <span className="hidden sm:inline">{device === "mobile" ? "Mobile" : "Desktop"}</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -433,9 +419,17 @@ export function MailingStudioPage() {
     const [templateName, setTemplateName] = useState<string>(DEFAULT_DESIGN_META.templateName);
     const [device, setDevice] = useState<DeviceKind>("desktop");
     const [previewing, setPreviewing] = useState(false);
+    const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+    const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
+    const [previewLoading, setPreviewLoading] = useState(false);
+    const [previewError, setPreviewError] = useState<string | null>(null);
+    const savedSelectionRef = useRef<string[]>([]);
     const [sending, setSending] = useState(false);
+    const [hydrating, setHydrating] = useState(true);
+    const [savedAt, setSavedAt] = useState<string | null>(null);
     const { canUndo, canRedo } = useHistoryCounts();
 
+    const EDITOR_WIDTH = 600;
     const width = device === "mobile" ? 375 : 600;
 
     const autosaveOptions = useMemo(
@@ -446,7 +440,125 @@ export function MailingStudioPage() {
         }),
         [templateName],
     );
-    const { save, status } = useDesignAutosave(autosaveOptions);
+    const { save, status, error, dirty } = useDesignAutosave(autosaveOptions);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const row = await getDesign(DEFAULT_DESIGN_META.templateKey);
+                if (cancelled) return;
+                if (row?.design_json) {
+                    let parsed: unknown;
+                    try {
+                        parsed = JSON.parse(row.design_json);
+                    } catch {
+                        toast.error("Saved design is corrupt — starting fresh.");
+                        return;
+                    }
+                    const result = canvasDocSchema.safeParse(parsed);
+                    if (!result.success) {
+                        toast.error("Saved design failed validation — starting fresh.");
+                        return;
+                    }
+                    if (row.template_name) setTemplateName(row.template_name);
+                    useCanvasDoc.getState().hydrate({
+                        nodes: result.data.nodes,
+                        rootIds: result.data.rootIds,
+                    });
+                }
+            } catch (cause) {
+                if (!cancelled) {
+                    toast.error(cause instanceof Error ? cause.message : "Failed to load design.");
+                }
+            } finally {
+                if (!cancelled) setHydrating(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (window.matchMedia("(max-width: 767px)").matches) setPanel("select");
+    }, []);
+
+    const prevStatusRef = useRef(status);
+    useEffect(() => {
+        if (status === "saved" && prevStatusRef.current !== "saved") {
+            setSavedAt(
+                new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            );
+        }
+        prevStatusRef.current = status;
+    }, [status]);
+
+    const errorToastedRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (status === "error" && error && errorToastedRef.current !== error) {
+            errorToastedRef.current = error;
+            toast.error(`Save failed: ${error}`);
+        }
+    }, [status, error]);
+
+    const handleSave = useCallback(async (): Promise<void> => {
+        const ok = await save();
+        if (ok) toast.success("Design saved.");
+    }, [save]);
+
+    // Preview = compiled receiver output. Snapshots the LIVE doc in-memory
+    // (never saves), clears editor selection so no rings/handles persist, then
+    // compiles through the real export path. The preview tree mounts NO
+    // StageCanvas/Moveable — just an isolated iframe of the export HTML.
+    const handlePreview = useCallback(async (): Promise<void> => {
+        const store = useCanvasDoc.getState();
+        savedSelectionRef.current = [...store.selection];
+        store.selectNodes([]);
+        const design_json = JSON.stringify({
+            version: 1,
+            width: 600,
+            nodes: store.nodes,
+            rootIds: store.rootIds,
+        });
+        setPreviewing(true);
+        setPreviewLoading(true);
+        setPreviewError(null);
+        setPreviewHtml(null);
+        setPreviewWarnings([]);
+        try {
+            const result = await previewDesign(design_json, templateName);
+            setPreviewHtml(result.html);
+            setPreviewWarnings(result.warnings);
+        } catch (cause) {
+            setPreviewError(cause instanceof Error ? cause.message : "Preview failed");
+        } finally {
+            setPreviewLoading(false);
+        }
+    }, [templateName]);
+
+    // Exit restores the exact pre-preview editor state (selection included).
+    const handleExitPreview = useCallback((): void => {
+        setPreviewing(false);
+        setPreviewHtml(null);
+        setPreviewWarnings([]);
+        setPreviewError(null);
+        setPreviewLoading(false);
+        const saved = savedSelectionRef.current;
+        if (saved.length > 0) useCanvasDoc.getState().selectNodes(saved);
+        savedSelectionRef.current = [];
+    }, []);
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+                event.preventDefault();
+                void handleSave();
+            }
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [handleSave]);
 
     const handleSendTest = async (): Promise<void> => {
         if (sending) return;
@@ -480,22 +592,121 @@ export function MailingStudioPage() {
         }
     };
 
+    if (hydrating) {
+        return (
+            <div
+                className="flex min-h-0 w-full flex-1 items-center justify-center bg-background"
+                data-testid="hydrate-loading"
+                role="status"
+            >
+                <span className="text-sm text-muted-foreground">Loading design…</span>
+            </div>
+        );
+    }
+
     if (previewing) {
         return (
-            <div className="relative flex min-h-0 w-full flex-1 flex-col bg-background">
-                <div className="flex min-h-0 flex-1">
-                    <StageCanvas width={width} />
+            <div className="flex min-h-0 w-full flex-1 flex-col bg-background">
+                <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                        Preview — receiver view
+                    </span>
+                    <div
+                        aria-label="Device preview"
+                        className="flex h-8 items-center gap-0.5 rounded-lg bg-muted p-0.5"
+                        role="group"
+                    >
+                        <button
+                            aria-label="Desktop preview"
+                            aria-pressed={device === "desktop"}
+                            className={cn(
+                                "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
+                                device === "desktop"
+                                    ? "bg-card text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground",
+                            )}
+                            type="button"
+                            onClick={() => setDevice("desktop")}
+                        >
+                            <Monitor aria-hidden="true" />
+                            <span className="hidden sm:inline">Desktop</span>
+                        </button>
+                        <button
+                            aria-label="Mobile preview"
+                            aria-pressed={device === "mobile"}
+                            className={cn(
+                                "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
+                                device === "mobile"
+                                    ? "bg-card text-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground",
+                            )}
+                            type="button"
+                            onClick={() => setDevice("mobile")}
+                        >
+                            <Smartphone aria-hidden="true" />
+                            <span className="hidden sm:inline">Mobile</span>
+                        </button>
+                    </div>
+                    {previewWarnings.length > 0 ? (
+                        <span
+                            className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex"
+                            data-testid="preview-warnings"
+                        >
+                            {previewWarnings.length} export notice
+                            {previewWarnings.length === 1 ? "" : "s"}
+                        </span>
+                    ) : null}
+                    <Button
+                        aria-label="Exit preview"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleExitPreview}
+                    >
+                        <X />
+                        Exit preview
+                    </Button>
+                </header>
+                <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-4 py-8 sm:px-6">
+                    <span className="mb-3 shrink-0 rounded-full border bg-card px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm tabular-nums">
+                        {width} px
+                    </span>
+                    {previewLoading ? (
+                        <div
+                            className="flex items-center justify-center py-16"
+                            data-testid="preview-loading"
+                            role="status"
+                        >
+                            <span className="text-sm text-muted-foreground">
+                                Compiling preview…
+                            </span>
+                        </div>
+                    ) : previewError ? (
+                        <div
+                            className="flex max-w-md flex-col items-center gap-3 py-16 text-center"
+                            data-testid="preview-error"
+                            role="alert"
+                        >
+                            <p className="text-sm text-muted-foreground">{previewError}</p>
+                            <Button size="sm" variant="outline" onClick={handleExitPreview}>
+                                <X />
+                                Back to editor
+                            </Button>
+                        </div>
+                    ) : previewHtml ? (
+                        <div
+                            className="w-full shrink-0 overflow-hidden rounded-xl border bg-card shadow-xl dark:shadow-black/50"
+                            data-testid="email-preview"
+                            style={{ maxWidth: width }}
+                        >
+                            <iframe
+                                sandbox=""
+                                srcDoc={previewHtml}
+                                style={{ border: 0, display: "block", height: 900, width: "100%" }}
+                                title="Email preview"
+                            />
+                        </div>
+                    ) : null}
                 </div>
-                <Button
-                    aria-label="Exit preview"
-                    className="absolute right-4 top-4 z-50 shadow-sm"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPreviewing(false)}
-                >
-                    <X />
-                    Exit preview
-                </Button>
             </div>
         );
     }
@@ -505,27 +716,77 @@ export function MailingStudioPage() {
             <StudioTopBar
                 canRedo={canRedo}
                 canUndo={canUndo}
-                device={device}
                 name={templateName}
                 saveStatus={status}
+                dirty={dirty}
+                savedAt={savedAt}
                 sending={sending}
-                onDeviceChange={setDevice}
                 onNameChange={setTemplateName}
-                onPreview={() => setPreviewing(true)}
+                onPreview={() => void handlePreview()}
                 onRedo={() => useCanvasDoc.getState().redo()}
-                onSave={() => void save()}
+                onSave={() => void handleSave()}
                 onSendTest={() => void handleSendTest()}
                 onUndo={() => useCanvasDoc.getState().undo()}
             />
             <div className="flex min-h-0 flex-1">
                 <StudioRail active={panel} onActivate={setPanel} />
                 {panel === "elements" ? <ElementsPanel /> : null}
+                {panel === "elements" ? (
+                    <div
+                        aria-label="Elements"
+                        className="fixed inset-0 z-40 md:hidden"
+                        role="dialog"
+                    >
+                        <button
+                            aria-label="Close elements"
+                            className="absolute inset-0 bg-background/60"
+                            type="button"
+                            onClick={() => setPanel("select")}
+                        />
+                        <div className="absolute inset-x-0 bottom-0 max-h-[70vh] overflow-y-auto rounded-t-xl border-t bg-card p-3 shadow-xl">
+                            <div className="mb-2 flex items-center justify-between">
+                                <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                    Elements
+                                </span>
+                                <Button
+                                    aria-label="Close elements"
+                                    size="icon-sm"
+                                    variant="ghost"
+                                    onClick={() => setPanel("select")}
+                                >
+                                    <X />
+                                </Button>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {ELEMENT_CHIPS.map((chip) => (
+                                    <button
+                                        className="flex flex-col items-center gap-1.5 rounded-lg border bg-card p-3"
+                                        key={chip.label}
+                                        type="button"
+                                        onClick={() => {
+                                            insertChipNode(chip.type);
+                                            setPanel("select");
+                                        }}
+                                    >
+                                        <chip.icon
+                                            aria-hidden="true"
+                                            className="size-4 text-muted-foreground"
+                                        />
+                                        <span className="text-xs font-medium text-foreground">
+                                            {chip.label}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
                 {panel === "layers" ? <LayersPanel /> : null}
-                {panel === "settings" ? <SettingsPanel device={device} width={width} /> : null}
-                <StageCanvas width={width} />
+                {panel === "settings" ? <SettingsPanel width={EDITOR_WIDTH} /> : null}
+                <StageCanvas width={EDITOR_WIDTH} />
                 <PropertyPanel />
             </div>
-            <StudioStatusStrip device={device} width={width} />
+            <StudioStatusStrip width={EDITOR_WIDTH} />
         </div>
     );
 }

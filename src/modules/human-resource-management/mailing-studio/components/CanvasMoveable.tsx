@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { flushSync } from "react-dom";
 import Moveable from "react-moveable";
 import Selecto from "react-selecto";
@@ -13,21 +13,67 @@ interface CanvasMoveableProps {
     readonly width: number;
 }
 
+interface ResizeCommit {
+    readonly width?: number;
+    readonly height?: number;
+    readonly drag?: { readonly left?: number; readonly top?: number };
+}
+
 /**
  * Moveable + Selecto wrappers for the live canvas (v0.56 cheat-sheet wiring).
- * - Moveable binds to the FIRST selected node; every gesture frame is coalesced
- *   by the store (beginGesture → move/resize/rotate → endGesture).
+ * - P0-1: Moveable owns the DOM mid-resize (imperative style writes); the store
+ *   commits once in onResizeEnd. Chrome re-measures via updateRect() after
+ *   every store-driven geometry change (numeric edit, undo/redo, device).
+ * - P0-4 (follow-up): group drag initiates from ANY selected node. A multi
+ *   selection renders a group (`targets`) Moveable whose control box IS the
+ *   union bounding box — the effective hitbox — so mousedown-drag on any
+ *   member moves the whole selection by identical deltas (onDragGroup delta →
+ *   moveNodesBy) in one coalesced history window (begin/endGesture) with the
+ *   same bounds clamp. Resize/rotate chrome stays single-target (primary).
  * - Selecto marquee multi-selects `.canvas-block` targets; shift unions.
  * Loaded client-only via dynamic(..., { ssr: false }) from StageCanvas.
  */
 export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMoveableProps) {
     const beginGesture = useCanvasDoc((state) => state.beginGesture);
     const endGesture = useCanvasDoc((state) => state.endGesture);
-    const moveNode = useCanvasDoc((state) => state.moveNode);
-    const resizeNode = useCanvasDoc((state) => state.resizeNode);
-    const rotateNode = useCanvasDoc((state) => state.rotateNode);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
+    const selection = useCanvasDoc((state) => state.selection);
     const selectoRef = useRef<Selecto>(null);
+    const moveableRef = useRef<Moveable>(null);
+
+    const targetX = useCanvasDoc((state) => (targetId ? state.nodes[targetId]?.x : undefined));
+    const targetY = useCanvasDoc((state) => (targetId ? state.nodes[targetId]?.y : undefined));
+    const targetW = useCanvasDoc((state) => (targetId ? state.nodes[targetId]?.w : undefined));
+    const targetH = useCanvasDoc((state) => (targetId ? state.nodes[targetId]?.h : undefined));
+    const targetRotation = useCanvasDoc((state) =>
+        targetId ? state.nodes[targetId]?.rotation : undefined,
+    );
+    const selectionKey = selection.join(",");
+
+    // Union-bbox hitbox: every selected block's live element. Dragging any of
+    // them drives the group Moveable; moveNodesBy applies the delta to the id
+    // list (not the element list) so off-DOM members still follow. Memoized so
+    // the targets identity is stable across position re-renders — a fresh
+    // array every render would make Moveable re-measure/teardown each frame.
+    const groupTargets = useMemo(
+        () =>
+            selection.length > 1 && stageEl
+                ? selection.flatMap((id) => {
+                      const element = stageEl.querySelector(`[data-id="${id}"]`);
+                      return element instanceof HTMLElement ? [element] : [];
+                  })
+                : [],
+        [stageEl, selection],
+    );
+    const isGroup = selection.length > 1 && groupTargets.length > 0;
+
+    useEffect(() => {
+        if (!targetId && !isGroup) return;
+        const frame = requestAnimationFrame(() => {
+            moveableRef.current?.updateRect();
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [targetId, targetX, targetY, targetW, targetH, targetRotation, width, selectionKey, isGroup]);
 
     if (!stageEl) return null;
 
@@ -75,8 +121,12 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                     if (!target) return true;
                     if (target.closest("[class*='moveable-']")) return false;
                     const block = target.closest<HTMLElement>(".canvas-block");
-                    const selectedId = useCanvasDoc.getState().selection[0];
-                    if (block && selectedId && block.dataset.id === selectedId) return false;
+                    // Union-bbox hitbox: a press on ANY selected block belongs
+                    // to the group Moveable, never to a Selecto marquee.
+                    if (block?.dataset.id) {
+                        const current = useCanvasDoc.getState().selection;
+                        if (current.includes(block.dataset.id)) return false;
+                    }
                     return true;
                 }}
                 ref={selectoRef}
@@ -84,26 +134,94 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                 selectByClick
                 toggleContinueSelect={["shift"]}
             />
-            {targetId ? (
+            {isGroup ? (
                 <Moveable
                     bounds={{ left: 0, top: 0, right: width, bottom: 2000 }}
                     container={stageEl}
                     draggable
                     flushSync={flushSync}
-                    onDrag={(event) =>
-                        moveNode(targetId, Math.round(event.left), Math.round(event.top))
-                    }
+                    onDragGroup={(event) => {
+                        // Snapping is off for the group so every member event
+                        // carries the same delta; the first one drives the
+                        // whole selection identically.
+                        const first = event.events[0];
+                        if (!first) return;
+                        const dx = Math.round(first.delta[0] ?? 0);
+                        const dy = Math.round(first.delta[1] ?? 0);
+                        if (dx === 0 && dy === 0) return;
+                        const store = useCanvasDoc.getState();
+                        store.moveNodesBy(store.selection, dx, dy);
+                    }}
+                    onDragGroupEnd={() => endGesture()}
+                    onDragGroupStart={() => beginGesture()}
+                    ref={moveableRef}
+                    snappable={false}
+                    targets={groupTargets}
+                />
+            ) : targetId ? (
+                <Moveable
+                    bounds={{ left: 0, top: 0, right: width, bottom: 2000 }}
+                    container={stageEl}
+                    draggable
+                    flushSync={flushSync}
+                    onDrag={(event) => {
+                        const store = useCanvasDoc.getState();
+                        const primary = store.nodes[targetId];
+                        if (!primary) return;
+                        const dx = Math.round(event.left) - primary.x;
+                        const dy = Math.round(event.top) - primary.y;
+                        store.moveNodesBy(
+                            store.selection.includes(targetId) ? store.selection : [targetId],
+                            dx,
+                            dy,
+                        );
+                    }}
                     onDragEnd={() => endGesture()}
                     onDragStart={() => beginGesture()}
-                    onResize={(event) =>
-                        resizeNode(targetId, Math.round(event.width), Math.round(event.height))
-                    }
-                    onResizeEnd={() => endGesture()}
+                    onResize={(event) => {
+                        event.target.style.width = `${event.width}px`;
+                        event.target.style.height = `${event.height}px`;
+                        if (event.drag) {
+                            event.target.style.transform = event.drag.transform;
+                        }
+                    }}
+                    onResizeEnd={(event) => {
+                        const last = event.lastEvent as ResizeCommit | undefined;
+                        const store = useCanvasDoc.getState();
+                        const node = store.nodes[targetId];
+                        if (node && last && typeof last.width === "number") {
+                            const nextW = Math.max(1, Math.round(last.width));
+                            const nextH = Math.max(
+                                1,
+                                Math.round(
+                                    typeof last.height === "number" ? last.height : node.h,
+                                ),
+                            );
+                            const nextX =
+                                typeof last.drag?.left === "number"
+                                    ? Math.round(last.drag.left)
+                                    : node.x;
+                            const nextY =
+                                typeof last.drag?.top === "number"
+                                    ? Math.round(last.drag.top)
+                                    : node.y;
+                            if (nextX !== node.x || nextY !== node.y) {
+                                store.moveNode(targetId, nextX, nextY);
+                            }
+                            if (nextW !== node.w || nextH !== node.h) {
+                                store.resizeNode(targetId, nextW, nextH);
+                            }
+                        }
+                        endGesture();
+                    }}
                     onResizeStart={() => beginGesture()}
-                    onRotate={(event) => rotateNode(targetId, Math.round(event.rotation))}
+                    onRotate={(event) =>
+                        useCanvasDoc.getState().rotateNode(targetId, Math.round(event.rotation))
+                    }
                     onRotateEnd={() => endGesture()}
                     onRotateStart={() => beginGesture()}
                     origin={false}
+                    ref={moveableRef}
                     resizable
                     rotatable
                     snappable={true}

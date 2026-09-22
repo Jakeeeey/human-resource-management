@@ -46,10 +46,14 @@ const BASE = "/api/hrm/mailing-studio/templates";
  * Fetches a T4 design route and unwraps the { success, data?, message? } envelope.
  * @param path - Path appended to BASE ("" or "?template_key=...").
  * @param init - Optional RequestInit (method/body/headers).
- * @returns envelope.data, or undefined when the envelope carries no data.
+ * @returns The envelope { data, message } — message carries export degradation
+ * warnings (rotated/overlap/clipped) on saves; data is undefined when absent.
  * @throws Error on non-2xx, !success, or a non-JSON body.
  */
-async function request<T>(path: string, init?: RequestInit): Promise<T | undefined> {
+async function request<T>(
+    path: string,
+    init?: RequestInit,
+): Promise<{ data: T | undefined; message: string | null }> {
     const res = await fetch(`${BASE}${path}`, {
         ...init,
         headers: {
@@ -66,22 +70,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T | undefin
     if (!res.ok || !envelope?.success) {
         throw new Error(envelope?.message ?? `Design request failed (HTTP ${res.status})`);
     }
-    return envelope.data;
+    return { data: envelope.data, message: envelope.message ?? null };
 }
 
 /**
  * Saves a design (server upserts by template_key via design-persistence-service).
  * @param payload - Template meta + stringified design_json.
- * @returns The verified row from the route.
+ * @returns The verified row plus the envelope message (export warnings, if any).
  * @throws Error when the route rejects or returns no data.
  */
-export async function saveDesign(payload: DesignSavePayload): Promise<DesignRow> {
-    const row = await request<DesignRow>("", {
+export async function saveDesign(
+    payload: DesignSavePayload,
+): Promise<{ row: DesignRow; message: string | null }> {
+    const { data: row, message } = await request<DesignRow>("", {
         method: "POST",
         body: JSON.stringify(payload),
     });
     if (!row) throw new Error("Design save returned no data");
-    return row;
+    return { row, message };
 }
 
 /**
@@ -90,7 +96,7 @@ export async function saveDesign(payload: DesignSavePayload): Promise<DesignRow>
  * @returns The row, or null when absent.
  */
 export async function getDesign(template_key: string): Promise<DesignRow | null> {
-    const row = await request<DesignRow | null>(
+    const { data: row } = await request<DesignRow | null>(
         `?template_key=${encodeURIComponent(template_key)}`
     );
     return row ?? null;
@@ -101,6 +107,45 @@ export async function getDesign(template_key: string): Promise<DesignRow | null>
  * @returns Row array (empty when the route returns no data).
  */
 export async function listDesigns(): Promise<DesignRow[]> {
-    const rows = await request<DesignRow[]>(``);
+    const { data: rows } = await request<DesignRow[]>(``);
     return rows ?? [];
+}
+
+export interface PreviewResult {
+    html: string;
+    warnings: string[];
+}
+
+/**
+ * Compiles the live (possibly unsaved) canvas doc through the real export
+ * path without persisting anything.
+ * @param design_json - Stringified canvas doc from the live store.
+ * @param subject - Becomes the export document title.
+ * @returns Compiled receiver HTML + export warnings.
+ * @throws Error when the route rejects (e.g. empty canvas).
+ */
+export async function previewDesign(
+    design_json: string,
+    subject?: string,
+): Promise<PreviewResult> {
+    const res = await fetch("/api/hrm/mailing-studio/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ design_json, ...(subject ? { subject } : {}) }),
+    });
+    let envelope: { success: boolean; data?: PreviewResult; message?: string } | null =
+        null;
+    try {
+        envelope = (await res.json()) as {
+            success: boolean;
+            data?: PreviewResult;
+            message?: string;
+        };
+    } catch {
+        envelope = null;
+    }
+    if (!res.ok || !envelope?.success || !envelope.data) {
+        throw new Error(envelope?.message ?? `Preview request failed (HTTP ${res.status})`);
+    }
+    return envelope.data;
 }

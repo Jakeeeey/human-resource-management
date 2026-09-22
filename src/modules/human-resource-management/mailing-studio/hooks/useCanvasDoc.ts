@@ -31,6 +31,7 @@ export interface CanvasDocState {
 
     addNode: (draft: CanvasNodeDraft) => string | null;
     moveNode: (id: string, x: number, y: number) => void;
+    moveNodesBy: (ids: string[], dx: number, dy: number) => void;
     resizeNode: (id: string, w: number, h: number) => void;
     rotateNode: (id: string, rotation: number) => void;
     updateProps: (id: string, patch: Record<string, unknown>) => void;
@@ -40,6 +41,7 @@ export interface CanvasDocState {
     setViewport: (patch: Partial<CanvasViewport>) => void;
     beginGesture: () => void;
     endGesture: () => void;
+    hydrate: (doc: CanvasHistory) => void;
     undo: () => void;
     redo: () => void;
 }
@@ -108,6 +110,24 @@ export function createCanvasDocStore() {
                         const node = get().nodes[id];
                         if (!node) return;
                         mutate({ nodes: { ...get().nodes, [id]: { ...node, x, y } } });
+                    },
+
+                    // Group-delta drag (P0-4): shift every selected node by the
+                    // same (dx, dy) in ONE mutate so the gesture stays a single
+                    // history entry and a single version bump.
+                    moveNodesBy: (ids, dx, dy) => {
+                        if (dx === 0 && dy === 0) return;
+                        const current = get().nodes;
+                        let touched = false;
+                        const nodes = { ...current };
+                        for (const id of ids) {
+                            const node = current[id];
+                            if (!node) continue;
+                            nodes[id] = { ...node, x: node.x + dx, y: node.y + dy };
+                            touched = true;
+                        }
+                        if (!touched) return;
+                        mutate({ nodes });
                     },
 
                     resizeNode: (id, w, h) => {
@@ -209,6 +229,17 @@ export function createCanvasDocStore() {
                         });
                         history.getState().resume();
                         set({ nodes: post.nodes, rootIds: post.rootIds });
+                    },
+
+                    hydrate: (doc) => {
+                        const state = get();
+                        if (Object.keys(state.nodes).length > 0) return;
+                        set({
+                            nodes: { ...doc.nodes },
+                            rootIds: [...doc.rootIds],
+                            selection: [],
+                        });
+                        history.getState().clear();
                     },
 
                     undo: () => {

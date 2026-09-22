@@ -72,11 +72,15 @@ function contentOf(doc: CanvasDoc, node: CanvasNode): string {
                 " />"
             );
         }
-        case "button":
+        case "button": {
+            // P0-2: editor/chips write props.text (PropertyPanel Label → updateProps
+            // { text }); fall back to props.label for legacy docs.
+            const label = stringProp(node, "text") || stringProp(node, "label");
             return (
                 `<mj-button href="${escapeAttr(stringProp(node, "href"))}">` +
-                `${escapeText(stringProp(node, "label"))}</mj-button>`
+                `${escapeText(label)}</mj-button>`
             );
+        }
         case "divider":
             return "<mj-divider />";
         case "spacer":

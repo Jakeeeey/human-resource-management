@@ -4,11 +4,12 @@ import { saveDesign, type DesignSavePayload } from "../providers/designService";
 
 import { useCanvasDoc } from "./useCanvasDoc";
 
-// T10 client autosave: debounced (1.5s) write of the canvas doc + template meta
-// through designService (→ /api/hrm/mailing-studio/templates, route lands T4).
-// Explicit save() flushes immediately and cancels the pending timer.
-// Compile-on-save (body_html/body_text via export-service) is intentionally NOT
-// wired here — it lands with T4/T6. Never writes mail_outbox.
+// Manual-save-only persistence (P1-5 follow-up): the 1.5s auto-persist path is
+// OFF. Edits only mark dirty; the Save button (+ Ctrl+S, wired in
+// MailingStudioPage) is the sole writer through designService
+// (→ /api/hrm/mailing-studio/templates). Mount hydration never marks dirty
+// (hydrate bumps no version). Compile-on-save (body_html/body_text via
+// export-service) is intentionally NOT wired here. Never writes mail_outbox.
 
 export type DesignAutosaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -21,10 +22,10 @@ export interface UseDesignAutosaveOptions {
 export interface UseDesignAutosaveResult {
     status: DesignAutosaveStatus;
     error: string | null;
+    message: string | null;
+    dirty: boolean;
     save: () => Promise<boolean>;
 }
-
-const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 /**
  * Serializes the live canvas store into the persisted design_json document.
@@ -43,20 +44,21 @@ function snapshotDesignJson(): string {
 }
 
 /**
- * Debounced design autosave + explicit save for the studio page.
+ * Manual-save persistence + dirty tracking for the studio page.
  * @param options - Stable template meta (key/name/subject) persisted with the doc.
- * @returns status (idle/saving/saved/error), last error, and save().
+ * @returns status (idle/saving/saved/error), last error, envelope message,
+ * dirty flag, and save() — the only writer.
  */
 export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignAutosaveResult {
     const [status, setStatus] = useState<DesignAutosaveStatus>("idle");
     const [error, setError] = useState<string | null>(null);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+    const [dirty, setDirty] = useState(false);
+    const [savedMeta, setSavedMeta] = useState(options);
+    const savedVersionRef = useRef<number | null>(null);
 
     const save = useCallback(async (): Promise<boolean> => {
-        if (timerRef.current !== null) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-        }
+        const versionAtSave = useCanvasDoc.getState().version;
         setStatus("saving");
         setError(null);
         try {
@@ -67,7 +69,12 @@ export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignA
                 design_json: snapshotDesignJson(),
                 is_active: true,
             };
-            await saveDesign(payload);
+            const { message: envelopeMessage } = await saveDesign(payload);
+            setMessage(envelopeMessage);
+            savedVersionRef.current = versionAtSave;
+            setSavedMeta(options);
+            // Edits landing mid-flight stay dirty instead of being swallowed.
+            setDirty(useCanvasDoc.getState().version !== versionAtSave);
             setStatus("saved");
             return true;
         } catch (cause) {
@@ -77,27 +84,23 @@ export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignA
         }
     }, [options]);
 
-    // Autosave on doc change: version bumps on every store mutation (add/move/
-    // resize/remove/undo/redo), while selection/hover/viewport leave it alone.
+    // Dirty on doc change: version bumps on every store mutation (add/move/
+    // resize/remove/undo/redo), while selection/hover/viewport/hydration leave
+    // it alone. No write happens here — save() is the only writer.
     useEffect(() => {
-        let lastVersion = useCanvasDoc.getState().version;
+        if (savedVersionRef.current === null) {
+            savedVersionRef.current = useCanvasDoc.getState().version;
+        }
         const unsubscribe = useCanvasDoc.subscribe((state) => {
-            if (state.version === lastVersion) return;
-            lastVersion = state.version;
-            if (timerRef.current !== null) clearTimeout(timerRef.current);
-            timerRef.current = setTimeout(() => {
-                timerRef.current = null;
-                void save();
-            }, AUTOSAVE_DEBOUNCE_MS);
+            if (state.version !== savedVersionRef.current) setDirty(true);
         });
-        return () => {
-            unsubscribe();
-            if (timerRef.current !== null) {
-                clearTimeout(timerRef.current);
-                timerRef.current = null;
-            }
-        };
-    }, [save]);
+        return unsubscribe;
+    }, []);
 
-    return { status, error, save };
+    const metaDirty =
+        savedMeta.templateKey !== options.templateKey ||
+        savedMeta.templateName !== options.templateName ||
+        savedMeta.subject !== options.subject;
+
+    return { status, error, message, dirty: dirty || metaDirty, save };
 }
