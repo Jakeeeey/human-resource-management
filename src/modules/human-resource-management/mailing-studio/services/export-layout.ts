@@ -1,5 +1,10 @@
 // T9 export layout — PURE helpers (no mjml, no I/O) so bucket/overlap/clamp stay unit-testable.
-import { CANVAS_WIDTH, type CanvasDoc, type CanvasNode } from "../types/canvas-doc.schema";
+import {
+    CANVAS_WIDTH,
+    resolveStyleValue,
+    type CanvasDoc,
+    type CanvasNode,
+} from "../types/canvas-doc.schema";
 
 /** y-center bucketing tolerance in px (±8 per plan). */
 export const ROW_Y_TOLERANCE = 8;
@@ -124,4 +129,81 @@ export function clampedWidth(node: CanvasNode): number {
 export function columnWidthPercent(node: CanvasNode): string {
     const percent = Math.round((clampedWidth(node) / CANVAS_WIDTH) * 100);
     return `${Math.max(20, percent)}%`;
+}
+
+/** Column span from the row cursor to the node right edge, as an mj-column
+width %. Columns tile the section, so a column covers prevEnd..x+w and its
+padding-left (= x − prevEnd) eats inside that span — leaving exactly w for
+content. Using w alone as the width double-counts the offset and starves
+content (button text wrapping letter-by-letter). prevEnd mirrors the
+leadingGaps traversal (0, then each prior right edge). */
+export function columnSpanPercent(node: CanvasNode, prevEnd: number): string {
+    const right = Math.min(CANVAS_WIDTH, node.x + node.w);
+    const span = Math.max(0, right - prevEnd);
+    const percent = Math.round((span / CANVAS_WIDTH) * 100);
+    return `${Math.max(20, percent)}%`;
+}
+
+/** Top edge (min y) of a row — the canvas top offset for the first row. */
+export function rowTop(row: readonly CanvasNode[]): number {
+    return Math.min(...row.map((node) => node.y));
+}
+
+/** Bottom edge (max y + h) of a row. */
+export function rowBottom(row: readonly CanvasNode[]): number {
+    return Math.max(...row.map((node) => node.y + node.h));
+}
+
+/**
+ * Exact canvas gap between two stacked rows (later top − earlier bottom),
+ * clamped ≥ 0. Overlapping rows yield 0 — the overlap itself still warns via
+ * findOverlaps; the gap helper only sizes section padding.
+ */
+export function verticalGap(prevRow: readonly CanvasNode[], row: readonly CanvasNode[]): number {
+    return Math.max(0, rowTop(row) - rowBottom(prevRow));
+}
+
+/**
+ * Per-node leading x-gap within an x-sorted row: canvas spacing before this
+ * node back to the previous node's right edge (first entry measures from
+ * stage left, x = 0), each clamped ≥ 0. The exporter carries these as
+ * mj-column padding-left so in-row offsets survive export.
+ */
+export function leadingGaps(row: readonly CanvasNode[]): number[] {
+    const gaps: number[] = [];
+    let prevEnd = 0;
+    for (const node of row) {
+        gaps.push(Math.max(0, node.x - prevEnd));
+        prevEnd = Math.max(prevEnd, node.x + node.w);
+    }
+    return gaps;
+}
+
+/** Email text line-height factor used to size buttons from canvas geometry. */
+const BUTTON_LINE_HEIGHT = 1.4;
+
+/** Average glyph width as a fraction of font-size (latin label estimate). */
+const BUTTON_GLYPH_WIDTH = 0.55;
+
+/**
+ * Size-derived mj-button padding so the rendered button fills its canvas w/h.
+ * mj-button has no width/height attrs — padding is the only box-model lever:
+ * vertical = (h − text line height) / 2, horizontal = (w − estimated label
+ * width) / 2, each clamped ≥ 0 and rounded. fontSize resolves through the
+ * shared fidelity contract (props → theme 14); the label is props.text with
+ * the legacy props.label fallback (same pick as the exporter).
+ */
+export function buttonSizePadding(node: CanvasNode): string {
+    const fontSize = resolveStyleValue(node.type, node.props, "fontSize");
+    const fs = typeof fontSize === "number" ? fontSize : 14;
+    const rawLabel = node.props["text"] ?? node.props["label"];
+    const label = typeof rawLabel === "string" ? rawLabel : "";
+    const vertical = Math.max(0, Math.round((node.h - fs * BUTTON_LINE_HEIGHT) / 2));
+    // Horizontal centers the label in w, but never below (w/2 − 1): the column
+    // content box is exactly w, so padding past half leaves no room for text
+    // and MJML wraps it letter-by-letter. Tiny buttons degrade to full-bleed
+    // text instead of wrapping.
+    const centered = Math.round((node.w - label.length * fs * BUTTON_GLYPH_WIDTH) / 2);
+    const horizontal = Math.max(0, Math.min(centered, Math.floor(node.w / 2) - 1));
+    return `${vertical}px ${horizontal}px`;
 }

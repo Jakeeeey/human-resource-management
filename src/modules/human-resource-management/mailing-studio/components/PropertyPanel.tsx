@@ -2,13 +2,21 @@
 
 import { useId, useState, type ReactNode } from "react";
 
+import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
-import { CANVAS_TEXT_MAX, type CanvasNode } from "../types/canvas-doc.schema";
+import {
+    CANVAS_TEXT_MAX,
+    defaultBlockProps,
+    type BlockAlign,
+    type CanvasNode,
+} from "../types/canvas-doc.schema";
 
 /**
  * Live properties panel (T8c): edits the first selected node through the store.
@@ -174,8 +182,108 @@ function ImageSrcField({ node }: { readonly node: CanvasNode }) {
     );
 }
 
-function TextContentField({ node }: { readonly node: CanvasNode }) {
+function styleString(node: CanvasNode, key: string, fallback = ""): string {
+    const theme = defaultBlockProps(node.type);
+    const stored = node.props[key];
+    if (typeof stored === "string" && stored.length > 0) return stored;
+    const themed = theme[key];
+    return typeof themed === "string" ? themed : fallback;
+}
+
+function styleNumber(node: CanvasNode, key: string, fallback: number): number {
+    const theme = defaultBlockProps(node.type);
+    const stored = node.props[key];
+    if (typeof stored === "number" && Number.isFinite(stored)) return stored;
+    const themed = theme[key];
+    return typeof themed === "number" ? themed : fallback;
+}
+
+function coerceHex(value: string, fallback: string): string {
+    return /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+}
+
+function ColorField({
+    label,
+    value,
+    fallback,
+    onCommit,
+}: {
+    readonly label: string;
+    readonly value: string;
+    readonly fallback: string;
+    readonly onCommit: (next: string | undefined) => void;
+}) {
     const id = useId();
+    const beginGesture = useCanvasDoc((state) => state.beginGesture);
+    const endGesture = useCanvasDoc((state) => state.endGesture);
+    const swatch = coerceHex(value, fallback);
+
+    return (
+        <div className="col-span-2 space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground" htmlFor={id}>
+                {label}
+            </Label>
+            <div className="flex items-center gap-2">
+                <input
+                    aria-label={`${label} swatch`}
+                    className="h-8 w-10 shrink-0 cursor-pointer rounded-md border bg-card"
+                    type="color"
+                    value={swatch}
+                    onBlur={endGesture}
+                    onChange={(event) => onCommit(event.target.value)}
+                    onFocus={beginGesture}
+                />
+                <Input
+                    className="h-8 text-xs tabular-nums"
+                    id={id}
+                    spellCheck={false}
+                    value={value}
+                    onBlur={endGesture}
+                    onChange={(event) => {
+                        const next = event.target.value.trim();
+                        onCommit(next.length > 0 ? next : undefined);
+                    }}
+                    onFocus={beginGesture}
+                />
+            </div>
+        </div>
+    );
+}
+
+const ALIGN_OPTIONS: readonly { readonly value: BlockAlign; readonly label: string; readonly Icon: typeof AlignLeft }[] = [
+    { value: "left", label: "Align left", Icon: AlignLeft },
+    { value: "center", label: "Align center", Icon: AlignCenter },
+    { value: "right", label: "Align right", Icon: AlignRight },
+];
+
+function AlignField({ node }: { readonly node: CanvasNode }) {
+    const updateProps = useCanvasDoc((state) => state.updateProps);
+    const current = styleString(node, "align", "left");
+
+    return (
+        <div className="col-span-2 space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground" id={`align-${node.id}`}>
+                Alignment
+            </span>
+            <div aria-labelledby={`align-${node.id}`} className="flex items-center gap-1" role="group">
+                {ALIGN_OPTIONS.map(({ value, label, Icon }) => (
+                    <Button
+                        aria-label={label}
+                        aria-pressed={current === value}
+                        key={value}
+                        size="icon-sm"
+                        variant={current === value ? "secondary" : "ghost"}
+                        onClick={() => updateProps(node.id, { align: value })}
+                    >
+                        <Icon />
+                    </Button>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function TextContentField({ node }: { readonly node: CanvasNode }) {    const id = useId();
     const updateProps = useCanvasDoc((state) => state.updateProps);
     const beginGesture = useCanvasDoc((state) => state.beginGesture);
     const endGesture = useCanvasDoc((state) => state.endGesture);
@@ -275,6 +383,91 @@ export function PropertyPanel() {
                             span
                             value={typeof node.props.alt === "string" ? node.props.alt : ""}
                             onCommit={(next) => updateProps(node.id, { alt: next })}
+                        />
+                    </Section>
+                ) : null}
+
+                {node.type === "text" || node.type === "button" ? (
+                    <Section title="Typography">
+                        <ColorField
+                            fallback="#000000"
+                            label="Text color"
+                            value={styleString(node, "color", "#000000")}
+                            onCommit={(next) => updateProps(node.id, { color: next })}
+                        />
+                        <NumericField
+                            label="Font size"
+                            value={styleNumber(node, "fontSize", 14)}
+                            onCommit={(next) => updateProps(node.id, { fontSize: next })}
+                        />
+                        <StringField
+                            label="Font family"
+                            span
+                            value={styleString(node, "fontFamily", "")}
+                            onCommit={(next) => updateProps(node.id, { fontFamily: next })}
+                        />
+                        <AlignField node={node} />
+                    </Section>
+                ) : null}
+
+                {node.type === "image" ? (
+                    <Section title="Layout">
+                        <AlignField node={node} />
+                    </Section>
+                ) : null}
+
+                {node.type === "text" ||
+                node.type === "button" ||
+                node.type === "image" ||
+                node.type === "box" ? (
+                    <Section title="Appearance">
+                        <ColorField
+                            fallback="#ffffff"
+                            label="Background"
+                            value={styleString(node, "background", "")}
+                            onCommit={(next) => updateProps(node.id, { background: next })}
+                        />
+                        <NumericField
+                            label="Padding"
+                            value={styleNumber(node, "padding", 0)}
+                            onCommit={(next) => updateProps(node.id, { padding: next })}
+                        />
+                        <NumericField
+                            label="Radius"
+                            value={styleNumber(node, "radius", 0)}
+                            onCommit={(next) => updateProps(node.id, { radius: next })}
+                        />
+                        <NumericField
+                            label="Border width"
+                            value={styleNumber(node, "borderWidth", 0)}
+                            onCommit={(next) => updateProps(node.id, { borderWidth: next })}
+                        />
+                        <ColorField
+                            fallback="#d1d5db"
+                            label="Border color"
+                            value={styleString(node, "borderColor", "")}
+                            onCommit={(next) => updateProps(node.id, { borderColor: next })}
+                        />
+                    </Section>
+                ) : null}
+
+                {node.type === "divider" ? (
+                    <Section title="Line">
+                        <ColorField
+                            fallback="#d1d5db"
+                            label="Color"
+                            value={styleString(node, "borderColor", "#d1d5db")}
+                            onCommit={(next) => updateProps(node.id, { borderColor: next })}
+                        />
+                        <NumericField
+                            label="Thickness"
+                            value={styleNumber(node, "borderWidth", 1)}
+                            onCommit={(next) => updateProps(node.id, { borderWidth: next })}
+                        />
+                        <NumericField
+                            label="Padding"
+                            value={styleNumber(node, "padding", 0)}
+                            onCommit={(next) => updateProps(node.id, { padding: next })}
                         />
                     </Section>
                 ) : null}

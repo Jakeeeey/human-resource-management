@@ -36,6 +36,7 @@ export interface CanvasDocState {
     rotateNode: (id: string, rotation: number) => void;
     updateProps: (id: string, patch: Record<string, unknown>) => void;
     removeNode: (id: string) => void;
+    reorderNode: (id: string, direction: "up" | "down") => void;
     selectNodes: (ids: string[]) => void;
     setHover: (id: string | null) => void;
     setViewport: (patch: Partial<CanvasViewport>) => void;
@@ -190,6 +191,31 @@ export function createCanvasDocStore() {
 
                     selectNodes: (ids) => {
                         set({ selection: Array.from(new Set(ids)) });
+                    },
+
+                    // Layer reorder (P1-3): swap one stage-root with its neighbour
+                    // and reassign every root z to its index so z === position.
+                    // Single mutate → one version bump, one undo entry outside a
+                    // gesture; callers wrap beginGesture/endGesture to coalesce.
+                    // Box children are not roots — no-op for them.
+                    reorderNode: (id, direction) => {
+                        const state = get();
+                        const index = state.rootIds.indexOf(id);
+                        if (index < 0) return;
+                        const next =
+                            direction === "up" ? index - 1 : index + 1;
+                        if (next < 0 || next >= state.rootIds.length) return;
+                        const rootIds = [...state.rootIds];
+                        const other = rootIds[next];
+                        if (other === undefined) return;
+                        rootIds[next] = id;
+                        rootIds[index] = other;
+                        const nodes = { ...state.nodes };
+                        rootIds.forEach((rootId, z) => {
+                            const node = nodes[rootId];
+                            if (node && node.z !== z) nodes[rootId] = { ...node, z };
+                        });
+                        mutate({ nodes, rootIds });
                     },
 
                     setHover: (id) => {

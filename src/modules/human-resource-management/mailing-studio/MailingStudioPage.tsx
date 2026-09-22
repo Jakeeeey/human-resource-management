@@ -12,7 +12,6 @@ import {
     LayoutGrid,
     Mail,
     Minus,
-    Monitor,
     MousePointer2,
     MousePointerClick,
     Redo2,
@@ -20,7 +19,6 @@ import {
     Send,
     Settings2,
     Share2,
-    Smartphone,
     Type,
     Undo2,
     X,
@@ -38,7 +36,7 @@ import { StageCanvas } from "./components/StageCanvas";
 import { useCanvasDoc } from "./hooks/useCanvasDoc";
 import { useDesignAutosave, type DesignAutosaveStatus } from "./hooks/useDesignAutosave";
 import { getDesign, previewDesign } from "./providers/designService";
-import { canvasDocSchema, type CanvasNodeType } from "./types/canvas-doc.schema";
+import { canvasDocSchema, defaultBlockProps, type CanvasNodeType } from "./types/canvas-doc.schema";
 
 /**
  * Mailing Studio — Wave-0 chrome + T8 live freeform canvas + T8c control matrix.
@@ -47,7 +45,6 @@ import { canvasDocSchema, type CanvasNodeType } from "./types/canvas-doc.schema"
  */
 
 type PanelId = "select" | "elements" | "layers" | "settings";
-type DeviceKind = "desktop" | "mobile";
 
 interface RailItem {
     readonly label: string;
@@ -82,12 +79,16 @@ const CHIP_NODE_SPEC: Record<
     CanvasNodeType,
     { readonly w: number; readonly h: number; readonly props: Record<string, unknown> }
 > = {
-    text: { w: 480, h: 44, props: { text: "New text block" } },
-    image: { w: 480, h: 160, props: { src: "https://placehold.co/480x160", alt: "Image" } },
-    button: { w: 180, h: 40, props: { text: "Read more" } },
-    divider: { w: 480, h: 2, props: {} },
-    spacer: { w: 480, h: 24, props: {} },
-    box: { w: 480, h: 120, props: {} },
+    text: { w: 480, h: 44, props: { text: "New text block", ...defaultBlockProps("text") } },
+    image: {
+        w: 480,
+        h: 160,
+        props: { src: "https://placehold.co/480x160", alt: "Image", ...defaultBlockProps("image") },
+    },
+    button: { w: 180, h: 40, props: { text: "Read more", ...defaultBlockProps("button") } },
+    divider: { w: 480, h: 2, props: { ...defaultBlockProps("divider") } },
+    spacer: { w: 480, h: 24, props: { ...defaultBlockProps("spacer") } },
+    box: { w: 480, h: 120, props: { ...defaultBlockProps("box") } },
 };
 
 // Plain-HTTP (insecure-context) origins have no crypto.randomUUID; the store
@@ -131,8 +132,6 @@ function StudioTopBar({
     sending,
     onSave,
     saveStatus,
-    dirty,
-    savedAt,
 }: {
     readonly name: string;
     readonly onNameChange: (next: string) => void;
@@ -145,8 +144,6 @@ function StudioTopBar({
     readonly sending: boolean;
     readonly onSave: () => void;
     readonly saveStatus: DesignAutosaveStatus;
-    readonly dirty: boolean;
-    readonly savedAt: string | null;
 }) {
     return (
         <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
@@ -208,32 +205,6 @@ function StudioTopBar({
                     <Send />
                     <span className="hidden md:inline">{sending ? "Sending…" : "Send test"}</span>
                 </Button>
-                {saveStatus === "error" ? (
-                    <button
-                        aria-live="polite"
-                        className="shrink-0 rounded-full border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive"
-                        data-testid="save-status"
-                        type="button"
-                        onClick={onSave}
-                    >
-                        Save failed — Retry
-                    </button>
-                ) : (
-                    <span
-                        aria-live="polite"
-                        className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums"
-                        data-testid="save-status"
-                        role="status"
-                    >
-                        {saveStatus === "saving"
-                            ? "Saving…"
-                            : dirty
-                              ? "Unsaved changes"
-                              : savedAt
-                                ? `Saved ${savedAt}`
-                                : null}
-                    </span>
-                )}
                 <Button
                     aria-label="Save design"
                     disabled={saveStatus === "saving"}
@@ -325,20 +296,17 @@ function ElementsPanel() {
     );
 }
 
-function InfoRow({ label, value }: { readonly label: string; readonly value: string }) {
-    return (
-        <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
-            <span className="text-xs tabular-nums text-foreground">{value}</span>
-        </div>
-    );
-}
-
-function SettingsPanel({ width }: { readonly width: number }) {
-    const nodeCount = useCanvasDoc((state) => Object.keys(state.nodes).length);
-    const selectionCount = useCanvasDoc((state) => state.selection.length);
-    const selectNodes = useCanvasDoc((state) => state.selectNodes);
-
+function SettingsPanel({
+    templateName,
+    onTemplateNameChange,
+    subject,
+    onSubjectChange,
+}: {
+    readonly templateName: string;
+    readonly onTemplateNameChange: (next: string) => void;
+    readonly subject: string;
+    readonly onSubjectChange: (next: string) => void;
+}) {
     return (
         <aside className="hidden w-60 shrink-0 flex-col border-r bg-card md:flex">
             <div className="flex h-11 shrink-0 items-center border-b px-4">
@@ -350,27 +318,32 @@ function SettingsPanel({ width }: { readonly width: number }) {
             <div className="flex flex-col gap-5 overflow-y-auto p-4">
                 <section className="flex flex-col gap-2.5">
                     <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Document
+                        Template
                     </h3>
-                    <div className="flex flex-col gap-2.5">
-                        <InfoRow label="Stage" value={`${width} px`} />
-                        <InfoRow label="Blocks" value={String(nodeCount)} />
-                        <InfoRow label="Selected" value={String(selectionCount)} />
+                    <div className="flex flex-col gap-2">
+                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="settings-template-name">
+                            Name
+                        </Label>
+                        <Input
+                            aria-label="Template name"
+                            className="h-8 text-xs"
+                            id="settings-template-name"
+                            value={templateName}
+                            onChange={(event) => onTemplateNameChange(event.target.value)}
+                        />
                     </div>
-                </section>
-
-                <section className="flex flex-col gap-2.5">
-                    <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Actions
-                    </h3>
-                    <Button
-                        disabled={selectionCount === 0}
-                        size="sm"
-                        variant="outline"
-                        onClick={() => selectNodes([])}
-                    >
-                        Deselect all
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="settings-subject">
+                            Subject
+                        </Label>
+                        <Input
+                            aria-label="Email subject"
+                            className="h-8 text-xs"
+                            id="settings-subject"
+                            value={subject}
+                            onChange={(event) => onSubjectChange(event.target.value)}
+                        />
+                    </div>
                 </section>
             </div>
         </aside>
@@ -417,7 +390,7 @@ function useHistoryCounts(): { canUndo: boolean; canRedo: boolean } {
 export function MailingStudioPage() {
     const [panel, setPanel] = useState<PanelId>("elements");
     const [templateName, setTemplateName] = useState<string>(DEFAULT_DESIGN_META.templateName);
-    const [device, setDevice] = useState<DeviceKind>("desktop");
+    const [subject, setSubject] = useState<string>(DEFAULT_DESIGN_META.subject);
     const [previewing, setPreviewing] = useState(false);
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
     const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
@@ -426,21 +399,20 @@ export function MailingStudioPage() {
     const savedSelectionRef = useRef<string[]>([]);
     const [sending, setSending] = useState(false);
     const [hydrating, setHydrating] = useState(true);
-    const [savedAt, setSavedAt] = useState<string | null>(null);
     const { canUndo, canRedo } = useHistoryCounts();
 
     const EDITOR_WIDTH = 600;
-    const width = device === "mobile" ? 375 : 600;
+    const width = EDITOR_WIDTH;
 
     const autosaveOptions = useMemo(
         () => ({
             templateKey: DEFAULT_DESIGN_META.templateKey,
             templateName,
-            subject: templateName,
+            subject,
         }),
-        [templateName],
+        [templateName, subject],
     );
-    const { save, status, error, dirty } = useDesignAutosave(autosaveOptions);
+    const { save, status, error } = useDesignAutosave(autosaveOptions);
 
     useEffect(() => {
         let cancelled = false;
@@ -462,6 +434,7 @@ export function MailingStudioPage() {
                         return;
                     }
                     if (row.template_name) setTemplateName(row.template_name);
+                    if (row.subject) setSubject(row.subject);
                     useCanvasDoc.getState().hydrate({
                         nodes: result.data.nodes,
                         rootIds: result.data.rootIds,
@@ -483,16 +456,6 @@ export function MailingStudioPage() {
     useEffect(() => {
         if (window.matchMedia("(max-width: 767px)").matches) setPanel("select");
     }, []);
-
-    const prevStatusRef = useRef(status);
-    useEffect(() => {
-        if (status === "saved" && prevStatusRef.current !== "saved") {
-            setSavedAt(
-                new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            );
-        }
-        prevStatusRef.current = status;
-    }, [status]);
 
     const errorToastedRef = useRef<string | null>(null);
     useEffect(() => {
@@ -527,7 +490,7 @@ export function MailingStudioPage() {
         setPreviewHtml(null);
         setPreviewWarnings([]);
         try {
-            const result = await previewDesign(design_json, templateName);
+            const result = await previewDesign(design_json, subject);
             setPreviewHtml(result.html);
             setPreviewWarnings(result.warnings);
         } catch (cause) {
@@ -535,7 +498,7 @@ export function MailingStudioPage() {
         } finally {
             setPreviewLoading(false);
         }
-    }, [templateName]);
+    }, [subject]);
 
     // Exit restores the exact pre-preview editor state (selection included).
     const handleExitPreview = useCallback((): void => {
@@ -611,42 +574,6 @@ export function MailingStudioPage() {
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         Preview — receiver view
                     </span>
-                    <div
-                        aria-label="Device preview"
-                        className="flex h-8 items-center gap-0.5 rounded-lg bg-muted p-0.5"
-                        role="group"
-                    >
-                        <button
-                            aria-label="Desktop preview"
-                            aria-pressed={device === "desktop"}
-                            className={cn(
-                                "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-                                device === "desktop"
-                                    ? "bg-card text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                            type="button"
-                            onClick={() => setDevice("desktop")}
-                        >
-                            <Monitor aria-hidden="true" />
-                            <span className="hidden sm:inline">Desktop</span>
-                        </button>
-                        <button
-                            aria-label="Mobile preview"
-                            aria-pressed={device === "mobile"}
-                            className={cn(
-                                "flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-                                device === "mobile"
-                                    ? "bg-card text-foreground shadow-sm"
-                                    : "text-muted-foreground hover:text-foreground",
-                            )}
-                            type="button"
-                            onClick={() => setDevice("mobile")}
-                        >
-                            <Smartphone aria-hidden="true" />
-                            <span className="hidden sm:inline">Mobile</span>
-                        </button>
-                    </div>
                     {previewWarnings.length > 0 ? (
                         <span
                             className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex"
@@ -718,8 +645,6 @@ export function MailingStudioPage() {
                 canUndo={canUndo}
                 name={templateName}
                 saveStatus={status}
-                dirty={dirty}
-                savedAt={savedAt}
                 sending={sending}
                 onNameChange={setTemplateName}
                 onPreview={() => void handlePreview()}
@@ -782,7 +707,14 @@ export function MailingStudioPage() {
                     </div>
                 ) : null}
                 {panel === "layers" ? <LayersPanel /> : null}
-                {panel === "settings" ? <SettingsPanel width={EDITOR_WIDTH} /> : null}
+                {panel === "settings" ? (
+                    <SettingsPanel
+                        templateName={templateName}
+                        onTemplateNameChange={setTemplateName}
+                        subject={subject}
+                        onSubjectChange={setSubject}
+                    />
+                ) : null}
                 <StageCanvas width={EDITOR_WIDTH} />
                 <PropertyPanel />
             </div>

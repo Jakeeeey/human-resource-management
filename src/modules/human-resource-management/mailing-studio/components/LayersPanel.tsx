@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Image, Minus, MousePointerClick, MoveVertical, Trash2, Type } from "lucide-react";
+import { Box, ChevronDown, ChevronUp, Image, Minus, MousePointerClick, MoveVertical, Trash2, Type } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -31,7 +31,9 @@ function layerLabel(node: CanvasNode): string {
 /**
  * Live layer list (T8c): every canvas node in document order (roots, then box
  * children indented). Row click selects, selected row takes the rail-active
- * treatment, per-row trash removes via removeNode.
+ * treatment, per-row trash removes via removeNode. Root rows carry up/down
+ * reorder controls driving canvas z-order through reorderNode inside a
+ * beginGesture/endGesture pair so each move is one undo step.
  */
 export function LayersPanel() {
     const nodes = useCanvasDoc((state) => state.nodes);
@@ -39,6 +41,9 @@ export function LayersPanel() {
     const selection = useCanvasDoc((state) => state.selection);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
     const removeNode = useCanvasDoc((state) => state.removeNode);
+    const beginGesture = useCanvasDoc((state) => state.beginGesture);
+    const endGesture = useCanvasDoc((state) => state.endGesture);
+    const reorderNode = useCanvasDoc((state) => state.reorderNode);
 
     const rows: { node: CanvasNode; depth: number }[] = [];
     for (const rootId of rootIds) {
@@ -75,6 +80,15 @@ export function LayersPanel() {
                         {rows.map(({ node, depth }) => {
                             const Icon = TYPE_ICON[node.type];
                             const isSelected = node.id === selectedId;
+                            const rootIndex = depth === 0 ? rootIds.indexOf(node.id) : -1;
+                            const canMoveUp = depth === 0 && rootIndex > 0;
+                            const canMoveDown =
+                                depth === 0 && rootIndex >= 0 && rootIndex < rootIds.length - 1;
+                            const moveLayer = (direction: "up" | "down"): void => {
+                                beginGesture();
+                                reorderNode(node.id, direction);
+                                endGesture();
+                            };
                             return (
                                 <li key={node.id} style={{ paddingLeft: depth * 12 }}>
                                     <div
@@ -105,6 +119,36 @@ export function LayersPanel() {
                                         <span className="min-w-0 flex-1 truncate text-xs font-medium">
                                             {layerLabel(node)}
                                         </span>
+                                        {depth === 0 ? (
+                                            <>
+                                                <Button
+                                                    aria-label={`Move ${node.type} block up`}
+                                                    className="size-6 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                                    disabled={!canMoveUp}
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        moveLayer("up");
+                                                    }}
+                                                >
+                                                    <ChevronUp className="size-3.5" />
+                                                </Button>
+                                                <Button
+                                                    aria-label={`Move ${node.type} block down`}
+                                                    className="size-6 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                                    disabled={!canMoveDown}
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        moveLayer("down");
+                                                    }}
+                                                >
+                                                    <ChevronDown className="size-3.5" />
+                                                </Button>
+                                            </>
+                                        ) : null}
                                         <Button
                                             aria-label={`Delete ${node.type} block`}
                                             className="size-6 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
@@ -127,7 +171,8 @@ export function LayersPanel() {
 
             <div className="shrink-0 border-t p-3">
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    Click a row to select its block on the canvas.
+                    Click a row to select it. Up/down moves its block through the
+                    canvas stack.
                 </p>
             </div>
         </aside>

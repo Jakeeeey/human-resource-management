@@ -20,6 +20,144 @@ export const canvasNodeTypeSchema = z.enum([
 
 export type CanvasNodeType = z.infer<typeof canvasNodeTypeSchema>;
 
+// P1-1 block style system — optional style props persisted per node in
+// `props`. Every key is optional so docs written before P1-1 (no style keys)
+// still parse unchanged (backwards-compatible). Known keys are validated
+// lightly when present; unknown props keys stay free-form.
+export const blockAlignSchema = z.enum(["left", "center", "right"]);
+
+export type BlockAlign = z.infer<typeof blockAlignSchema>;
+
+export const blockStylePropsSchema = z.object({
+    /** Text color (text/button) or line color (divider). */
+    color: z.string().min(1).optional(),
+    /** Text size in px (text/button). */
+    fontSize: z.number().finite().positive().optional(),
+    /** Font stack (text/button) — email-safe stacks, e.g. Arial/Georgia. */
+    fontFamily: z.string().min(1).optional(),
+    /** Fill behind the block (text/button/image/box). */
+    background: z.string().min(1).optional(),
+    /** Horizontal alignment (text/button/image). */
+    align: blockAlignSchema.optional(),
+    /** Inner spacing in px (text/button/image/box/divider). */
+    padding: z.number().finite().min(0).optional(),
+    /** Border thickness in px (text/button/image/box/divider). */
+    borderWidth: z.number().finite().min(0).optional(),
+    /** Border color (text/button/image/box/divider). */
+    borderColor: z.string().min(1).optional(),
+    /** Corner radius in px (text/button/image/box). */
+    radius: z.number().finite().min(0).optional(),
+});
+
+export type BlockStyleProps = z.infer<typeof blockStylePropsSchema>;
+
+// NOTE (DESIGN.md no-hex rule): the hex literals below are EMAIL PAYLOAD data —
+// persisted into design_json and compiled to MJML attributes — not UI chrome.
+// Chrome tokens still come from globals.css / Tailwind utilities only.
+const BASE_STYLE: Record<string, unknown> = {
+    fontFamily: "Arial, Helvetica, sans-serif",
+    fontSize: 14,
+};
+
+/**
+ * Template-level theme defaults for NEW blocks (P1-1). Chip inserts spread
+ * these into props so every block starts on-theme; per-block edits override.
+ */
+export function defaultBlockProps(type: CanvasNodeType): Record<string, unknown> {
+    switch (type) {
+        case "text":
+            return {
+                ...BASE_STYLE,
+                color: "#1f2937",
+                align: "left",
+            };
+        case "button":
+            return {
+                ...BASE_STYLE,
+                color: "#ffffff",
+                background: "#2563eb",
+                align: "center",
+                radius: 6,
+            };
+        case "image":
+            return { align: "center" };
+        case "divider":
+            return { borderColor: "#d1d5db", borderWidth: 1 };
+        case "box":
+            return { background: "#f9fafb", padding: 12, radius: 6 };
+        case "spacer":
+            return {};
+    }
+}
+
+/**
+ * Shared canvas↔export style resolution (fidelity contract).
+ *
+ * Both renderers must agree on every style prop: the canvas
+ * (`CanvasNodeView.blockStyle`) and the export compiler
+ * (`export-service` MJML attrs) resolve through this helper, so a resolved
+ * value renders identically on both sides BY CONSTRUCTION.
+ *
+ * Resolution order per key: valid `props` value wins; otherwise the
+ * type's `defaultBlockProps` theme value; otherwise `undefined` (renderer
+ * default applies — padded by `blockPaddingFallback` where the canvas has
+ * a class-level padding).
+ */
+export function resolveStyleValue(
+    type: CanvasNodeType,
+    props: Readonly<Record<string, unknown>>,
+    key: string,
+): string | number | undefined {
+    if (key === "align") {
+        const pick = (value: unknown): BlockAlign | undefined =>
+            value === "left" || value === "center" || value === "right"
+                ? value
+                : undefined;
+        return pick(props["align"]) ?? pick(defaultBlockProps(type)["align"]);
+    }
+    if (
+        key === "fontSize" ||
+        key === "padding" ||
+        key === "borderWidth" ||
+        key === "radius"
+    ) {
+        const pick = (value: unknown): number | undefined =>
+            typeof value === "number" && Number.isFinite(value) && value >= 0
+                ? value
+                : undefined;
+        return pick(props[key]) ?? pick(defaultBlockProps(type)[key]);
+    }
+    const pick = (value: unknown): string | undefined =>
+        typeof value === "string" && value.trim().length > 0 ? value : undefined;
+    return pick(props[key]) ?? pick(defaultBlockProps(type)[key]);
+}
+
+/**
+ * Canvas class-level padding the export compiler must emit explicitly.
+ *
+ * The canvas renders a fixed padding via Tailwind classes even when no
+ * `padding` prop is stored (`text` p-1.5, `button` px-3); MJML defaults
+ * (10px 25px) differ, so export emits these fallbacks when neither props
+ * nor theme resolve a padding. `box` resolves via its theme default (12);
+ * `spacer` carries no padding.
+ */
+export function blockPaddingFallback(type: CanvasNodeType): string | undefined {
+    switch (type) {
+        case "text":
+            return "6px";
+        case "button":
+            return "0px 12px";
+        case "image":
+            return "0px";
+        case "divider":
+            return "0px";
+        case "box":
+            return undefined;
+        case "spacer":
+            return undefined;
+    }
+}
+
 function isAbsoluteHttpsImageSrc(value: unknown): boolean {
     if (typeof value !== "string" || value !== value.trim()) return false;
     let url: URL;
@@ -69,6 +207,14 @@ export const canvasNodeSchema = z
                     message: `Text must be at most ${CANVAS_TEXT_MAX} characters`,
                     path: ["props", "text"],
                 });
+            }
+        }
+        // P1-1 style keys are optional (absent = theme/MJML defaults), but when
+        // present they must be well-formed so the export compiler can trust them.
+        const style = blockStylePropsSchema.safeParse(node.props);
+        if (!style.success) {
+            for (const issue of style.error.issues) {
+                ctx.addIssue({ ...issue, path: ["props", ...issue.path] });
             }
         }
     });
