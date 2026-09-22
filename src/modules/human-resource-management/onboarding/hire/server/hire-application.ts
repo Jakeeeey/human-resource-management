@@ -10,6 +10,7 @@ import {
 } from "../types/hire.schema";
 import { philippineDate } from "./hire-time";
 import { extractEmailDomain } from "./hire-email";
+import { placeholderApplicantEmail } from "./hire-log";
 import type { SpringUserCreatePayload } from "@/modules/human-resource-management/shared/services/spring-user-service";
 
 // hire-application.ts — Directus reads + Spring payload mapping for the
@@ -116,6 +117,22 @@ export function resolveHireEmail(
 ): string | null {
   const email = application.email?.trim();
   return email ? email : null;
+}
+
+/**
+ * Resolves the STABLE identity for idempotent user resolution. Prefers the
+ * applicant's real email; when the application carries none, falls back to
+ * the deterministic applicant-scoped synthetic identity so the hire proceeds
+ * without a personal address. The fallback is a dedup key only — never a
+ * contact address, never persisted to `user.personal_email`.
+ * @param application - Linked application row.
+ * @returns The real email, or the synthetic identity for the applicant.
+ */
+export function resolveHireIdentity(application: HireApplicationRow): string {
+  return (
+    resolveHireEmail(application) ??
+    placeholderApplicantEmail(application.applicant_id)
+  );
 }
 
 /**
