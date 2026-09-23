@@ -12,6 +12,7 @@ import {
   type ApplicantStatus,
 } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { getPhilippineTime, patchRow } from "./signingSetIo";
+import { stampUpdate } from "@/modules/human-resource-management/onboarding/utils/audit";
 import { findSigningEnvelopeByApplicant } from "./signingSetRows";
 import { readJobOfferById } from "./signingRollupIo";
 import { recomputeSigningRollups } from "./signing-rollup-service";
@@ -85,6 +86,8 @@ export interface SignJobOfferResult {
  * already-signed offer is refused (a signature is evidence, not a draft).
  * @param rawInput - `{ offerId, signatureFile, strokes, signedPdfFile }`
  * (strict; every payload field may be null).
+ * @param actorId - Optional acting user id, stamped as `updated_by` on the
+ * signed offer PATCH (absent/null = no stamp).
  * @returns The signed offer plus the post-recompute envelope/batch rows,
  * counts, and the applicant status this call produced (`hired` when the set
  * completed, `incomplete` while it is still open, `null` when no applicant
@@ -94,7 +97,8 @@ export interface SignJobOfferResult {
  * rollup/status-service coded errors surface unchanged.
  */
 export async function signJobOffer(
-  rawInput: unknown
+  rawInput: unknown,
+  actorId?: number | null
 ): Promise<SignJobOfferResult> {
   const validation = SignJobOfferInputSchema.safeParse(rawInput);
   if (!validation.success) {
@@ -131,14 +135,17 @@ export async function signJobOffer(
     offer = await patchRow(
       "job_offer",
       offerId,
-      {
-        status: "signed",
-        signature_file: signatureFile,
-        strokes,
-        signed_pdf_file: signedPdfFile,
-        signed_at: now,
-        updated_at: now,
-      },
+      stampUpdate(
+        {
+          status: "signed",
+          signature_file: signatureFile,
+          strokes,
+          signed_pdf_file: signedPdfFile,
+          signed_at: now,
+          updated_at: now,
+        },
+        actorId ?? null
+      ),
       JobOfferSchema
     );
   }
@@ -154,13 +161,14 @@ export async function signJobOffer(
     envelopeId = envelope.id;
   }
 
-  const rollup = await recomputeSigningRollups({ envelopeId });
+  const rollup = await recomputeSigningRollups({ envelopeId }, actorId);
 
   let applicantStatus: ApplicantStatus | null = rollup.applicantStatus;
   if (rollup.envelope.status !== "complete") {
     const row = await setApplicantStatus({
       applicantId: offer.applicant_id,
       status: "incomplete",
+      ...(actorId != null ? { actorId } : {}),
     });
     applicantStatus = row.status;
   }

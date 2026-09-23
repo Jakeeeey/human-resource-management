@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import {
     mailBindingSchema,
     mailSendConditionSchema,
 } from "@/modules/human-resource-management/recruitment/mailing/types/mail-binding.schema";
 import { mailEventKeySchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-template.schema";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
+import {
+    actorIdFromJwt,
+    nowPH,
+    stampCreate,
+    stampUpdate,
+} from "@/modules/human-resource-management/recruitment/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -135,9 +143,14 @@ export async function POST(req: NextRequest) {
             return validationFailed(validation.error.flatten().fieldErrors);
         }
 
+        const token = (await cookies()).get(COOKIE_NAME)?.value;
+        const actorId = actorIdFromJwt(token ? decodeJwtPayload(token) : null);
+        const now = nowPH();
         const res = (await dFetch(COLLECTION, {
             method: "POST",
-            body: JSON.stringify(validation.data),
+            body: JSON.stringify(
+                stampCreate({ ...validation.data, created_at: now, updated_at: now }, actorId)
+            ),
         })) as { data?: unknown };
         if (!res?.data) {
             console.error("[mailing-bindings] create: Directus returned no data");
@@ -184,9 +197,13 @@ export async function PATCH(req: NextRequest) {
             return validationFailed(validation.error.flatten().fieldErrors);
         }
 
+        const token = (await cookies()).get(COOKIE_NAME)?.value;
+        const actorId = actorIdFromJwt(token ? decodeJwtPayload(token) : null);
         const res = (await dFetch(`${COLLECTION}/${encodeURIComponent(String(rawId))}`, {
             method: "PATCH",
-            body: JSON.stringify(validation.data),
+            body: JSON.stringify(
+                stampUpdate({ ...validation.data, updated_at: nowPH() }, actorId)
+            ),
         })) as { data?: unknown };
         if (!res?.data) {
             console.error("[mailing-bindings] update: Directus returned no data");

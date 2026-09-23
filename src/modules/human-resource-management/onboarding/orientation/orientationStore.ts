@@ -134,7 +134,7 @@ export async function upsertTopic(
     if (required !== existing.is_required) patch.is_required = required;
     if (Object.keys(patch).length === 0) return toTopic(existing);
     patch.updated_at = now;
-    patch.updated_by = actorId;
+    if (actorId != null) patch.updated_by = actorId;
     return toTopic(await patchTopicRow(existing.id, patch));
   }
 
@@ -189,7 +189,7 @@ export async function patchTopic(
 
   const actorId = patch.actorId ?? null;
   rowPatch.updated_at = phTimeNow();
-  rowPatch.updated_by = actorId;
+  if (actorId != null) rowPatch.updated_by = actorId;
   const updated = await patchTopicRow(existing.id, rowPatch);
 
   if (activeChanged) {

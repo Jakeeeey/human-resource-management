@@ -21,6 +21,7 @@ export const onboardingTaskMaterializeStep: HireCompletionStep = async (
   try {
     const result = await materializeOnboardingTasks({
       userId: context.userId,
+      ...(context.actorId != null ? { actorId: context.actorId } : {}),
     });
     return {
       step: STEP_NAME,

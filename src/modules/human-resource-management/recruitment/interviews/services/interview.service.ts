@@ -8,6 +8,7 @@ import {
 } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { ensureSigningSetForFinalApproved } from "@/modules/human-resource-management/onboarding/signing/server/signing-set-service";
+import { stampCreate, stampUpdate } from "@/modules/human-resource-management/recruitment/utils/audit";
 
 // interviews/service — interview grading + the applicant-pipeline wiring it owns
 // (todo 8). Every stage transition below routes through the SINGLE writer
@@ -388,9 +389,10 @@ export const interviewService = {
      * SUM(score*weight)/100) → create interview row with explicit PH
      * created_at/updated_at (never DB CURRENT_TIMESTAMP).
      * @param input - Interview fields plus criterion snapshot items.
+     * @param actorId - Acting user id for the interview-row audit stamp (optional).
      * @returns The created interview record.
      */
-    async createInterviewFlow(input: InterviewFlowInput): Promise<Interview> {
+    async createInterviewFlow(input: InterviewFlowInput, actorId?: number | null): Promise<Interview> {
         try {
             const { items, recorded_by, ...interviewFields } = input;
 
@@ -404,6 +406,8 @@ export const interviewService = {
                     composite_score: 0,
                     recorded_by: recorded_by ?? input.interviewed_by ?? null,
                     recorded_at: nowPH(),
+                    created_at: nowPH(),
+                    updated_at: nowPH(),
                 }),
             });
             if (!sheetRes.ok) {
@@ -439,7 +443,7 @@ export const interviewService = {
             const sheetPatchRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet/${sheetId}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify({ composite_score: composite }),
+                body: JSON.stringify({ composite_score: composite, updated_at: nowPH() }),
             });
             if (!sheetPatchRes.ok) {
                 const errorText = await sheetPatchRes.text();
@@ -450,12 +454,12 @@ export const interviewService = {
             const interviewRes = await fetch(`${API_BASE_URL}/items/interview`, {
                 method: "POST",
                 headers,
-                body: JSON.stringify({
+                body: JSON.stringify(stampCreate({
                     ...interviewFields,
                     score_sheet_id: sheetId,
                     created_at: nowPH(),
                     updated_at: nowPH(),
-                }),
+                }, actorId ?? null)),
             });
             if (!interviewRes.ok) {
                 const errorText = await interviewRes.text();
@@ -476,6 +480,7 @@ export const interviewService = {
      * interviewed_by/at all NULL. Sheet creation stays in grading only — the
      * grade page fills those via gradeScheduledInterview.
      * @param input - Stage, application id, and Final linkage ids.
+     * @param actorId - Acting user id for the interview-row audit stamp (optional).
      * @returns The created Pending interview record.
      */
     async createScheduledInterview(input: {
@@ -483,12 +488,12 @@ export const interviewService = {
         application_id: number;
         manpower_request_id: number | null;
         recommendation_id: number | null;
-    }): Promise<Interview> {
+    }, actorId?: number | null): Promise<Interview> {
         try {
             const response = await fetch(`${API_BASE_URL}/items/interview`, {
                 method: "POST",
                 headers,
-                body: JSON.stringify({
+                body: JSON.stringify(stampCreate({
                     stage: input.stage,
                     application_id: input.application_id,
                     manpower_request_id: input.manpower_request_id,
@@ -501,7 +506,7 @@ export const interviewService = {
                     notes: null,
                     created_at: nowPH(),
                     updated_at: nowPH(),
-                }),
+                }, actorId ?? null)),
             });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -523,6 +528,7 @@ export const interviewService = {
      * template_id, manual verdict, and interviewer stamps.
      * @param id - Scheduled interview record ID.
      * @param input - Template, manual verdict, date, notes, criterion items.
+     * @param actorId - Acting user id for the interview-row audit stamp (optional).
      * @returns The updated (graded) interview record.
      */
     async gradeScheduledInterview(
@@ -538,6 +544,7 @@ export const interviewService = {
             recorded_by?: number | null;
             items: InterviewFlowItemInput[];
         },
+        actorId?: number | null,
     ): Promise<Interview> {
         try {
             const sheetRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet`, {
@@ -550,6 +557,8 @@ export const interviewService = {
                     composite_score: 0,
                     recorded_by: input.recorded_by ?? input.interviewed_by ?? null,
                     recorded_at: nowPH(),
+                    created_at: nowPH(),
+                    updated_at: nowPH(),
                 }),
             });
             if (!sheetRes.ok) {
@@ -585,7 +594,7 @@ export const interviewService = {
             const sheetPatchRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet/${sheetId}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify({ composite_score: composite }),
+                body: JSON.stringify({ composite_score: composite, updated_at: nowPH() }),
             });
             if (!sheetPatchRes.ok) {
                 const errorText = await sheetPatchRes.text();
@@ -596,7 +605,7 @@ export const interviewService = {
             const interviewRes = await fetch(`${API_BASE_URL}/items/interview/${id}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify({
+                body: JSON.stringify(stampUpdate({
                     score_sheet_id: sheetId,
                     template_id: input.template_id,
                     verdict: input.verdict,
@@ -604,7 +613,7 @@ export const interviewService = {
                     interviewed_at: input.interviewed_at,
                     notes: input.notes,
                     updated_at: nowPH(),
-                }),
+                }, actorId ?? null)),
             });
             if (!interviewRes.ok) {
                 const errorText = await interviewRes.text();
@@ -624,14 +633,15 @@ export const interviewService = {
      * (never DB ON UPDATE CURRENT_TIMESTAMP).
      * @param id - Interview record ID.
      * @param patch - Partial interview fields to update.
+     * @param actorId - Acting user id for the interview-row audit stamp (optional).
      * @returns The updated interview record.
      */
-    async updateInterview(id: number, patch: Partial<Interview>): Promise<Interview> {
+    async updateInterview(id: number, patch: Partial<Interview>, actorId?: number | null): Promise<Interview> {
         try {
             const response = await fetch(`${API_BASE_URL}/items/interview/${id}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify({ ...patch, updated_at: nowPH() }),
+                body: JSON.stringify(stampUpdate({ ...patch, updated_at: nowPH() }, actorId ?? null)),
             });
 
             if (!response.ok) {
@@ -827,6 +837,7 @@ export async function advanceApplicantForInterviewVerdict(input: {
     stage: "Initial" | "Final";
     applicationId: number;
     verdict: "Pending" | "Passed" | "Failed";
+    actorId?: number | null;
 }): Promise<void> {
     const applicantId = await fetchApplicantIdForApplication(input.applicationId);
     if (applicantId === null) {
@@ -850,16 +861,16 @@ export async function advanceApplicantForInterviewVerdict(input: {
     for (const target of path) {
         if (target === status) continue;
         if (canTransition(status, target)) {
-            await setApplicantStatus({ applicantId, status: target, manpowerRequestId: await stampFor(target) });
+            await setApplicantStatus({ applicantId, status: target, manpowerRequestId: await stampFor(target), ...(input.actorId != null ? { actorId: input.actorId } : {}) });
             status = target;
             continue;
         }
         if (target !== finalTarget) continue;
-        await setApplicantStatus({ applicantId, status: target, manpowerRequestId: await stampFor(target) });
+        await setApplicantStatus({ applicantId, status: target, manpowerRequestId: await stampFor(target), ...(input.actorId != null ? { actorId: input.actorId } : {}) });
     }
     // Final Approved hook (todo 10): the approval that commits this applicant
     // materializes the signing set + advances to `for_signing` (idempotent).
     if (status === "final_approved") {
-        await ensureSigningSetForFinalApproved({ applicantId });
+        await ensureSigningSetForFinalApproved({ applicantId }, input.actorId ?? undefined);
     }
 }

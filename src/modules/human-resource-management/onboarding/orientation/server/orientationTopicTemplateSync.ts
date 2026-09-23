@@ -83,7 +83,7 @@ export async function syncDerivedTemplateActive(
       body: JSON.stringify({
         is_active: topic.is_active,
         updated_at: phTimeNow(),
-        updated_by: actorId,
+        ...(actorId != null ? { updated_by: actorId } : {}),
       }),
     }
   );

@@ -15,6 +15,7 @@ import {
   signJobOffer,
 } from "@/modules/human-resource-management/onboarding/signing/server/signing-offer-service";
 import { JobOfferSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
+import { actorIdFromJwt } from "@/modules/human-resource-management/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,7 +90,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!readSigningSession(req)) return unauthorized();
+    const session = readSigningSession(req);
+    if (!session) return unauthorized();
+    const actorId = actorIdFromJwt(session);
 
     const { id } = await params;
     const offerId = Number(id);
@@ -112,7 +115,7 @@ export async function PATCH(
         signatureFile: validation.data.signature_file,
         strokes: validation.data.strokes,
         signedPdfFile: validation.data.signed_pdf_file,
-      });
+      }, actorId);
       return NextResponse.json({ success: true, data: result });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

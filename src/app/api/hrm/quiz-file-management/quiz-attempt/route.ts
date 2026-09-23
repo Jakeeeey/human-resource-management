@@ -3,6 +3,7 @@ import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { gradeAnswers, persistGradedAttempt, type AnswerInput } from "@/modules/human-resource-management/quiz-file-management/utils/grading";
 import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { actorIdFromJwt, nowPH, stampUpdate } from "@/modules/human-resource-management/recruitment/utils/audit";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
 
         const token = req.cookies.get(COOKIE_NAME)?.value;
         const payload = token ? decodeJwtPayload(token) : null;
+        const actorId = actorIdFromJwt(payload);
         const administeredBy = payload?.sub ? Number(payload.sub) || null : null;
 
         const outcome = await gradeAnswers(quiz_id, answers);
@@ -118,10 +120,11 @@ export async function POST(req: NextRequest) {
             try {
                 await dFetch(`/items/application/${application_id}`, {
                     method: "PATCH",
-                    body: JSON.stringify({
+                    body: JSON.stringify(stampUpdate({
                         quiz_score: outcome.score,
                         quiz_passed: outcome.passed,
-                    }),
+                        updated_at: nowPH(),
+                    }, actorId)),
                 });
             } catch (writeBackErr) {
                 console.error(
@@ -139,6 +142,7 @@ export async function POST(req: NextRequest) {
             await setApplicantStatus({
                 applicantId: applicant_id,
                 status: "quiz_completed",
+                ...(actorId != null ? { actorId } : {}),
             });
             // Linear flow: auto-materialize a Pending Initial row (sheetless)
             // so Grade always links to a real row. Guard: skip when an
@@ -154,7 +158,7 @@ export async function POST(req: NextRequest) {
                         application_id,
                         manpower_request_id: null,
                         recommendation_id: null,
-                    });
+                    }, actorId);
                 }
             } catch (materializeErr) {
                 console.error(

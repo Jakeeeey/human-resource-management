@@ -216,6 +216,7 @@ export function TrainingItemsTable({
         rangeEnd={controls.rangeEnd}
         onPageChange={controls.setPage}
         onPageSizeChange={controls.setPageSize}
+        alwaysShowControls
       />
     </div>
   );

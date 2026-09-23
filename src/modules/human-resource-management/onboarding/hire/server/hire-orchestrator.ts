@@ -32,7 +32,7 @@ import { resolveHireUser } from "./hire-user";
 //      duplicates collapse to one create (hire-user.ts);
 //   3. run every registered post-hire step with the resolved `user_id` — the
 //      todos 17/19 SEAM (hire-steps.ts). Steps receive `{ applicantId,
-//      applicationId, userId, userCreated, email }`; `userId` IS the
+//      applicationId, userId, userCreated, email, actorId }`; `userId` IS the
 //      correlation, so NO applicant↔user / offer↔user DB column exists;
 //   4. record the outcome in Directus `activity_logs` (success AND failure).
 //
@@ -95,7 +95,8 @@ export async function runHireOrchestrator(
         .join("; ")}`
     );
   }
-  const { applicantId, authToken } = validation.data;
+  const { applicantId, authToken, actorId } = validation.data;
+  const effectiveActorId = actorId ?? null;
 
   const applicant = await readHireApplicant(applicantId);
   if (!applicant) {
@@ -176,6 +177,7 @@ export async function runHireOrchestrator(
       userId: resolved.userId,
       userCreated: resolved.created,
       email,
+      actorId: effectiveActorId,
     });
 
     await logHireActivity({

@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { manpowerRequestService } from "@/modules/human-resource-management/manpower-request/services/manpowerRequest.service";
 import { ManpowerRequestSchema } from "@/modules/human-resource-management/manpower-request/types";
+import { actorIdFromJwt, stampCreate } from "@/modules/human-resource-management/manpower-request/utils/audit";
+import type { JwtPayload } from "@/lib/auth-utils";
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
+function decodeJwtPayload(token: string): JwtPayload | null {
     try {
         if (!token) return null;
         const parts = token.split(".");
@@ -72,6 +74,7 @@ export async function POST(req: NextRequest) {
         const token = cookieStore.get(COOKIE_NAME)?.value;
         const payload = token ? decodeJwtPayload(token) : null;
         const userId = payload?.id || payload?.user_id || payload?.sub;
+        const actorId = actorIdFromJwt(payload);
 
         const body = await req.json();
 
@@ -104,7 +107,7 @@ export async function POST(req: NextRequest) {
         }
 
         const validated = ManpowerRequestSchema.parse(body);
-        const data = await manpowerRequestService.create(validated);
+        const data = await manpowerRequestService.create(stampCreate({ ...validated }, actorId));
         return NextResponse.json(data, { status: 201 });
     } catch (e: unknown) {
         console.error("Error in POST /api/hrm/manpower_request:", e);
