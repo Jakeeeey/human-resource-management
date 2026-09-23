@@ -24,7 +24,10 @@ import type { MailBindingRow } from "../providers/mailBindingService";
 import { MailCombobox } from "./MailCombobox";
 import { MailingTablePagination } from "./MailingTablePagination";
 
-const EVENT_KEY_OPTIONS = mailEventKeySchema.options.map((key) => ({ value: key, label: key }));
+const MANUAL_ONLY_EVENT_KEYS: readonly MailEventKey[] = ["final_interview.invited"];
+const EVENT_KEY_OPTIONS = mailEventKeySchema.options
+    .filter((key) => !MANUAL_ONLY_EVENT_KEYS.includes(key))
+    .map((key) => ({ value: key, label: key }));
 const CONDITION_OPTIONS = mailSendConditionSchema.options.map((key) => ({ value: key, label: key }));
 
 interface MailBindingsManagerProps {
@@ -34,7 +37,7 @@ interface MailBindingsManagerProps {
 }
 
 /**
- * Bindings manager: 3-key select + condition select + enabled toggle +
+ * Bindings manager: event-key select (auto events only) + condition select + enabled toggle +
  * unhook. Never defaults to an enabled final_interview.invited binding.
  * @param onSendNow - Optional Send-now hook point (todo 12).
  * @returns The bindings table + create form.
