@@ -1,4 +1,5 @@
 import { ManpowerRequest } from "../types";
+import { nowPH } from "../utils/audit";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -89,7 +90,7 @@ export const manpowerRequestService = {
 
     async create(request: ManpowerRequest): Promise<ManpowerRequest> {
         try {
-            const body = { ...request };
+            const body = { ...request, created_at: nowPH(), updated_at: nowPH() };
             
             if (!body.request_no) {
                 const year = new Date().getFullYear();
@@ -136,7 +137,7 @@ export const manpowerRequestService = {
             const response = await fetch(`${API_BASE_URL}/items/manpower_request/${id}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify(data),
+                body: JSON.stringify({ ...data, updated_at: nowPH() }),
             });
 
             if (!response.ok) {

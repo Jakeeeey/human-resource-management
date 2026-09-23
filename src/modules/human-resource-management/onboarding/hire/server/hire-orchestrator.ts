@@ -11,7 +11,7 @@ import {
   readHireApplicationByApplicant,
   readHireCompanyDomain,
   readHireRecruitmentProfile,
-  resolveHireEmail,
+  resolveHireIdentity,
   resolveHirePosition,
 } from "./hire-application";
 import { logHireActivity, placeholderApplicantEmail } from "./hire-log";
@@ -32,7 +32,7 @@ import { resolveHireUser } from "./hire-user";
 //      duplicates collapse to one create (hire-user.ts);
 //   3. run every registered post-hire step with the resolved `user_id` — the
 //      todos 17/19 SEAM (hire-steps.ts). Steps receive `{ applicantId,
-//      applicationId, userId, userCreated, email }`; `userId` IS the
+//      applicationId, userId, userCreated, email, actorId }`; `userId` IS the
 //      correlation, so NO applicant↔user / offer↔user DB column exists;
 //   4. record the outcome in Directus `activity_logs` (success AND failure).
 //
@@ -79,8 +79,10 @@ async function runHireSteps(
  * @returns The resolved employee id, whether it was created, and the step
  * outcomes.
  * @throws Error with `HIRE_ORCHESTRATOR_ERROR_CODES` on invalid input, a
- * non-hired/absent applicant, a missing application/email/position, a Spring
- * create/verify failure, or a failed post-hire step.
+ * non-hired/absent applicant, a missing application/position, a Spring
+ * create/verify failure, or a failed post-hire step. A missing application
+ * email does NOT throw: the identity falls back to the applicant-scoped
+ * synthetic so the hire proceeds and the company login is still created.
  */
 export async function runHireOrchestrator(
   rawInput: unknown
@@ -93,7 +95,8 @@ export async function runHireOrchestrator(
         .join("; ")}`
     );
   }
-  const { applicantId, authToken } = validation.data;
+  const { applicantId, authToken, actorId } = validation.data;
+  const effectiveActorId = actorId ?? null;
 
   const applicant = await readHireApplicant(applicantId);
   if (!applicant) {
@@ -136,12 +139,7 @@ export async function runHireOrchestrator(
       userName ||
       `Applicant #${applicantId}`;
 
-    email = resolveHireEmail(application);
-    if (!email) {
-      throw new Error(
-        `${HIRE_ORCHESTRATOR_ERROR_CODES.emailMissing}: application ${application.id} carries no email to resolve the employee by`
-      );
-    }
+    email = resolveHireIdentity(application);
     const position = resolveHirePosition(application, applicant);
     if (!position) {
       throw new Error(
@@ -179,6 +177,7 @@ export async function runHireOrchestrator(
       userId: resolved.userId,
       userCreated: resolved.created,
       email,
+      actorId: effectiveActorId,
     });
 
     await logHireActivity({

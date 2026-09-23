@@ -123,7 +123,7 @@ export async function reorderTemplateRows(
     await patchTemplateRow(entry.id, {
       sort_order: entry.sort_order,
       updated_at: now,
-      updated_by: actorId,
+      ...(actorId != null ? { updated_by: actorId } : {}),
     });
   }
 }

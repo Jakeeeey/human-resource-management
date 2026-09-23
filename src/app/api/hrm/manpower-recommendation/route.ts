@@ -6,6 +6,8 @@ import { ManpowerRecommendationSchema } from "@/modules/human-resource-managemen
 import { ALLOWED_TRANSITIONS, setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
+import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/utils/audit";
+import type { JwtPayload } from "@/lib/auth-utils";
 
 // manpower-recommendation — the recommendation row is a recruitment ARTIFACT
 // (its `status` column is the artifact lifecycle); the applicant PIPELINE truth
@@ -44,7 +46,7 @@ async function dFetch(path: string, options?: RequestInit) {
     return res.json();
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
+function decodeJwtPayload(token: string): JwtPayload | null {
     try {
         if (!token) return null;
         const parts = token.split(".");
@@ -121,6 +123,7 @@ export async function POST(req: NextRequest) {
         if (!userId) {
             return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
         }
+        const actorId = actorIdFromJwt(payload);
 
         const body = await req.json();
 
@@ -142,7 +145,7 @@ export async function POST(req: NextRequest) {
         // a retry re-runs as an idempotent same-status no-op.
         if (validated.status === "Recommended") {
             try {
-                await setApplicantStatus({ applicantId: validated.applicant_id, status: "recommended" });
+                await setApplicantStatus({ applicantId: validated.applicant_id, status: "recommended", ...(actorId != null ? { actorId } : {}) });
             } catch (statusError) {
                 console.error("[manpower-recommendation] applicant status advance failed:", statusError);
                 const humanized = humanizeApplicantStatusError(statusError, "recommend");
@@ -151,7 +154,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const created = await manpowerRecommendationService.create(validated);
+        const created = await manpowerRecommendationService.create(validated, actorId);
         try {
             const existingRes = await dFetch(
                 `/items/interview?filter[recommendation_id][_eq]=${created.id}&filter[stage][_eq]=Final&filter[score_sheet_id][_null]=true&limit=1&fields=id`
@@ -168,7 +171,7 @@ export async function POST(req: NextRequest) {
                         application_id: applicationId,
                         manpower_request_id: created.manpower_request_id ?? null,
                         recommendation_id: created.id ?? null,
-                    });
+                    }, actorId);
                 }
             }
         } catch (materializeErr) {

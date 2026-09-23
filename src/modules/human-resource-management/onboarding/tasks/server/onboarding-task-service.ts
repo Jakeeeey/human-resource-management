@@ -215,14 +215,14 @@ export async function updateOnboardingTask(
   const now = phTimeNow();
   const patch: Record<string, unknown> = {
     updated_at: now,
-    updated_by: actorId,
+    ...(actorId != null ? { updated_by: actorId } : {}),
   };
 
   if (input.patch.status !== undefined) {
     patch.status = input.patch.status;
     if (input.patch.status === "done" && current.completed_at === null) {
       patch.completed_at = now;
-      patch.completed_by = actorId;
+      if (actorId != null) patch.completed_by = actorId;
     }
     if (input.patch.status !== "done" && current.completed_at !== null) {
       patch.completed_at = null;
@@ -308,10 +308,10 @@ export async function completeOnboardingTask(
   const now = phTimeNow();
   const task = await patchTaskRow(input.taskId, {
     status: "done",
-    completed_by: input.completedBy,
+    ...(input.completedBy != null ? { completed_by: input.completedBy } : {}),
     completed_at: now,
     updated_at: now,
-    updated_by: input.completedBy,
+    ...(input.completedBy != null ? { updated_by: input.completedBy } : {}),
   });
   return { task, alreadyDone: false };
 }

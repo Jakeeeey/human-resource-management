@@ -244,7 +244,7 @@ export async function softDeleteTopicRow(
   const row = await patchTopicRow(id, {
     is_active: 0,
     updated_at: phTimeNow(),
-    updated_by: actorId,
+    ...(actorId != null ? { updated_by: actorId } : {}),
   });
   await syncDerivedTemplateActive(
     { code: row.code, is_active: false },
@@ -270,7 +270,7 @@ export async function reorderTopics(
       await patchTopicRow(entry.id, {
         sort_order: entry.sort_order,
         updated_at: now,
-        updated_by: actorId,
+        ...(actorId != null ? { updated_by: actorId } : {}),
       })
     );
   }

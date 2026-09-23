@@ -4,12 +4,14 @@ import { manpowerRecommendationService, nowPH } from "@/modules/human-resource-m
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
 import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
+import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/utils/audit";
+import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
+function decodeJwtPayload(token: string): JwtPayload | null {
     try {
         if (!token) return null;
         const parts = token.split(".");
@@ -58,6 +60,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const raw = payload?.id || payload?.user_id || payload?.sub;
         const userId = typeof raw === "string" ? parseInt(raw, 10) : raw;
         if (!userId) return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
+        const actorId = actorIdFromJwt(payload);
 
         const body = await req.json();
 
@@ -87,6 +90,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                     await setApplicantStatus({
                         applicantId: current.applicant_id,
                         status: validated.status === "Rejected" ? "rejected" : "withdrawn",
+                        ...(actorId != null ? { actorId } : {}),
                     });
                 } catch (statusError) {
                     console.error("[manpower-recommendation] applicant status close failed:", statusError);
@@ -111,7 +115,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             }
         }
 
-        const data = await manpowerRecommendationService.update(id, validated);
+        const data = await manpowerRecommendationService.update(id, validated, actorId);
         return NextResponse.json({ data });
     } catch (e: unknown) {
         console.error("Error in PATCH /api/hrm/manpower-recommendation/[id]:", e);

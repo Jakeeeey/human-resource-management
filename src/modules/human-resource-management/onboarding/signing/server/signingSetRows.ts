@@ -18,6 +18,10 @@ import {
   readList,
   type ActivePaperworkTemplate,
 } from "./signingSetIo";
+import {
+  stampCreate,
+  stampUpdate,
+} from "@/modules/human-resource-management/onboarding/utils/audit";
 
 // signingSetRows.ts — typed row access for the four applicant-scoped signing
 // collections (todo 10). Every function names one query/mutation and parses
@@ -25,7 +29,8 @@ import {
 // hook never composes raw Directus rows. `resolveRequiredSigningTemplates`
 // owns the required-template rule: ACTIVE `paperwork_templates`, narrowed by
 // the `paperwork_template_companies` junction when the applicant's company is
-// known.
+// known. Insert builders stamp `created_by` + `updated_by` and patch builders
+// stamp `updated_by` when the caller passes `actorId` (absent/null = no stamp).
 
 /**
  * Active paperwork templates — the registry candidates for the required set.
@@ -121,17 +126,21 @@ export async function insertPaperworks(input: {
   applicantId: number;
   requiredCount: number;
   now: string;
+  actorId?: number | null;
 }): Promise<Paperworks> {
   return insertRow(
     "paperworks",
-    {
-      applicant_id: input.applicantId,
-      status: "pending",
-      required_count: input.requiredCount,
-      signed_count: 0,
-      created_at: input.now,
-      updated_at: input.now,
-    },
+    stampCreate(
+      {
+        applicant_id: input.applicantId,
+        status: "pending",
+        required_count: input.requiredCount,
+        signed_count: 0,
+        created_at: input.now,
+        updated_at: input.now,
+      },
+      input.actorId ?? null
+    ),
     PaperworksSchema
   );
 }
@@ -140,16 +149,20 @@ export async function insertPaperworks(input: {
 export async function insertJobOffer(input: {
   applicantId: number;
   now: string;
+  actorId?: number | null;
 }): Promise<JobOffer> {
   return insertRow(
     "job_offer",
-    {
-      applicant_id: input.applicantId,
-      status: "sent",
-      offered_at: input.now,
-      created_at: input.now,
-      updated_at: input.now,
-    },
+    stampCreate(
+      {
+        applicant_id: input.applicantId,
+        status: "sent",
+        offered_at: input.now,
+        created_at: input.now,
+        updated_at: input.now,
+      },
+      input.actorId ?? null
+    ),
     JobOfferSchema
   );
 }
@@ -160,17 +173,21 @@ export async function insertSigningEnvelope(input: {
   jobOfferId: number;
   paperworksId: number;
   now: string;
+  actorId?: number | null;
 }): Promise<SigningEnvelope> {
   return insertRow(
     "signing_envelope",
-    {
-      applicant_id: input.applicantId,
-      joboffer_id: input.jobOfferId,
-      paperworks_id: input.paperworksId,
-      status: "pending",
-      created_at: input.now,
-      updated_at: input.now,
-    },
+    stampCreate(
+      {
+        applicant_id: input.applicantId,
+        joboffer_id: input.jobOfferId,
+        paperworks_id: input.paperworksId,
+        status: "pending",
+        created_at: input.now,
+        updated_at: input.now,
+      },
+      input.actorId ?? null
+    ),
     SigningEnvelopeSchema
   );
 }
@@ -185,16 +202,22 @@ export async function insertPaperworkItemsBatch(input: {
   paperworksId: number;
   templateIds: readonly number[];
   now: string;
+  actorId?: number | null;
 }): Promise<PaperworkItem[]> {
   return insertRows(
     "paperwork_item",
-    input.templateIds.map((templateId) => ({
-      paperworks_id: input.paperworksId,
-      template_id: templateId,
-      status: "pending",
-      created_at: input.now,
-      updated_at: input.now,
-    })),
+    input.templateIds.map((templateId) =>
+      stampCreate(
+        {
+          paperworks_id: input.paperworksId,
+          template_id: templateId,
+          status: "pending",
+          created_at: input.now,
+          updated_at: input.now,
+        },
+        input.actorId ?? null
+      )
+    ),
     PaperworkItemSchema
   );
 }
@@ -204,11 +227,15 @@ export async function patchPaperworksEnvelopeLink(input: {
   paperworksId: number;
   envelopeId: number;
   now: string;
+  actorId?: number | null;
 }): Promise<Paperworks> {
   return patchRow(
     "paperworks",
     input.paperworksId,
-    { signing_envelope_id: input.envelopeId, updated_at: input.now },
+    stampUpdate(
+      { signing_envelope_id: input.envelopeId, updated_at: input.now },
+      input.actorId ?? null
+    ),
     PaperworksSchema
   );
 }
@@ -218,11 +245,15 @@ export async function patchJobOfferEnvelopeLink(input: {
   jobOfferId: number;
   envelopeId: number;
   now: string;
+  actorId?: number | null;
 }): Promise<JobOffer> {
   return patchRow(
     "job_offer",
     input.jobOfferId,
-    { signing_envelope_id: input.envelopeId, updated_at: input.now },
+    stampUpdate(
+      { signing_envelope_id: input.envelopeId, updated_at: input.now },
+      input.actorId ?? null
+    ),
     JobOfferSchema
   );
 }
@@ -233,15 +264,19 @@ export async function patchSigningEnvelopeLinks(input: {
   jobOfferId: number;
   paperworksId: number;
   now: string;
+  actorId?: number | null;
 }): Promise<SigningEnvelope> {
   return patchRow(
     "signing_envelope",
     input.envelopeId,
-    {
-      joboffer_id: input.jobOfferId,
-      paperworks_id: input.paperworksId,
-      updated_at: input.now,
-    },
+    stampUpdate(
+      {
+        joboffer_id: input.jobOfferId,
+        paperworks_id: input.paperworksId,
+        updated_at: input.now,
+      },
+      input.actorId ?? null
+    ),
     SigningEnvelopeSchema
   );
 }
@@ -251,11 +286,15 @@ export async function patchPaperworksRequiredCount(input: {
   paperworksId: number;
   requiredCount: number;
   now: string;
+  actorId?: number | null;
 }): Promise<Paperworks> {
   return patchRow(
     "paperworks",
     input.paperworksId,
-    { required_count: input.requiredCount, updated_at: input.now },
+    stampUpdate(
+      { required_count: input.requiredCount, updated_at: input.now },
+      input.actorId ?? null
+    ),
     PaperworksSchema
   );
 }

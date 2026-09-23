@@ -15,6 +15,7 @@ import {
   signPaperworkItem,
 } from "@/modules/human-resource-management/onboarding/signing/server/signing-rollup-service";
 import { PaperworkItemSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
+import { actorIdFromJwt } from "@/modules/human-resource-management/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,7 +87,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!readSigningSession(req)) return unauthorized();
+    const session = readSigningSession(req);
+    if (!session) return unauthorized();
+    const actorId = actorIdFromJwt(session);
 
     const { id } = await params;
     const itemId = Number(id);
@@ -108,7 +111,7 @@ export async function PATCH(
         itemId,
         strokes: validation.data.strokes,
         pdfFile: validation.data.pdf_file,
-      });
+      }, actorId);
       return NextResponse.json({ success: true, data: result });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

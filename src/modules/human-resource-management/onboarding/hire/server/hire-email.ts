@@ -70,3 +70,17 @@ export function buildLoginEmail(
   const base = localPart.slice(0, maxBase);
   return `${base}${suffixText}@${domain}`;
 }
+
+const SYNTHETIC_HIRE_IDENTITY_PATTERN = /^applicant-\d+@no-email\.invalid$/;
+
+/**
+ * Reports whether a hire identity is the synthetic applicant-scoped fallback
+ * (see `placeholderApplicantEmail`) rather than a real personal address.
+ * Synthetic identities are stable dedup keys only: they must never be mailed
+ * to and must never be persisted into `user.personal_email`.
+ * @param identity - Normalized hire identity string.
+ * @returns True for the synthetic fallback shape, false for real addresses.
+ */
+export function isSyntheticHireIdentity(identity: string): boolean {
+  return SYNTHETIC_HIRE_IDENTITY_PATTERN.test(identity.trim().toLowerCase());
+}
