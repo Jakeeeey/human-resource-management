@@ -207,7 +207,7 @@ export async function softDeleteEquipmentItemRow(
   return patchEquipmentItemRow(id, {
     is_active: 0,
     updated_at: phTimeNow(),
-    updated_by: actorId,
+    ...(actorId != null ? { updated_by: actorId } : {}),
   });
 }
 
@@ -228,7 +228,7 @@ export async function reorderEquipmentItems(
       await patchEquipmentItemRow(entry.id, {
         sort_order: entry.sort_order,
         updated_at: now,
-        updated_by: actorId,
+        ...(actorId != null ? { updated_by: actorId } : {}),
       })
     );
   }

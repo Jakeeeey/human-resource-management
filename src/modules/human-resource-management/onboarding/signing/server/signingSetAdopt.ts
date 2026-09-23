@@ -33,10 +33,15 @@ import type { SigningSetResult } from "./signing-set-service";
  */
 export async function advanceFinalApprovedToForSigning(
   applicantId: number,
-  status: ApplicantStatus
+  status: ApplicantStatus,
+  actorId?: number | null
 ): Promise<void> {
   if (status === "final_approved") {
-    await setApplicantStatus({ applicantId, status: "for_signing" });
+    await setApplicantStatus({
+      applicantId,
+      status: "for_signing",
+      ...(actorId != null ? { actorId } : {}),
+    });
   }
 }
 
@@ -73,8 +78,9 @@ export async function repairExistingSet(input: {
   envelope: SigningEnvelope;
   companyId: number | null;
   status: ApplicantStatus;
+  actorId?: number | null;
 }): Promise<SigningSetResult> {
-  const { applicantId, companyId, status } = input;
+  const { applicantId, companyId, status, actorId } = input;
   const now = getPhilippineTime();
   let { envelope } = input;
   let paperworks = await findPaperworksByApplicant(applicantId);
@@ -86,16 +92,22 @@ export async function repairExistingSet(input: {
       applicantId,
       requiredCount: required.length,
       now,
+      ...(actorId != null ? { actorId } : {}),
     });
   }
   if (!jobOffer) {
-    jobOffer = await insertJobOffer({ applicantId, now });
+    jobOffer = await insertJobOffer({
+      applicantId,
+      now,
+      ...(actorId != null ? { actorId } : {}),
+    });
   }
   if (paperworks.signing_envelope_id !== envelope.id) {
     paperworks = await patchPaperworksEnvelopeLink({
       paperworksId: paperworks.id,
       envelopeId: envelope.id,
       now,
+      ...(actorId != null ? { actorId } : {}),
     });
   }
   if (jobOffer.signing_envelope_id !== envelope.id) {
@@ -103,6 +115,7 @@ export async function repairExistingSet(input: {
       jobOfferId: jobOffer.id,
       envelopeId: envelope.id,
       now,
+      ...(actorId != null ? { actorId } : {}),
     });
   }
   if (
@@ -114,6 +127,7 @@ export async function repairExistingSet(input: {
       jobOfferId: jobOffer.id,
       paperworksId: paperworks.id,
       now,
+      ...(actorId != null ? { actorId } : {}),
     });
   }
 
@@ -125,18 +139,20 @@ export async function repairExistingSet(input: {
         paperworksId: paperworks.id,
         templateIds: required.map((template) => template.id),
         now,
+        ...(actorId != null ? { actorId } : {}),
       });
       if (paperworks.required_count !== required.length) {
         paperworks = await patchPaperworksRequiredCount({
           paperworksId: paperworks.id,
           requiredCount: required.length,
           now,
+          ...(actorId != null ? { actorId } : {}),
         });
       }
     }
   }
 
-  await advanceFinalApprovedToForSigning(applicantId, status);
+  await advanceFinalApprovedToForSigning(applicantId, status, actorId);
   return {
     applicantId,
     created: false,

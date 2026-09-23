@@ -79,6 +79,8 @@ export async function POST(req: NextRequest) {
                 full_name: fullName,
                 position_applied_for: position,
                 created_by: createdBy,
+                created_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" }),
+                updated_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" }),
             }),
         });
         const applicantErr = firstError(createdApplicant);
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
         // The row starts at the DB default `draft`; the SINGLE status writer advances
         // it to `submitted` (creation IS the submission moment).
         try {
-            await setApplicantStatus({ applicantId, status: "submitted" });
+            await setApplicantStatus({ applicantId, status: "submitted", ...(createdBy != null ? { actorId: createdBy } : {}) });
         } catch (err: unknown) {
             console.error(
                 "[application-form] failed to set applicant status:",
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Failed to submit application." }, { status: 502 });
         }
 
-        const nowIso = new Date().toISOString();
+        const nowIso = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
         const createdApplication = await dFetch(`/items/application`, {
             method: "POST",
             body: JSON.stringify({
@@ -148,6 +150,8 @@ export async function POST(req: NextRequest) {
 
                 source: "hrm-assisted",
                 submitted_at: nowIso,
+                created_at: nowIso,
+                updated_at: nowIso,
                 created_by: createdBy,
             }),
         });

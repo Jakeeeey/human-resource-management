@@ -40,6 +40,8 @@ export interface FireHiredIfCompleteInput {
   offerStatus: JobOffer["status"];
   requiredCount: number;
   signedCount: number;
+  /** Optional acting user id, stamped as `updated_by` on the `hired` PATCH. */
+  actorId?: number | null;
 }
 
 export interface FireHiredIfCompleteResult {
@@ -112,6 +114,7 @@ export async function fireHiredIfComplete(
   const applicant = await setApplicantStatus({
     applicantId: input.applicantId,
     status: "hired",
+    ...(input.actorId != null ? { actorId: input.actorId } : {}),
   });
   if (applicant.status !== "hired") {
     return {
@@ -123,6 +126,7 @@ export async function fireHiredIfComplete(
   try {
     const outcome = await runHireOrchestrator({
       applicantId: input.applicantId,
+      ...(input.actorId != null ? { actorId: input.actorId } : {}),
     });
     return {
       applicantStatus: applicant.status,

@@ -64,6 +64,8 @@ export const HireOrchestrationInputSchema = z
      * cookie; direct server-side invocations may pass a token explicitly.
      */
     authToken: z.string().min(1).optional(),
+    /** Optional acting user id, threaded into post-hire step contexts. */
+    actorId: z.number().int().positive().nullable().optional(),
   })
   .strict();
 
@@ -99,6 +101,8 @@ export interface HireCompletionContext {
   userCreated: boolean;
   /** Hire identity: the real personal email, or the synthetic fallback. */
   email: string;
+  /** Acting user id for audit stamps on rows steps create/patch (null = stamp nothing). */
+  actorId: number | null;
 }
 
 /** Outcome a post-hire step reports. `ok:false` fails the whole run. */

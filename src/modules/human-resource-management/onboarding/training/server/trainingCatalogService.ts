@@ -365,7 +365,7 @@ export async function updateTrainingTemplate(input: {
   const patch: Record<string, unknown> = {
     ...rest,
     updated_at: phTimeNow(),
-    updated_by: actorId,
+    ...(actorId != null ? { updated_by: actorId } : {}),
   };
   if (departmentIds !== undefined) {
     patch.department_id = [...new Set(departmentIds)][0] ?? null;
@@ -501,7 +501,7 @@ export async function updateTrainingItem(input: {
   const updated = await patchTrainingItemRow(input.id, {
     ...parsed.data,
     updated_at: phTimeNow(),
-    updated_by: actorId,
+    ...(actorId != null ? { updated_by: actorId } : {}),
   });
   const verified = await readItemById(updated.id);
   if (!verified) {
@@ -594,7 +594,7 @@ export async function syncTrainingDerivedTemplates(
     await patchTemplateRow(existing.id, {
       is_active: row.isActive,
       updated_at: now,
-      updated_by: actorId,
+      ...(actorId != null ? { updated_by: actorId } : {}),
     });
     updated += 1;
   }

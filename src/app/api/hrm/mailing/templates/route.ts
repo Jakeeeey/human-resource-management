@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/utils/audit";
 import { mailTemplateSchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-template.schema";
 import { assertMailableHtml } from "@/modules/human-resource-management/recruitment/mailing/utils/mailScrub";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
@@ -93,7 +96,10 @@ export async function POST(req: NextRequest) {
         }
 
         const now = getPhilippineTime();
-        const payload = {
+        const token = (await cookies()).get(COOKIE_NAME)?.value;
+        const payload = token ? decodeJwtPayload(token) : null;
+        const actorId = actorIdFromJwt(payload);
+        const mailPayload = {
             template_key: parsed.data.template_key,
             template_name: parsed.data.template_name,
             subject: parsed.data.subject,
@@ -102,13 +108,12 @@ export async function POST(req: NextRequest) {
             is_active: parsed.data.is_active,
             created_at: now,
             updated_at: now,
-            updated_by:
-                typeof parsed.data.updated_by === "string" ? parsed.data.updated_by : "",
+            ...(actorId != null ? { updated_by: actorId, created_by: actorId } : {}),
         };
 
         const created = (await dFetch(`/items/${COLLECTION}`, {
             method: "POST",
-            body: JSON.stringify(payload),
+            body: JSON.stringify(mailPayload),
         })) as { data?: unknown; errors?: { message?: string }[] };
         if (!created?.data) {
             const message = created?.errors?.[0]?.message ?? "Failed to create mail template";
@@ -167,11 +172,15 @@ export async function PATCH(req: NextRequest) {
             }
         }
 
+        const token = (await cookies()).get(COOKIE_NAME)?.value;
+        const jwt = token ? decodeJwtPayload(token) : null;
+        const actorId = actorIdFromJwt(jwt);
+        const { updated_by: _clientAudit, ...clientFields } = parsed.data;
+        void _clientAudit;
         const payload = {
-            ...parsed.data,
+            ...clientFields,
             updated_at: getPhilippineTime(),
-            updated_by:
-                typeof parsed.data.updated_by === "string" ? parsed.data.updated_by : "",
+            ...(actorId != null ? { updated_by: actorId } : {}),
         };
 
         const updated = (await dFetch(`/items/${COLLECTION}/${id}`, {

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { mailBindingSchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-binding.schema";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
+import {
+    actorIdFromJwt,
+    nowPH,
+    stampUpdate,
+} from "@/modules/human-resource-management/recruitment/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -93,9 +100,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             return validationFailed(validation.error.flatten().fieldErrors);
         }
 
+        const token = (await cookies()).get(COOKIE_NAME)?.value;
+        const actorId = actorIdFromJwt(token ? decodeJwtPayload(token) : null);
         const res = (await dFetch(`${COLLECTION}/${encodeURIComponent(id)}`, {
             method: "PATCH",
-            body: JSON.stringify(validation.data),
+            body: JSON.stringify(
+                stampUpdate({ ...validation.data, updated_at: nowPH() }, actorId)
+            ),
         })) as { data?: unknown };
         if (!res?.data) {
             return NextResponse.json(

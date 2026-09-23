@@ -116,13 +116,16 @@ export interface SignPaperworkItemResult {
  * still recomputes (heals a rollup write that failed after the item write); a
  * retry with DIFFERENT evidence is refused.
  * @param rawInput - `{ itemId, strokes, pdfFile }` (strict).
+ * @param actorId - Optional acting user id, forwarded to the rollup recompute
+ * so the `hired` PATCH carries the human stamp (absent/null = no stamp).
  * @returns The signed item, the post-recompute rows, and the applicant
  * status this signature produced (`"hired"` when it completed the set).
  * @throws Error with `SIGNING_ROLLUP_ERROR_CODES` on invalid input, an absent
  * item, an attempted overwrite, a missing envelope, or a Directus failure.
  */
 export async function signPaperworkItem(
-  rawInput: unknown
+  rawInput: unknown,
+  actorId?: number | null
 ): Promise<SignPaperworkItemResult> {
   const validation = SignPaperworkItemInputSchema.safeParse(rawInput);
   if (!validation.success) {
@@ -174,7 +177,7 @@ export async function signPaperworkItem(
 
   const rollup = await recomputeSigningRollups({
     envelopeId: envelope.id,
-  });
+  }, actorId);
   return {
     item,
     envelope: rollup.envelope,
@@ -196,6 +199,8 @@ export async function signPaperworkItem(
  * `canSigningSetFireHired`, the applicant advances to `hired` via the single
  * status writer (partial/empty sets never fire).
  * @param rawInput - `{ envelopeId }` (strict).
+ * @param actorId - Optional acting user id, stamped as `updated_by` on the
+ * `hired` PATCH when the completion fires (absent/null = no stamp).
  * @returns The post-recompute envelope, batch, offer, items, counts, and the
  * `hired` status this call fired/observed (`null` while incomplete).
  * @throws Error with `SIGNING_ROLLUP_ERROR_CODES` when the envelope is absent
@@ -203,7 +208,8 @@ export async function signPaperworkItem(
  * status service error codes surface unchanged when `hired` is disallowed.
  */
 export async function recomputeSigningRollups(
-  rawInput: unknown
+  rawInput: unknown,
+  actorId?: number | null
 ): Promise<SigningRollupResult> {
   const validation = RecomputeSigningRollupsInputSchema.safeParse(rawInput);
   if (!validation.success) {
@@ -278,6 +284,7 @@ export async function recomputeSigningRollups(
     offerStatus: jobOffer.status,
     requiredCount: paperworks.required_count,
     signedCount,
+    ...(actorId != null ? { actorId } : {}),
   });
 
   return {

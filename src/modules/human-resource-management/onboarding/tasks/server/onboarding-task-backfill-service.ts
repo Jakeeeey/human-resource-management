@@ -122,7 +122,7 @@ export async function deactivateLegacyTrainingTemplates(input: {
       const updated = await patchTemplateRow(template.id, {
         is_active: false,
         updated_at: now,
-        updated_by: actorId,
+        ...(actorId != null ? { updated_by: actorId } : {}),
       });
       if (updated.is_active !== false) {
         failed.push({
