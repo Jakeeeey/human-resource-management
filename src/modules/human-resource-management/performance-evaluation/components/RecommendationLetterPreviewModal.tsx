@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
@@ -46,55 +48,49 @@ export function RecommendationLetterPreviewModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="flex h-[96vh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden rounded-2xl border-none p-0 shadow-2xl sm:max-w-none">
-                <DialogHeader className="flex-none border-b bg-gradient-to-r from-primary to-primary/80 px-6 py-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <DialogTitle className="text-lg font-bold tracking-tight text-white">
-                                Recommendation Letter — Print Preview
-                            </DialogTitle>
-                            <p className="mt-0.5 truncate text-xs text-primary-foreground/70" title={fileName}>
-                                {fileName}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2 pr-8">
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={handlePrint}
-                                disabled={!pdfUrl}
-                                className="h-8 gap-1.5 rounded-lg text-xs"
-                            >
-                                <Printer className="h-3.5 w-3.5" />
-                                Print
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={handleDownload}
-                                disabled={!pdfUrl}
-                                className="h-8 gap-1.5 rounded-lg bg-white text-xs text-primary hover:bg-white/90"
-                            >
-                                <Download className="h-3.5 w-3.5" />
-                                Download PDF
-                            </Button>
-                        </div>
-                    </div>
+            <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-3xl">
+                <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-6">
+                    <DialogTitle className="text-base">Recommendation letter</DialogTitle>
+                    <DialogDescription className="truncate text-xs" title={fileName}>
+                        {fileName}
+                    </DialogDescription>
                 </DialogHeader>
-                <div className="relative flex-1 overflow-hidden bg-muted/30">
+                <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-3 sm:p-6">
                     {pdfUrl ? (
-                        <iframe
-                            src={pdfUrl}
-                            className="h-full w-full border-0"
-                            title="Recommendation letter PDF preview"
-                        />
+                        <div className="mx-auto max-w-2xl overflow-hidden rounded-[var(--radius)] border bg-card shadow-md">
+                            <iframe
+                                src={pdfUrl}
+                                className="h-[60vh] w-full border-0 sm:h-[65vh]"
+                                title="Recommendation letter preview"
+                            />
+                        </div>
                     ) : (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <p className="text-sm text-muted-foreground">
+                        <div className="mx-auto flex max-w-2xl items-center justify-center rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">
+                            <p className="text-center text-sm text-muted-foreground">
                                 Preview unavailable. Try issuing the letter again.
                             </p>
                         </div>
                     )}
                 </div>
+                <DialogFooter className="shrink-0 flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:justify-end">
+                    <Button
+                        variant="outline"
+                        onClick={handlePrint}
+                        disabled={!pdfUrl}
+                        className="w-full sm:w-auto"
+                    >
+                        <Printer className="h-4 w-4" aria-hidden="true" />
+                        Print
+                    </Button>
+                    <Button
+                        onClick={handleDownload}
+                        disabled={!pdfUrl}
+                        className="w-full sm:w-auto"
+                    >
+                        <Download className="h-4 w-4" aria-hidden="true" />
+                        Download PDF
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

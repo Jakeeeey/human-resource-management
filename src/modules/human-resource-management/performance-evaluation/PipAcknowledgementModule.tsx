@@ -12,22 +12,29 @@ import { PipAcknowledgeView } from "./components/PipAcknowledgeView";
 export function PipAcknowledgementModule(): JSX.Element {
   const { pips, loading, error, refresh } = useMyPips();
   const [selectedPipId, setSelectedPipId] = useState<number | null>(null);
+  const pendingCount = pips.filter((pip) => pip.employee_acknowledged_at === null).length;
 
   return (
-    <div className="flex-1 space-y-6 overflow-auto p-6 pt-8">
-      <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between md:gap-0">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl border bg-primary/10 text-primary shadow-sm">
-            <ClipboardList className="h-6 w-6" aria-hidden="true" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-3xl font-black leading-tight tracking-tighter text-foreground">
-              My Performance Improvement Plans
-            </h2>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">
-              Review and acknowledge your Performance Improvement Plans.
-            </p>
-          </div>
+    <div className="flex-1 space-y-6 overflow-auto bg-background p-4 md:p-6">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] border bg-card text-primary shadow-sm">
+          <ClipboardList className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="truncate text-xl font-semibold tracking-tight md:text-2xl">
+            My Performance Improvement Plans
+          </h2>
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {loading
+              ? "Loading your plans…"
+              : error
+                ? "Could not load your plans."
+                : pips.length === 0
+                  ? "Nothing assigned to you right now."
+                  : pendingCount > 0
+                    ? `${pendingCount} of ${pips.length} awaiting acknowledgement`
+                    : `All ${pips.length} acknowledged.`}
+          </p>
         </div>
       </div>
 

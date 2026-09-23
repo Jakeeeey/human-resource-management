@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { JSX } from "react";
 import { toast } from "sonner";
-import { Award, FileCheck, Stamp } from "lucide-react";
+import { Award, CheckCircle2, FileCheck, Stamp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -38,6 +39,28 @@ interface CompanyLogo {
 function errorMessage(err: unknown, fallback: string): string {
     if (err instanceof EvaluationClientError) return err.message;
     return fallback;
+}
+
+function StepMarker({ state, step }: { state: "done" | "active" | "upcoming"; step: number }): JSX.Element {
+    if (state === "done") {
+        return (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+            </span>
+        );
+    }
+    if (state === "active") {
+        return (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground tabular-nums">
+                {step}
+            </span>
+        );
+    }
+    return (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
+            {step}
+        </span>
+    );
 }
 
 export function RecommendationSection({
@@ -92,6 +115,13 @@ export function RecommendationSection({
     const readyToRecommend = nextAction?.key === "recommendation";
     const canIssue = isHr && readyToRecommend && !recommendationIssued && !issuing;
     const canRegularize = isHr && recommendationIssued && !alreadyRegular && !regularizing;
+
+    const issueStepState = recommendationIssued ? "done" : readyToRecommend ? "active" : "upcoming";
+    const regularizeStepState = alreadyRegular
+        ? "done"
+        : recommendationIssued
+            ? "active"
+            : "upcoming";
 
     const employee = bundle.employee;
     const employeeName = employee.full_name.trim() ? employee.full_name : `Employee #${userId}`;
@@ -159,43 +189,59 @@ export function RecommendationSection({
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
+                            <StepMarker state={issueStepState} step={1} />
                             <FileCheck className="h-4 w-4 text-primary" aria-hidden="true" />
-                            Recommendation letter
+                            Issue recommendation letter
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                            {recommendationIssued ? (
-                                <StatusBadge tone="success">Issued</StatusBadge>
-                            ) : (
-                                <StatusBadge tone="neutral">Not issued</StatusBadge>
-                            )}
-                            {bundle.tracking?.recommendation_issued_at ? (
-                                <span className="text-sm text-muted-foreground">
-                                    {bundle.tracking.recommendation_issued_at}
-                                </span>
-                            ) : null}
-                        </div>
-                        {isHr ? (
-                            <div className="space-y-2">
-                                <Button
-                                    onClick={() => void handleIssue()}
-                                    disabled={!canIssue}
-                                    className="w-full sm:w-auto"
-                                >
-                                    <Award className="mr-2 h-4 w-4" aria-hidden="true" />
-                                    {issuing ? "Saving…" : "Issue recommendation letter"}
-                                </Button>
-                                {!recommendationIssued && !readyToRecommend ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Current stage: {workflowStageLabel(stage)}
-                                        {nextAction ? ` — ${nextAction.label} first.` : "."}
-                                    </p>
-                                ) : null}
+                        {recommendationIssued ? (
+                            <div className="space-y-1 rounded-[var(--radius)] border bg-muted/40 px-4 py-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <StatusBadge tone="success">
+                                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Issued
+                                    </StatusBadge>
+                                    {bundle.tracking?.recommendation_issued_at ? (
+                                        <span className="text-sm font-medium tabular-nums">
+                                            {bundle.tracking.recommendation_issued_at}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Step 1 of 2 complete. The letter can move to final approval.
+                                </p>
                             </div>
                         ) : (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <StatusBadge tone="neutral">Not issued</StatusBadge>
+                                <span className="text-xs text-muted-foreground">Step 1 of 2</span>
+                            </div>
+                        )}
+                        {isHr ? (
+                            recommendationIssued ? null : (
+                                <div className="space-y-2">
+                                    <Button
+                                        onClick={() => void handleIssue()}
+                                        disabled={!canIssue}
+                                        aria-describedby="issue-gating"
+                                        className="w-full sm:w-auto"
+                                    >
+                                        <Award className="mr-2 h-4 w-4" aria-hidden="true" />
+                                        {issuing ? "Saving…" : "Issue recommendation letter"}
+                                    </Button>
+                                    {!readyToRecommend ? (
+                                        <p id="issue-gating" className="text-sm text-muted-foreground">
+                                            Current stage: {workflowStageLabel(stage)}
+                                            {nextAction ? ` — ${nextAction.label} first.` : " — finish the current stage first."}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            )
+                        ) : (
                             <p className="text-sm text-muted-foreground">
-                                Recommendation letters are issued by HR.
+                                Only HR can issue the recommendation letter. Current stage:{" "}
+                                {workflowStageLabel(stage)}.
                             </p>
                         )}
                     </CardContent>
@@ -204,43 +250,59 @@ export function RecommendationSection({
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
+                            <StepMarker state={regularizeStepState} step={2} />
                             <Stamp className="h-4 w-4 text-primary" aria-hidden="true" />
-                            Regularization
+                            Regularize
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                            {alreadyRegular ? (
-                                <StatusBadge tone="success">Regular</StatusBadge>
-                            ) : (
-                                <StatusBadge tone="neutral">Probationary</StatusBadge>
-                            )}
-                            {bundle.tracking?.regularized_at ? (
-                                <span className="text-sm text-muted-foreground">
-                                    {bundle.tracking.regularized_at}
-                                </span>
-                            ) : null}
-                        </div>
-                        {isHr ? (
-                            <div className="space-y-2">
-                                <Button
-                                    onClick={() => void handleRegularize()}
-                                    disabled={!canRegularize}
-                                    variant="outline"
-                                    className="w-full sm:w-auto"
-                                >
-                                    {regularizing ? "Saving…" : "Regularize"}
-                                </Button>
-                                {!alreadyRegular && !recommendationIssued ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Current stage: {workflowStageLabel(stage)} — issue the
-                                        recommendation letter first.
-                                    </p>
-                                ) : null}
+                        {alreadyRegular ? (
+                            <div className="space-y-1 rounded-[var(--radius)] border bg-muted/40 px-4 py-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <StatusBadge tone="success">
+                                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Regular
+                                    </StatusBadge>
+                                    {bundle.tracking?.regularized_at ? (
+                                        <span className="text-sm font-medium tabular-nums">
+                                            {bundle.tracking.regularized_at}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Step 2 of 2 complete. This employee is regular.
+                                </p>
                             </div>
                         ) : (
+                            <div className="flex flex-wrap items-center gap-2">
+                                <StatusBadge tone="info">For regularization</StatusBadge>
+                                <span className="text-xs text-muted-foreground">Step 2 of 2 · final approval</span>
+                            </div>
+                        )}
+                        {isHr ? (
+                            alreadyRegular ? null : (
+                                <div className="space-y-2">
+                                    <Button
+                                        onClick={() => void handleRegularize()}
+                                        disabled={!canRegularize}
+                                        aria-describedby="regularize-gating"
+                                        variant="outline"
+                                        className="w-full sm:w-auto"
+                                    >
+                                        {regularizing ? "Saving…" : "Regularize"}
+                                    </Button>
+                                    {!recommendationIssued ? (
+                                        <p id="regularize-gating" className="text-sm text-muted-foreground">
+                                            Current stage: {workflowStageLabel(stage)} — issue the
+                                            recommendation letter first.
+                                        </p>
+                                    ) : null}
+                                </div>
+                            )
+                        ) : (
                             <p className="text-sm text-muted-foreground">
-                                Final approval is recorded by HR.
+                                Final approval is recorded by HR. Current stage:{" "}
+                                {workflowStageLabel(stage)}.
                             </p>
                         )}
                     </CardContent>

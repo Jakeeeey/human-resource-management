@@ -8,7 +8,6 @@ import type {
   EmployeePipArea,
   EvaluationCriterion,
   EvaluationTracking,
-  PipCriterion,
   RosterRow,
   WorkspaceBundle,
 } from "../types/performance-evaluation.schema";
@@ -20,19 +19,16 @@ import {
   EmployeePipSchema,
   EvaluationCriterionSchema,
   EvaluationTrackingSchema,
-  PipCriterionSchema,
   RosterRowSchema,
   WorkspaceBundleSchema,
 } from "../types/performance-evaluation.schema";
 import type {
   CreateEvaluationInput,
   CreateKpiCriterionInput,
-  CreatePipAreaInput,
   CreatePipInput,
   ReorderInput,
   UpdateEvaluationInput,
   UpdateKpiCriterionInput,
-  UpdatePipAreaInput,
   UpdatePipInput,
 } from "../types/performance-evaluation-api.schema";
 
@@ -140,59 +136,55 @@ export async function getWorkspace(scope: EvaluationScope, userId: number): Prom
   return requestParsed(`${base}?user_id=${userId}`, WorkspaceBundleSchema);
 }
 
-export async function listKpiCriteria(includeInactive?: boolean): Promise<EvaluationCriterion[]> {
-  const path = includeInactive ? `${HR_BASE}/kpi-criteria?include_inactive=1` : `${HR_BASE}/kpi-criteria`;
-  return requestParsed(path, z.array(EvaluationCriterionSchema));
+function kpiCriteriaQuery(includeInactive?: boolean, departmentId?: number): string {
+  const params = new URLSearchParams();
+  if (includeInactive) params.set("include_inactive", "1");
+  if (departmentId !== undefined) params.set("department_id", String(departmentId));
+  const query = params.toString();
+  return query === "" ? `${HR_BASE}/kpi-criteria` : `${HR_BASE}/kpi-criteria?${query}`;
 }
 
-export async function createKpiCriterion(input: CreateKpiCriterionInput): Promise<EvaluationCriterion> {
-  return requestParsed(`${HR_BASE}/kpi-criteria`, EvaluationCriterionSchema, jsonInit("POST", input));
+function kpiCriterionScopedPath(id: number, departmentId?: number): string {
+  const base = `${HR_BASE}/kpi-criteria/${id}`;
+  return departmentId === undefined ? base : `${base}?department_id=${departmentId}`;
+}
+
+export async function listKpiCriteria(
+  includeInactive?: boolean,
+  departmentId?: number,
+): Promise<EvaluationCriterion[]> {
+  return requestParsed(kpiCriteriaQuery(includeInactive, departmentId), z.array(EvaluationCriterionSchema));
+}
+
+export async function createKpiCriterion(
+  input: CreateKpiCriterionInput,
+  departmentId?: number,
+): Promise<EvaluationCriterion> {
+  return requestParsed(kpiCriteriaQuery(false, departmentId), EvaluationCriterionSchema, jsonInit("POST", input));
 }
 
 export async function updateKpiCriterion(
   id: number,
   input: UpdateKpiCriterionInput,
+  departmentId?: number,
 ): Promise<EvaluationCriterion> {
   return requestParsed(
-    `${HR_BASE}/kpi-criteria/${id}`,
+    kpiCriterionScopedPath(id, departmentId),
     EvaluationCriterionSchema,
     jsonInit("PATCH", input),
   );
 }
 
-export async function deleteKpiCriterion(id: number): Promise<void> {
-  await request<unknown>(`${HR_BASE}/kpi-criteria/${id}`, { method: "DELETE" });
+export async function deleteKpiCriterion(id: number, departmentId?: number): Promise<void> {
+  await request<unknown>(kpiCriterionScopedPath(id, departmentId), { method: "DELETE" });
 }
 
-export async function reorderKpiCriteria(input: ReorderInput): Promise<EvaluationCriterion[]> {
+export async function reorderKpiCriteria(input: ReorderInput, departmentId?: number): Promise<EvaluationCriterion[]> {
+  const base = `${HR_BASE}/kpi-criteria/reorder`;
+  const path = departmentId === undefined ? base : `${base}?department_id=${departmentId}`;
   return requestParsed(
-    `${HR_BASE}/kpi-criteria/reorder`,
+    path,
     z.array(EvaluationCriterionSchema),
-    jsonInit("POST", input),
-  );
-}
-
-export async function listPipAreas(includeInactive?: boolean): Promise<PipCriterion[]> {
-  const path = includeInactive ? `${HR_BASE}/pip-areas?include_inactive=1` : `${HR_BASE}/pip-areas`;
-  return requestParsed(path, z.array(PipCriterionSchema));
-}
-
-export async function createPipArea(input: CreatePipAreaInput): Promise<PipCriterion> {
-  return requestParsed(`${HR_BASE}/pip-areas`, PipCriterionSchema, jsonInit("POST", input));
-}
-
-export async function updatePipArea(id: number, input: UpdatePipAreaInput): Promise<PipCriterion> {
-  return requestParsed(`${HR_BASE}/pip-areas/${id}`, PipCriterionSchema, jsonInit("PATCH", input));
-}
-
-export async function deletePipArea(id: number): Promise<void> {
-  await request<unknown>(`${HR_BASE}/pip-areas/${id}`, { method: "DELETE" });
-}
-
-export async function reorderPipAreas(input: ReorderInput): Promise<PipCriterion[]> {
-  return requestParsed(
-    `${HR_BASE}/pip-areas/reorder`,
-    z.array(PipCriterionSchema),
     jsonInit("POST", input),
   );
 }
@@ -267,7 +259,6 @@ export async function acknowledgePip(pipId: number): Promise<EmployeePip> {
 export type {
   CreateEvaluationInput,
   CreateKpiCriterionInput,
-  CreatePipAreaInput,
   CreatePipInput,
   EmployeeEvaluation,
   EmployeeEvaluationItem,
@@ -276,12 +267,10 @@ export type {
   EmployeePipArea,
   EvaluationCriterion,
   EvaluationTracking,
-  PipCriterion,
   ReorderInput,
   RosterRow,
   UpdateEvaluationInput,
   UpdateKpiCriterionInput,
-  UpdatePipAreaInput,
   UpdatePipInput,
   WorkspaceBundle,
 };

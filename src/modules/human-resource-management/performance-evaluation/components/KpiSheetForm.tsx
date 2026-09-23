@@ -4,20 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { JSX } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 import {
   EvaluationClientError,
@@ -52,6 +46,8 @@ type KpiRow = {
 
 type EvalResult = "passed" | "failed";
 
+const RATING_OPTIONS = [1, 2, 3, 4, 5] as const;
+
 function todayIso(): string {
   const now = new Date();
   const month = `${now.getMonth() + 1}`.padStart(2, "0");
@@ -61,6 +57,67 @@ function todayIso(): string {
 
 function formatScore(value: number): string {
   return `${Math.round(value * 100) / 100}`;
+}
+
+function bandTone(band: string | null): "success" | "info" | "warning" | "destructive" | "neutral" {
+  if (band === "Outstanding" || band === "Very Good") return "success";
+  if (band === "Satisfactory") return "info";
+  if (band === "Needs Improvement") return "warning";
+  if (band === "Unsatisfactory") return "destructive";
+  return "neutral";
+}
+
+function RatingSelector(props: {
+  rowLabel: string;
+  value: number | null;
+  disabled: boolean;
+  onSelect: (rating: number) => void;
+  onClear: () => void;
+}): JSX.Element {
+  const { rowLabel, value, disabled, onSelect, onClear } = props;
+  return (
+    <div className="flex flex-col gap-1">
+      <div
+        role="radiogroup"
+        aria-label={`Rating for ${rowLabel}, 1 to 5`}
+        className="inline-flex items-center gap-1"
+      >
+        {RATING_OPTIONS.map((option) => {
+          const selected = value === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={`${option} out of 5`}
+              disabled={disabled}
+              onClick={() => onSelect(option)}
+              onKeyDown={(event) => {
+                if (event.key === "Delete" || event.key === "Backspace") {
+                  event.preventDefault();
+                  onClear();
+                }
+              }}
+              className={cn(
+                "h-8 w-8 rounded-md border text-sm font-semibold tabular-nums transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                selected
+                  ? "border-transparent bg-primary text-primary-foreground shadow-sm"
+                  : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+      <span className="text-xs tabular-nums text-muted-foreground">
+        {value == null ? "Not rated" : `Rated ${value} of 5`}
+      </span>
+    </div>
+  );
 }
 
 export function KpiSheetForm(props: {
@@ -90,16 +147,19 @@ export function KpiSheetForm(props: {
       .sort((a, b) => a.sort_order - b.sort_order);
   }, [bundle.evaluationItems, existing]);
 
+  const departmentId = bundle.employee.department_id ?? undefined;
+
   const [library, setLibrary] = useState<EvaluationCriterion[] | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (existing || voidBlocked) return;
     let cancelled = false;
     setLibraryLoading(true);
     setLibraryError(null);
-    listKpiCriteria()
+    listKpiCriteria(false, departmentId)
       .then((rows) => {
         if (cancelled) return;
         setLibrary(rows);
@@ -115,7 +175,7 @@ export function KpiSheetForm(props: {
     return () => {
       cancelled = true;
     };
-  }, [existing, voidBlocked]);
+  }, [existing, voidBlocked, departmentId, reloadKey]);
 
   const rows: KpiRow[] = useMemo(() => {
     if (existing) {
@@ -205,16 +265,18 @@ export function KpiSheetForm(props: {
     !unlinkedRow &&
     !libraryLoading;
 
-  function handleRatingChange(index: number, raw: string): void {
+  function handleRatingSelect(index: number, rating: number): void {
     setRatings((prev) => {
       const next = [...prev];
-      if (raw.trim() === "") {
-        next[index] = null;
-        return next;
-      }
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed)) return prev;
-      next[index] = Math.min(5, Math.max(1, Math.round(parsed)));
+      next[index] = rating;
+      return next;
+    });
+  }
+
+  function handleRatingClear(index: number): void {
+    setRatings((prev) => {
+      const next = [...prev];
+      next[index] = null;
       return next;
     });
   }
@@ -284,16 +346,23 @@ export function KpiSheetForm(props: {
           <CardTitle className="text-base font-semibold">
             KPI Rating Sheet
           </CardTitle>
-          <Badge variant="secondary">
+          <StatusBadge tone="info">
             {evalType === "first" ? "First Evaluation" : "Second Evaluation"}
-          </Badge>
-          <Badge variant="outline">
+          </StatusBadge>
+          <StatusBadge tone="neutral">
             {scope === "hr" ? "HR" : "Department Head"}
-          </Badge>
-          <Badge variant="outline">{existing ? "Edit" : "Create"}</Badge>
+          </StatusBadge>
+          <StatusBadge tone="neutral">{existing ? "Edit" : "Create"}</StatusBadge>
         </div>
+        <p className="text-xs text-muted-foreground">
+          {bundle.employee.full_name}
+          {bundle.employee.department_name
+            ? ` · ${bundle.employee.department_name}`
+            : null}{" "}
+          · Criteria from the employee&apos;s department library
+        </p>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {voidBlocked ? (
           <Alert variant="destructive">
             <AlertTitle>Evaluation voided</AlertTitle>
@@ -303,109 +372,147 @@ export function KpiSheetForm(props: {
           </Alert>
         ) : null}
 
-        {libraryLoading ? <p className="text-sm">Loading KPI criteria…</p> : null}
+        {libraryLoading ? (
+          <div className="space-y-2" aria-label="Loading KPI criteria">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        ) : null}
 
         {libraryError ? (
           <Alert variant="destructive">
             <AlertTitle>Failed to load criteria</AlertTitle>
-            <AlertDescription>{libraryError}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        {!libraryLoading && !libraryError && rows.length === 0 ? (
-          <Alert>
-            <AlertTitle>No KPI rows</AlertTitle>
-            <AlertDescription>
-              There are no active KPI criteria to rate yet.
+            <AlertDescription className="flex flex-wrap items-center gap-2">
+              <span>{libraryError}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReloadKey((key) => key + 1)}
+              >
+                Retry
+              </Button>
             </AlertDescription>
           </Alert>
         ) : null}
 
-        {rows.length > 0 ? (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>KPI Category</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Measurement Method</TableHead>
-                  <TableHead className="text-right">Weight</TableHead>
-                  <TableHead>Rating (1–5)</TableHead>
-                  <TableHead className="text-right">Weighted Score</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row, index) => {
-                  const rating = ratings[index] ?? null;
-                  const weighted =
-                    rating == null ? null : (rating * row.weight) / 100;
-                  return (
-                    <TableRow key={row.key}>
-                      <TableCell className="font-medium">
-                        {row.category}
-                      </TableCell>
-                      <TableCell className="max-w-xs whitespace-pre-wrap">
-                        {row.description}
-                      </TableCell>
-                      <TableCell>{row.target ?? "—"}</TableCell>
-                      <TableCell>{row.method ?? "—"}</TableCell>
-                      <TableCell className="text-right">
-                        {formatScore(row.weight)}
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={5}
-                          step={1}
-                          className="w-20"
-                          aria-label={`Rating for ${row.category}`}
-                          value={rating ?? ""}
-                          onChange={(event) =>
-                            handleRatingChange(index, event.target.value)
-                          }
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {weighted == null ? "—" : formatScore(weighted)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                <TableRow>
-                  <TableCell colSpan={6} className="font-semibold">
-                    Total Score{" "}
-                    {band ? (
-                      <Badge variant="secondary" className="ml-2">
-                        {band}
-                      </Badge>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    {formatScore(total)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+        {!libraryLoading && !libraryError && rows.length === 0 && !voidBlocked ? (
+          <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-border p-6 text-center">
+            <p className="text-sm font-semibold">No KPI rows</p>
+            <p className="text-sm text-muted-foreground">
+              There are no active KPI criteria in this employee&apos;s
+              department library yet.
+            </p>
           </div>
         ) : null}
 
         {rows.length > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Weight total: {formatScore(weightSum)}
-            {!allRated ? " — rate every row to complete the sheet." : null}
-          </p>
+          <section aria-label="KPI scorecard" className="space-y-3">
+            <div className="overflow-x-auto">
+              <table className="data-grid density-comfortable min-w-[880px]">
+                <thead>
+                  <tr>
+                    <th scope="col">KPI Category</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Target</th>
+                    <th scope="col">Measurement Method</th>
+                    <th scope="col" className="td-num">
+                      Weight
+                    </th>
+                    <th scope="col">Rating (1–5)</th>
+                    <th scope="col" className="td-num">
+                      Weighted Score
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, index) => {
+                    const rating = ratings[index] ?? null;
+                    const weighted =
+                      rating == null ? null : (rating * row.weight) / 100;
+                    return (
+                      <tr key={row.key}>
+                        <td className="font-medium">{row.category}</td>
+                        <td className="max-w-xs whitespace-pre-wrap">
+                          {row.description}
+                        </td>
+                        <td className="text-muted-foreground">
+                          {row.target ?? "—"}
+                        </td>
+                        <td className="text-muted-foreground">
+                          {row.method ?? "—"}
+                        </td>
+                        <td className="td-num tabular-nums">
+                          {formatScore(row.weight)}
+                        </td>
+                        <td>
+                          <RatingSelector
+                            rowLabel={row.category}
+                            value={rating}
+                            disabled={voidBlocked || saving}
+                            onSelect={(next) =>
+                              handleRatingSelect(index, next)
+                            }
+                            onClear={() => handleRatingClear(index)}
+                          />
+                        </td>
+                        <td className="td-num tabular-nums">
+                          {weighted == null ? "—" : formatScore(weighted)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {!allRated && !voidBlocked ? (
+              <p className="text-xs text-muted-foreground">
+                Rate every row from 1 to 5 to complete the sheet.
+              </p>
+            ) : null}
+          </section>
         ) : null}
 
-        {rows.length > 0 && !weightsValid ? (
-          <Alert variant="destructive">
-            <AlertTitle>Weights do not total 100</AlertTitle>
-            <AlertDescription>
-              The KPI library currently totals {formatScore(weightSum)}. Save
-              will be rejected until the library totals 100.
-            </AlertDescription>
-          </Alert>
+        {rows.length > 0 ? (
+          <section
+            aria-label="Live total"
+            className="rounded-lg border border-border bg-card p-4"
+          >
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  Total Score
+                </p>
+                <p className="text-2xl font-semibold tabular-nums">
+                  {formatScore(total)}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={bandTone(allRated ? band : null)}>
+                    {allRated ? (band ?? "Unrated") : "Incomplete"}
+                  </StatusBadge>
+                  <StatusBadge tone={weightsValid ? "success" : "warning"}>
+                    Weights {formatScore(weightSum)}
+                    {weightsValid ? " · totals 100" : " · must total 100"}
+                  </StatusBadge>
+                </div>
+              </div>
+              <p className="max-w-sm text-xs text-muted-foreground">
+                Computed live from rating × weight. The band describes the
+                score — it is not the verdict below.
+              </p>
+            </div>
+            {!weightsValid ? (
+              <Alert variant="destructive" className="mt-3">
+                <AlertTitle>Weights do not total 100</AlertTitle>
+                <AlertDescription>
+                  The department&apos;s library currently totals{" "}
+                  {formatScore(weightSum)}. Save will be rejected until the
+                  library totals 100.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+          </section>
         ) : null}
 
         {unlinkedRow ? (
@@ -417,36 +524,94 @@ export function KpiSheetForm(props: {
           </Alert>
         ) : null}
 
+        <Separator />
+
         <div className="space-y-2">
-          <Label htmlFor="kpi-evaluator-comments">Evaluator Comments</Label>
+          <Label htmlFor="kpi-evaluator-comments">Evaluator comments</Label>
           <Textarea
             id="kpi-evaluator-comments"
             value={comments}
+            disabled={voidBlocked || saving}
             onChange={(event) => setComments(event.target.value)}
-            placeholder="Typed evaluator comments"
+            placeholder="Observations, strengths, and concerns supporting the verdict"
             rows={4}
           />
+          <p className="text-xs text-muted-foreground">
+            Optional. Saved with the evaluation and shown in the history card.
+          </p>
         </div>
 
-        <div className="space-y-2">
-          <Label>Result — human verdict, never auto-computed</Label>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={result === "passed" ? "default" : "outline"}
-              onClick={() => setResult("passed")}
-            >
-              Pass
-            </Button>
-            <Button
-              type="button"
-              variant={result === "failed" ? "destructive" : "outline"}
-              onClick={() => setResult("failed")}
-            >
-              Fail
-            </Button>
+        <section
+          aria-label="Evaluation result"
+          className="space-y-2 rounded-lg border border-border p-4"
+        >
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">Result — human verdict</h3>
+            <p className="text-xs text-muted-foreground">
+              Decided by the evaluator, never auto-computed from the score.
+            </p>
           </div>
-        </div>
+          <div
+            role="radiogroup"
+            aria-label="Evaluation result"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={result === "passed"}
+              disabled={voidBlocked || saving}
+              onClick={() => setResult("passed")}
+              className={cn(
+                "rounded-md border p-3 text-left transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                result === "passed"
+                  ? "border-transparent bg-primary text-primary-foreground shadow-sm"
+                  : "border-border bg-card hover:bg-accent",
+              )}
+            >
+              <span className="block text-sm font-semibold">Pass</span>
+              <span
+                className={cn(
+                  "block text-xs",
+                  result === "passed"
+                    ? "text-primary-foreground/80"
+                    : "text-muted-foreground",
+                )}
+              >
+                Proceeds to the next workflow stage
+              </span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={result === "failed"}
+              disabled={voidBlocked || saving}
+              onClick={() => setResult("failed")}
+              className={cn(
+                "rounded-md border p-3 text-left transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                result === "failed"
+                  ? "border-transparent bg-destructive text-destructive-foreground shadow-sm"
+                  : "border-border bg-card hover:bg-accent",
+              )}
+            >
+              <span className="block text-sm font-semibold">Fail</span>
+              <span
+                className={cn(
+                  "block text-xs",
+                  result === "failed"
+                    ? "text-destructive-foreground/80"
+                    : "text-muted-foreground",
+                )}
+              >
+                Opens a performance improvement plan
+              </span>
+            </button>
+          </div>
+        </section>
 
         {saveError ? (
           <Alert variant="destructive">
@@ -455,9 +620,16 @@ export function KpiSheetForm(props: {
           </Alert>
         ) : null}
 
-        <Button type="button" disabled={!canSave} onClick={handleSave}>
-          {saving ? "Saving…" : existing ? "Save Changes" : "Save Evaluation"}
-        </Button>
+        {!voidBlocked ? (
+          <Button
+            type="button"
+            disabled={!canSave}
+            onClick={handleSave}
+            aria-disabled={!canSave}
+          >
+            {saving ? "Saving…" : existing ? "Save Changes" : "Save Evaluation"}
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );

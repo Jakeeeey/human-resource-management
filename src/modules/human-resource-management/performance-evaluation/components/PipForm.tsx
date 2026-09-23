@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { JSX } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 import {
   EvaluationClientError,
@@ -49,8 +51,21 @@ type PlanRow = {
 
 type PipStatus = "open" | "passed" | "failed";
 
+const AREA_NAME_LIMIT = 150;
+
+const PLAN_RESULT_LABELS: Record<Exclude<PlanResult, "">, string> = {
+  met: "Met",
+  partially_met: "Partially met",
+  not_met: "Not met",
+};
+
 function toDateInput(value: string | null): string {
   if (!value) return "";
+  return value.slice(0, 10);
+}
+
+function toDisplayDate(value: string | null | undefined): string {
+  if (!value) return "—";
   return value.slice(0, 10);
 }
 
@@ -59,6 +74,16 @@ function parsePlanResult(value: string): PlanResult {
     return value;
   }
   return "";
+}
+
+function EmployeeField(props: { label: string; value: string }): JSX.Element {
+  const { label, value } = props;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <p className="text-sm">{value}</p>
+    </div>
+  );
 }
 
 export function PipForm(props: {
@@ -305,14 +330,14 @@ export function PipForm(props: {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Alert>
-            <AlertTitle>No failed evaluation</AlertTitle>
-            <AlertDescription>
+          <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-border p-6 text-center">
+            <p className="text-sm font-semibold">No failed evaluation</p>
+            <p className="text-sm text-muted-foreground">
               A PIP can only be opened from a failed evaluation. There is no
               failed evaluation without a PIP for this employee yet, so there
               is nothing to file.
-            </AlertDescription>
-          </Alert>
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -325,21 +350,37 @@ export function PipForm(props: {
           <CardTitle className="text-base font-semibold">
             Performance Improvement Plan
           </CardTitle>
-          <Badge variant="outline">{currentPip ? "Edit" : "Create"}</Badge>
+          <StatusBadge tone="neutral">
+            {currentPip ? "Edit" : "Create"}
+          </StatusBadge>
           {currentPip ? (
-            <Badge
-              variant={currentPip.status === "failed" ? "destructive" : "secondary"}
+            <StatusBadge
+              tone={
+                currentPip.status === "failed"
+                  ? "destructive"
+                  : currentPip.status === "passed"
+                    ? "success"
+                    : "warning"
+              }
             >
               {currentPip.status === "open"
-                ? "Open"
+                ? "PIP in progress"
                 : currentPip.status === "passed"
-                  ? "Passed"
-                  : "Failed"}
-            </Badge>
-          ) : null}
+                  ? "PIP passed"
+                  : "Separated"}
+            </StatusBadge>
+          ) : (
+            <StatusBadge tone="warning">PIP in progress</StatusBadge>
+          )}
         </div>
+        <p className="text-xs text-muted-foreground">
+          {bundle.employee.full_name}
+          {bundle.employee.department_name
+            ? ` · ${bundle.employee.department_name}`
+            : null}
+        </p>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
         {isReadOnly ? (
           <Alert variant="destructive">
             <AlertTitle>PIP failed — read-only</AlertTitle>
@@ -350,229 +391,401 @@ export function PipForm(props: {
           </Alert>
         ) : null}
 
-        <div className="space-y-2">
-          <Label>Areas for Improvement</Label>
+        <section aria-label="Employee information" className="space-y-3">
+          <h3 className="text-sm font-semibold">Employee Information</h3>
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-border p-4 sm:grid-cols-2">
+            <EmployeeField label="Name" value={bundle.employee.full_name} />
+            <EmployeeField
+              label="Department"
+              value={bundle.employee.department_name ?? "—"}
+            />
+            <EmployeeField
+              label="Position"
+              value={bundle.employee.position ?? "—"}
+            />
+            <EmployeeField
+              label="Date hired"
+              value={toDisplayDate(bundle.employee.date_hired)}
+            />
+          </div>
+        </section>
+
+        <Separator />
+
+        <section aria-label="Areas for improvement" className="space-y-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">Areas for Improvement</h3>
+            <p className="text-xs text-muted-foreground">
+              Short labels, up to {AREA_NAME_LIMIT} characters each. Blank rows
+              are dropped on save.
+            </p>
+          </div>
           {areaRows.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No areas for improvement yet.
+              No areas listed yet. Add the first area the employee must improve
+              on.
             </p>
           ) : (
-            <div className="space-y-2">
-              {areaRows.map((row) => (
-                <div key={row.key} className="flex items-center gap-2">
-                  <Input
-                    value={row.name}
-                    disabled={isReadOnly}
-                    maxLength={150}
-                    onChange={(event) =>
-                      updateArea(row.key, event.target.value)
-                    }
-                    placeholder="Typed area for improvement"
-                  />
+            <ul className="space-y-2">
+              {areaRows.map((row, index) => (
+                <li key={row.key} className="flex items-center gap-2">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor={`pip-area-name-${row.key}`} className="sr-only">
+                      {`Area ${index + 1}`}
+                    </Label>
+                    <Input
+                      id={`pip-area-name-${row.key}`}
+                      value={row.name}
+                      disabled={isReadOnly || saving}
+                      maxLength={AREA_NAME_LIMIT}
+                      onChange={(event) =>
+                        updateArea(row.key, event.target.value)
+                      }
+                      placeholder={`Area ${index + 1} — e.g. Attendance and punctuality`}
+                      aria-describedby={`pip-area-count-${row.key}`}
+                    />
+                    <p
+                      id={`pip-area-count-${row.key}`}
+                      className="text-xs tabular-nums text-muted-foreground"
+                    >
+                      {row.name.length}/{AREA_NAME_LIMIT}
+                    </p>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
-                    disabled={isReadOnly}
+                    size="sm"
+                    disabled={isReadOnly || saving}
                     onClick={() => removeArea(row.key)}
+                    aria-label={`Remove area ${index + 1}`}
                   >
                     Remove
                   </Button>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
           <Button
             type="button"
             variant="outline"
-            disabled={isReadOnly}
+            size="sm"
+            disabled={isReadOnly || saving}
             onClick={addArea}
           >
             Add area
           </Button>
-        </div>
+        </section>
 
-        <div className="space-y-2">
+        <Separator />
+
+        <section aria-label="Detailed concerns" className="space-y-2">
           <Label htmlFor="pip-detailed-concerns">
             Detailed Areas for Improvement/Concern
           </Label>
           <Textarea
             id="pip-detailed-concerns"
             value={detailedConcerns}
-            disabled={isReadOnly}
+            disabled={isReadOnly || saving}
             onChange={(event) => setDetailedConcerns(event.target.value)}
-            placeholder="Typed details of the areas for improvement"
+            placeholder="Describe the observed concerns and the expected standard"
             rows={4}
           />
-        </div>
+          <p className="text-xs text-muted-foreground">
+            Printed on the PIP as the narrative behind the listed areas.
+          </p>
+        </section>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="pip-start-date">PIP Start Date</Label>
+            <Label htmlFor="pip-start-date">PIP start date</Label>
             <Input
               id="pip-start-date"
               type="date"
               value={startDate}
-              disabled={isReadOnly}
+              disabled={isReadOnly || saving}
               onChange={(event) => setStartDate(event.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="pip-end-date">PIP End Date</Label>
+            <Label htmlFor="pip-end-date">PIP end date</Label>
             <Input
               id="pip-end-date"
               type="date"
               value={endDate}
-              disabled={isReadOnly}
+              disabled={isReadOnly || saving}
               onChange={(event) => setEndDate(event.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="pip-superior-id">Immediate Superior ID</Label>
+            <Label htmlFor="pip-superior-id">Immediate superior ID</Label>
             <Input
               id="pip-superior-id"
               type="number"
               min={1}
               step={1}
               value={superiorId}
-              disabled={isReadOnly}
+              disabled={isReadOnly || saving}
               onChange={(event) => setSuperiorId(event.target.value)}
               placeholder="Optional"
             />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label>Improvement and Action Plan Timeline</Label>
+        <Separator />
+
+        <section aria-label="Action plan timeline" className="space-y-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">
+              Improvement and Action Plan Timeline
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Each row links an area to its action plan, review date, and
+              result.
+            </p>
+          </div>
           {planRows.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No action-plan rows yet.
+              No action-plan rows yet. Add the first improvement and its action
+              plan.
             </p>
           ) : (
-            <div className="space-y-3">
-              {planRows.map((row) => (
-                <div
-                  key={row.key}
-                  className="space-y-3 rounded-lg border p-3"
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor={`pip-area-${row.key}`}>
-                      Area for improvement
-                    </Label>
-                    <Input
-                      id={`pip-area-${row.key}`}
-                      value={row.area}
-                      disabled={isReadOnly}
-                      onChange={(event) =>
-                        updateRow(row.key, { area: event.target.value })
-                      }
-                      placeholder="Area for improvement"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`pip-action-${row.key}`}>Action plan</Label>
-                    <Textarea
-                      id={`pip-action-${row.key}`}
-                      value={row.action}
-                      disabled={isReadOnly}
-                      onChange={(event) =>
-                        updateRow(row.key, { action: event.target.value })
-                      }
-                      placeholder="Typed action plan"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="space-y-2">
-                      <Label htmlFor={`pip-review-${row.key}`}>
-                        Review date
-                      </Label>
-                      <Input
-                        id={`pip-review-${row.key}`}
-                        type="date"
-                        value={row.reviewDate}
-                        disabled={isReadOnly}
-                        onChange={(event) =>
-                          updateRow(row.key, { reviewDate: event.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`pip-result-${row.key}`}>Result</Label>
-                      <Select
-                        value={row.result === "" ? "unreviewed" : row.result}
-                        disabled={isReadOnly}
-                        onValueChange={(value) =>
-                          updateRow(row.key, { result: parsePlanResult(value) })
-                        }
-                      >
-                        <SelectTrigger
-                          id={`pip-result-${row.key}`}
-                          className="w-full"
+            <div className="overflow-x-auto">
+              <table className="data-grid density-comfortable min-w-[860px]">
+                <thead>
+                  <tr>
+                    <th scope="col">Area for improvement</th>
+                    <th scope="col">Action plan</th>
+                    <th scope="col">Review date</th>
+                    <th scope="col">Result</th>
+                    <th scope="col">
+                      <span className="sr-only">Row actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {planRows.map((row, index) => (
+                    <tr key={row.key}>
+                      <td className="min-w-44 align-top">
+                        <Label
+                          htmlFor={`pip-plan-area-${row.key}`}
+                          className="sr-only"
                         >
-                          <SelectValue placeholder="Not reviewed" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unreviewed">
-                            Not reviewed
-                          </SelectItem>
-                          <SelectItem value="met">Met</SelectItem>
-                          <SelectItem value="partially_met">
-                            Partially met
-                          </SelectItem>
-                          <SelectItem value="not_met">Not met</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={isReadOnly}
-                        onClick={() => removeRow(row.key)}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                          {`Row ${index + 1} area for improvement`}
+                        </Label>
+                        <Input
+                          id={`pip-plan-area-${row.key}`}
+                          value={row.area}
+                          disabled={isReadOnly || saving}
+                          onChange={(event) =>
+                            updateRow(row.key, { area: event.target.value })
+                          }
+                          placeholder="Area for improvement"
+                        />
+                      </td>
+                      <td className="min-w-56 align-top">
+                        <Label
+                          htmlFor={`pip-plan-action-${row.key}`}
+                          className="sr-only"
+                        >
+                          {`Row ${index + 1} action plan`}
+                        </Label>
+                        <Textarea
+                          id={`pip-plan-action-${row.key}`}
+                          value={row.action}
+                          disabled={isReadOnly || saving}
+                          onChange={(event) =>
+                            updateRow(row.key, { action: event.target.value })
+                          }
+                          placeholder="Action plan"
+                          rows={2}
+                        />
+                      </td>
+                      <td className="align-top">
+                        <Label
+                          htmlFor={`pip-plan-review-${row.key}`}
+                          className="sr-only"
+                        >
+                          {`Row ${index + 1} review date`}
+                        </Label>
+                        <Input
+                          id={`pip-plan-review-${row.key}`}
+                          type="date"
+                          value={row.reviewDate}
+                          disabled={isReadOnly || saving}
+                          onChange={(event) =>
+                            updateRow(row.key, {
+                              reviewDate: event.target.value,
+                            })
+                          }
+                        />
+                      </td>
+                      <td className="min-w-36 align-top">
+                        <Label
+                          htmlFor={`pip-plan-result-${row.key}`}
+                          className="sr-only"
+                        >
+                          {`Row ${index + 1} result`}
+                        </Label>
+                        <Select
+                          value={row.result === "" ? "unreviewed" : row.result}
+                          disabled={isReadOnly || saving}
+                          onValueChange={(value) =>
+                            updateRow(row.key, { result: parsePlanResult(value) })
+                          }
+                        >
+                          <SelectTrigger
+                            id={`pip-plan-result-${row.key}`}
+                            className="w-full"
+                          >
+                            <SelectValue placeholder="Not reviewed" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="unreviewed">
+                              Not reviewed
+                            </SelectItem>
+                            <SelectItem value="met">
+                              {PLAN_RESULT_LABELS.met}
+                            </SelectItem>
+                            <SelectItem value="partially_met">
+                              {PLAN_RESULT_LABELS.partially_met}
+                            </SelectItem>
+                            <SelectItem value="not_met">
+                              {PLAN_RESULT_LABELS.not_met}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="align-top">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isReadOnly || saving}
+                          onClick={() => removeRow(row.key)}
+                          aria-label={`Remove action-plan row ${index + 1}`}
+                        >
+                          Remove
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           <Button
             type="button"
             variant="outline"
-            disabled={isReadOnly}
+            size="sm"
+            disabled={isReadOnly || saving}
             onClick={addRow}
           >
-            Add Row
+            Add row
           </Button>
-        </div>
+        </section>
 
-        <div className="space-y-2">
-          <Label>Outcome — human verdict</Label>
-          <p className="text-xs text-muted-foreground">
-            Once the PIP is failed the form becomes read-only and the employee
-            is recorded as separated.
-          </p>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={status === "passed" ? "default" : "outline"}
-              disabled={isReadOnly}
-              onClick={() => setStatus("passed")}
-            >
-              Pass
-            </Button>
-            <Button
-              type="button"
-              variant={status === "failed" ? "destructive" : "outline"}
-              disabled={isReadOnly}
-              onClick={() => setStatus("failed")}
-            >
-              Fail
-            </Button>
+        <Separator />
+
+        <section aria-label="Acknowledgement" className="space-y-2">
+          <h3 className="text-sm font-semibold">Acknowledgement</h3>
+          <div className="rounded-lg border border-border p-4 text-sm">
+            {currentPip?.employee_acknowledged_at ? (
+              <p>
+                Acknowledged by the employee on{" "}
+                <span className="tabular-nums">
+                  {toDisplayDate(currentPip.employee_acknowledged_at)}
+                </span>
+                .
+              </p>
+            ) : currentPip?.employee_viewed_at ? (
+              <p className="text-muted-foreground">
+                Viewed by the employee on{" "}
+                <span className="tabular-nums">
+                  {toDisplayDate(currentPip.employee_viewed_at)}
+                </span>
+                , awaiting acknowledgement.
+              </p>
+            ) : (
+              <p className="text-muted-foreground">
+                Read-only. The employee acknowledges in their own module once
+                this PIP is saved.
+              </p>
+            )}
           </div>
-        </div>
+        </section>
+
+        <section
+          aria-label="PIP outcome"
+          className="space-y-2 rounded-lg border border-border p-4"
+        >
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">Outcome — human verdict</h3>
+            <p className="text-xs text-muted-foreground">
+              Once the PIP is failed the form becomes read-only and the
+              employee is recorded as separated.
+            </p>
+          </div>
+          <div
+            role="radiogroup"
+            aria-label="PIP outcome"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={status === "passed"}
+              disabled={isReadOnly || saving}
+              onClick={() => setStatus("passed")}
+              className={cn(
+                "rounded-md border p-3 text-left transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                status === "passed"
+                  ? "border-transparent bg-primary text-primary-foreground shadow-sm"
+                  : "border-border bg-card hover:bg-accent",
+              )}
+            >
+              <span className="block text-sm font-semibold">Pass</span>
+              <span
+                className={cn(
+                  "block text-xs",
+                  status === "passed"
+                    ? "text-primary-foreground/80"
+                    : "text-muted-foreground",
+                )}
+              >
+                Employee met the improvement plan
+              </span>
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={status === "failed"}
+              disabled={isReadOnly || saving}
+              onClick={() => setStatus("failed")}
+              className={cn(
+                "rounded-md border p-3 text-left transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                status === "failed"
+                  ? "border-transparent bg-destructive text-destructive-foreground shadow-sm"
+                  : "border-border bg-card hover:bg-accent",
+              )}
+            >
+              <span className="block text-sm font-semibold">Fail</span>
+              <span
+                className={cn(
+                  "block text-xs",
+                  status === "failed"
+                    ? "text-destructive-foreground/80"
+                    : "text-muted-foreground",
+                )}
+              >
+                Locks the form; employee recorded as separated
+              </span>
+            </button>
+          </div>
+        </section>
 
         {validationError && (currentPip || failedEvaluation) ? (
           <Alert>
@@ -589,7 +802,12 @@ export function PipForm(props: {
         ) : null}
 
         {!isReadOnly ? (
-          <Button type="button" disabled={!canSave} onClick={handleSave}>
+          <Button
+            type="button"
+            disabled={!canSave}
+            onClick={handleSave}
+            aria-disabled={!canSave}
+          >
             {saving ? "Saving…" : currentPip ? "Save Changes" : "Save PIP"}
           </Button>
         ) : null}

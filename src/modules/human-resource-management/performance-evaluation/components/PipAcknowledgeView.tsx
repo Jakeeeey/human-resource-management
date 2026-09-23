@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Loader2, Lock, RotateCcw } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -89,7 +89,7 @@ function formatStamp(value: string | null): string {
 function pipStatusTone(status: EmployeePip["status"]): StatusTone {
   if (status === "passed") return "success";
   if (status === "failed") return "destructive";
-  return "info";
+  return "warning";
 }
 
 function pipStatusLabel(status: EmployeePip["status"]): string {
@@ -105,19 +105,24 @@ function resultLabel(result: EmployeePipActionPlan["result"]): string {
 
 function PipDetailSkeleton(): JSX.Element {
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-3xl space-y-4">
       <Card>
-        <CardContent className="space-y-3 pt-6">
-          <Skeleton className="h-6 w-1/2" />
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex items-center justify-between gap-2">
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-6 w-20" />
+          </div>
           <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-32 w-full" />
         </CardContent>
       </Card>
       <Card>
         <CardContent className="space-y-3 pt-6">
           <Skeleton className="h-5 w-1/3" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-9 w-48" />
         </CardContent>
       </Card>
     </div>
@@ -157,169 +162,210 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
 
   if (error || !pip) {
     return (
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" aria-hidden="true" />
-            <AlertTitle>This Performance Improvement Plan is not available.</AlertTitle>
-            {error ? <AlertDescription>{error}</AlertDescription> : null}
-          </Alert>
-          <Button variant="outline" size="sm" onClick={() => void refresh()}>
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="mx-auto w-full max-w-3xl">
+        <Card>
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <FileText className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p className="text-sm font-semibold">This improvement plan is not available.</p>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              It may have been removed, or you may not have access to it. If you believe
+              this is a mistake, contact HR.
+            </p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => void refresh()}>
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   const acknowledged = pip.employee_acknowledged_at !== null;
+  const period = `${formatDay(pip.pip_start_date)} — ${formatDay(pip.pip_end_date)}`;
   const sortedAreas = [...areas].sort((a, b) => a.sort_order - b.sort_order);
   const sortedPlans = [...actionPlans].sort((a, b) => a.sort_order - b.sort_order);
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-3xl space-y-4">
       <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Performance Improvement Plan</CardTitle>
-              <CardDescription>
-                {formatDay(pip.pip_start_date)} — {formatDay(pip.pip_end_date)}
-              </CardDescription>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Performance Improvement Plan
+              </p>
+              <CardTitle className="text-xl tabular-nums">{period}</CardTitle>
             </div>
             <StatusBadge tone={pipStatusTone(pip.status)}>
               {pipStatusLabel(pip.status)}
             </StatusBadge>
           </div>
+          <CardDescription className="grid grid-cols-1 gap-1 text-xs tabular-nums sm:grid-cols-2">
+            <span>
+              Viewed: {pip.employee_viewed_at ? formatStamp(pip.employee_viewed_at) : "Not viewed"}
+            </span>
+            <span>
+              Acknowledged:{" "}
+              {pip.employee_acknowledged_at
+                ? formatStamp(pip.employee_acknowledged_at)
+                : "Pending"}
+            </span>
+          </CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-          <p>Viewed: {pip.employee_viewed_at ? formatStamp(pip.employee_viewed_at) : "Not viewed"}</p>
-          <p>
-            Acknowledged:{" "}
-            {pip.employee_acknowledged_at ? formatStamp(pip.employee_acknowledged_at) : "Pending"}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Areas for Improvement</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {sortedAreas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No areas recorded.</p>
-          ) : (
-            sortedAreas.map((area) => (
-              <label
-                key={area.id}
-                className="flex cursor-default items-start gap-3 rounded-lg border px-3 py-2"
-              >
-                <Checkbox checked={area.selected} disabled aria-label={area.area_name_snapshot} />
-                <span
-                  className={
-                    area.selected ? "text-sm font-medium" : "text-sm text-muted-foreground"
-                  }
-                >
-                  {area.area_name_snapshot}
-                </span>
-              </label>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Detailed Areas for Improvement / Concern</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pip.detailed_concerns ? (
-            <p className="whitespace-pre-wrap text-sm">{pip.detailed_concerns}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">No details recorded.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Improvement and Action Plan Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {sortedPlans.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No action plans recorded.</p>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Area for Improvement</TableHead>
-                    <TableHead>Action Plan</TableHead>
-                    <TableHead>Review Date</TableHead>
-                    <TableHead>Result</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedPlans.map((plan) => (
-                    <TableRow key={plan.id}>
-                      <TableCell className="font-medium">{plan.area_for_improvement}</TableCell>
-                      <TableCell>{plan.action_plan ?? "—"}</TableCell>
-                      <TableCell>{formatDay(plan.review_date)}</TableCell>
-                      <TableCell>{resultLabel(plan.result)}</TableCell>
+        <CardContent className="space-y-6">
+          <Separator />
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold">Areas for improvement</h3>
+            {sortedAreas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No areas recorded.</p>
+            ) : (
+              <ul className="space-y-2">
+                {sortedAreas.map((area) => (
+                  <li
+                    key={area.id}
+                    className="flex cursor-default items-start gap-3 rounded-[var(--radius)] border bg-card px-3 py-2"
+                  >
+                    <Checkbox checked={area.selected} disabled aria-label={area.area_name_snapshot} />
+                    <span
+                      className={
+                        area.selected ? "text-sm font-medium" : "text-sm text-muted-foreground"
+                      }
+                    >
+                      {area.area_name_snapshot}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <Separator />
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold">Detailed concerns</h3>
+            {pip.detailed_concerns ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {pip.detailed_concerns}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">No details recorded.</p>
+            )}
+          </section>
+          <Separator />
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold">Improvement and action plan timeline</h3>
+            {sortedPlans.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No action plans recorded.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table className="data-grid density-compact min-w-[36rem]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Area for improvement</TableHead>
+                      <TableHead>Action plan</TableHead>
+                      <TableHead>Review date</TableHead>
+                      <TableHead>Result</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedPlans.map((plan) => (
+                      <TableRow key={plan.id}>
+                        <TableCell className="font-medium">{plan.area_for_improvement}</TableCell>
+                        <TableCell>{plan.action_plan ?? "—"}</TableCell>
+                        <TableCell className="tabular-nums">{formatDay(plan.review_date)}</TableCell>
+                        <TableCell>{resultLabel(plan.result)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </section>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            {acknowledged ? (
+              <Lock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            ) : (
+              <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
+            )}
+            Acknowledgement
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <blockquote className="rounded-[var(--radius)] border bg-muted/40 px-4 py-3 text-sm leading-relaxed">
+            {ACK_STATEMENT}
+          </blockquote>
+          {acknowledged ? (
+            <div className="space-y-2 rounded-[var(--radius)] border bg-muted/40 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusBadge tone="success">
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  Acknowledged
+                </StatusBadge>
+                <p className="text-sm font-semibold tabular-nums">
+                  Acknowledged on {formatStamp(pip.employee_acknowledged_at)}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This acknowledgement is on record and cannot be changed.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Button
+                onClick={() => {
+                  setActionError(null);
+                  setConfirmOpen(true);
+                }}
+              >
+                Review and acknowledge
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                You will be asked to confirm after reading the full statement.
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Acknowledgement</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm">{ACK_STATEMENT}</p>
-          <Separator />
-          {acknowledged ? (
-            <p className="flex items-center gap-2 text-sm font-medium">
-              <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
-              Acknowledged on {formatStamp(pip.employee_acknowledged_at)}
-            </p>
-          ) : (
-            <Button
-              onClick={() => {
-                setActionError(null);
-                setConfirmOpen(true);
-              }}
-            >
-              Acknowledge PIP
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Acknowledge Performance Improvement Plan</DialogTitle>
-            <DialogDescription>{ACK_STATEMENT}</DialogDescription>
+            <DialogTitle>Acknowledge this improvement plan</DialogTitle>
+            <DialogDescription className="tabular-nums">{period}</DialogDescription>
           </DialogHeader>
-          {actionError ? (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" aria-hidden="true" />
-              <AlertTitle>Failed to record acknowledgement.</AlertTitle>
-              <AlertDescription>{actionError}</AlertDescription>
-            </Alert>
-          ) : null}
-          <DialogFooter>
+          <div className="space-y-3">
+            <p className="text-sm">
+              You are acknowledging the plan for <strong>{period}</strong>. Please read the
+              statement below in full before confirming.
+            </p>
+            <blockquote className="rounded-[var(--radius)] border bg-muted/40 px-4 py-3 text-sm leading-relaxed">
+              {ACK_STATEMENT}
+            </blockquote>
+            <p className="text-xs text-muted-foreground">
+              Confirming records your acknowledgement permanently with today&apos;s date. This
+              cannot be undone.
+            </p>
+            {actionError ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                <AlertTitle>Failed to record acknowledgement.</AlertTitle>
+                <AlertDescription>{actionError}</AlertDescription>
+              </Alert>
+            ) : null}
+          </div>
+          <DialogFooter className="gap-2">
             <Button variant="outline" disabled={actionBusy} onClick={() => setConfirmOpen(false)}>
               Cancel
             </Button>
             <Button disabled={actionBusy} onClick={() => void handleConfirm()}>
               {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-              I acknowledge
+              {actionBusy ? "Recording…" : "I have read and acknowledge"}
             </Button>
           </DialogFooter>
         </DialogContent>

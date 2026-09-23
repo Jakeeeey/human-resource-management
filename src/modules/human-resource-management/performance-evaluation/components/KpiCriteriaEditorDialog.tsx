@@ -83,8 +83,8 @@ function KpiCriterionForm({
         <DialogTitle>{criterion ? "Edit KPI criterion" : "Add KPI criterion"}</DialogTitle>
         <DialogDescription>
           {criterion
-            ? "Update this criterion in the shared KPI library."
-            : "Add a new criterion to the shared KPI library."}
+            ? "Update this criterion in your department's KPI library."
+            : "Add a new criterion to your department's KPI library."}
         </DialogDescription>
       </DialogHeader>
 

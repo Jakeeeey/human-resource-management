@@ -24,7 +24,7 @@ export interface KpiCriteriaState {
   reorder: (input: ReorderInput) => Promise<EvaluationCriterion[]>;
 }
 
-export function useKpiCriteria(): KpiCriteriaState {
+export function useKpiCriteria(departmentId?: number): KpiCriteriaState {
   const [rows, setRows] = useState<EvaluationCriterion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export function useKpiCriteria(): KpiCriteriaState {
       setError(null);
     }
     try {
-      const next = await listKpiCriteria(true);
+      const next = await listKpiCriteria(true, departmentId);
       if (!mountedRef.current) return;
       setRows(next);
     } catch (err) {
@@ -55,7 +55,7 @@ export function useKpiCriteria(): KpiCriteriaState {
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [departmentId]);
 
   useEffect(() => {
     void refresh();
@@ -63,37 +63,37 @@ export function useKpiCriteria(): KpiCriteriaState {
 
   const create = useCallback(
     async (input: CreateKpiCriterionInput): Promise<EvaluationCriterion> => {
-      const row = await createKpiCriterion(input);
+      const row = await createKpiCriterion(input, departmentId);
       await refresh();
       return row;
     },
-    [refresh],
+    [refresh, departmentId],
   );
 
   const update = useCallback(
     async (id: number, input: UpdateKpiCriterionInput): Promise<EvaluationCriterion> => {
-      const row = await updateKpiCriterion(id, input);
+      const row = await updateKpiCriterion(id, input, departmentId);
       await refresh();
       return row;
     },
-    [refresh],
+    [refresh, departmentId],
   );
 
   const remove = useCallback(
     async (id: number): Promise<void> => {
-      await deleteKpiCriterion(id);
+      await deleteKpiCriterion(id, departmentId);
       await refresh();
     },
-    [refresh],
+    [refresh, departmentId],
   );
 
   const reorder = useCallback(
     async (input: ReorderInput): Promise<EvaluationCriterion[]> => {
-      const next = await reorderKpiCriteria(input);
+      const next = await reorderKpiCriteria(input, departmentId);
       await refresh();
       return next;
     },
-    [refresh],
+    [refresh, departmentId],
   );
 
   return { rows, loading, error, refresh, create, update, remove, reorder };

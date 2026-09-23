@@ -14,7 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -24,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/tooltip";
 import { EvaluationClientError } from "../providers/evaluationClient";
 import type { EvaluationCriterion } from "../types/performance-evaluation.schema";
+import { isWeightSetValid, sumWeights } from "../utils/kpiScore";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
@@ -81,6 +82,15 @@ export function KpiCriteriaTable({
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const ordered = useMemo(() => sortedRows(rows), [rows]);
+  const activeWeightItems = useMemo(
+    () =>
+      ordered
+        .filter((row) => row.is_active)
+        .map((row) => ({ weight_percentage_snapshot: row.weight_percentage })),
+    [ordered],
+  );
+  const activeWeightTotal = sumWeights(activeWeightItems);
+  const weightsBalanced = isWeightSetValid(activeWeightItems);
   const totalPages = Math.max(1, Math.ceil(ordered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const rangeStart = ordered.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
@@ -155,7 +165,7 @@ export function KpiCriteriaTable({
   return (
     <TooltipProvider>
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editable ? (
             <Button onClick={onCreate}>
               <Plus className="size-4" />
@@ -163,6 +173,14 @@ export function KpiCriteriaTable({
             </Button>
           ) : (
             <p className="text-sm text-muted-foreground">{readOnlyNote}</p>
+          )}
+          <StatusBadge tone={weightsBalanced ? "success" : "warning"}>
+            <span aria-live="polite">Active weight total: {activeWeightTotal}%</span>
+          </StatusBadge>
+          {!weightsBalanced && (
+            <p className="text-sm text-muted-foreground">
+              Active criteria must total 100% before an evaluation can be created.
+            </p>
           )}
         </div>
 
@@ -177,149 +195,151 @@ export function KpiCriteriaTable({
             No KPI criteria yet.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
-            <div className="overflow-x-auto">
-              <Table className="min-w-[880px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead scope="col" className="w-16">Order</TableHead>
-                    <TableHead scope="col">KPI Category</TableHead>
-                    <TableHead scope="col">Description</TableHead>
-                    <TableHead scope="col">Target</TableHead>
-                    <TableHead scope="col">Measurement Method</TableHead>
-                    <TableHead scope="col" className="w-24 text-right">Weight %</TableHead>
-                    <TableHead scope="col" className="w-24">Active</TableHead>
-                    {editable && (
-                      <TableHead scope="col" className="w-36 text-right">Actions</TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visible.map((row) => {
-                    const position = ordered.findIndex((entry) => entry.id === row.id);
-                    const isFirst = position === 0;
-                    const isLast = position === ordered.length - 1;
-                    const busy = movingId === row.id;
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell className="text-muted-foreground">{row.sort_order}</TableCell>
-                        <TableCell className="font-medium">{row.kpi_category}</TableCell>
-                        <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="block max-w-64 cursor-default truncate text-muted-foreground">
-                                {row.kpi_description}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs whitespace-pre-wrap">{row.kpi_description}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {row.target && row.target.trim() !== "" ? row.target : "—"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {row.measurement_method && row.measurement_method.trim() !== "" ? row.measurement_method : "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">{row.weight_percentage}</TableCell>
-                        <TableCell>
-                          <Badge variant={row.is_active ? "secondary" : "outline"}>
-                            {row.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        {editable && (
+          <div className="density-comfortable">
+            <div className="data-grid">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[880px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead scope="col" className="w-16">Order</TableHead>
+                      <TableHead scope="col">KPI Category</TableHead>
+                      <TableHead scope="col">Description</TableHead>
+                      <TableHead scope="col">Target</TableHead>
+                      <TableHead scope="col">Measurement Method</TableHead>
+                      <TableHead scope="col" className="td-num w-24">Weight %</TableHead>
+                      <TableHead scope="col" className="w-24">Active</TableHead>
+                      {editable && (
+                        <TableHead scope="col" className="w-36 text-right">Actions</TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visible.map((row) => {
+                      const position = ordered.findIndex((entry) => entry.id === row.id);
+                      const isFirst = position === 0;
+                      const isLast = position === ordered.length - 1;
+                      const busy = movingId === row.id;
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell className="td-num text-muted-foreground">{row.sort_order}</TableCell>
+                          <TableCell className="font-medium">{row.kpi_category}</TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Move ${row.kpi_category} up`}
-                                disabled={busy || isFirst}
-                                onClick={() => void move(row, -1)}
-                              >
-                                <ArrowUp className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Move ${row.kpi_category} down`}
-                                disabled={busy || isLast}
-                                onClick={() => void move(row, 1)}
-                              >
-                                <ArrowDown className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Edit ${row.kpi_category}`}
-                                onClick={() => onEdit(row)}
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Delete ${row.kpi_category}`}
-                                onClick={() => {
-                                  setDeleteError(null);
-                                  setDeleteTarget(row);
-                                }}
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            </div>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="block max-w-64 cursor-default truncate text-muted-foreground">
+                                  {row.kpi_description}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="max-w-xs whitespace-pre-wrap">{row.kpi_description}</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                          <TableCell className="text-muted-foreground">
+                            {row.target && row.target.trim() !== "" ? row.target : "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {row.measurement_method && row.measurement_method.trim() !== "" ? row.measurement_method : "—"}
+                          </TableCell>
+                          <TableCell className="td-num font-medium">{row.weight_percentage}</TableCell>
+                          <TableCell>
+                            <StatusBadge tone={row.is_active ? "success" : "neutral"}>
+                              {row.is_active ? "Active" : "Inactive"}
+                            </StatusBadge>
+                          </TableCell>
+                          {editable && (
+                            <TableCell>
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Move ${row.kpi_category} up`}
+                                  disabled={busy || isFirst}
+                                  onClick={() => void move(row, -1)}
+                                >
+                                  <ArrowUp className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Move ${row.kpi_category} down`}
+                                  disabled={busy || isLast}
+                                  onClick={() => void move(row, 1)}
+                                >
+                                  <ArrowDown className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Edit ${row.kpi_category}`}
+                                  onClick={() => onEdit(row)}
+                                >
+                                  <Pencil className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={`Delete ${row.kpi_category}`}
+                                  onClick={() => {
+                                    setDeleteError(null);
+                                    setDeleteTarget(row);
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
 
-            <div className="flex flex-col gap-3 border-t border-border/50 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground" aria-live="polite">
-                {ordered.length === 0
-                  ? "No rows to show"
-                  : `Showing ${rangeStart}–${rangeEnd} of ${ordered.length}`}
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Rows per page</span>
-                  <Select value={String(pageSize)} onValueChange={(value) => changePageSize(Number(value))}>
-                    <SelectTrigger size="sm" className="w-[90px]" aria-label="Rows per page">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PAGE_SIZE_OPTIONS.map((size) => (
-                        <SelectItem key={size} value={String(size)}>
-                          {size}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage <= 1}
-                    onClick={() => setPage(safePage - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground" aria-live="polite">
-                    Page {safePage} of {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={safePage >= totalPages}
-                    onClick={() => setPage(safePage + 1)}
-                  >
-                    Next
-                  </Button>
+              <div className="flex flex-col gap-3 border-t border-border/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                  {ordered.length === 0
+                    ? "No rows to show"
+                    : `Showing ${rangeStart}–${rangeEnd} of ${ordered.length}`}
+                </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Rows per page</span>
+                    <Select value={String(pageSize)} onValueChange={(value) => changePageSize(Number(value))}>
+                      <SelectTrigger size="sm" className="w-[90px]" aria-label="Rows per page">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PAGE_SIZE_OPTIONS.map((size) => (
+                          <SelectItem key={size} value={String(size)}>
+                            {size}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage(safePage - 1)}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground" aria-live="polite">
+                      Page {safePage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setPage(safePage + 1)}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
