@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useKpiCriteria } from "./hooks/useKpiCriteria";
-import { EvaluationClientError, getRoster } from "./providers/evaluationClient";
+import { EvaluationClientError, getRoster, type RosterRow } from "./providers/evaluationClient";
 import type { EvaluationCriterion } from "./types/performance-evaluation.schema";
 import { KpiCriteriaEditorDialog, type KpiCriterionFormValues } from "./components/KpiCriteriaEditorDialog";
 import { KpiCriteriaTable } from "./components/KpiCriteriaTable";
@@ -32,39 +32,52 @@ function saveErrorMessage(err: unknown, fallback: string): string {
   return err instanceof EvaluationClientError ? err.message : fallback;
 }
 
+function collectDepartments(rows: RosterRow[], into: Map<number, string>): void {
+  for (const row of rows) {
+    if (row.department_id === null || into.has(row.department_id)) continue;
+    const name = row.department_name?.trim() || `Department ${row.department_id}`;
+    into.set(row.department_id, name);
+  }
+}
+
 function HeadCriteriaAdmin(): JSX.Element {
   const [departments, setDepartments] = useState<HeadDepartment[] | null>(null);
+  const [managesAllDepartments, setManagesAllDepartments] = useState(false);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getRoster("head")
-      .then((rows) => {
-        if (cancelled) return;
-        const seen = new Map<number, string>();
-        for (const row of rows) {
-          if (row.department_id === null || seen.has(row.department_id)) continue;
-          const name = row.department_name?.trim() || `Department ${row.department_id}`;
-          seen.set(row.department_id, name);
-        }
-        setDepartments(
-          [...seen]
-            .map(([id, name]) => ({ id, name }))
-            .sort((left, right) => left.name.localeCompare(right.name)),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setDepartments([]);
-      });
+    Promise.allSettled([getRoster("head"), getRoster("hr")]).then(([headResult, hrResult]) => {
+      if (cancelled) return;
+      const seen = new Map<number, string>();
+      if (headResult.status === "fulfilled") collectDepartments(headResult.value, seen);
+      let managesAll = false;
+      if (hrResult.status === "fulfilled" && hrResult.value.length > 0) {
+        managesAll = true;
+        collectDepartments(hrResult.value, seen);
+      }
+      setManagesAllDepartments(managesAll);
+      setDepartments(
+        [...seen]
+          .map(([id, name]) => ({ id, name }))
+          .sort((left, right) => left.name.localeCompare(right.name)),
+      );
+    });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const effectiveDepartmentId =
-    departments !== null && departments.length > 1
-      ? (selectedDepartmentId ?? departments[0]?.id)
-      : undefined;
+  const showDepartmentSelector =
+    departments !== null && (departments.length > 1 || managesAllDepartments);
+  const activeDepartment =
+    (selectedDepartmentId !== null
+      ? departments?.find((department) => department.id === selectedDepartmentId)
+      : undefined) ??
+    departments?.[0] ??
+    null;
+
+  const effectiveDepartmentId = showDepartmentSelector ? (activeDepartment?.id ?? undefined) : undefined;
 
   const kpi = useKpiCriteria(effectiveDepartmentId);
 
@@ -114,11 +127,11 @@ function HeadCriteriaAdmin(): JSX.Element {
       <CardContent className="space-y-4">
         {departments === null ? (
           <Skeleton className="h-10 w-64" />
-        ) : departments.length > 1 ? (
+        ) : showDepartmentSelector ? (
           <div className="flex flex-wrap items-center gap-2">
             <Label htmlFor="criteria-department">Department</Label>
             <Select
-              value={effectiveDepartmentId === undefined ? "" : String(effectiveDepartmentId)}
+              value={activeDepartment ? String(activeDepartment.id) : ""}
               onValueChange={(value) => setSelectedDepartmentId(Number(value))}
             >
               <SelectTrigger id="criteria-department" className="w-64" aria-label="Department">
@@ -141,6 +154,7 @@ function HeadCriteriaAdmin(): JSX.Element {
           error={kpi.error}
           editable
           readOnlyNote=""
+          departmentName={showDepartmentSelector ? null : (activeDepartment?.name ?? null)}
           onCreate={openCreate}
           onEdit={openEdit}
           onRemove={kpi.remove}

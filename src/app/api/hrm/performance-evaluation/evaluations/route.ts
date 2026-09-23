@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     if (criteria.length === 0) {
       return evaluationError(
         400,
-        EVALUATION_ERROR_CODES.readFailed,
+        EVALUATION_ERROR_CODES.criteriaNotConfigured,
         "No active KPI criteria configured for this department"
       );
     }
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     if (!isWeightSetValid(libraryWeights)) {
       return evaluationError(
         400,
-        EVALUATION_ERROR_CODES.readFailed,
+        EVALUATION_ERROR_CODES.criteriaWeightInvalid,
         `Active KPI criterion weights must sum to 100 (actual: ${sumWeights(libraryWeights)})`
       );
     }

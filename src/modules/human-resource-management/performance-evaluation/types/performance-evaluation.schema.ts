@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+const DecimalNumber = z.coerce.number();
+
+const BooleanFlag = z
+  .union([z.boolean(), z.number(), z.string()])
+  .transform(
+    (value) =>
+      value === true || value === 1 || value === "1" || value === "true"
+  );
+
 export const EvaluationCriterionSchema = z.object({
   id: z.number().int().positive(),
   department_id: z.number().int(),
@@ -7,9 +16,9 @@ export const EvaluationCriterionSchema = z.object({
   kpi_description: z.string(),
   target: z.string().nullable(),
   measurement_method: z.string().nullable(),
-  weight_percentage: z.number(),
+  weight_percentage: DecimalNumber,
   sort_order: z.number().int(),
-  is_active: z.boolean(),
+  is_active: BooleanFlag,
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),
@@ -22,7 +31,7 @@ export const PipCriterionSchema = z.object({
   id: z.number().int().positive(),
   area_name: z.string(),
   sort_order: z.number().int(),
-  is_active: z.boolean(),
+  is_active: BooleanFlag,
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),
@@ -44,7 +53,7 @@ export const EvaluationTrackingSchema = z.object({
   terminated_by: z.number().int().nullable(),
   separation_type: z.string().nullable(),
   termination_reason: z.string().nullable(),
-  is_active: z.boolean(),
+  is_active: BooleanFlag,
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),
@@ -58,7 +67,7 @@ export const EmployeeEvaluationSchema = z.object({
   user_id: z.number().int(),
   eval_type: z.enum(["first", "second"]),
   evaluation_date: z.string(),
-  total_score: z.number(),
+  total_score: DecimalNumber,
   rating_band: z.string().nullable(),
   result: z.enum(["passed", "failed"]),
   evaluator_comments: z.string().nullable(),
@@ -66,7 +75,7 @@ export const EmployeeEvaluationSchema = z.object({
   voided_at: z.string().nullable(),
   voided_by: z.number().int().nullable(),
   void_reason: z.string().nullable(),
-  is_active: z.boolean(),
+  is_active: BooleanFlag,
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),
@@ -83,8 +92,8 @@ export const EmployeeEvaluationItemSchema = z.object({
   kpi_description_snapshot: z.string(),
   target_snapshot: z.string().nullable(),
   measurement_method_snapshot: z.string().nullable(),
-  weight_percentage_snapshot: z.number(),
-  rating: z.number(),
+  weight_percentage_snapshot: DecimalNumber,
+  rating: DecimalNumber,
   sort_order: z.number().int(),
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
@@ -110,7 +119,7 @@ export const EmployeePipSchema = z.object({
   employee_acknowledged_at: z.string().nullable(),
   manager_ack_user_id: z.number().int().nullable(),
   manager_acknowledged_at: z.string().nullable(),
-  is_active: z.boolean(),
+  is_active: BooleanFlag,
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),
   updated_at: z.string().nullable(),
@@ -124,7 +133,7 @@ export const EmployeePipAreaSchema = z.object({
   pip_id: z.number().int(),
   pip_criteria_id: z.number().int().nullable(),
   area_name_snapshot: z.string(),
-  selected: z.boolean(),
+  selected: BooleanFlag,
   sort_order: z.number().int(),
   created_at: z.string().nullable(),
   created_by: z.number().int().nullable(),

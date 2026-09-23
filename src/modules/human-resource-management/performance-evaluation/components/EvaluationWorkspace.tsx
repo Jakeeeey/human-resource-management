@@ -5,14 +5,14 @@ import { ClipboardCheck, RefreshCw } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 import { useEvaluationWorkspace } from "../hooks/useEvaluationWorkspace";
 import type { EvaluationScope } from "../providers/evaluationClient";
 import type { WorkspaceBundle } from "../types/performance-evaluation.schema";
-import { computeDueDates } from "../utils/probationClock";
+import { computeDueDates, formatHiredDate } from "../utils/probationClock";
 import {
     deriveNextAction,
     deriveProbationStatus,
@@ -49,26 +49,41 @@ function stageHeading(stage: WorkflowStage): string {
     return workflowStageLabel(stage);
 }
 
+const SEPARATION_LABELS: Record<string, string> = {
+    failed_probation: "Failed probation",
+    resigned: "Resigned",
+    laid_off: "Laid off",
+};
+
+function separationLabel(value: string): string {
+    return SEPARATION_LABELS[value] ?? value.replace(/_/g, " ");
+}
+
+function formatClosingDate(value: string | null | undefined): string {
+    if (!value) return "—";
+    return formatHiredDate(value.slice(0, 10));
+}
+
 function ClosingSummary({ bundle }: { bundle: WorkspaceBundle }) {
     const tracking = bundle.tracking;
     const regular = tracking?.regularized_at !== null && tracking?.regularized_at !== undefined;
+    const closingDate = regular
+        ? formatClosingDate(tracking?.regularized_at)
+        : formatClosingDate(tracking?.terminated_at);
 
     return (
         <Card>
-            <CardHeader>
-                <CardTitle className="text-base">Closing summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 pt-6">
                 <div className="flex flex-wrap items-center gap-2">
                     <StatusBadge tone={regular ? "success" : "destructive"}>
                         {regular ? "Regular" : "Separated"}
                     </StatusBadge>
                     <span className="text-sm text-muted-foreground tabular-nums">
-                        {regular ? tracking?.regularized_at : tracking?.terminated_at}
+                        {closingDate}
                     </span>
                 </div>
                 {!regular && tracking?.separation_type ? (
-                    <p className="text-sm text-muted-foreground">{tracking.separation_type}</p>
+                    <p className="text-sm text-muted-foreground">{separationLabel(tracking.separation_type)}</p>
                 ) : null}
                 {!regular && tracking?.termination_reason ? (
                     <p className="text-sm text-foreground">{tracking.termination_reason}</p>
@@ -101,7 +116,7 @@ export function EvaluationWorkspace({
     scope: EvaluationScope;
     userId: number;
 }) {
-    const { bundle, loading, error, refresh } = useEvaluationWorkspace(scope, userId);
+    const { bundle, loading, error, errorStatus, refresh } = useEvaluationWorkspace(scope, userId);
 
     const employee = bundle?.employee ?? null;
     const title = employee?.full_name ?? `Employee #${userId}`;
@@ -115,6 +130,7 @@ export function EvaluationWorkspace({
         scope === "hr"
             ? `/hrm/performance-evaluation?selected=${userId}`
             : `/hrm/department-evaluation?selected=${userId}`;
+    const activeOwnedByOther = action !== null && action.owner !== scope;
 
     const handleRefresh = () => {
         void refresh();
@@ -173,6 +189,20 @@ export function EvaluationWorkspace({
 
             {loading && !bundle ? (
                 <WorkspaceSkeletons />
+            ) : errorStatus === 403 || errorStatus === 404 ? (
+                <Alert>
+                    <AlertTitle>Not available</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                        <p>
+                            {errorStatus === 403
+                                ? "This employee is outside your scope, so their evaluation workspace is not available to you."
+                                : "This employee could not be found."}
+                        </p>
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={rosterHref}>Back to roster</Link>
+                        </Button>
+                    </AlertDescription>
+                </Alert>
             ) : error || !bundle || !facts || !status || !stage ? (
                 <Alert variant="destructive">
                     <AlertTitle>Workspace unavailable</AlertTitle>
@@ -201,6 +231,7 @@ export function EvaluationWorkspace({
                                 evalType="first"
                                 bundle={bundle}
                                 onSaved={refresh}
+                                readOnly={activeOwnedByOther}
                             />
                         ) : stage === "second_evaluation" ? (
                             <KpiSheetForm
@@ -209,9 +240,16 @@ export function EvaluationWorkspace({
                                 evalType="second"
                                 bundle={bundle}
                                 onSaved={refresh}
+                                readOnly={activeOwnedByOther}
                             />
                         ) : stage === "pip_1" || stage === "pip_2" ? (
-                            <PipForm userId={userId} bundle={bundle} onSaved={refresh} />
+                            <PipForm
+                                scope={scope}
+                                userId={userId}
+                                bundle={bundle}
+                                onSaved={refresh}
+                                readOnly={activeOwnedByOther}
+                            />
                         ) : stage === "recommendation" || stage === "regularization" ? (
                             <RecommendationSection
                                 scope={scope}

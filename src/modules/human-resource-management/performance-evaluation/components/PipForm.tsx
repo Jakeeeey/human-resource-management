@@ -87,11 +87,13 @@ function EmployeeField(props: { label: string; value: string }): JSX.Element {
 }
 
 export function PipForm(props: {
+  scope: "hr" | "head";
   userId: number;
   bundle: WorkspaceBundle;
   onSaved: () => void;
+  readOnly?: boolean;
 }): JSX.Element {
-  const { userId, bundle, onSaved } = props;
+  const { scope, userId, bundle, onSaved, readOnly = false } = props;
 
   const currentPip = useMemo(() => {
     if (bundle.pips.length === 0) return null;
@@ -187,7 +189,8 @@ export function PipForm(props: {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const isReadOnly = currentPip?.status === "failed";
+  const viewerLocked = readOnly;
+  const isReadOnly = currentPip?.status === "failed" || viewerLocked;
 
   function updateArea(key: string, name: string): void {
     setAreaRows((prev) =>
@@ -351,7 +354,7 @@ export function PipForm(props: {
             Performance Improvement Plan
           </CardTitle>
           <StatusBadge tone="neutral">
-            {currentPip ? "Edit" : "Create"}
+            {currentPip ? "Edit" : "Draft"}
           </StatusBadge>
           {currentPip ? (
             <StatusBadge
@@ -381,7 +384,21 @@ export function PipForm(props: {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        {isReadOnly ? (
+        {viewerLocked ? (
+          <Alert>
+            <AlertTitle>
+              {scope === "hr"
+                ? "Awaiting the department head"
+                : "Awaiting HR"}
+            </AlertTitle>
+            <AlertDescription>
+              The department head owns this PIP step. You can review the plan,
+              timeline, and outcome below, but only the department head can
+              submit them.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {isReadOnly && !viewerLocked ? (
           <Alert variant="destructive">
             <AlertTitle>PIP failed — read-only</AlertTitle>
             <AlertDescription>

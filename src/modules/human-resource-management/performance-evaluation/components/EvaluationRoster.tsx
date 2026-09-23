@@ -7,6 +7,14 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { useEvaluationRoster } from "../hooks/useEvaluationRoster";
 import type { EvaluationScope } from "../providers/evaluationClient";
@@ -31,6 +39,8 @@ const SCOPE_COPY: Record<
   },
 };
 
+const SKELETON_ROWS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
 function RosterSkeleton() {
   return (
     <div
@@ -44,14 +54,82 @@ function RosterSkeleton() {
       </div>
       <Skeleton className="h-[58px] w-full" />
       <div className="data-grid">
-        <Skeleton className="h-12 w-full rounded-none border-b border-border/50" />
-        {[0, 1, 2, 3, 4, 5].map((index) => (
-          <Skeleton
-            key={index}
-            className="h-16 w-full rounded-none border-b border-border/50 last:border-b-0"
-          />
-        ))}
-        <Skeleton className="h-14 w-full rounded-none border-t border-border/50" />
+        <ul className="max-h-[560px] divide-y divide-border overflow-auto xl:hidden">
+          {SKELETON_ROWS.map((index) => (
+            <li key={index} className="flex flex-col gap-2.5 p-4">
+              <span className="flex items-start justify-between gap-2">
+                <span className="min-w-0 flex-1">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="mt-1 h-3 w-1/2" />
+                </span>
+                <Skeleton className="h-4 w-4 shrink-0" />
+              </span>
+              <span className="flex flex-wrap items-center gap-1.5">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </span>
+              <span className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="col-span-2 h-16 w-full" />
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="hidden max-h-[560px] overflow-auto xl:block">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Employee</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead className="td-num">Date hired</TableHead>
+                <TableHead>Due dates</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Attention</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {SKELETON_ROWS.map((index) => (
+                <TableRow key={index}>
+                  <TableCell>
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="mt-1 h-3 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-24" />
+                  </TableCell>
+                  <TableCell className="td-num">
+                    <Skeleton className="ml-auto h-4 w-20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="mt-1 h-3 w-24" />
+                    <Skeleton className="mt-1 h-3 w-24" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-6 w-24 rounded-full" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-border/50 bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <Skeleton className="h-4 w-48" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Skeleton className="h-8 w-44" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-8 w-16" />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

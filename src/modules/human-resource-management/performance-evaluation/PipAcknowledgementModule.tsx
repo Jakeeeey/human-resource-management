@@ -15,7 +15,7 @@ export function PipAcknowledgementModule(): JSX.Element {
   const pendingCount = pips.filter((pip) => pip.employee_acknowledged_at === null).length;
 
   return (
-    <div className="flex-1 space-y-6 overflow-auto bg-background p-4 md:p-6">
+    <div className="flex-1 space-y-6 overflow-auto bg-background p-4 sm:p-6">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius)] border bg-card text-primary shadow-sm">
           <ClipboardList className="h-5 w-5" aria-hidden="true" />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { ArrowUpRight, CalendarDays, ListChecks } from "lucide-react";
+import { ArrowUpRight, CalendarDays, Clock, ListChecks, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -13,6 +13,7 @@ import {
   formatRosterDate,
   type DueKey,
 } from "./EvaluationRosterTable";
+import { statusToneBadgeClass } from "./StatusPill";
 
 const STAGE_LABELS: Record<string, string> = {
   first_evaluation: "1st evaluation",
@@ -88,10 +89,22 @@ export function EvaluationRosterDetail({
                 <span className="text-sm text-muted-foreground">{label}</span>
                 <span className="flex items-center gap-2">
                   {tone === "overdue" ? (
-                    <StatusBadge tone="destructive">Overdue</StatusBadge>
+                    <StatusBadge
+                      tone="destructive"
+                      className={statusToneBadgeClass("destructive")}
+                    >
+                      <TriangleAlert aria-hidden="true" />
+                      Overdue
+                    </StatusBadge>
                   ) : null}
                   {tone === "soon" ? (
-                    <StatusBadge tone="warning">Due soon</StatusBadge>
+                    <StatusBadge
+                      tone="warning"
+                      className={statusToneBadgeClass("warning")}
+                    >
+                      <Clock aria-hidden="true" />
+                      Due soon
+                    </StatusBadge>
                   ) : null}
                   <span
                     className={
@@ -156,7 +169,7 @@ export function EvaluationRosterDetail({
 
       {workspaceHref ? (
         <Button asChild className="w-full">
-          <Link href={workspaceHref}>
+          <Link href={workspaceHref} target="_blank" rel="noopener noreferrer">
             Open workspace
             <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
           </Link>

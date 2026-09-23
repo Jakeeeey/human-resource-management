@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronRight, UserSearch } from "lucide-react";
+import {
+  ChevronRight,
+  CircleCheck,
+  Clock,
+  TriangleAlert,
+  UserSearch,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +37,7 @@ import { cn } from "@/lib/utils";
 
 import type { EvaluationScope } from "../providers/evaluationClient";
 import type { RosterRow } from "../types/performance-evaluation.schema";
-import { StatusPill } from "./StatusPill";
+import { StatusPill, statusToneBadgeClass } from "./StatusPill";
 
 export const EVALUATION_ROSTER_PAGE_SIZES = [10, 25, 50, 100] as const;
 
@@ -165,10 +171,28 @@ function DueTriple({ row }: { row: RosterRow }) {
 function AttentionBadge({ row }: { row: RosterRow }) {
   const attention = attentionFor(row);
   if (attention === "overdue")
-    return <StatusBadge tone="destructive">Overdue</StatusBadge>;
+    return (
+      <StatusBadge
+        tone="destructive"
+        className={statusToneBadgeClass("destructive")}
+      >
+        <TriangleAlert aria-hidden="true" />
+        Overdue
+      </StatusBadge>
+    );
   if (attention === "soon")
-    return <StatusBadge tone="warning">Due soon</StatusBadge>;
-  return null;
+    return (
+      <StatusBadge tone="warning" className={statusToneBadgeClass("warning")}>
+        <Clock aria-hidden="true" />
+        Due soon
+      </StatusBadge>
+    );
+  return (
+    <StatusBadge tone="neutral" className={statusToneBadgeClass("neutral")}>
+      <CircleCheck aria-hidden="true" />
+      On track
+    </StatusBadge>
+  );
 }
 
 function emptyCopy(scope: EvaluationScope, filtersActive: boolean) {
@@ -270,10 +294,12 @@ export function EvaluationRosterTable({
                 <li key={row.user_id}>
                   <button
                     type="button"
+                    data-roster-row={row.user_id}
+                    aria-label={`View evaluation details for ${row.full_name}`}
                     aria-current={isActive ? "true" : undefined}
                     onClick={() => onSelect(row)}
                     className={cn(
-                      "flex w-full flex-col gap-2.5 p-4 text-left transition-colors hover:bg-accent/60",
+                      "flex w-full flex-col gap-2.5 p-4 text-left transition-colors hover:bg-accent/60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring focus-visible:-outline-offset-2",
                       isActive && "bg-accent hover:bg-accent"
                     )}
                   >
@@ -364,6 +390,8 @@ export function EvaluationRosterTable({
                 return (
                   <TableRow
                     key={row.user_id}
+                    data-roster-row={row.user_id}
+                    aria-label={`View evaluation details for ${row.full_name}`}
                     aria-selected={isActive}
                     tabIndex={0}
                     onClick={() => onSelect(row)}
@@ -374,7 +402,7 @@ export function EvaluationRosterTable({
                       }
                     }}
                     className={cn(
-                      "cursor-pointer transition-colors",
+                      "cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring focus-visible:-outline-offset-2",
                       isActive && "bg-accent hover:bg-accent"
                     )}
                   >

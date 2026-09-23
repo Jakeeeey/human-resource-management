@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
-import { AlertCircle, CheckCircle2, FileText, Loader2, Lock, RotateCcw } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Loader2, Lock, RotateCcw, ShieldAlert } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,8 @@ const RESULT_LABELS: Record<NonNullable<EmployeePipActionPlan["result"]>, string
   partially_met: "Partially met",
   not_met: "Not met",
 };
+
+const PLAN_PAGE_SIZE = 10;
 
 const MONTHS = [
   "Jan",
@@ -105,7 +107,7 @@ function resultLabel(result: EmployeePipActionPlan["result"]): string {
 
 function PipDetailSkeleton(): JSX.Element {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="mx-auto w-full max-w-3xl space-y-4 p-4 sm:p-6">
       <Card>
         <CardContent className="space-y-4 pt-6">
           <div className="flex items-center justify-between gap-2">
@@ -135,6 +137,7 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [planPage, setPlanPage] = useState(1);
   const viewedOnceRef = useRef(false);
 
   useEffect(() => {
@@ -142,6 +145,10 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
     viewedOnceRef.current = true;
     void markViewed().catch(() => undefined);
   }, [markViewed]);
+
+  useEffect(() => {
+    setPlanPage(1);
+  }, [pipId, actionPlans.length]);
 
   async function handleConfirm(): Promise<void> {
     setActionBusy(true);
@@ -161,17 +168,28 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
   }
 
   if (error || !pip) {
+    const accessDenied =
+      error !== null && /403|forbidden|not have access|access denied/i.test(error);
     return (
-      <div className="mx-auto w-full max-w-3xl">
+      <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
         <Card>
           <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <FileText className="h-5 w-5" aria-hidden="true" />
+              {accessDenied ? (
+                <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <FileText className="h-5 w-5" aria-hidden="true" />
+              )}
             </span>
-            <p className="text-sm font-semibold">This improvement plan is not available.</p>
+            <p className="text-sm font-semibold">
+              {accessDenied
+                ? "You don't have access to this improvement plan."
+                : "This improvement plan is not available."}
+            </p>
             <p className="max-w-sm text-sm text-muted-foreground">
-              It may have been removed, or you may not have access to it. If you believe
-              this is a mistake, contact HR.
+              {accessDenied
+                ? "This plan belongs to another employee, or your access was changed. If you believe this is a mistake, contact HR."
+                : "It may have been removed, or you may not have access to it. If you believe this is a mistake, contact HR."}
             </p>
             <Button variant="outline" size="sm" className="mt-2" onClick={() => void refresh()}>
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -187,9 +205,18 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
   const period = `${formatDay(pip.pip_start_date)} — ${formatDay(pip.pip_end_date)}`;
   const sortedAreas = [...areas].sort((a, b) => a.sort_order - b.sort_order);
   const sortedPlans = [...actionPlans].sort((a, b) => a.sort_order - b.sort_order);
+  const planTotalPages = Math.max(1, Math.ceil(sortedPlans.length / PLAN_PAGE_SIZE));
+  const safePlanPage = Math.min(Math.max(1, planPage), planTotalPages);
+  const planRangeStart =
+    sortedPlans.length === 0 ? 0 : (safePlanPage - 1) * PLAN_PAGE_SIZE + 1;
+  const planRangeEnd = Math.min(safePlanPage * PLAN_PAGE_SIZE, sortedPlans.length);
+  const pagedPlans = sortedPlans.slice(
+    (safePlanPage - 1) * PLAN_PAGE_SIZE,
+    safePlanPage * PLAN_PAGE_SIZE
+  );
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="mx-auto w-full max-w-3xl space-y-4 p-4 sm:p-6">
       <Card>
         <CardHeader className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -258,27 +285,77 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
             {sortedPlans.length === 0 ? (
               <p className="text-sm text-muted-foreground">No action plans recorded.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="data-grid density-compact min-w-[36rem]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Area for improvement</TableHead>
-                      <TableHead>Action plan</TableHead>
-                      <TableHead>Review date</TableHead>
-                      <TableHead>Result</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedPlans.map((plan) => (
-                      <TableRow key={plan.id}>
-                        <TableCell className="font-medium">{plan.area_for_improvement}</TableCell>
-                        <TableCell>{plan.action_plan ?? "—"}</TableCell>
-                        <TableCell className="tabular-nums">{formatDay(plan.review_date)}</TableCell>
-                        <TableCell>{resultLabel(plan.result)}</TableCell>
+              <div className="space-y-2">
+                <ul className="space-y-2 sm:hidden">
+                  {pagedPlans.map((plan) => (
+                    <li
+                      key={plan.id}
+                      className="space-y-1 rounded-[var(--radius)] border bg-card px-3 py-2"
+                    >
+                      <p className="text-sm font-medium">{plan.area_for_improvement}</p>
+                      <p className="text-sm text-muted-foreground">{plan.action_plan ?? "—"}</p>
+                      <p className="flex items-center justify-between gap-2 text-xs text-muted-foreground tabular-nums">
+                        <span>{formatDay(plan.review_date)}</span>
+                        <span>{resultLabel(plan.result)}</span>
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                <div className="hidden max-h-[560px] overflow-auto sm:block">
+                  <Table className="data-grid density-compact">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Area for improvement</TableHead>
+                        <TableHead>Action plan</TableHead>
+                        <TableHead>Review date</TableHead>
+                        <TableHead>Result</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {pagedPlans.map((plan) => (
+                        <TableRow key={plan.id}>
+                          <TableCell className="font-medium">{plan.area_for_improvement}</TableCell>
+                          <TableCell>{plan.action_plan ?? "—"}</TableCell>
+                          <TableCell className="tabular-nums">
+                            {formatDay(plan.review_date)}
+                          </TableCell>
+                          <TableCell>{resultLabel(plan.result)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                {planTotalPages > 1 ? (
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
+                      Showing {planRangeStart}–{planRangeEnd} of {sortedPlans.length}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={safePlanPage <= 1}
+                        onClick={() => setPlanPage(safePlanPage - 1)}
+                      >
+                        Previous
+                      </Button>
+                      <span
+                        className="text-xs text-muted-foreground tabular-nums"
+                        aria-live="polite"
+                      >
+                        {safePlanPage} of {planTotalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={safePlanPage >= planTotalPages}
+                        onClick={() => setPlanPage(safePlanPage + 1)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </section>

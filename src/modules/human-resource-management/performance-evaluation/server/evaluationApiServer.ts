@@ -14,6 +14,8 @@ export const EVALUATION_ERROR_CODES = {
   rowNotFound: "EVALUATION_ROW_NOT_FOUND",
   readFailed: "EVALUATION_READ_FAILED",
   writeFailed: "EVALUATION_WRITE_FAILED",
+  criteriaNotConfigured: "EVALUATION_CRITERIA_NOT_CONFIGURED",
+  criteriaWeightInvalid: "EVALUATION_CRITERIA_WEIGHT_INVALID",
 } as const;
 
 export type EvaluationErrorCode =

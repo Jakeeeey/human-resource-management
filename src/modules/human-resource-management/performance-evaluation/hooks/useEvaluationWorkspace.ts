@@ -13,6 +13,7 @@ export interface EvaluationWorkspaceState {
   bundle: WorkspaceBundle | null;
   loading: boolean;
   error: string | null;
+  errorStatus: number | null;
   refresh: () => Promise<void>;
 }
 
@@ -23,6 +24,7 @@ export function useEvaluationWorkspace(
   const [bundle, setBundle] = useState<WorkspaceBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const mountedRef = useRef(false);
 
   useEffect(() => {
@@ -37,6 +39,7 @@ export function useEvaluationWorkspace(
     if (mountedRef.current) {
       setLoading(true);
       setError(null);
+      setErrorStatus(null);
     }
     try {
       const next = await getWorkspace(scope, userId);
@@ -48,6 +51,7 @@ export function useEvaluationWorkspace(
       setError(
         err instanceof EvaluationClientError ? err.message : "Failed to load this workspace.",
       );
+      setErrorStatus(err instanceof EvaluationClientError ? err.status : null);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -57,11 +61,12 @@ export function useEvaluationWorkspace(
     if (userId === null) {
       setBundle(null);
       setError(null);
+      setErrorStatus(null);
       setLoading(false);
       return;
     }
     void refresh();
   }, [userId, refresh]);
 
-  return { bundle, loading, error, refresh };
+  return { bundle, loading, error, errorStatus, refresh };
 }

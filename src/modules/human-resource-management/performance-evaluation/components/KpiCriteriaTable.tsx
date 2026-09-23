@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -50,6 +50,7 @@ interface KpiCriteriaTableProps {
   error: string | null;
   editable: boolean;
   readOnlyNote: string;
+  departmentName?: string | null;
   onCreate: () => void;
   onEdit: (row: EvaluationCriterion) => void;
   onRemove: (id: number) => Promise<void>;
@@ -67,6 +68,7 @@ export function KpiCriteriaTable({
   error,
   editable,
   readOnlyNote,
+  departmentName,
   onCreate,
   onEdit,
   onRemove,
@@ -102,14 +104,8 @@ export function KpiCriteriaTable({
     setPage(1);
   };
 
-  const move = async (row: EvaluationCriterion, direction: -1 | 1) => {
-    const index = ordered.findIndex((entry) => entry.id === row.id);
-    const neighbor = ordered[index + direction];
-    if (index < 0 || !neighbor) return;
-    const next = [...ordered];
-    next[index] = neighbor;
-    next[index + direction] = row;
-    setMovingId(row.id);
+  const persistOrder = async (rowId: number, next: EvaluationCriterion[]) => {
+    setMovingId(rowId);
     setMoveError(null);
     try {
       await onReorder(next.map((entry, position) => ({ id: entry.id, sort_order: (position + 1) * 10 })));
@@ -118,6 +114,92 @@ export function KpiCriteriaTable({
     } finally {
       setMovingId(null);
     }
+  };
+
+  const move = (row: EvaluationCriterion, direction: -1 | 1) => {
+    const index = ordered.findIndex((entry) => entry.id === row.id);
+    const neighbor = ordered[index + direction];
+    if (index < 0 || !neighbor) return;
+    const next = [...ordered];
+    next[index] = neighbor;
+    next[index + direction] = row;
+    void persistOrder(row.id, next);
+  };
+
+  const moveToEdge = (row: EvaluationCriterion, edge: "first" | "last") => {
+    const index = ordered.findIndex((entry) => entry.id === row.id);
+    if (index < 0) return;
+    if (edge === "first" && index === 0) return;
+    if (edge === "last" && index === ordered.length - 1) return;
+    const next = ordered.filter((entry) => entry.id !== row.id);
+    next.splice(edge === "first" ? 0 : next.length, 0, row);
+    void persistOrder(row.id, next);
+  };
+
+  const renderRowActions = (row: EvaluationCriterion, className: string) => {
+    const position = ordered.findIndex((entry) => entry.id === row.id);
+    const isFirst = position === 0;
+    const isLast = position === ordered.length - 1;
+    const busy = movingId === row.id;
+    return (
+      <div className={`flex items-center gap-1 ${className}`}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Move ${row.kpi_category} to top`}
+          disabled={busy || isFirst}
+          onClick={() => moveToEdge(row, "first")}
+        >
+          <ChevronsUp className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Move ${row.kpi_category} up`}
+          disabled={busy || isFirst}
+          onClick={() => move(row, -1)}
+        >
+          <ArrowUp className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Move ${row.kpi_category} down`}
+          disabled={busy || isLast}
+          onClick={() => move(row, 1)}
+        >
+          <ArrowDown className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Move ${row.kpi_category} to bottom`}
+          disabled={busy || isLast}
+          onClick={() => moveToEdge(row, "last")}
+        >
+          <ChevronsDown className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Edit ${row.kpi_category}`}
+          onClick={() => onEdit(row)}
+        >
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Delete ${row.kpi_category}`}
+          onClick={() => {
+            setDeleteError(null);
+            setDeleteTarget(row);
+          }}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    );
   };
 
   const confirmDelete = async () => {
@@ -174,9 +256,19 @@ export function KpiCriteriaTable({
           ) : (
             <p className="text-sm text-muted-foreground">{readOnlyNote}</p>
           )}
-          <StatusBadge tone={weightsBalanced ? "success" : "warning"}>
-            <span aria-live="polite">Active weight total: {activeWeightTotal}%</span>
-          </StatusBadge>
+          <span title={totalPages > 1 ? "Sums active criteria across all pages." : undefined}>
+            <StatusBadge tone={weightsBalanced ? "success" : "warning"}>
+              <span aria-live="polite">
+                Active weight total: {activeWeightTotal}%
+                {totalPages > 1 ? ` (all ${ordered.length} criteria)` : ""}
+              </span>
+            </StatusBadge>
+          </span>
+          {departmentName && (
+            <p className="text-sm text-muted-foreground">
+              Department: <span className="font-medium text-foreground">{departmentName}</span>
+            </p>
+          )}
           {!weightsBalanced && (
             <p className="text-sm text-muted-foreground">
               Active criteria must total 100% before an evaluation can be created.
@@ -191,13 +283,27 @@ export function KpiCriteriaTable({
         )}
 
         {ordered.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-            No KPI criteria yet.
-          </p>
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border p-8 text-center">
+            <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <ListChecks className="size-5" aria-hidden="true" />
+            </span>
+            <p className="text-sm font-semibold text-foreground">No KPI criteria yet</p>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Add your first criterion to start building this department&apos;s 100% library.
+            </p>
+            {editable ? (
+              <Button onClick={onCreate} className="mt-1">
+                <Plus className="size-4" />
+                Add criterion
+              </Button>
+            ) : (
+              readOnlyNote !== "" && <p className="text-sm text-muted-foreground">{readOnlyNote}</p>
+            )}
+          </div>
         ) : (
           <div className="density-comfortable">
             <div className="data-grid">
-              <div className="overflow-x-auto">
+              <div className="hidden overflow-x-auto sm:block">
                 <Table className="min-w-[880px]">
                   <TableHeader>
                     <TableRow>
@@ -209,24 +315,23 @@ export function KpiCriteriaTable({
                       <TableHead scope="col" className="td-num w-24">Weight %</TableHead>
                       <TableHead scope="col" className="w-24">Active</TableHead>
                       {editable && (
-                        <TableHead scope="col" className="w-36 text-right">Actions</TableHead>
+                        <TableHead scope="col" className="w-56 text-right">Actions</TableHead>
                       )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visible.map((row) => {
-                      const position = ordered.findIndex((entry) => entry.id === row.id);
-                      const isFirst = position === 0;
-                      const isLast = position === ordered.length - 1;
-                      const busy = movingId === row.id;
-                      return (
-                        <TableRow key={row.id}>
+                    {visible.map((row) => (
+                      <TableRow key={row.id}>
                           <TableCell className="td-num text-muted-foreground">{row.sort_order}</TableCell>
                           <TableCell className="font-medium">{row.kpi_category}</TableCell>
                           <TableCell>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="block max-w-64 cursor-default truncate text-muted-foreground">
+                                <span
+                                  tabIndex={0}
+                                  aria-label={row.kpi_description}
+                                  className="block max-w-64 cursor-default truncate text-muted-foreground"
+                                >
                                   {row.kpi_description}
                                 </span>
                               </TooltipTrigger>
@@ -248,54 +353,53 @@ export function KpiCriteriaTable({
                             </StatusBadge>
                           </TableCell>
                           {editable && (
-                            <TableCell>
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={`Move ${row.kpi_category} up`}
-                                  disabled={busy || isFirst}
-                                  onClick={() => void move(row, -1)}
-                                >
-                                  <ArrowUp className="size-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={`Move ${row.kpi_category} down`}
-                                  disabled={busy || isLast}
-                                  onClick={() => void move(row, 1)}
-                                >
-                                  <ArrowDown className="size-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={`Edit ${row.kpi_category}`}
-                                  onClick={() => onEdit(row)}
-                                >
-                                  <Pencil className="size-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={`Delete ${row.kpi_category}`}
-                                  onClick={() => {
-                                    setDeleteError(null);
-                                    setDeleteTarget(row);
-                                  }}
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
+                            <TableCell>{renderRowActions(row, "justify-end")}</TableCell>
                           )}
                         </TableRow>
-                      );
-                    })}
+                    ))}
                   </TableBody>
                 </Table>
               </div>
+
+              <ul className="space-y-3 p-3 sm:hidden">
+                {visible.map((row) => (
+                  <li
+                    key={row.id}
+                    className="space-y-2 rounded-2xl border border-border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium">{row.kpi_category}</p>
+                      <StatusBadge tone={row.is_active ? "success" : "neutral"}>
+                        {row.is_active ? "Active" : "Inactive"}
+                      </StatusBadge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{row.kpi_description}</p>
+                    <dl className="grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Weight</dt>
+                        <dd className="font-medium tabular-nums">{row.weight_percentage}%</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Target</dt>
+                        <dd className="text-muted-foreground">
+                          {row.target && row.target.trim() !== "" ? row.target : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Method</dt>
+                        <dd className="text-muted-foreground">
+                          {row.measurement_method && row.measurement_method.trim() !== "" ? row.measurement_method : "—"}
+                        </dd>
+                      </div>
+                    </dl>
+                    {editable && (
+                      <div className="border-t border-border/50 pt-2">
+                        {renderRowActions(row, "justify-start")}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
 
               <div className="flex flex-col gap-3 border-t border-border/50 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground" aria-live="polite">

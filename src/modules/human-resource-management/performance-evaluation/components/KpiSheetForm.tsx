@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { JSX } from "react";
+import Link from "next/link";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -126,8 +127,10 @@ export function KpiSheetForm(props: {
   evalType: "first" | "second";
   bundle: WorkspaceBundle;
   onSaved: () => void;
+  readOnly?: boolean;
 }): JSX.Element {
-  const { scope, userId, evalType, bundle, onSaved } = props;
+  const { scope, userId, evalType, bundle, onSaved, readOnly = false } = props;
+  const viewerLocked = readOnly;
 
   const newestOfType = useMemo(() => {
     const matches = bundle.evaluations
@@ -251,6 +254,8 @@ export function KpiSheetForm(props: {
   const weightsValid = isWeightSetValid(weightItems);
 
   const unlinkedRow = rows.some((row) => row.criterionId == null);
+  const libraryEmpty =
+    !existing && !voidBlocked && !libraryLoading && !libraryError && rows.length === 0;
   const allRated =
     rows.length > 0 &&
     ratings.length === rows.length &&
@@ -258,6 +263,8 @@ export function KpiSheetForm(props: {
   const canSave =
     !saving &&
     !voidBlocked &&
+    !viewerLocked &&
+    !libraryEmpty &&
     rows.length > 0 &&
     allRated &&
     result != null &&
@@ -352,7 +359,7 @@ export function KpiSheetForm(props: {
           <StatusBadge tone="neutral">
             {scope === "hr" ? "HR" : "Department Head"}
           </StatusBadge>
-          <StatusBadge tone="neutral">{existing ? "Edit" : "Create"}</StatusBadge>
+          <StatusBadge tone="neutral">{existing ? "Edit" : "Draft"}</StatusBadge>
         </div>
         <p className="text-xs text-muted-foreground">
           {bundle.employee.full_name}
@@ -363,6 +370,21 @@ export function KpiSheetForm(props: {
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
+        {viewerLocked ? (
+          <Alert>
+            <AlertTitle>
+              {scope === "hr"
+                ? "Awaiting the department head"
+                : "Awaiting HR"}
+            </AlertTitle>
+            <AlertDescription>
+              {scope === "hr"
+                ? "The department head owns this evaluation step. You can review the scores, band, result, and comments below, but only the department head can submit them."
+                : "HR owns this step. You can review the scores, band, result, and comments below, but only HR can submit them."}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         {voidBlocked ? (
           <Alert variant="destructive">
             <AlertTitle>Evaluation voided</AlertTitle>
@@ -397,23 +419,29 @@ export function KpiSheetForm(props: {
           </Alert>
         ) : null}
 
-        {!libraryLoading && !libraryError && rows.length === 0 && !voidBlocked ? (
-          <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-border p-6 text-center">
+        {libraryEmpty ? (
+          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-6 text-center">
             <p className="text-sm font-semibold">No KPI rows</p>
             <p className="text-sm text-muted-foreground">
               There are no active KPI criteria in this employee&apos;s
-              department library yet.
+              department library yet. The department head populates the library
+              before an evaluation can be recorded.
             </p>
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/hrm/department-evaluation/criteria">
+                Open evaluation criteria
+              </Link>
+            </Button>
           </div>
         ) : null}
 
         {rows.length > 0 ? (
           <section aria-label="KPI scorecard" className="space-y-3">
-            <div className="overflow-x-auto">
+            <div className="max-h-[60vh] overflow-auto">
               <table className="data-grid density-comfortable min-w-[880px]">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-muted">
                   <tr>
-                    <th scope="col">KPI Category</th>
+                    <th scope="col" className="sticky left-0 z-10 bg-muted">KPI Category</th>
                     <th scope="col">Description</th>
                     <th scope="col">Target</th>
                     <th scope="col">Measurement Method</th>
@@ -433,7 +461,7 @@ export function KpiSheetForm(props: {
                       rating == null ? null : (rating * row.weight) / 100;
                     return (
                       <tr key={row.key}>
-                        <td className="font-medium">{row.category}</td>
+                        <td className="sticky left-0 bg-card font-medium">{row.category}</td>
                         <td className="max-w-xs whitespace-pre-wrap">
                           {row.description}
                         </td>
@@ -450,7 +478,7 @@ export function KpiSheetForm(props: {
                           <RatingSelector
                             rowLabel={row.category}
                             value={rating}
-                            disabled={voidBlocked || saving}
+                            disabled={voidBlocked || saving || viewerLocked}
                             onSelect={(next) =>
                               handleRatingSelect(index, next)
                             }
@@ -477,7 +505,7 @@ export function KpiSheetForm(props: {
         {rows.length > 0 ? (
           <section
             aria-label="Live total"
-            className="rounded-lg border border-border bg-card p-4"
+            className="sticky bottom-0 z-10 rounded-lg border border-border bg-card p-4"
           >
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="space-y-1">
@@ -526,12 +554,13 @@ export function KpiSheetForm(props: {
 
         <Separator />
 
+        {libraryEmpty ? null : (
         <div className="space-y-2">
           <Label htmlFor="kpi-evaluator-comments">Evaluator comments</Label>
           <Textarea
             id="kpi-evaluator-comments"
             value={comments}
-            disabled={voidBlocked || saving}
+            disabled={voidBlocked || saving || viewerLocked}
             onChange={(event) => setComments(event.target.value)}
             placeholder="Observations, strengths, and concerns supporting the verdict"
             rows={4}
@@ -540,7 +569,9 @@ export function KpiSheetForm(props: {
             Optional. Saved with the evaluation and shown in the history card.
           </p>
         </div>
+        )}
 
+        {libraryEmpty ? null : (
         <section
           aria-label="Evaluation result"
           className="space-y-2 rounded-lg border border-border p-4"
@@ -551,6 +582,18 @@ export function KpiSheetForm(props: {
               Decided by the evaluator, never auto-computed from the score.
             </p>
           </div>
+          {viewerLocked ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Verdict:</span>
+              {result ? (
+                <StatusBadge tone={result === "passed" ? "success" : "destructive"}>
+                  {result === "passed" ? "Pass" : "Fail"}
+                </StatusBadge>
+              ) : (
+                <StatusBadge tone="neutral">Not recorded yet</StatusBadge>
+              )}
+            </div>
+          ) : (
           <div
             role="radiogroup"
             aria-label="Evaluation result"
@@ -611,7 +654,9 @@ export function KpiSheetForm(props: {
               </span>
             </button>
           </div>
+          )}
         </section>
+        )}
 
         {saveError ? (
           <Alert variant="destructive">
@@ -620,7 +665,7 @@ export function KpiSheetForm(props: {
           </Alert>
         ) : null}
 
-        {!voidBlocked ? (
+        {!voidBlocked && !viewerLocked && !libraryEmpty ? (
           <Button
             type="button"
             disabled={!canSave}

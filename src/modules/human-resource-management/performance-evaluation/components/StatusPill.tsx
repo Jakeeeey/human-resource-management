@@ -16,9 +16,24 @@ export const PROBATION_STATUS_TONES: Record<string, StatusTone> = {
   terminated: "destructive",
 };
 
+const STATUS_TONE_BADGE_CLASS: Record<StatusTone, string> = {
+  neutral: "border-transparent bg-muted text-foreground",
+  success:
+    "border-transparent bg-[hsl(var(--success-bg))] text-[hsl(var(--success))]",
+  warning:
+    "border-transparent bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning))]",
+  info: "border-transparent bg-[hsl(var(--info-bg))] text-[hsl(var(--info))]",
+  destructive: "border-transparent bg-destructive/10 text-destructive",
+};
+
+export function statusToneBadgeClass(tone: StatusTone): string {
+  return STATUS_TONE_BADGE_CLASS[tone];
+}
+
 export function StatusPill({ status }: { status: string }) {
+  const tone = PROBATION_STATUS_TONES[status] ?? "neutral";
   return (
-    <StatusBadge tone={PROBATION_STATUS_TONES[status] ?? "neutral"}>
+    <StatusBadge tone={tone} className={STATUS_TONE_BADGE_CLASS[tone]}>
       {PROBATION_STATUS_LABELS[status] ?? status}
     </StatusBadge>
   );
