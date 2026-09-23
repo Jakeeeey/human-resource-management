@@ -6,7 +6,7 @@ import { ApplicantFetchProvider } from "./providers/fetchProvider";
 import { useApplicants } from "./hooks/useApplicants";
 import type { ApplicantRow } from "./types";
 import { ApplicantsTable } from "./components/Table";
-import { ApplicantDetailDrawer } from "./components/ApplicantDetailDrawer";
+import { ApplicationViewDialog } from "../manpower-recommendation/components/ApplicationViewDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCw, Users } from "lucide-react";
@@ -59,13 +59,7 @@ function ApplicantsModuleContent() {
                 </Button>
             </div>
             <ApplicantsTable onSelect={setSelected} />
-            <ApplicantDetailDrawer
-                row={selected}
-                open={selected !== null}
-                onOpenChange={(o) => {
-                    if (!o) setSelected(null);
-                }}
-            />
+            <ApplicationViewDialog applicantId={selected?.id ?? null} applicantName={selected?.full_name || "Applicant"} open={selected !== null} onOpenChange={(o) => { if (!o) setSelected(null); }} />
         </div>
     );
 }
