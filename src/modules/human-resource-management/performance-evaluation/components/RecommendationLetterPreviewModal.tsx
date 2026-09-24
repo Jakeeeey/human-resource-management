@@ -12,6 +12,15 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 
+function toFitWidthUrl(url: string): string {
+    const hashIndex = url.indexOf("#");
+    if (hashIndex === -1) return `${url}#zoom=page-width`;
+    const base = url.slice(0, hashIndex);
+    const fragment = url.slice(hashIndex + 1);
+    if (fragment.includes("zoom=")) return url;
+    return fragment ? `${base}#${fragment}&zoom=page-width` : `${base}#zoom=page-width`;
+}
+
 export function RecommendationLetterPreviewModal({
     isOpen,
     onOpenChange,
@@ -23,6 +32,7 @@ export function RecommendationLetterPreviewModal({
     pdfUrl: string | null;
     fileName: string;
 }) {
+    const viewUrl = pdfUrl ? toFitWidthUrl(pdfUrl) : null;
     const handlePrint = () => {
         if (!pdfUrl) return;
         const iframe = document.createElement("iframe");
@@ -59,7 +69,7 @@ export function RecommendationLetterPreviewModal({
                     {pdfUrl ? (
                         <div className="mx-auto max-w-3xl overflow-hidden rounded-[var(--radius)] border bg-card shadow-md">
                             <iframe
-                                src={pdfUrl}
+                                src={viewUrl ?? pdfUrl}
                                 className="h-[68vh] w-full border-0 sm:h-[72vh]"
                                 title="Recommendation letter preview"
                             />

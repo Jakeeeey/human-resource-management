@@ -4,14 +4,9 @@ import { Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+
+import { DepartmentCombobox } from "./DepartmentCombobox";
 
 export function EvaluationRosterFilterBar({
   query,
@@ -55,22 +50,13 @@ export function EvaluationRosterFilterBar({
         />
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:shrink-0">
-        <Select value={department} onValueChange={onDepartmentChange}>
-          <SelectTrigger
-            aria-label="Filter by department"
-            className="h-10 bg-background sm:w-52"
-          >
-            <SelectValue placeholder="All departments" />
-          </SelectTrigger>
-          <SelectContent className="max-h-60">
-            <SelectItem value="all">All departments</SelectItem>
-            {departmentOptions.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <DepartmentCombobox
+          id="evaluation-roster-department"
+          options={departmentOptions}
+          value={department}
+          onValueChange={onDepartmentChange}
+          placeholder="All departments"
+        />
         <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3">
           <Switch
             id="evaluation-roster-show-regular"

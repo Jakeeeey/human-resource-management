@@ -19,6 +19,7 @@ import type {
 } from "../types/performance-evaluation.schema";
 import {
     EvaluationClientError,
+    getDepartmentSuperiors,
     issueRecommendation,
     regularize,
     type EvaluationScope,
@@ -34,6 +35,17 @@ interface CompanyLogo {
     company_name: string;
     logo_data_url: string | null;
     is_default: boolean;
+}
+
+interface PdfCompanyRecord {
+    company_name: unknown;
+    company_address: unknown;
+    company_brgy: unknown;
+    company_city: unknown;
+    company_province: unknown;
+    company_zipCode: unknown;
+    company_contact: unknown;
+    company_email: unknown;
 }
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -110,6 +122,11 @@ export function RecommendationSection({
 }) {
     const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
     const [companyName, setCompanyName] = useState("");
+    const [headerAddress, setHeaderAddress] = useState("");
+    const [headerContact, setHeaderContact] = useState("");
+    const [headerEmail, setHeaderEmail] = useState("");
+    const [signatoryName, setSignatoryName] = useState("");
+    const [signatoryTitle, setSignatoryTitle] = useState("");
     const [issuing, setIssuing] = useState(false);
     const [regularizing, setRegularizing] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -127,7 +144,7 @@ export function RecommendationSection({
                 const preferred = rows.find((row) => row.is_default) ?? rows[0];
                 if (!preferred) return;
                 setLogoDataUrl(preferred.logo_data_url);
-                setCompanyName(preferred.company_name);
+                setCompanyName((previous) => (previous.trim() ? previous : preferred.company_name));
             } catch {
                 if (!cancelled) setLogoDataUrl(null);
             }
@@ -136,6 +153,62 @@ export function RecommendationSection({
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch("/api/pdf/company");
+                if (!res.ok) return;
+                const json = await res.json().catch(() => null);
+                if (cancelled || !Array.isArray(json?.data)) return;
+                const rows = json.data as PdfCompanyRecord[];
+                const record = rows[0] ?? null;
+                if (!record) return;
+                const text = (value: unknown): string =>
+                    typeof value === "string" ? value : "";
+                const address = [
+                    text(record.company_address),
+                    text(record.company_brgy),
+                    text(record.company_city),
+                    text(record.company_province),
+                    text(record.company_zipCode),
+                ]
+                    .filter((part) => part.trim() !== "")
+                    .join(", ");
+                const name = text(record.company_name);
+                if (cancelled) return;
+                if (name.trim()) setCompanyName(name);
+                setHeaderAddress(address);
+                setHeaderContact(text(record.company_contact));
+                setHeaderEmail(text(record.company_email));
+            } catch {
+                return;
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            try {
+                const superiors = await getDepartmentSuperiors(userId);
+                if (cancelled) return;
+                const head = superiors.find((entry) => entry.is_department_head);
+                if (!head) return;
+                setSignatoryName(head.full_name);
+                setSignatoryTitle(head.position ?? "");
+            } catch {
+                return;
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [userId]);
 
     const facts = buildWorkflowFacts(bundle);
     const stage = deriveStage(facts);
@@ -169,11 +242,11 @@ export function RecommendationSection({
                 department: employee.department_name ?? "",
                 letterDate: todayPH(),
                 companyName,
-                headerAddress: "",
-                headerContact: "",
-                headerEmail: "",
-                signatoryName: "",
-                signatoryTitle: "",
+                headerAddress,
+                headerContact,
+                headerEmail,
+                signatoryName,
+                signatoryTitle,
             },
             logoDataUrl
         );
