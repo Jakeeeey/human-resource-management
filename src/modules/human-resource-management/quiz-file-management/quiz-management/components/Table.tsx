@@ -22,6 +22,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { Plus } from "lucide-react";
 import { createColumns } from "./columns";
 import { Toolbar } from "./Toolbar";
@@ -119,9 +120,6 @@ export function QuizManagementTable({
     }
 
     const totalRows = table.getFilteredRowModel().rows.length;
-    const { pageIndex, pageSize } = table.getState().pagination;
-    const rangeStart = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
-    const rangeEnd = Math.min((pageIndex + 1) * pageSize, totalRows);
 
     return (
         <div className="space-y-4">
@@ -208,29 +206,15 @@ export function QuizManagementTable({
                 </UiTable>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-                <div className="flex-1 text-sm text-muted-foreground">
-                    Showing {rangeStart}&ndash;{rangeEnd} of {totalRows}
-                </div>
-                <div className="space-x-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.previousPage()}
-                        disabled={!table.getCanPreviousPage()}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => table.nextPage()}
-                        disabled={!table.getCanNextPage()}
-                    >
-                        Next
-                    </Button>
-                </div>
-            </div>
+            {totalRows > 0 && (
+                <DataTablePagination
+                    pageIndex={table.getState().pagination.pageIndex + 1}
+                    pageSize={table.getState().pagination.pageSize}
+                    rowCount={totalRows}
+                    onPageChange={(page) => table.setPageIndex(page - 1)}
+                    onPageSizeChange={(pageSize) => table.setPageSize(pageSize)}
+                />
+            )}
 
             <QuizSettingsDialog
                 open={createDialogOpen}

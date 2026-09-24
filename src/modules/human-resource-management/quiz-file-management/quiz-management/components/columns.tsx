@@ -13,19 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import type { Quiz } from "../types";
-
-function formatDate(value: string): string {
-    if (!value) return "—";
-    try {
-        return new Date(value).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    } catch {
-        return value;
-    }
-}
+import { formatPHT } from "@/lib/time";
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
     active: "default",
@@ -132,7 +120,7 @@ export const createColumns = (
             </Button>
         ),
         meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
-        cell: ({ row }) => <div>{formatDate(row.getValue("created_at") as string)}</div>,
+        cell: ({ row }) => <div>{formatPHT(row.getValue("created_at") as string, { includeTime: false })}</div>,
     },
     {
         id: "start",
