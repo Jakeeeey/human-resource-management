@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { ArrowUpRight, CalendarDays, Clock, ListChecks, TriangleAlert } from "lucide-react";
+import { ArrowRight, CalendarDays, Clock, ListChecks, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -169,9 +169,9 @@ export function EvaluationRosterDetail({
 
       {workspaceHref ? (
         <Button asChild className="w-full">
-          <Link href={workspaceHref} target="_blank" rel="noopener noreferrer">
+          <Link href={workspaceHref}>
             Open workspace
-            <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </Button>
       ) : null}

@@ -47,6 +47,19 @@ export function isDateOverdue(
   return target.getTime() < today.getTime();
 }
 
+export const PROBATION_TERM_MONTHS = 6;
+
+export function hasCompletedProbation(
+  dateHired: string | null | undefined,
+  now: Date = new Date()
+): boolean {
+  const hired = parseLocalDate(dateHired);
+  if (hired === null) return false;
+  const probationEnd = addMonthsClamped(hired, PROBATION_TERM_MONTHS);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return probationEnd.getTime() <= today.getTime();
+}
+
 export function formatHiredDate(value: string | null | undefined): string {
   const date = parseLocalDate(value);
   if (date === null) return "—";

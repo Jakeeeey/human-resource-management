@@ -59,11 +59,14 @@ over the `WorkflowFacts` built from the workspace bundle. Never hand-roll the pr
 
 1. **Hero band** — employee identity (name, department, position, date hired) on the left; the
    `StatusBadge` and the derived stage on the right. This is the anchor of the page.
-2. **Stage rail** — a horizontal rail of the lifecycle nodes:
-   `1st Evaluation · PIP #1 · 2nd Evaluation · PIP #2 · Recommendation · Regularization`.
-   Each node is `done` (muted, check), `active` (primary, emphasised), `upcoming` (dashed/muted),
-   `skipped` (struck through — e.g. PIP #1 when the 1st evaluation passed), or `terminated`
-   (destructive). The rail is **read-only state**, not navigation.
+2. **Stage rail** — a horizontal rail of the lifecycle nodes. The base pipeline is
+   `1st Evaluation · 2nd Evaluation · Recommendation · Regularization`. A PIP node is
+   **conditional**: `PIP #1` appears only once the 1st evaluation has failed (or a PIP exists for
+   it), and `PIP #2` only once the 2nd evaluation has failed (or a PIP exists for it). A PIP is
+   never advertised up front — it is the intermediary action a *failed* evaluation triggers, so the
+   rail never shows a PIP the employee has not earned. Each node is `done` (muted, check), `active`
+   (primary, emphasised), `upcoming` (dashed/muted), or `terminated` (destructive). The rail is
+   **read-only state**, not navigation.
 3. **Next-action card** — driven by `deriveNextAction`. Shows the label and who owns it
    (HR vs Department Head). When the action belongs to the other side, say so plainly instead of
    showing a disabled form.

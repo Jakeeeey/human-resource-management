@@ -1,3 +1,5 @@
+import { hasCompletedProbation } from "./probationClock";
+
 export type ProbationStatus =
   | "probationary"
   | "pip_open"
@@ -37,18 +39,22 @@ export interface NextAction {
   owner: "hr" | "head";
 }
 
-export function deriveProbationStatus(f: WorkflowFacts): ProbationStatus {
+export function deriveProbationStatus(
+  f: WorkflowFacts,
+  now: Date = new Date()
+): ProbationStatus {
   if (f.terminatedAt !== null || f.pips.some((p) => p.status === "failed")) {
     return "terminated";
   }
   if (f.regularizedAt !== null) return "regular";
   if (f.recommendationIssuedAt !== null) return "recommendation_issued";
   if (f.pips.some((p) => p.status === "open")) return "pip_open";
+  if (hasCompletedProbation(f.dateHired, now)) return "regular";
   return "probationary";
 }
 
-export function deriveStage(f: WorkflowFacts): WorkflowStage {
-  const status = deriveProbationStatus(f);
+export function deriveStage(f: WorkflowFacts, now: Date = new Date()): WorkflowStage {
+  const status = deriveProbationStatus(f, now);
   if (status === "regular" || status === "terminated") return "closed";
   const live = f.evaluations.filter((e) => e.voidedAt === null);
   const first = live.find((e) => e.evalType === "first");
@@ -67,9 +73,9 @@ export function deriveStage(f: WorkflowFacts): WorkflowStage {
   return "recommendation";
 }
 
-export function deriveNextAction(f: WorkflowFacts): NextAction | null {
+export function deriveNextAction(f: WorkflowFacts, now: Date = new Date()): NextAction | null {
   if (f.pips.some((p) => p.status === "failed")) return null;
-  const status = deriveProbationStatus(f);
+  const status = deriveProbationStatus(f, now);
   if (status === "regular" || status === "terminated") return null;
   const live = f.evaluations.filter((e) => e.voidedAt === null);
   const first = live.find((e) => e.evalType === "first");

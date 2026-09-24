@@ -54,7 +54,7 @@ function RosterSkeleton() {
       </div>
       <Skeleton className="h-[58px] w-full" />
       <div className="data-grid">
-        <ul className="max-h-[560px] divide-y divide-border overflow-auto xl:hidden">
+        <ul className="divide-y divide-border xl:hidden">
           {SKELETON_ROWS.map((index) => (
             <li key={index} className="flex flex-col gap-2.5 p-4">
               <span className="flex items-start justify-between gap-2">
@@ -71,20 +71,20 @@ function RosterSkeleton() {
               <span className="grid grid-cols-2 gap-x-3 gap-y-2">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
-                <Skeleton className="col-span-2 h-16 w-full" />
+                <Skeleton className="col-span-2 h-8 w-full" />
               </span>
             </li>
           ))}
         </ul>
 
-        <div className="hidden max-h-[560px] overflow-auto xl:block">
+        <div className="hidden xl:block">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead className="td-num">Date hired</TableHead>
-                <TableHead>Due dates</TableHead>
+                <TableHead>Next due date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Attention</TableHead>
               </TableRow>
@@ -104,8 +104,6 @@ function RosterSkeleton() {
                   </TableCell>
                   <TableCell>
                     <Skeleton className="h-3 w-24" />
-                    <Skeleton className="mt-1 h-3 w-24" />
-                    <Skeleton className="mt-1 h-3 w-24" />
                   </TableCell>
                   <TableCell>
                     <Skeleton className="h-6 w-24 rounded-full" />

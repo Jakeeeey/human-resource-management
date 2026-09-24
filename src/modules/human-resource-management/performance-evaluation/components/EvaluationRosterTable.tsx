@@ -140,30 +140,29 @@ const DEADLINE_TEXT: Record<DeadlineTone, string> = {
   muted: "text-muted-foreground",
 };
 
-const DUE_LABELS: Record<DueKey, string> = {
-  third: "3rd",
-  fifth: "5th",
-  sixth: "6th",
-};
-
 function displayText(value: string | null): string {
   return value && value.trim() !== "" ? value : "—";
 }
 
-function DueTriple({ row }: { row: RosterRow }) {
+function nextDueKeyFor(row: RosterRow): DueKey | null {
+  const stageIndex = STAGE_ORDER[row.stage];
+  if (stageIndex === undefined) return null;
   const keys: readonly DueKey[] = ["third", "fifth", "sixth"];
+  for (const key of keys) {
+    if (DUE_STAGE[key] === stageIndex) return key;
+  }
+  return null;
+}
+
+function NextDueDate({ row }: { row: RosterRow }) {
+  const key = nextDueKeyFor(row);
+  if (key === null)
+    return <span className="tabular-nums whitespace-nowrap">—</span>;
   return (
-    <span className="flex flex-col gap-0.5 tabular-nums">
-      {keys.map((key) => (
-        <span key={key} className="flex items-baseline gap-1.5 text-[13px]">
-          <span className="w-6 shrink-0 text-xs text-muted-foreground">
-            {DUE_LABELS[key]}
-          </span>
-          <span className={DEADLINE_TEXT[deadlineToneFor(row, key)]}>
-            {formatRosterDate(dueValue(row, key))}
-          </span>
-        </span>
-      ))}
+    <span
+      className={`tabular-nums whitespace-nowrap ${DEADLINE_TEXT[deadlineToneFor(row, key)]}`}
+    >
+      {formatRosterDate(dueValue(row, key))}
     </span>
   );
 }
@@ -278,7 +277,7 @@ export function EvaluationRosterTable({
   return (
     <div className="density-comfortable">
       <div className="data-grid">
-        <ul className="max-h-[560px] divide-y divide-border overflow-auto xl:hidden">
+        <ul className="divide-y divide-border xl:hidden">
           {paged.length === 0 ? (
             <li>
               <RosterEmpty
@@ -349,9 +348,9 @@ export function EvaluationRosterTable({
                       </span>
                       <span className="col-span-2 border-t border-border/50 pt-2">
                         <span className="mb-1 block text-muted-foreground">
-                          Due dates
+                          Next due date
                         </span>
-                        <DueTriple row={row} />
+                        <NextDueDate row={row} />
                       </span>
                     </span>
                   </button>
@@ -361,14 +360,14 @@ export function EvaluationRosterTable({
           )}
         </ul>
 
-        <div className="hidden max-h-[560px] overflow-auto xl:block">
+        <div className="hidden xl:block">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead className="td-num">Date hired</TableHead>
-                <TableHead>Due dates</TableHead>
+                <TableHead>Next due date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Attention</TableHead>
               </TableRow>
@@ -429,8 +428,8 @@ export function EvaluationRosterTable({
                     <TableCell className="td-num whitespace-nowrap">
                       {formatRosterDate(row.date_hired)}
                     </TableCell>
-                    <TableCell>
-                      <DueTriple row={row} />
+                    <TableCell className="whitespace-nowrap">
+                      <NextDueDate row={row} />
                     </TableCell>
                     <TableCell>
                       <StatusPill status={row.probation_status} />

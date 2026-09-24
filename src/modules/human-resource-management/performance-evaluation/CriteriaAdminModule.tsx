@@ -42,34 +42,30 @@ function collectDepartments(rows: RosterRow[], into: Map<number, string>): void 
 
 function HeadCriteriaAdmin(): JSX.Element {
   const [departments, setDepartments] = useState<HeadDepartment[] | null>(null);
-  const [managesAllDepartments, setManagesAllDepartments] = useState(false);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([getRoster("head"), getRoster("hr")]).then(([headResult, hrResult]) => {
-      if (cancelled) return;
-      const seen = new Map<number, string>();
-      if (headResult.status === "fulfilled") collectDepartments(headResult.value, seen);
-      let managesAll = false;
-      if (hrResult.status === "fulfilled" && hrResult.value.length > 0) {
-        managesAll = true;
-        collectDepartments(hrResult.value, seen);
-      }
-      setManagesAllDepartments(managesAll);
-      setDepartments(
-        [...seen]
-          .map(([id, name]) => ({ id, name }))
-          .sort((left, right) => left.name.localeCompare(right.name)),
-      );
-    });
+    getRoster("head")
+      .then((rows) => {
+        if (cancelled) return;
+        const seen = new Map<number, string>();
+        collectDepartments(rows, seen);
+        setDepartments(
+          [...seen]
+            .map(([id, name]) => ({ id, name }))
+            .sort((left, right) => left.name.localeCompare(right.name)),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setDepartments([]);
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const showDepartmentSelector =
-    departments !== null && (departments.length > 1 || managesAllDepartments);
+  const showDepartmentSelector = departments !== null && departments.length > 1;
   const activeDepartment =
     (selectedDepartmentId !== null
       ? departments?.find((department) => department.id === selectedDepartmentId)
@@ -77,7 +73,7 @@ function HeadCriteriaAdmin(): JSX.Element {
     departments?.[0] ??
     null;
 
-  const effectiveDepartmentId = showDepartmentSelector ? (activeDepartment?.id ?? undefined) : undefined;
+  const effectiveDepartmentId = activeDepartment?.id ?? undefined;
 
   const kpi = useKpiCriteria(effectiveDepartmentId);
 

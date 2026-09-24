@@ -47,18 +47,11 @@ function resolveTargetDepartment(
     if (!Number.isInteger(parsed) || parsed <= 0) {
       return validationFailed({ department_id: ["Invalid department_id"] });
     }
-    if (!cap.isAdmin && !cap.headScopeDepartmentIds.includes(parsed))
-      return forbidden();
+    if (!cap.headScopeDepartmentIds.includes(parsed)) return forbidden();
     return parsed;
   }
   const first = cap.headScopeDepartmentIds[0];
   if (first !== undefined) return first;
-  if (cap.isAdmin && cap.userDepartmentId !== null)
-    return cap.userDepartmentId;
-  if (cap.isAdmin)
-    return validationFailed({
-      department_id: ["department_id is required"],
-    });
   return forbidden();
 }
 
