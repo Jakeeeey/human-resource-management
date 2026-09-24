@@ -20,6 +20,10 @@ import {
     isDateOverdue,
     parseLocalDate,
 } from "../utils/probationClock";
+import {
+    PROBATION_STATUS_LABELS,
+    PROBATION_STATUS_TONES,
+} from "./StatusPill";
 
 export function buildWorkflowFacts(bundle: WorkspaceBundle): WorkflowFacts {
     const evalTypeById = new Map(bundle.evaluations.map((entry) => [entry.id, entry.eval_type]));
@@ -42,25 +46,6 @@ export function buildWorkflowFacts(bundle: WorkspaceBundle): WorkflowFacts {
     };
 }
 
-const PROBATION_STATUS_LABELS: Record<ProbationStatus, string> = {
-    probationary: "Probationary",
-    pip_open: "PIP open",
-    recommendation_issued: "Recommendation issued",
-    regular: "Regular",
-    terminated: "Terminated",
-};
-
-const PROBATION_STATUS_TONES: Record<
-    ProbationStatus,
-    "neutral" | "success" | "warning" | "info" | "destructive"
-> = {
-    probationary: "info",
-    pip_open: "warning",
-    recommendation_issued: "info",
-    regular: "success",
-    terminated: "destructive",
-};
-
 const STAGE_LABELS: Record<WorkflowStage, string> = {
     first_evaluation: "1st evaluation",
     pip_1: "PIP #1",
@@ -72,13 +57,13 @@ const STAGE_LABELS: Record<WorkflowStage, string> = {
 };
 
 export function probationStatusLabel(status: ProbationStatus): string {
-    return PROBATION_STATUS_LABELS[status];
+    return PROBATION_STATUS_LABELS[status] ?? status;
 }
 
 export function probationStatusTone(
     status: ProbationStatus,
 ): "neutral" | "success" | "warning" | "info" | "destructive" {
-    return PROBATION_STATUS_TONES[status];
+    return PROBATION_STATUS_TONES[status] ?? "neutral";
 }
 
 export function workflowStageLabel(stage: WorkflowStage): string {

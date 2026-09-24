@@ -475,30 +475,32 @@ export function EvaluationRosterTable({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage <= 1}
-                onClick={() => onPageChange(safePage - 1)}
-              >
-                Previous
-              </Button>
-              <span
-                className="text-xs tabular-nums text-muted-foreground"
-                aria-live="polite"
-              >
-                {safePage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={safePage >= totalPages}
-                onClick={() => onPageChange(safePage + 1)}
-              >
-                Next
-              </Button>
-            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage <= 1}
+                  onClick={() => onPageChange(safePage - 1)}
+                >
+                  Previous
+                </Button>
+                <span
+                  className="text-xs tabular-nums text-muted-foreground"
+                  aria-live="polite"
+                >
+                  {safePage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={safePage >= totalPages}
+                  onClick={() => onPageChange(safePage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
