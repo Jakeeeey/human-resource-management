@@ -9,11 +9,16 @@ import type { NextAction, ProbationStatus } from "../utils/workflow";
 import { isDateOverdue } from "../utils/probationClock";
 import { isDueSoon, probationStatusLabel, probationStatusTone } from "./OverviewSection";
 
-const OWNER_LABELS = { hr: "HR", head: "Department head" } as const;
+const OWNER_LABELS = {
+    hr: "HR",
+    head: "Department head",
+    employee: "Employee",
+} as const;
 
 const AWAITING_LABELS = {
     hr: "Awaiting HR",
     head: "Awaiting the department head",
+    employee: "Awaiting the employee",
 } as const;
 
 export function NextActionCard({

@@ -60,6 +60,16 @@ export async function POST(
     if (pipParsed.data.employee_acknowledged_at !== null) {
       return ok(pipParsed.data);
     }
+    if (pipParsed.data.status !== "open") {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "PIP_ALREADY_CLOSED",
+          message: "The PIP is already closed",
+        },
+        { status: 409 }
+      );
+    }
 
     const now = nowPH();
     const patched = (await dFetch(`/items/employee_pip/${pipId}`, {
