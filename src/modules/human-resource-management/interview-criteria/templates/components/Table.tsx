@@ -22,6 +22,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { Plus } from "lucide-react";
 import { createColumns } from "./columns";
 import { Toolbar } from "./Toolbar";
@@ -89,13 +90,7 @@ export function TemplateTable({
         state: { sorting, columnFilters, columnVisibility },
     });
 
-    // Footer pagination read: rows carry no selection UI, so the slot reports
-    // the visible window ("Showing X–Y of Z") instead of a dead selection count.
     const rowCount = table.getFilteredRowModel().rows.length;
-    const { pageIndex, pageSize } = table.getState().pagination;
-    const showingFrom = rowCount === 0 ? 0 : pageIndex * pageSize + 1;
-    const showingTo = Math.min(rowCount, (pageIndex + 1) * pageSize);
-    const pageCount = table.getPageCount();
 
     if (isLoading) {
         return (
@@ -165,31 +160,15 @@ export function TemplateTable({
                 </UiTable>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm text-muted-foreground">
-                    Showing {showingFrom}–{showingTo} of {rowCount}
-                </div>
-                {pageCount > 1 && (
-                    <div className="space-x-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => table.previousPage()}
-                            disabled={!table.getCanPreviousPage()}
-                        >
-                            Previous
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => table.nextPage()}
-                            disabled={!table.getCanNextPage()}
-                        >
-                            Next
-                        </Button>
-                    </div>
-                )}
-            </div>
+            {rowCount > 0 && (
+                <DataTablePagination
+                    pageIndex={table.getState().pagination.pageIndex + 1}
+                    pageSize={table.getState().pagination.pageSize}
+                    rowCount={rowCount}
+                    onPageChange={(page) => table.setPageIndex(page - 1)}
+                    onPageSizeChange={(pageSize) => table.setPageSize(pageSize)}
+                />
+            )}
 
             <TemplateEditorDialog
                 open={createDialogOpen}

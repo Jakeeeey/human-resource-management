@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Building2, FileText, UserCheck, Loader2, Pencil } from "lucide-react";
 import { ApplicationViewDialog } from "./ApplicationViewDialog";
-import { formatDateTime } from "@/lib/utils";
+import { formatPHT } from "@/lib/time";
 
 const STATUS_OPTIONS = ["Recommended", "Approved", "Hired", "Rejected", "Withdrawn"] as const;
 
@@ -211,7 +211,7 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommended At</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.recommended_at ? formatDateTime(new Date(selectedRecommendation.recommended_at)) : "-"}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.recommended_at ? formatPHT(selectedRecommendation.recommended_at) : "-"}</div>
                             </div>
                         </div>
                     </div>
@@ -229,7 +229,7 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Decision At</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.decision_at ? formatDateTime(new Date(selectedRecommendation.decision_at)) : "-"}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.decision_at ? formatPHT(selectedRecommendation.decision_at) : "-"}</div>
                             </div>
                             <div className="md:col-span-2">
                                 <div className="flex items-center gap-1 mb-1">

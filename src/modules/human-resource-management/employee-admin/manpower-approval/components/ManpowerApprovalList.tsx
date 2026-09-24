@@ -17,21 +17,30 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { FilterCombobox } from "./FilterCombobox";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { requesterName } from "@/modules/human-resource-management/manpower-request/utils/requester";
 
 export function ManpowerApprovalList() {
-    const { requests, departments, isLoading, error, setSelectedRequest, setIsViewOpen, approveRequest, rejectRequest } = useManpowerApproval();
+    const { requests, departments, users, isLoading, error, setSelectedRequest, setIsViewOpen, approveRequest, rejectRequest } = useManpowerApproval();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
     const [selectedPurpose, setSelectedPurpose] = useState<string>("all");
     const [confirmAction, setConfirmAction] = useState<{ type: 'Approve' | 'Reject', id: number } | null>(null);
+    const [pageIndex, setPageIndex] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
 
     if (error) {
         return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
     }
 
+    const query = searchQuery.trim().toLowerCase();
     const filteredRequests = requests.filter(req => {
-        const matchesSearch = !searchQuery || req.request_no?.toLowerCase().includes(searchQuery.toLowerCase());
-        
+        const matchesSearch = !query || [
+            req.request_no,
+            req.position,
+            requesterName(req, users),
+        ].some(value => value?.toLowerCase().includes(query));
+
         const reqDeptName = departments.find(d => d.id === req.requesting_department_id)?.name || String(req.requesting_department_id);
         const matchesDepartment = selectedDepartment === "all" || reqDeptName.toLowerCase() === selectedDepartment.toLowerCase();
         
@@ -39,6 +48,10 @@ export function ManpowerApprovalList() {
 
         return matchesSearch && matchesDepartment && matchesPurpose;
     });
+
+    const maxPageIndex = Math.max(0, Math.ceil(filteredRequests.length / pageSize) - 1);
+    const safePageIndex = Math.min(pageIndex, maxPageIndex);
+    const pagedRequests = filteredRequests.slice(safePageIndex * pageSize, (safePageIndex + 1) * pageSize);
 
     const getPurposeColor = (purpose: string) => {
         switch (purpose) {
@@ -65,7 +78,7 @@ export function ManpowerApprovalList() {
                 <div className="relative w-full sm:w-[400px] group">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
-                        placeholder="Search by Request No..."
+                        placeholder="Search by request no., position or requester..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-12 h-12 rounded-full bg-card border-border/50 shadow-sm focus-visible:ring-primary/30 transition-all text-base"
@@ -103,6 +116,7 @@ export function ManpowerApprovalList() {
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground pl-6 h-14">Request No</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Department</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Position Title</TableHead>
+                            <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Requested By</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14">Purpose</TableHead>
                             <TableHead className="font-bold text-xs uppercase tracking-wider text-muted-foreground h-14 text-center">Manpower</TableHead>
                             <TableHead className="w-[180px] pr-6 h-14 text-center">Actions</TableHead>
@@ -111,7 +125,7 @@ export function ManpowerApprovalList() {
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-48">
+                                <TableCell colSpan={7} className="text-center h-48">
                                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                                         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mb-4"></div>
                                         <p className="font-medium animate-pulse">Loading draft requests...</p>
@@ -120,7 +134,7 @@ export function ManpowerApprovalList() {
                             </TableRow>
                         ) : filteredRequests.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-48">
+                                <TableCell colSpan={7} className="text-center h-48">
                                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                                         <FileText className="w-12 h-12 text-muted-foreground/30 mb-3" />
                                         <p className="font-medium">No draft requests pending approval.</p>
@@ -128,7 +142,7 @@ export function ManpowerApprovalList() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredRequests.map((req) => (
+                            pagedRequests.map((req) => (
                                 <TableRow key={req.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                     <TableCell className="pl-6 h-16 font-bold text-foreground group-hover:text-primary transition-colors">
                                         {req.request_no}
@@ -138,6 +152,9 @@ export function ManpowerApprovalList() {
                                     </TableCell>
                                     <TableCell className="font-medium text-muted-foreground/80">
                                         {req.position}
+                                    </TableCell>
+                                    <TableCell className="font-medium text-muted-foreground/80">
+                                        {requesterName(req, users)}
                                     </TableCell>
                                     <TableCell>
                                         <span className={`px-3 py-1.5 border text-xs rounded-full font-bold uppercase tracking-wider ${getPurposeColor(req.purpose)}`}>
@@ -150,7 +167,7 @@ export function ManpowerApprovalList() {
                                         </div>
                                     </TableCell>
                                     <TableCell className="pr-6 text-center">
-                                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex items-center justify-center gap-2">
                                             <Button 
                                                 variant="ghost" 
                                                 size="icon" 
@@ -188,6 +205,20 @@ export function ManpowerApprovalList() {
                         )}
                     </TableBody>
                 </Table>
+                {filteredRequests.length > 0 && (
+                    <div className="border-t border-border/50 p-3">
+                        <DataTablePagination
+                            pageIndex={safePageIndex + 1}
+                            pageSize={pageSize}
+                            rowCount={filteredRequests.length}
+                            onPageChange={(page) => setPageIndex(page - 1)}
+                            onPageSizeChange={(size) => {
+                                setPageSize(size);
+                                setPageIndex(0);
+                            }}
+                        />
+                    </div>
+                )}
             </div>
 
             <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>

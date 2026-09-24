@@ -13,46 +13,86 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ManpowerRequestSchema } from "../types";
+import { ManpowerRequestSchema, type ManpowerRequest } from "../types";
 import { z } from "zod";
 import { Building2, Briefcase, FileText, Users, User, CheckCircle2, Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
-export function ManpowerRequestForm() {
-    const { isCreateOpen, setIsCreateOpen, submitRequest, departments, divisions, users, currentUserDepartmentId } = useManpowerRequest();
-    const [isSubmitting, setIsSubmitting] = useState(false);
+type ManpowerRequestFormValues = z.infer<typeof ManpowerRequestSchema>;
 
-    const form = useForm<z.infer<typeof ManpowerRequestSchema>>({
+function toFormValues(request: ManpowerRequest): ManpowerRequestFormValues {
+    return {
+        requesting_department_id: request.requesting_department_id,
+        position: request.position ?? "",
+        division_id: request.division_id ?? undefined,
+        no_manpower_needed: Number(request.no_manpower_needed ?? 1),
+        purpose: request.purpose,
+        replacement_name: request.replacement_name ?? "",
+        employment_type: request.employment_type,
+        employment_others: request.employment_others ?? "",
+        reason_justification: request.reason_justification ?? "",
+        qualification: request.qualification ?? "Any",
+        qualification_description: request.qualification_description ?? "",
+        applicant_name: request.applicant_name ?? "",
+        rate: request.rate == null || isNaN(Number(request.rate)) ? 0 : Number(request.rate),
+    };
+}
+
+export function ManpowerRequestForm() {
+    const { isCreateOpen, setIsCreateOpen, isEditOpen, setIsEditOpen, selectedRequest } = useManpowerRequest();
+    const editing = isEditOpen && selectedRequest ? selectedRequest : null;
+    const close = () => {
+        setIsCreateOpen(false);
+        setIsEditOpen(false);
+    };
+
+    return (
+        <Dialog open={isCreateOpen || editing !== null} onOpenChange={(open) => { if (!open) close(); }}>
+            <DialogContent className="sm:max-w-[85vw] lg:max-w-[1000px] w-full p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl">
+                {/* The form state lives inside the dialog content, so every open starts from fresh defaults (or the request being edited). */}
+                <ManpowerRequestFormBody request={editing} onClose={close} />
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function ManpowerRequestFormBody({ request, onClose }: { request: ManpowerRequest | null; onClose: () => void }) {
+    const { submitRequest, updateRequest, departments, divisions, users, currentUserDepartmentId } = useManpowerRequest();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const isEdit = request !== null;
+
+    const form = useForm<ManpowerRequestFormValues>({
         resolver: zodResolver(ManpowerRequestSchema),
-        defaultValues: {
-            requesting_department_id: currentUserDepartmentId || undefined as unknown as number,
-            position: "",
-            division_id: undefined as unknown as number | undefined,
-            no_manpower_needed: 1,
-            purpose: "New Position",
-            replacement_name: "",
-            employment_type: "Regular",
-            employment_others: "",
-            reason_justification: "",
-            qualification: "Any",
-            qualification_description: "",
-            applicant_name: "",
-            rate: 0,
-        },
+        defaultValues: request
+            ? toFormValues(request)
+            : {
+                requesting_department_id: currentUserDepartmentId || undefined as unknown as number,
+                position: "",
+                division_id: undefined as unknown as number | undefined,
+                no_manpower_needed: 1,
+                purpose: "New Position",
+                replacement_name: "",
+                employment_type: "Regular",
+                employment_others: "",
+                reason_justification: "",
+                qualification: "Any",
+                qualification_description: "",
+                applicant_name: "",
+                rate: 0,
+            },
     });
 
     const purposeValue = form.watch("purpose");
     const employmentTypeValue = form.watch("employment_type");
 
-    const onSubmit = async (values: z.infer<typeof ManpowerRequestSchema>) => {
+    const onSubmit = async (values: ManpowerRequestFormValues) => {
         setIsSubmitting(true);
         try {
-            const success = await submitRequest(values);
-            if (success) {
-                setIsCreateOpen(false);
-                form.reset();
-            }
+            const success = request?.id != null
+                ? await updateRequest(request.id, values)
+                : await submitRequest(values);
+            if (success) onClose();
         } catch (error) {
             const message = error instanceof Error ? error.message : "Failed to submit form.";
             toast.error(message);
@@ -62,16 +102,17 @@ export function ManpowerRequestForm() {
     };
 
     return (
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogContent className="sm:max-w-[85vw] lg:max-w-[1000px] w-full p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl">
+        <>
                 <div className="p-6 md:p-8 border-b border-border/40 bg-card">
                     <DialogHeader>
                         <DialogTitle className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
                             <FileText className="w-8 h-8 text-primary" />
-                            MANPOWER REQUEST FORM
+                            {isEdit ? "REVISE MANPOWER REQUEST" : "MANPOWER REQUEST FORM"}
                         </DialogTitle>
                         <DialogDescription className="text-base mt-2">
-                            Please fill in the details below to formally request additional manpower.
+                            {isEdit
+                                ? `Update the details of draft request ${request?.request_no} before it is approved.`
+                                : "Please fill in the details below to formally request additional manpower."}
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -124,7 +165,8 @@ export function ManpowerRequestForm() {
                                                             </Button>
                                                         </FormControl>
                                                     </PopoverTrigger>
-                                                    <PopoverContent className="w-[300px] p-0" align="start">
+                                                    {/* Popover content is portalled outside the modal dialog, whose scroll-lock swallows wheel/touch events — stop them here so the list scrolls. */}
+                                                    <PopoverContent className="w-[300px] p-0" align="start" onWheel={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()}>
                                                         <Command>
                                                             <CommandInput placeholder="Search division..." />
                                                             <CommandList>
@@ -191,17 +233,17 @@ export function ManpowerRequestForm() {
                                             <FormItem className="relative z-10">
                                                 <FormControl>
                                                     <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col gap-3">
-                                                        <FormItem className="flex items-center space-x-3 space-y-0 p-3 rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all cursor-pointer">
+                                                        <FormItem className="relative flex items-center space-x-3 space-y-0 p-3 rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all cursor-pointer">
                                                             <FormControl><RadioGroupItem value="New Position" /></FormControl>
-                                                            <FormLabel className="font-medium cursor-pointer w-full">New Position</FormLabel>
+                                                            <FormLabel className="font-medium cursor-pointer w-full after:absolute after:inset-0 after:content-['']">New Position</FormLabel>
                                                         </FormItem>
-                                                        <FormItem className="flex items-center space-x-3 space-y-0 p-3 rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all cursor-pointer">
+                                                        <FormItem className="relative flex items-center space-x-3 space-y-0 p-3 rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all cursor-pointer">
                                                             <FormControl><RadioGroupItem value="Additional" /></FormControl>
-                                                            <FormLabel className="font-medium cursor-pointer w-full">Additional</FormLabel>
+                                                            <FormLabel className="font-medium cursor-pointer w-full after:absolute after:inset-0 after:content-['']">Additional</FormLabel>
                                                         </FormItem>
-                                                        <FormItem className="flex items-center space-x-3 space-y-0 p-3 rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all cursor-pointer">
+                                                        <FormItem className="relative flex items-center space-x-3 space-y-0 p-3 rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all cursor-pointer">
                                                             <FormControl><RadioGroupItem value="Replacement" /></FormControl>
-                                                            <FormLabel className="font-medium cursor-pointer w-full">Replacement</FormLabel>
+                                                            <FormLabel className="font-medium cursor-pointer w-full after:absolute after:inset-0 after:content-['']">Replacement</FormLabel>
                                                         </FormItem>
                                                     </RadioGroup>
                                                 </FormControl>
@@ -263,9 +305,9 @@ export function ManpowerRequestForm() {
                                                     <FormControl>
                                                         <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                                                             {["Regular", "Seasonal", "Reliever", "Others"].map((type) => (
-                                                                <FormItem key={type} className="flex items-center space-x-3 space-y-0 bg-muted/20 p-3 rounded-lg border hover:border-primary/30 hover:bg-primary/5 transition-colors cursor-pointer">
+                                                                <FormItem key={type} className="relative flex items-center space-x-3 space-y-0 bg-muted/20 p-3 rounded-lg border hover:border-primary/30 hover:bg-primary/5 transition-colors cursor-pointer">
                                                                     <FormControl><RadioGroupItem value={type} /></FormControl>
-                                                                    <FormLabel className="font-medium cursor-pointer w-full text-sm md:text-base">{type}</FormLabel>
+                                                                    <FormLabel className="font-medium cursor-pointer w-full after:absolute after:inset-0 after:content-[''] text-sm md:text-base">{type}</FormLabel>
                                                                 </FormItem>
                                                             ))}
                                                         </RadioGroup>
@@ -329,19 +371,13 @@ export function ManpowerRequestForm() {
                                                 <FormItem>
                                                     <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Gender Preference <span className="text-destructive">*</span></FormLabel>
                                                     <FormControl>
-                                                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value || "Any"} className="flex gap-4">
-                                                            <FormItem className="flex items-center space-x-2 space-y-0 p-2 px-4 rounded-full border bg-muted/20 hover:bg-primary/5 transition-colors cursor-pointer">
-                                                                <FormControl><RadioGroupItem value="Male" /></FormControl>
-                                                                <FormLabel className="cursor-pointer font-medium">Male</FormLabel>
-                                                            </FormItem>
-                                                            <FormItem className="flex items-center space-x-2 space-y-0 p-2 px-4 rounded-full border bg-muted/20 hover:bg-primary/5 transition-colors cursor-pointer">
-                                                                <FormControl><RadioGroupItem value="Female" /></FormControl>
-                                                                <FormLabel className="cursor-pointer font-medium">Female</FormLabel>
-                                                            </FormItem>
-                                                            <FormItem className="hidden">
-                                                                <FormControl><RadioGroupItem value="Any" /></FormControl>
-                                                                <FormLabel>Any</FormLabel>
-                                                            </FormItem>
+                                                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value || "Any"} className="flex flex-wrap gap-4">
+                                                            {(["Male", "Female", "Any"] as const).map((option) => (
+                                                                <FormItem key={option} className="relative flex items-center space-x-2 space-y-0 p-2 px-4 rounded-full border bg-muted/20 hover:bg-primary/5 transition-colors cursor-pointer">
+                                                                    <FormControl><RadioGroupItem value={option} /></FormControl>
+                                                                    <FormLabel className="cursor-pointer font-medium after:absolute after:inset-0 after:content-['']">{option}</FormLabel>
+                                                                </FormItem>
+                                                            ))}
                                                         </RadioGroup>
                                                     </FormControl>
                                                     <FormMessage />
@@ -397,14 +433,16 @@ export function ManpowerRequestForm() {
                                                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                                 <span className="text-muted-foreground sm:text-sm">₱</span>
                                                             </div>
-                                                            <Input 
-                                                                type="number" 
-                                                                step="0.01" 
-                                                                placeholder="0.00" 
-                                                                className="pl-7 bg-background text-lg font-medium" 
-                                                                {...field} 
-                                                                value={field.value ?? ""} 
-                                                                onChange={(e) => field.onChange(e.target.value === "" ? null : parseFloat(e.target.value) || 0)} 
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                placeholder="0.00"
+                                                                className="pl-7 bg-background text-lg font-medium"
+                                                                {...field}
+                                                                value={field.value ?? ""}
+                                                                onKeyDown={(e) => { if (e.key === "-" || e.key === "e" || e.key === "E") e.preventDefault(); }}
+                                                                onChange={(e) => field.onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
                                                             />
                                                         </div>
                                                     </FormControl>
@@ -424,22 +462,21 @@ export function ManpowerRequestForm() {
                 
                 <div className="p-4 md:p-6 bg-card border-t border-border/40">
                     <DialogFooter className="flex w-full sm:justify-end gap-3">
-                        <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)} className="rounded-full px-6">
+                        <Button type="button" variant="outline" onClick={onClose} className="rounded-full px-6">
                             Cancel
                         </Button>
                         <Button type="submit" disabled={isSubmitting} onClick={form.handleSubmit(onSubmit)} className="rounded-full px-8 shadow-sm hover:shadow-md transition-all">
                             {isSubmitting ? (
                                 <>
                                     <div className="w-4 h-4 mr-2 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin"></div>
-                                    Submitting...
+                                    {isEdit ? "Saving..." : "Submitting..."}
                                 </>
                             ) : (
-                                "Submit Request"
+                                isEdit ? "Save Changes" : "Submit Request"
                             )}
                         </Button>
                     </DialogFooter>
                 </div>
-            </DialogContent>
-        </Dialog>
+        </>
     );
 }

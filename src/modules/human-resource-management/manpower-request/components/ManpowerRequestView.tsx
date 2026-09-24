@@ -3,10 +3,11 @@
 import { useManpowerRequest } from "../hooks/useManpowerRequest";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
-import { Building2, Briefcase, FileText, Users, User, CheckCircle2 } from "lucide-react";
+import { Building2, Briefcase, FileText, Users, User, CheckCircle2, Pencil } from "lucide-react";
+import { requesterName } from "../utils/requester";
 
 export function ManpowerRequestView() {
-    const { isViewOpen, setIsViewOpen, selectedRequest, departments, divisions } = useManpowerRequest();
+    const { isViewOpen, setIsViewOpen, setIsEditOpen, selectedRequest, departments, divisions, users } = useManpowerRequest();
 
     if (!selectedRequest) return null;
 
@@ -48,9 +49,13 @@ export function ManpowerRequestView() {
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Division</label>
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{divisionName}</div>
                             </div>
-                            <div className="md:col-span-3">
+                            <div className="md:col-span-2">
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Job Position / Title</label>
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRequest.position}</div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Requested By</label>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{requesterName(selectedRequest, users)}</div>
                             </div>
                         </div>
                     </div>
@@ -146,6 +151,19 @@ export function ManpowerRequestView() {
                 </div>
 
                 <DialogFooter className="p-4 md:p-6 border-t border-border/40 bg-card/50 flex items-center gap-3 justify-end rounded-b-2xl">
+                    {(selectedRequest.status ?? "Draft") === "Draft" && (
+                        <Button
+                            variant="outline"
+                            className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm"
+                            onClick={() => {
+                                setIsViewOpen(false);
+                                setIsEditOpen(true);
+                            }}
+                        >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit / Revise
+                        </Button>
+                    )}
                     <DialogClose asChild>
                         <Button variant="outline" className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm">
                             Close
