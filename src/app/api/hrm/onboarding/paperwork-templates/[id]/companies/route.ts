@@ -5,6 +5,7 @@ import {
   ReplacePaperworkTemplateCompaniesSchema,
   type PaperworkTemplateCompany,
 } from "@/modules/human-resource-management/onboarding/paperwork/types/paperwork-template-company.schema";
+import { nowUTC } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,10 +18,6 @@ export const dynamic = "force-dynamic";
 // the caller's view — the full set travels in one strict body. Duplicate ids
 // collapse to a single row (UNIQUE pair, never doubled). Empty sets are
 // rejected with a reason (a template must scope to ≥1 company).
-
-function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -128,7 +125,7 @@ export async function PUT(
         )
     );
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const created = await Promise.all(
       companyIds.map(async (companyId) => {
         const row = (await dFetch("/items/paperwork_template_companies", {

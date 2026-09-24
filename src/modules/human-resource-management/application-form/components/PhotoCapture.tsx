@@ -14,13 +14,15 @@ import { Label } from "@/components/ui/label";
 
 interface PhotoCaptureProps {
     value: File | null;
-    onChange: (file: File | null) => void;
+    onChange?: (file: File | null) => void;
+    readOnly?: boolean;
+    imageUrl?: string | null;
 }
 
 /** Square edge, in px, of the exported 2x2 capture. */
 const PHOTO_EDGE = 512;
 
-export function PhotoCapture({ value, onChange }: PhotoCaptureProps) {
+export function PhotoCapture({ value, onChange = () => {}, readOnly = false, imageUrl = null }: PhotoCaptureProps) {
     const inputRef = useRef<HTMLInputElement | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -32,6 +34,8 @@ export function PhotoCapture({ value, onChange }: PhotoCaptureProps) {
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isStreamReady, setIsStreamReady] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+    const shownUrl = readOnly ? (imageUrl ?? previewUrl) : previewUrl;
 
     useEffect(() => {
         const url = value ? URL.createObjectURL(value) : null;
@@ -127,16 +131,25 @@ export function PhotoCapture({ value, onChange }: PhotoCaptureProps) {
 
     return (
         <div className="space-y-1.5">
-            <Label>2x2 Photo (optional)</Label>
+            <Label>{readOnly ? "2x2 Photo" : "2x2 Photo (optional)"}</Label>
             <div className="flex items-start gap-3">
                 <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
-                    {previewUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- local blob preview, not a served asset
-                        <img src={previewUrl} alt="Applicant photo preview" className="h-full w-full object-cover" />
+                    {shownUrl ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsLightboxOpen(true)}
+                            className="h-full w-full cursor-zoom-in"
+                            aria-label="View photo full size"
+                            title="Click to enlarge"
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- local blob or server data URL, not a served asset */}
+                            <img src={shownUrl} alt="Applicant photo" className="h-full w-full object-cover" />
+                        </button>
                     ) : (
                         <span className="px-2 text-center text-xs text-muted-foreground">No photo</span>
                     )}
                 </div>
+                {!readOnly && (
                 <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
                     <Button
                         type="button"
@@ -182,7 +195,21 @@ export function PhotoCapture({ value, onChange }: PhotoCaptureProps) {
                     />
                     {cameraError && <p className="text-xs text-destructive">{cameraError}</p>}
                 </div>
+                )}
             </div>
+
+            <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Photo</DialogTitle>
+                        <DialogDescription>Full-size view of the 2x2 photo.</DialogDescription>
+                    </DialogHeader>
+                    {shownUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element -- local blob or server data URL, not a served asset
+                        <img src={shownUrl} alt="Applicant photo, full size" className="mx-auto max-h-[70vh] w-auto rounded-md object-contain" />
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <Dialog
                 open={isCameraOpen}

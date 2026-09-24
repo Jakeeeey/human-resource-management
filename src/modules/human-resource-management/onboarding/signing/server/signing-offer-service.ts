@@ -11,8 +11,8 @@ import {
   setApplicantStatus,
   type ApplicantStatus,
 } from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import { getPhilippineTime, patchRow } from "./signingSetIo";
-import { stampUpdate } from "@/modules/human-resource-management/onboarding/utils/audit";
+import { patchRow } from "./signingSetIo";
+import { stampUpdate, nowUTC } from "@/lib/audit";
 import { findSigningEnvelopeByApplicant } from "./signingSetRows";
 import { readJobOfferById } from "./signingRollupIo";
 import { recomputeSigningRollups } from "./signing-rollup-service";
@@ -131,7 +131,7 @@ export async function signJobOffer(
       `${SIGNING_OFFER_ERROR_CODES.offerClosed}: job_offer ${offerId} is declined and cannot be signed`
     );
   } else {
-    const now = getPhilippineTime();
+    const now = nowUTC();
     offer = await patchRow(
       "job_offer",
       offerId,

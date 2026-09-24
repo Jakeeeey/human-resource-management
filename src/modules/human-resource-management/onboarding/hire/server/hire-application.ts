@@ -8,7 +8,7 @@ import {
   type HireApplicantRow,
   type HireApplicationRow,
 } from "../types/hire.schema";
-import { philippineDate } from "./hire-time";
+import { phToday } from "@/lib/time";
 import { extractEmailDomain } from "./hire-email";
 import { placeholderApplicantEmail } from "./hire-log";
 import type { SpringUserCreatePayload } from "@/modules/human-resource-management/shared/services/spring-user-service";
@@ -373,7 +373,7 @@ export function buildSpringUserPayload(
         ? String(recruitment.departmentId)
         : undefined,
     position_id: recruitment.positionId ?? undefined,
-    dateOfHire: philippineDate(),
+    dateOfHire: phToday(),
     role: "USER",
     admin: false,
     tags: "Employee",

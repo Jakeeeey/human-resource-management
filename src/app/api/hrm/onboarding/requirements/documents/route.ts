@@ -8,7 +8,6 @@ import {
 import {
   mapRequirementsFailure,
   nextSortOrder,
-  phTimeNow,
   readAllFlag,
   readRequirementsSession,
   serverError,
@@ -16,6 +15,7 @@ import {
   validationFailed,
 } from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
 import { CreateDocumentSlotBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
+import { nowUTC } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const current = await listDocSlotRows();
-    const now = phTimeNow();
+    const now = nowUTC();
     const write: DocSlotWriteRow = {
       doc_key: validation.data.doc_key,
       title: validation.data.title,

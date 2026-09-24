@@ -9,8 +9,9 @@ import {
   JobOfferSchema,
   type JobOffer,
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { getPhilippineTime, patchRow } from "./signingSetIo";
+import { patchRow } from "./signingSetIo";
 import { readJobOfferById } from "./signingRollupIo";
+import { nowUTC } from "@/lib/audit";
 
 // signing-closeout-service.ts — terminal close-out for NON-SIGNING applicants
 // (todo 18). The locked mapping:
@@ -140,7 +141,7 @@ export async function closeOutNonSigner(
     offer = await patchRow(
       "job_offer",
       offerId,
-      { status: "declined", updated_at: getPhilippineTime() },
+      { status: "declined", updated_at: nowUTC() },
       JobOfferSchema
     );
   }

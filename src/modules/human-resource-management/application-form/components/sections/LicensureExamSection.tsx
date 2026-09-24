@@ -4,9 +4,12 @@ import type { UseFormReturn } from "react-hook-form";
 import { useFieldArray } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EMPTY_LICENSURE_EXAM, type ApplicationFormValues } from "../../types";
 import { RepeatingFieldArray } from "../RepeatingFieldArray";
 import { checkPastDate } from "../../lib/softValidation";
+import { maskDecimal } from "../../lib/hardValidation";
+import { phToday } from "@/lib/time";
 
 export function LicensureExamSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
     const { fields, append, remove } = useFieldArray({
@@ -55,7 +58,7 @@ export function LicensureExamSection({ form }: { form: UseFormReturn<Application
                                 <FormItem>
                                     <FormLabel>Date Taken</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="e.g. March 2021" {...field} />
+                                        <Input type="date" max={phToday()} {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -68,7 +71,12 @@ export function LicensureExamSection({ form }: { form: UseFormReturn<Application
                                 <FormItem>
                                     <FormLabel>Rating</FormLabel>
                                     <FormControl>
-                                        <Input {...field} />
+                                        <Input
+                                            inputMode="decimal"
+                                            placeholder="e.g. 85.5"
+                                            {...field}
+                                            onChange={(e) => field.onChange(maskDecimal(e.target.value))}
+                                        />
                                     </FormControl>
                                 </FormItem>
                             )}
@@ -79,21 +87,17 @@ export function LicensureExamSection({ form }: { form: UseFormReturn<Application
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Result</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Passed / Failed" {...field} />
-                                    </FormControl>
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name={`licensure_exams.${index}.inclusive_dates`}
-                            render={({ field }) => (
-                                <FormItem className="sm:col-span-2">
-                                    <FormLabel>Inclusive Dates</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} />
-                                    </FormControl>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="Passed">Passed</SelectItem>
+                                            <SelectItem value="Failed">Failed</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </FormItem>
                             )}
                         />

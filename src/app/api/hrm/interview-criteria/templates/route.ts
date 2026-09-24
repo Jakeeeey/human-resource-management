@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { cookies } from "next/headers";
-import { actorIdFromJwt, nowPH, stampCreate, stampUpdate } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { actorIdFromJwt, nowUTC, stampCreate, stampUpdate } from "@/lib/audit";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -79,7 +79,7 @@ async function clearOtherDefaultsForStage(stage: string, exceptId: number) {
         others.map((t) =>
             dFetch(`/items/interview_criteria_template/${t.id}`, {
                 method: "PATCH",
-                body: JSON.stringify({ is_default_for_stage: false }),
+                body: JSON.stringify({ is_default_for_stage: false, updated_at: nowUTC() }),
             })
         )
     );
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const now = nowPH();
+        const now = nowUTC();
         const created = await dFetch(`/items/interview_criteria_template`, {
             method: "POST",
             body: JSON.stringify(
@@ -227,7 +227,7 @@ export async function PATCH(req: NextRequest) {
         await dFetch(`/items/interview_criteria_template/${id}`, {
             method: "PATCH",
             body: JSON.stringify(
-                stampUpdate({ ...rest, updated_at: nowPH() }, actorId)
+                stampUpdate({ ...rest, updated_at: nowUTC() }, actorId)
             ),
         });
 

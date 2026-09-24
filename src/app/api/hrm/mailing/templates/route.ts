@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/lib/audit";
 import { mailTemplateSchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-template.schema";
 import { assertMailableHtml } from "@/modules/human-resource-management/recruitment/mailing/utils/mailScrub";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
@@ -26,10 +26,6 @@ const FIELDS =
  * wall time, never server default / UTC toISOString.
  * @returns Current Philippine time as a MySQL-compatible string.
  */
-function getPhilippineTime(): string {
-    return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 /**
  * Lists mail_templates rows, newest first.
  * @param req - Request carrying the optional ?is_active= filter.
@@ -95,7 +91,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: false, message: reason }, { status: 400 });
         }
 
-        const now = getPhilippineTime();
+        const now = nowUTC();
         const token = (await cookies()).get(COOKIE_NAME)?.value;
         const payload = token ? decodeJwtPayload(token) : null;
         const actorId = actorIdFromJwt(payload);
@@ -179,7 +175,7 @@ export async function PATCH(req: NextRequest) {
         void _clientAudit;
         const payload = {
             ...clientFields,
-            updated_at: getPhilippineTime(),
+            updated_at: nowUTC(),
             ...(actorId != null ? { updated_by: actorId } : {}),
         };
 

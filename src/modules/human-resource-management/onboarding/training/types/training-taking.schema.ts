@@ -48,15 +48,11 @@ export const TrainingAssignmentSchema = z.object({
 export type TrainingTakingAssignment = z.infer<typeof TrainingAssignmentSchema>;
 
 // POST body (HR): assigns a quiz to a hire (`user_id` = the employee's
-// `user.user_id`). `due` is an optional deadline (overdue stays a DERIVED
-// flag — never a stored state). `application_id` is an optional explicit HR
-// link to the engine's application chain; when absent it stays null — never
-// resolved from a profile.
 export const CreateTrainingAssignmentSchema = z
   .object({
     user_id: z.number().int().positive(),
     quiz_id: z.number().int().positive(),
-    due: z.string().min(1).nullable().optional(),
+    due: z.iso.datetime().nullable().optional(),
     application_id: z.number().int().positive().nullable().optional(),
   })
   .strict();

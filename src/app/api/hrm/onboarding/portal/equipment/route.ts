@@ -16,6 +16,7 @@ import {
   hireeSigner,
   parseEquipmentDocRef,
 } from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
+import { nowUTC } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,10 +26,6 @@ export const dynamic = "force-dynamic";
 // signer is FORCED to `hiree:<resolved user_id>` and no client-supplied
 // user_id/signer is ever read. Pre-hire (no employee record) lists nothing
 // and cannot acknowledge. Method is not part of the log contract.
-
-function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 interface AckLogRow {
   id?: number;
@@ -215,7 +212,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, data: prior[0] ?? null });
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     let created: { data?: AckLogRow };
     try {
       created = (await dFetch("/items/acknowledgement_logs", {

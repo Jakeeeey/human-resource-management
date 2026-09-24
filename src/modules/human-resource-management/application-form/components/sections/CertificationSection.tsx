@@ -12,6 +12,7 @@ import {
     CERTIFICATION_HEADING,
     type ApplicationFormValues,
 } from "../../types";
+import { CERTIFICATION_FIELD_ID } from "../../lib/fieldIds";
 import { SIGNATURE_ERROR_ID, SignaturePad, type SignaturePadHandle } from "../SignaturePad";
 
 export function CertificationSection({
@@ -32,7 +33,7 @@ export function CertificationSection({
                 control={form.control}
                 name="certification_agreed"
                 render={({ field }) => (
-                    <FormItem className="space-y-3 rounded-lg border p-4">
+                    <FormItem id={CERTIFICATION_FIELD_ID} className="space-y-3 rounded-lg border p-4">
                         <FormLabel>9. {CERTIFICATION_HEADING}</FormLabel>
                         <div className="space-y-2 text-sm text-muted-foreground">
                             {CERTIFICATION_CLAUSES.map((clause, i) => (

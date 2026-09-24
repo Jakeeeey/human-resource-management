@@ -3,11 +3,11 @@ import {
   listTaskUserIds,
   listTemplateRows,
   patchTemplateRow,
-  phTimeNow,
 } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
 import { materializeOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { completeTaskByCode } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { LEGACY_TRAINING_TEMPLATE_CODES } from "@/modules/human-resource-management/onboarding/training/server/trainingCatalogService";
+import { nowUTC } from "@/lib/audit";
 
 // onboarding-task-backfill-service.ts — maintenance sweep for hires who are
 // ALREADY mid-onboarding.
@@ -113,7 +113,7 @@ export async function deactivateLegacyTrainingTemplates(input: {
       LEGACY_TRAINING_TEMPLATE_CODE_SET.has(template.code)
   );
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const deactivated: LegacyTrainingTemplateChange[] = [];
   const failed: LegacyTrainingTemplateFailure[] = [];
 

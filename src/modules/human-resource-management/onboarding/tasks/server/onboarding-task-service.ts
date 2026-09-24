@@ -3,7 +3,6 @@ import {
   createTaskRows,
   listTaskRows,
   patchTaskRow,
-  phTimeNow,
   readTaskRow,
   readUserExists,
   type TaskWriteRow,
@@ -12,6 +11,7 @@ import { ensureOnboardingTaskTemplates } from "./task-template-service";
 import { listOnboardingTaskTemplates } from "./task-template-service";
 import { readUserDepartmentId } from "../../training/server/trainingCatalogIo";
 import { filterMaterializableTrainingTemplates } from "../../training/server/trainingCatalogService";
+import { nowUTC } from "@/lib/audit";
 import type {
   OnboardingOwnerRole,
   OnboardingTask,
@@ -99,7 +99,7 @@ async function doMaterialize(
     (template) => !currentTemplateIds.has(template.id)
   );
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const rows: TaskWriteRow[] = missing.map((template) => ({
     user_id: userId,
     template_id: template.id,
@@ -212,7 +212,7 @@ export async function updateOnboardingTask(
 ): Promise<OnboardingTask> {
   const actorId = input.actorId ?? null;
   const current = await getOnboardingTask(input.taskId);
-  const now = phTimeNow();
+  const now = nowUTC();
   const patch: Record<string, unknown> = {
     updated_at: now,
     ...(actorId != null ? { updated_by: actorId } : {}),
@@ -305,7 +305,7 @@ export async function completeOnboardingTask(
   if (current.status === "done") {
     return { task: current, alreadyDone: true };
   }
-  const now = phTimeNow();
+  const now = nowUTC();
   const task = await patchTaskRow(input.taskId, {
     status: "done",
     ...(input.completedBy != null ? { completed_by: input.completedBy } : {}),

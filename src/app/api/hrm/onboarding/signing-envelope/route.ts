@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
-  getPhilippineTime,
   mapWriteFailure,
   readSigningSession,
   serverError,
@@ -14,7 +13,7 @@ import {
   SigningEnvelopeListQuerySchema,
 } from "@/modules/human-resource-management/onboarding/signing/types/signing-api.schema";
 import { SigningEnvelopeSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { actorIdFromJwt, stampCreate } from "@/modules/human-resource-management/onboarding/utils/audit";
+import { actorIdFromJwt, stampCreate, nowUTC } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,7 +88,7 @@ export async function POST(req: NextRequest) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const created = (await dFetch("/items/signing_envelope", {
       method: "POST",
       body: JSON.stringify(stampCreate({

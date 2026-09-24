@@ -3,7 +3,7 @@ import {
   type ApplicantStatus,
 } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { SigningEnvelope } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { getPhilippineTime } from "./signingSetIo";
+import { nowUTC } from "@/lib/audit";
 import {
   findJobOfferByApplicant,
   findPaperworksByApplicant,
@@ -81,7 +81,7 @@ export async function repairExistingSet(input: {
   actorId?: number | null;
 }): Promise<SigningSetResult> {
   const { applicantId, companyId, status, actorId } = input;
-  const now = getPhilippineTime();
+  const now = nowUTC();
   let { envelope } = input;
   let paperworks = await findPaperworksByApplicant(applicantId);
   let jobOffer = await findJobOfferByApplicant(applicantId);

@@ -4,6 +4,7 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 
 import { PortalDocVerificationStateSchema } from "../types/portal-checklist.schema";
 import type { PortalDocVerificationState } from "../types/portal-checklist.schema";
+import { nowUTC } from "@/lib/audit";
 
 export interface DocumentVerificationEntry {
   state: PortalDocVerificationState;
@@ -20,10 +21,6 @@ const ExistingRowSchema = z.object({
   id: z.number().int().positive(),
   state: PortalDocVerificationStateSchema,
 });
-
-function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 export async function listDocumentVerificationsByUser(
   userId: number
@@ -61,7 +58,7 @@ export async function resetDocumentVerificationIfPresent(
     .safeParse(existingBody);
   const row = existing.success ? existing.data.data[0] : undefined;
   if (row === undefined) return;
-  const now = phTimeNow();
+  const now = nowUTC();
   await dFetch(`/items/onboarding_document_verification/${row.id}`, {
     method: "PATCH",
     body: JSON.stringify({

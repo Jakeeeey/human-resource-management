@@ -25,10 +25,6 @@ export type ActivePaperworkTemplate = z.infer<
   typeof ActivePaperworkTemplateSchema
 >;
 
-export function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function directusErrorText(body: unknown): string | null {
   const errors = (body as { errors?: unknown } | null | undefined)?.errors;
   if (!Array.isArray(errors) || errors.length === 0) return null;

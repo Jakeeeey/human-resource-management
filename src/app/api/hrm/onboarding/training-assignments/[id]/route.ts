@@ -7,8 +7,8 @@ import {
 import {
   assertAssignmentOwner,
   normalizeTrainingAssignment,
-  getPhilippineTime,
 } from "@/modules/human-resource-management/onboarding/training/trainingTaking";
+import { nowUTC } from "@/lib/audit";
 import {
   transitionAssignment,
   type TrainingAssignment,
@@ -118,7 +118,7 @@ export async function PATCH(
       );
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const updated = (await dFetch(`/items/training_assignments/${assignmentId}`, {
       method: "PATCH",
       body: JSON.stringify({

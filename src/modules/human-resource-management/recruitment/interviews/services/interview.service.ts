@@ -8,7 +8,7 @@ import {
 } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { ensureSigningSetForFinalApproved } from "@/modules/human-resource-management/onboarding/signing/server/signing-set-service";
-import { stampCreate, stampUpdate } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { nowUTC, stampCreate, stampUpdate } from "@/lib/audit";
 
 // interviews/service — interview grading + the applicant-pipeline wiring it owns
 // (todo 8). Every stage transition below routes through the SINGLE writer
@@ -23,16 +23,6 @@ const headers = {
     Authorization: `Bearer ${STATIC_TOKEN}`,
     "Content-Type": "application/json",
 };
-
-/**
- * Current Philippine wall time as MySQL-compatible 'YYYY-MM-DD HH:mm:ss' (no offset).
- * Single producer for ALL timestamp writes in this module — never rely on DB
- * CURRENT_TIMESTAMP (see conventions §6 Timestamp convention).
- * @returns PH wall time string.
- */
-export function nowPH(): string {
-    return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 /**
  * Initial-stage application lookup row for the Initial-tab eligible list
@@ -405,9 +395,9 @@ export const interviewService = {
                     stage: input.stage,
                     composite_score: 0,
                     recorded_by: recorded_by ?? input.interviewed_by ?? null,
-                    recorded_at: nowPH(),
-                    created_at: nowPH(),
-                    updated_at: nowPH(),
+                    recorded_at: nowUTC(),
+                    created_at: nowUTC(),
+                    updated_at: nowUTC(),
                 }),
             });
             if (!sheetRes.ok) {
@@ -443,7 +433,7 @@ export const interviewService = {
             const sheetPatchRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet/${sheetId}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify({ composite_score: composite, updated_at: nowPH() }),
+                body: JSON.stringify({ composite_score: composite, updated_at: nowUTC() }),
             });
             if (!sheetPatchRes.ok) {
                 const errorText = await sheetPatchRes.text();
@@ -457,8 +447,8 @@ export const interviewService = {
                 body: JSON.stringify(stampCreate({
                     ...interviewFields,
                     score_sheet_id: sheetId,
-                    created_at: nowPH(),
-                    updated_at: nowPH(),
+                    created_at: nowUTC(),
+                    updated_at: nowUTC(),
                 }, actorId ?? null)),
             });
             if (!interviewRes.ok) {
@@ -504,8 +494,8 @@ export const interviewService = {
                     interviewed_by: null,
                     interviewed_at: null,
                     notes: null,
-                    created_at: nowPH(),
-                    updated_at: nowPH(),
+                    created_at: nowUTC(),
+                    updated_at: nowUTC(),
                 }, actorId ?? null)),
             });
             if (!response.ok) {
@@ -556,9 +546,9 @@ export const interviewService = {
                     stage: input.stage,
                     composite_score: 0,
                     recorded_by: input.recorded_by ?? input.interviewed_by ?? null,
-                    recorded_at: nowPH(),
-                    created_at: nowPH(),
-                    updated_at: nowPH(),
+                    recorded_at: nowUTC(),
+                    created_at: nowUTC(),
+                    updated_at: nowUTC(),
                 }),
             });
             if (!sheetRes.ok) {
@@ -594,7 +584,7 @@ export const interviewService = {
             const sheetPatchRes = await fetch(`${API_BASE_URL}/items/interview_score_sheet/${sheetId}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify({ composite_score: composite, updated_at: nowPH() }),
+                body: JSON.stringify({ composite_score: composite, updated_at: nowUTC() }),
             });
             if (!sheetPatchRes.ok) {
                 const errorText = await sheetPatchRes.text();
@@ -612,7 +602,7 @@ export const interviewService = {
                     interviewed_by: input.interviewed_by,
                     interviewed_at: input.interviewed_at,
                     notes: input.notes,
-                    updated_at: nowPH(),
+                    updated_at: nowUTC(),
                 }, actorId ?? null)),
             });
             if (!interviewRes.ok) {
@@ -641,7 +631,7 @@ export const interviewService = {
             const response = await fetch(`${API_BASE_URL}/items/interview/${id}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify(stampUpdate({ ...patch, updated_at: nowPH() }, actorId ?? null)),
+                body: JSON.stringify(stampUpdate({ ...patch, updated_at: nowUTC() }, actorId ?? null)),
             });
 
             if (!response.ok) {

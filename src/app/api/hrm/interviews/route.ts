@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 import { getApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/lib/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
 
         body.interviewed_by = userId;
-        body.interviewed_at = nowPH();
+        body.interviewed_at = nowUTC();
 
         const validated = InterviewSchema.parse(body);
 

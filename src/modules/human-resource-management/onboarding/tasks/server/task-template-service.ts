@@ -2,9 +2,9 @@ import {
   ONBOARDING_TASK_ERROR_CODES,
   createTemplateRows,
   listTemplateRows,
-  phTimeNow,
   type TemplateWriteRow,
 } from "./onboardingTaskIo";
+import { nowUTC } from "@/lib/audit";
 import {
   buildOrientationTemplateSeeds,
   buildTrainingTemplateSeeds,
@@ -91,7 +91,7 @@ export async function ensureOnboardingTaskTemplates(input?: {
   const byCode = new Set(existing.map((row) => row.code));
   const missing = seed.filter((row) => !byCode.has(row.code));
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const createdCodes: string[] = [];
   if (missing.length > 0) {
     const rows: TemplateWriteRow[] = missing.map((row) => ({

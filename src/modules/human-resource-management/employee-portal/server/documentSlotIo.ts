@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { nowUTC } from "@/lib/audit";
 
 // documentSlotIo.ts — Directus primitives for the hiree document checklist
 // catalog (`onboarding_document_slot`, todo 4 of onboarding-requirements-config).
@@ -22,10 +23,6 @@ export const DOC_SLOT_ERROR_CODES = {
 } as const;
 
 /** PH wall-time, MySQL-compatible `YYYY-MM-DD HH:mm:ss` (conventions §6). */
-export function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }
@@ -194,7 +191,7 @@ export async function softDeleteDocSlotRow(
 ): Promise<OnboardingDocumentSlot> {
   return patchDocSlotRow(id, {
     is_active: 0,
-    updated_at: phTimeNow(),
+    updated_at: nowUTC(),
     updated_by: actorId,
   });
 }
@@ -209,7 +206,7 @@ export async function reorderDocSlots(
   entries: readonly DocSlotOrderEntry[],
   actorId: number | null
 ): Promise<OnboardingDocumentSlot[]> {
-  const now = phTimeNow();
+  const now = nowUTC();
   const updated: OnboardingDocumentSlot[] = [];
   for (const entry of entries) {
     updated.push(

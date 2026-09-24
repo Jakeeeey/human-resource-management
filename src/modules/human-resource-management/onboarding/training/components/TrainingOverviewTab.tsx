@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrainingAssignments } from "../hooks/useTrainingAssignments";
 import { useTrainingAssignmentFetch } from "../providers/trainingAssignmentProvider";
+import { formatPHT, phLocalToUtcIso } from "@/lib/time";
 
 // TrainingOverviewTab.tsx — HR overview per hire (Todo 12).
 //
@@ -41,12 +42,17 @@ export function TrainingOverviewTab({
       setFormError("An employee is required to assign training.");
       return;
     }
+    const dueUtc = due.trim() === "" ? null : phLocalToUtcIso(due);
+    if (due.trim() !== "" && dueUtc === null) {
+      setFormError("Pick a valid deadline date and time.");
+      return;
+    }
     setAssigning(true);
     try {
       await createAssignment({
         user_id: userId,
         quiz_id: parsedQuiz,
-        due: due.trim() === "" ? null : due.trim(),
+        due: dueUtc,
       });
       setQuizId("");
       setDue("");
@@ -79,7 +85,7 @@ export function TrainingOverviewTab({
               <tr key={a.id} className="border-t">
                 <td className="py-2 pr-4">#{a.id}</td>
                 <td className="py-2 pr-4">Quiz #{a.quiz_id}</td>
-                <td className="py-2 pr-4">{a.due ?? "No deadline"}</td>
+                <td className="py-2 pr-4">{a.due ? formatPHT(a.due) : "No deadline"}</td>
                 <td className="py-2 pr-4">{overdueIds.has(a.id) ? "Overdue" : "—"}</td>
                 <td className="py-2">{a.completed_ref ?? "—"}</td>
               </tr>
@@ -112,12 +118,12 @@ export function TrainingOverviewTab({
           />
         </div>
         <div className="space-y-1">
-          <label htmlFor="tr-due" className="text-sm font-medium">Due (optional)</label>
+          <label htmlFor="tr-due" className="text-sm font-medium">Deadline (Manila time, optional)</label>
           <Input
             id="tr-due"
+            type="datetime-local"
             value={due}
             onChange={(e) => setDue(e.target.value)}
-            placeholder="YYYY-MM-DD HH:mm:ss"
             className="w-full sm:w-56"
           />
         </div>

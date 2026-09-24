@@ -10,7 +10,6 @@ import {
   hardDeleteItem,
   invalidId,
   mapRequirementsFailure,
-  phTimeNow,
   readRequirementsSession,
   requirementsConflict,
   requirementsNotFound,
@@ -18,6 +17,7 @@ import {
   validationFailed,
 } from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
 import { UpdateTaskTemplateBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
+import { nowUTC } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +82,7 @@ export async function PATCH(
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ success: true, data: current });
     }
-    patch.updated_at = phTimeNow();
+    patch.updated_at = nowUTC();
     patch.updated_by = session.actorId;
 
     const updated = await patchTemplateRow(id, patch);
@@ -122,7 +122,7 @@ export async function DELETE(
 
     const soft = await patchTemplateRow(id, {
       is_active: 0,
-      updated_at: phTimeNow(),
+      updated_at: nowUTC(),
       updated_by: session.actorId,
     });
     return NextResponse.json({ success: true, data: soft });

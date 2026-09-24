@@ -8,6 +8,7 @@ import {
 import { listActiveDocSlotConfig } from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
 
 import { readHireApplicationByApplicant } from "./hire-application";
+import { nowPH } from "@/lib/audit";
 
 // hiring-documents-filing-service.ts — auto-files hiring documents into the
 // employee's 201 file (`employee_file_records`) under Pre-Employment &
@@ -28,10 +29,6 @@ const HIRING_DOCS_LIST_DESCRIPTION =
 /** `employee_file_records.record_name` is VARCHAR(150). */
 const RECORD_NAME_MAX_LENGTH = 150;
 
-function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function recordNameFor(value: string | null | undefined, fallback: string): string {
   const clean = (value ?? "").trim() || fallback;
   return clean.slice(0, RECORD_NAME_MAX_LENGTH);
@@ -48,7 +45,7 @@ async function readRows(url: string): Promise<unknown[]> {
 let listInFlight: Promise<number> | null = null;
 
 async function doEnsureHiringDocsListId(): Promise<number> {
-  const now = phTimeNow();
+  const now = nowPH();
   const typeRows = await readRows(
     `/items/employee_file_record_type?filter[name][_eq]=${encodeURIComponent(PRE_EMPLOYMENT_TYPE_NAME)}&fields=id&limit=1`
   );
@@ -135,7 +132,7 @@ async function insertFileRecords(
   staged: StagedRecord[]
 ): Promise<void> {
   if (staged.length === 0) return;
-  const now = phTimeNow();
+  const now = nowPH();
   await dFetch("/items/employee_file_records", {
     method: "POST",
     body: JSON.stringify(

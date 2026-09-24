@@ -84,6 +84,3 @@ export function resolveEngineApplicant(
     : null;
 }
 
-export function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}

@@ -4,10 +4,10 @@ import { ApplicantStatusSchema } from "@/modules/human-resource-management/onboa
 import type { ApplicantStatus } from "@/modules/human-resource-management/onboarding/types/applicant-status";
 import {
   ActivePaperworkTemplateSchema,
-  getPhilippineTime,
   insertRows,
   readList,
 } from "./signingSetIo";
+import { nowUTC } from "@/lib/audit";
 
 // signingFilingIo.ts — Directus IO primitives for the deferred filing service
 // (todo 17). The flow decisions live in `signing-filing-service.ts`; this file
@@ -134,7 +134,7 @@ export async function insertFiledPdfRecords(
 let listInFlight: Promise<number> | null = null;
 
 async function doEnsureSignedDocsListId(): Promise<number> {
-  const now = getPhilippineTime();
+  const now = nowUTC();
   const typeRows = await readList(
     `/items/employee_file_record_type?filter[name][_eq]=${encodeURIComponent(SIGNED_DOCS_TYPE_NAME)}&fields=id,name&limit=1`,
     RecordTypeRowSchema

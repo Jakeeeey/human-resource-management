@@ -5,9 +5,9 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 import {
     actorIdFromJwt,
-    nowPH,
+    nowUTC,
     stampUpdate,
-} from "@/modules/human-resource-management/recruitment/utils/audit";
+} from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -105,7 +105,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const res = (await dFetch(`${COLLECTION}/${encodeURIComponent(id)}`, {
             method: "PATCH",
             body: JSON.stringify(
-                stampUpdate({ ...validation.data, updated_at: nowPH() }, actorId)
+                stampUpdate({ ...validation.data, updated_at: nowUTC() }, actorId)
             ),
         })) as { data?: unknown };
         if (!res?.data) {

@@ -17,7 +17,7 @@ import {
   listTopicRows,
   type TopicWriteRow,
 } from "../../orientation/server/orientationTopicIo";
-import { phTimeNow } from "./onboardingTaskIo";
+import { nowUTC } from "@/lib/audit";
 
 // catalogSeed.ts — RUNTIME create-missing seeding for the three new catalogs
 // (todo 6 of onboarding-requirements-config): `orientation_topic`,
@@ -68,7 +68,7 @@ async function seedOrientationTopics(
   );
   if (missing.length === 0) return [];
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const rows: TopicWriteRow[] = missing.map((topic) => ({
     code: topic.id,
     title: topic.title,
@@ -94,7 +94,7 @@ async function seedDocumentSlots(actorId: number | null): Promise<string[]> {
   })).filter(({ slot }) => !present.has(slot.key));
   if (missing.length === 0) return [];
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const rows: DocSlotWriteRow[] = missing.map(({ slot, sort_order }) => ({
     doc_key: slot.key,
     title: slot.title,
@@ -119,7 +119,7 @@ async function seedEquipmentItems(actorId: number | null): Promise<string[]> {
   })).filter(({ item }) => !present.has(item.key));
   if (missing.length === 0) return [];
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const rows: EquipmentItemWriteRow[] = missing.map(
     ({ item, sort_order }) => ({
       item_key: item.key,

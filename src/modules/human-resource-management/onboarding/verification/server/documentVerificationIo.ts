@@ -4,10 +4,7 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 
 import type { DocumentVerificationState } from "../types/document-verification.schema";
 import { DocumentVerificationSchema } from "../types/document-verification.schema";
-
-export function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
+import { nowUTC } from "@/lib/audit";
 
 export interface DocumentVerificationEntry {
   state: DocumentVerificationState;
@@ -48,7 +45,7 @@ export interface UpsertDocumentDecisionInput {
 export async function upsertDocumentDecision(
   input: UpsertDocumentDecisionInput
 ): Promise<void> {
-  const now = phTimeNow();
+  const now = nowUTC();
   const existingBody: unknown = await dFetch(
     `/items/onboarding_document_verification?filter[user_id][_eq]=${input.userId}&filter[doc_key][_eq]=${encodeURIComponent(input.docKey)}&fields=id&limit=1`
   );

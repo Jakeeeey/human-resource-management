@@ -9,7 +9,7 @@ import {
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
 import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { fireHiredIfComplete } from "./signingHireCommit";
-import { getPhilippineTime } from "./signingSetIo";
+import { nowUTC } from "@/lib/audit";
 import {
   findSigningEnvelopeByApplicant,
   listPaperworkItems,
@@ -155,7 +155,7 @@ export async function signPaperworkItem(
       itemId,
       strokes,
       pdfFile,
-      now: getPhilippineTime(),
+      now: nowUTC(),
     });
   }
 
@@ -255,7 +255,7 @@ export async function recomputeSigningRollups(
       itemStatuses: items.map((entry) => entry.status),
       offerStatus: jobOffer.status,
     });
-  const now = getPhilippineTime();
+  const now = nowUTC();
 
   let updatedPaperworks = paperworks;
   if (

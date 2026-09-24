@@ -9,10 +9,10 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 import {
     actorIdFromJwt,
-    nowPH,
+    nowUTC,
     stampCreate,
     stampUpdate,
-} from "@/modules/human-resource-management/recruitment/utils/audit";
+} from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
 
         const token = (await cookies()).get(COOKIE_NAME)?.value;
         const actorId = actorIdFromJwt(token ? decodeJwtPayload(token) : null);
-        const now = nowPH();
+        const now = nowUTC();
         const res = (await dFetch(COLLECTION, {
             method: "POST",
             body: JSON.stringify(
@@ -202,7 +202,7 @@ export async function PATCH(req: NextRequest) {
         const res = (await dFetch(`${COLLECTION}/${encodeURIComponent(String(rawId))}`, {
             method: "PATCH",
             body: JSON.stringify(
-                stampUpdate({ ...validation.data, updated_at: nowPH() }, actorId)
+                stampUpdate({ ...validation.data, updated_at: nowUTC() }, actorId)
             ),
         })) as { data?: unknown };
         if (!res?.data) {

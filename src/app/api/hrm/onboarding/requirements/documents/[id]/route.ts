@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listDocSlotRows,
   patchDocSlotRow,
-  phTimeNow,
   softDeleteDocSlotRow,
 } from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
+import { nowUTC } from "@/lib/audit";
 import {
   hardDeleteItem,
   invalidId,
@@ -66,7 +66,7 @@ export async function PATCH(
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ success: true, data: current });
     }
-    patch.updated_at = phTimeNow();
+    patch.updated_at = nowUTC();
     patch.updated_by = session.actorId;
 
     const updated = await patchDocSlotRow(id, patch);

@@ -7,6 +7,7 @@ import {
   type OrientationTrack,
 } from "../types/orientation.schema";
 import { syncDerivedTemplateActive } from "./orientationTopicTemplateSync";
+import { nowUTC } from "@/lib/audit";
 
 // `orientationTopicCode` (the ONLY topic↔template formula) and
 // `syncDerivedTemplateActive` are re-exported so the store keeps one surface.
@@ -35,10 +36,6 @@ export const ORIENTATION_TOPIC_ERROR_CODES = {
 } as const;
 
 /** PH wall-time, MySQL-compatible `YYYY-MM-DD HH:mm:ss` (conventions §6). */
-export function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }
@@ -243,7 +240,7 @@ export async function softDeleteTopicRow(
 ): Promise<OrientationTopicRow> {
   const row = await patchTopicRow(id, {
     is_active: 0,
-    updated_at: phTimeNow(),
+    updated_at: nowUTC(),
     ...(actorId != null ? { updated_by: actorId } : {}),
   });
   await syncDerivedTemplateActive(
@@ -263,7 +260,7 @@ export async function reorderTopics(
   entries: readonly TopicOrderEntry[],
   actorId: number | null
 ): Promise<OrientationTopicRow[]> {
-  const now = phTimeNow();
+  const now = nowUTC();
   const updated: OrientationTopicRow[] = [];
   for (const entry of entries) {
     updated.push(

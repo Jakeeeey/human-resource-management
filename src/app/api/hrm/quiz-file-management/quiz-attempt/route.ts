@@ -3,7 +3,7 @@ import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { gradeAnswers, persistGradedAttempt, type AnswerInput } from "@/modules/human-resource-management/quiz-file-management/utils/grading";
 import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import { actorIdFromJwt, nowPH, stampUpdate } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { actorIdFromJwt, nowUTC, stampUpdate } from "@/lib/audit";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
                     body: JSON.stringify(stampUpdate({
                         quiz_score: outcome.score,
                         quiz_passed: outcome.passed,
-                        updated_at: nowPH(),
+                        updated_at: nowUTC(),
                     }, actorId)),
                 });
             } catch (writeBackErr) {

@@ -3,6 +3,8 @@ import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { SubmitApplicationPayload } from "@/modules/human-resource-management/application-form/types";
+import { nowUTC } from "@/lib/audit";
+import { submissionError } from "@/modules/human-resource-management/application-form/lib/submissionRules";
 
 export const runtime = "nodejs";
 
@@ -64,6 +66,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const invalid = submissionError(body);
+        if (invalid) {
+            return NextResponse.json({ error: invalid }, { status: 400 });
+        }
+
         const token = req.cookies.get(COOKIE_NAME)?.value;
         const payload = token ? decodeJwtPayload(token) : null;
         const createdBy = payload?.sub ? Number(payload.sub) || null : null;
@@ -79,8 +86,8 @@ export async function POST(req: NextRequest) {
                 full_name: fullName,
                 position_applied_for: position,
                 created_by: createdBy,
-                created_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" }),
-                updated_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" }),
+                created_at: nowUTC(),
+                updated_at: nowUTC(),
             }),
         });
         const applicantErr = firstError(createdApplicant);
@@ -104,7 +111,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Failed to submit application." }, { status: 502 });
         }
 
-        const nowIso = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
+        const nowIso = nowUTC();
         const createdApplication = await dFetch(`/items/application`, {
             method: "POST",
             body: JSON.stringify({

@@ -11,7 +11,8 @@ import type {
   Paperworks,
   SigningEnvelope,
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { SIGNING_SET_ERROR_CODES, getPhilippineTime } from "./signingSetIo";
+import { SIGNING_SET_ERROR_CODES } from "./signingSetIo";
+import { nowUTC } from "@/lib/audit";
 import {
   findSigningEnvelopeByApplicant,
   insertJobOffer,
@@ -151,7 +152,7 @@ export async function ensureSigningSetForFinalApproved(
     );
   }
 
-  const now = getPhilippineTime();
+  const now = nowUTC();
   const required = await resolveRequiredSigningTemplates(companyId);
   if (required.length === 0) {
     console.warn(

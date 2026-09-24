@@ -21,7 +21,7 @@ import {
 import {
   stampCreate,
   stampUpdate,
-} from "@/modules/human-resource-management/onboarding/utils/audit";
+} from "@/lib/audit";
 
 // signingSetRows.ts — typed row access for the four applicant-scoped signing
 // collections (todo 10). Every function names one query/mutation and parses

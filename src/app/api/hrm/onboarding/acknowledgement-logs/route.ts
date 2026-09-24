@@ -6,6 +6,7 @@ import {
   CreateAcknowledgementLogSchema,
   type AcknowledgementLog,
 } from "@/modules/human-resource-management/onboarding/verification/types/acknowledgement-log.schema";
+import { nowUTC } from "@/lib/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +21,6 @@ export const dynamic = "force-dynamic";
 // Double-ack collapses to ONE row: exact-triple pre-check first, then insert;
 // a UNIQUE-conflict body (Directus answers 400 RECORD_NOT_UNIQUE, never 409)
 // re-reads the triple and returns the single surviving row (Todo 2 precedent).
-
-function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -113,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     const docRef = validation.data.doc_ref.trim();
     const signer = validation.data.signer.trim();
-    const at = (validation.data.acknowledged_at ?? "").trim() || getPhilippineTime();
+    const at = (validation.data.acknowledged_at ?? "").trim() || nowUTC();
 
     const preExisting = await findTriple(docRef, signer, at);
     if (preExisting) {
@@ -124,7 +121,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const payload: Record<string, string> = {
       doc_ref: docRef,
       signer,
