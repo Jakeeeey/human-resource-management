@@ -127,9 +127,10 @@ export function KpiSheetForm(props: {
   evalType: "first" | "second";
   bundle: WorkspaceBundle;
   onSaved: () => void;
+  backHref: string;
   readOnly?: boolean;
 }): JSX.Element {
-  const { scope, userId, evalType, bundle, onSaved, readOnly = false } = props;
+  const { scope, userId, evalType, bundle, onSaved, backHref, readOnly = false } = props;
   const viewerLocked = readOnly;
 
   const newestOfType = useMemo(() => {
@@ -359,7 +360,6 @@ export function KpiSheetForm(props: {
           <StatusBadge tone="neutral">
             {scope === "hr" ? "HR" : "Department Head"}
           </StatusBadge>
-          <StatusBadge tone="neutral">{existing ? "Edit" : "Draft"}</StatusBadge>
         </div>
         <p className="text-xs text-muted-foreground">
           {bundle.employee.full_name}
@@ -437,19 +437,22 @@ export function KpiSheetForm(props: {
 
         {rows.length > 0 ? (
           <section aria-label="KPI scorecard" className="space-y-3">
-            <div className="max-h-[60vh] overflow-auto">
-              <table className="data-grid density-comfortable min-w-[880px]">
+            <div className="max-h-[60vh] overflow-auto rounded-lg border border-border">
+              <table className="data-grid density-comfortable min-w-[880px] border-0">
+                <caption className="sr-only">
+                  Weighted KPI ratings, one row per criterion
+                </caption>
                 <thead className="sticky top-0 z-10 bg-muted">
                   <tr>
                     <th scope="col" className="sticky left-0 z-10 bg-muted">KPI Category</th>
                     <th scope="col">Description</th>
                     <th scope="col">Target</th>
                     <th scope="col">Measurement Method</th>
-                    <th scope="col" className="td-num">
-                      Weight
+                    <th scope="col" className="td-num whitespace-nowrap">
+                      Weight %
                     </th>
-                    <th scope="col">Rating (1–5)</th>
-                    <th scope="col" className="td-num">
+                    <th scope="col" className="whitespace-nowrap">Rating (1–5)</th>
+                    <th scope="col" className="td-num whitespace-nowrap">
                       Weighted Score
                     </th>
                   </tr>
@@ -665,16 +668,29 @@ export function KpiSheetForm(props: {
           </Alert>
         ) : null}
 
-        {!voidBlocked && !viewerLocked && !libraryEmpty ? (
+        <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
-            disabled={!canSave}
-            onClick={handleSave}
-            aria-disabled={!canSave}
+            variant="outline"
+            size="sm"
+            className="min-h-11 w-full sm:w-auto md:min-h-0"
+            asChild
           >
-            {saving ? "Saving…" : existing ? "Save Changes" : "Save Evaluation"}
+            <Link href={backHref}>Back to workspace</Link>
           </Button>
-        ) : null}
+          {!voidBlocked && !viewerLocked && !libraryEmpty ? (
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-11 w-full sm:w-auto md:min-h-0"
+              disabled={!canSave}
+              onClick={handleSave}
+              aria-disabled={!canSave}
+            >
+              {saving ? "Saving…" : existing ? "Save Changes" : "Save Evaluation"}
+            </Button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

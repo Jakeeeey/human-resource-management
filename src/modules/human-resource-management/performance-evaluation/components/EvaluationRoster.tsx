@@ -83,7 +83,7 @@ function RosterSkeleton() {
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>Department</TableHead>
-                <TableHead className="td-num">Date hired</TableHead>
+                <TableHead>Date hired</TableHead>
                 <TableHead>Next due date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Attention</TableHead>
@@ -99,8 +99,8 @@ function RosterSkeleton() {
                   <TableCell>
                     <Skeleton className="h-4 w-24" />
                   </TableCell>
-                  <TableCell className="td-num">
-                    <Skeleton className="ml-auto h-4 w-20" />
+                  <TableCell>
+                    <Skeleton className="h-4 w-20" />
                   </TableCell>
                   <TableCell>
                     <Skeleton className="h-3 w-24" />

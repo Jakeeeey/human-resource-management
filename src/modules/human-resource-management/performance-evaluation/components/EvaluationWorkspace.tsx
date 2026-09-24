@@ -18,20 +18,16 @@ import {
     deriveProbationStatus,
     deriveStage,
     type NextAction,
-    type WorkflowStage,
 } from "../utils/workflow";
+import { derivePipPhase } from "../utils/pipGuards";
 import { HistoryPanel } from "./HistoryPanel";
-import { KpiSheetForm } from "./KpiSheetForm";
 import { NextActionCard } from "./NextActionCard";
 import {
     buildWorkflowFacts,
     probationStatusLabel,
     probationStatusTone,
-    workflowStageLabel,
     WorkspaceHero,
 } from "./OverviewSection";
-import { PipForm } from "./PipForm";
-import { RecommendationSection } from "./RecommendationSection";
 import { StageRail } from "./StageRail";
 
 function dueKeyForAction(key: NextAction["key"]): "third" | "fifth" | "sixth" {
@@ -44,9 +40,31 @@ function dueKeyForAction(key: NextAction["key"]): "third" | "fifth" | "sixth" {
     return "third";
 }
 
-function stageHeading(stage: WorkflowStage): string {
-    if (stage === "closed") return "Closing summary";
-    return workflowStageLabel(stage);
+function stageHrefForAction(scope: EvaluationScope, userId: number): string {
+    return scope === "hr"
+        ? `/hrm/performance-evaluation/${userId}/stage`
+        : `/hrm/department-evaluation/${userId}/stage`;
+}
+
+function stageCtaLabel(bundle: WorkspaceBundle): string | null {
+    const facts = buildWorkflowFacts(bundle);
+    const stage = deriveStage(facts);
+    if (stage === "first_evaluation") return "Open 1st evaluation form";
+    if (stage === "second_evaluation") return "Open 2nd evaluation form";
+    if (stage === "pip_1" || stage === "pip_2") {
+        const pipNumber = stage === "pip_1" ? "1" : "2";
+        if (bundle.pips.length === 0) return `Create PIP #${pipNumber}`;
+        const currentPip = [...bundle.pips].sort((a, b) => b.id - a.id)[0];
+        const phase = derivePipPhase({
+            status: currentPip.status,
+            employeeAcknowledgedAt: currentPip.employee_acknowledged_at,
+        });
+        if (phase === "ready_for_review") return `Record PIP #${pipNumber} outcome`;
+        return `Edit PIP #${pipNumber} plan`;
+    }
+    if (stage === "recommendation") return "Open recommendation form";
+    if (stage === "regularization") return "Open regularization form";
+    return null;
 }
 
 const SEPARATION_LABELS: Record<string, string> = {
@@ -131,6 +149,24 @@ export function EvaluationWorkspace({
             ? `/hrm/performance-evaluation?selected=${userId}`
             : `/hrm/department-evaluation?selected=${userId}`;
     const activeOwnedByOther = action !== null && action.owner !== scope;
+    const latestPip =
+        bundle !== null && bundle.pips.length > 0
+            ? [...bundle.pips].sort((a, b) => b.id - a.id)[0]
+            : null;
+    const pipPlanEditable =
+        latestPip != null &&
+        latestPip.status === "open" &&
+        latestPip.employee_acknowledged_at == null;
+    const viewerCanAct =
+        !activeOwnedByOther || (pipPlanEditable && scope === "head");
+    const ctaLabel = bundle ? stageCtaLabel(bundle) : null;
+    const showStageCta =
+        bundle !== null &&
+        stage !== null &&
+        stage !== "closed" &&
+        action !== null &&
+        viewerCanAct &&
+        ctaLabel !== null;
 
     const handleRefresh = () => {
         void refresh();
@@ -220,49 +256,17 @@ export function EvaluationWorkspace({
 
                     <StageRail facts={facts} stage={stage} />
 
-                    <NextActionCard action={action} scope={scope} status={status} dueDate={dueDate} />
+                    <NextActionCard
+                        action={action}
+                        scope={scope}
+                        status={status}
+                        dueDate={dueDate}
+                        ctaHref={stageHrefForAction(scope, userId)}
+                        ctaLabel={ctaLabel}
+                        showCta={showStageCta}
+                    />
 
-                    <section aria-label={stageHeading(stage)} className="space-y-4">
-                        <h2 className="text-base font-semibold">{stageHeading(stage)}</h2>
-                        {stage === "first_evaluation" ? (
-                            <KpiSheetForm
-                                scope={scope}
-                                userId={userId}
-                                evalType="first"
-                                bundle={bundle}
-                                onSaved={refresh}
-                                readOnly={activeOwnedByOther}
-                            />
-                        ) : stage === "second_evaluation" ? (
-                            <KpiSheetForm
-                                scope={scope}
-                                userId={userId}
-                                evalType="second"
-                                bundle={bundle}
-                                onSaved={refresh}
-                                readOnly={activeOwnedByOther}
-                            />
-                        ) : stage === "pip_1" || stage === "pip_2" ? (
-                            <PipForm
-                                scope={scope}
-                                userId={userId}
-                                bundle={bundle}
-                                onSaved={refresh}
-                                readOnly={activeOwnedByOther}
-                            />
-                        ) : stage === "recommendation" || stage === "regularization" ? (
-                            <RecommendationSection
-                                scope={scope}
-                                userId={userId}
-                                bundle={bundle}
-                                onRefresh={() => {
-                                    void refresh();
-                                }}
-                            />
-                        ) : (
-                            <ClosingSummary bundle={bundle} />
-                        )}
-                    </section>
+                    {stage === "closed" ? <ClosingSummary bundle={bundle} /> : null}
 
                     <HistoryPanel bundle={bundle} />
                 </div>

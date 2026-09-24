@@ -80,36 +80,76 @@ export const UpdateEvaluationSchema = z
 
 export type UpdateEvaluationInput = z.infer<typeof UpdateEvaluationSchema>;
 
-const PipActionPlanItemSchema = z.object({
-  pip_area_id: z.number().int().positive().nullable().optional(),
-  area_for_improvement: z.string().trim().min(1).max(255),
-  action_plan: z.string().max(4000).nullable().optional(),
-  review_date: DateStringSchema.nullable().optional(),
-  result: z.enum(["met", "partially_met", "not_met"]).nullable().optional(),
-});
+const PipDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-const PipBase = z.object({
-  user_id: z.number().int().positive(),
-  evaluation_id: z.number().int().positive(),
-  pip_start_date: DateStringSchema.nullable().optional(),
-  pip_end_date: DateStringSchema.nullable().optional(),
-  immediate_superior_id: z.number().int().positive().nullable().optional(),
-  detailed_concerns: z.string().max(4000).nullable().optional(),
-  areas: z.array(z.string().trim().min(1).max(150)).default([]),
-  action_plan: z.array(PipActionPlanItemSchema).default([]),
-});
+const CreatePipActionPlanItemSchema = z
+  .object({
+    pip_area_id: z.number().int().positive().nullable().optional(),
+    area: z.string().trim().min(1).max(255),
+    action: z.string().trim().min(1).max(4000),
+  })
+  .strict();
 
-export const CreatePipSchema = PipBase.strict();
+export type CreatePipActionPlanItem = z.infer<
+  typeof CreatePipActionPlanItemSchema
+>;
+
+function pipDatesCoherent(value: {
+  pip_start_date?: string | null;
+  pip_end_date?: string | null;
+}): boolean {
+  const start = value.pip_start_date ?? null;
+  const end = value.pip_end_date ?? null;
+  if (start === null || end === null) return true;
+  return end >= start;
+}
+
+export const CreatePipSchema = z
+  .object({
+    evaluation_id: z.number().int().positive(),
+    pip_start_date: PipDateString.nullable().optional(),
+    pip_end_date: PipDateString.nullable().optional(),
+    immediate_superior_id: z.number().int().positive().nullable().optional(),
+    detailed_concerns: z.string().max(4000).nullable().optional(),
+    action_plan: z.array(CreatePipActionPlanItemSchema).min(1),
+  })
+  .strict()
+  .refine(pipDatesCoherent, {
+    message: "PIP_DATE_INCOHERENT",
+    path: ["pip_end_date"],
+  });
 
 export type CreatePipInput = z.infer<typeof CreatePipSchema>;
 
-export const UpdatePipSchema = PipBase.partial()
-  .extend({
-    areas: z.array(z.string().trim().min(1).max(150)).optional(),
-    action_plan: z.array(PipActionPlanItemSchema).optional(),
-    status: z.enum(["open", "passed", "failed"]).optional(),
+const UpdatePipActionPlanItemSchema = z
+  .object({
+    id: z.number().int().positive().optional(),
+    pip_area_id: z.number().int().positive().nullable().optional(),
+    area: z.string().trim().min(1).max(255).optional(),
+    action: z.string().max(4000).nullable().optional(),
+    review_date: PipDateString.nullable().optional(),
+    result: z.enum(["met", "partially_met", "not_met"]).nullable().optional(),
   })
   .strict();
+
+export type UpdatePipActionPlanItem = z.infer<
+  typeof UpdatePipActionPlanItemSchema
+>;
+
+export const UpdatePipSchema = z
+  .object({
+    pip_start_date: PipDateString.nullable().optional(),
+    pip_end_date: PipDateString.nullable().optional(),
+    immediate_superior_id: z.number().int().positive().nullable().optional(),
+    detailed_concerns: z.string().max(4000).nullable().optional(),
+    action_plan: z.array(UpdatePipActionPlanItemSchema).min(1).optional(),
+    status: z.enum(["open", "passed", "failed"]).optional(),
+  })
+  .strict()
+  .refine(pipDatesCoherent, {
+    message: "PIP_DATE_INCOHERENT",
+    path: ["pip_end_date"],
+  });
 
 export type UpdatePipInput = z.infer<typeof UpdatePipSchema>;
 

@@ -1,6 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -9,11 +13,16 @@ import type { NextAction, ProbationStatus } from "../utils/workflow";
 import { isDateOverdue } from "../utils/probationClock";
 import { isDueSoon, probationStatusLabel, probationStatusTone } from "./OverviewSection";
 
-const OWNER_LABELS = { hr: "HR", head: "Department head" } as const;
+const OWNER_LABELS = {
+    hr: "HR",
+    head: "Department head",
+    employee: "Employee",
+} as const;
 
 const AWAITING_LABELS = {
     hr: "Awaiting HR",
     head: "Awaiting the department head",
+    employee: "Awaiting the employee",
 } as const;
 
 export function NextActionCard({
@@ -21,13 +30,21 @@ export function NextActionCard({
     scope,
     status,
     dueDate,
+    ctaHref,
+    ctaLabel,
+    showCta = false,
 }: {
     action: NextAction | null;
     scope: EvaluationScope;
     status: ProbationStatus;
     dueDate: string | null;
+    ctaHref?: string;
+    ctaLabel?: string | null;
+    showCta?: boolean;
 }) {
     const overdue = dueDate !== null && isDateOverdue(dueDate);
+    const showStageCta =
+        showCta && ctaHref !== undefined && ctaLabel != null;
 
     return (
         <Card>
@@ -45,12 +62,21 @@ export function NextActionCard({
                             ) : null}
                         </div>
                         {action.owner !== scope ? (
-                            <p className="text-sm font-medium text-foreground">
-                                {AWAITING_LABELS[action.owner]}{" "}
-                                <span className="font-normal text-muted-foreground">
-                                    — nothing is required from you on this step.
-                                </span>
-                            </p>
+                            showStageCta ? (
+                                <p className="text-sm font-medium text-foreground">
+                                    {AWAITING_LABELS[action.owner]}{" "}
+                                    <span className="font-normal text-muted-foreground">
+                                        — you can still revise the plan until it is acknowledged.
+                                    </span>
+                                </p>
+                            ) : (
+                                <p className="text-sm font-medium text-foreground">
+                                    {AWAITING_LABELS[action.owner]}{" "}
+                                    <span className="font-normal text-muted-foreground">
+                                        — nothing is required from you on this step.
+                                    </span>
+                                </p>
+                            )
                         ) : (
                             <p className="text-sm text-muted-foreground">
                                 {dueDate
@@ -58,6 +84,20 @@ export function NextActionCard({
                                     : "Complete this step to move the workflow forward."}
                             </p>
                         )}
+                        {showStageCta ? (
+                            <div className="pt-1">
+                                <Button
+                                    asChild
+                                    size="sm"
+                                    className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                >
+                                    <Link href={ctaHref ?? ""}>
+                                        {ctaLabel}
+                                        <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        ) : null}
                     </div>
                 ) : (
                     <div className="flex flex-wrap items-center gap-2">

@@ -342,7 +342,7 @@ export function EvaluationRosterTable({
                         <span className="block text-muted-foreground">
                           Date hired
                         </span>
-                        <span className="block font-medium tabular-nums">
+                        <span className="block font-medium whitespace-nowrap tabular-nums">
                           {formatRosterDate(row.date_hired)}
                         </span>
                       </span>
@@ -366,7 +366,7 @@ export function EvaluationRosterTable({
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>Department</TableHead>
-                <TableHead className="td-num">Date hired</TableHead>
+                <TableHead>Date hired</TableHead>
                 <TableHead>Next due date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Attention</TableHead>
@@ -425,7 +425,7 @@ export function EvaluationRosterTable({
                     >
                       {displayText(row.department_name)}
                     </TableCell>
-                    <TableCell className="td-num whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap tabular-nums">
                       {formatRosterDate(row.date_hired)}
                     </TableCell>
                     <TableCell className="whitespace-nowrap">

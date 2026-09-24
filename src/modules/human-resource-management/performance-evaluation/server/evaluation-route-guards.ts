@@ -39,6 +39,21 @@ export async function authorizeEvaluationRoute(
   return { cap };
 }
 
+export async function authorizeEvaluationRouteAny(
+  req: NextRequest,
+  needed: readonly RoutableCapability[]
+): Promise<Authorization> {
+  const session = readSession(req);
+  if (!session) return { failure: unauthorized() };
+  const actorId = actorIdFromJwt(session);
+  if (actorId === null) return { failure: unauthorized() };
+  const cap = await resolveEvaluationCapability(actorId);
+  if (!needed.some((flag) => cap[flag])) {
+    throw new EvaluationCapabilityError(needed[0] ?? "canEvaluate");
+  }
+  return { cap };
+}
+
 function toScopeDepartmentId(value: unknown): number | null {
   if (typeof value === "number") {
     return Number.isInteger(value) && value > 0 ? value : null;

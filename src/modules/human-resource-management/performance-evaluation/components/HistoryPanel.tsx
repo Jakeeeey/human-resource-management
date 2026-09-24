@@ -21,6 +21,7 @@ import {
 import { StatusBadge } from "@/components/ui/status-badge";
 
 import type { WorkspaceBundle } from "../types/performance-evaluation.schema";
+import { computeTotalScore } from "../utils/kpiScore";
 
 const PLAN_RESULT_LABELS = {
     met: "Met",
@@ -28,8 +29,31 @@ const PLAN_RESULT_LABELS = {
     not_met: "Not met",
 } as const;
 
+const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+];
+
+function formatDay(value: string | null | undefined): string {
+    if (!value) return "—";
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return value;
+    const [, year, month, day] = match;
+    return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`;
+}
+
 function evaluationTriggerLabel(evalType: string, date: string): string {
-    return `${evalType === "first" ? "1st" : "2nd"} evaluation · ${date}`;
+    return `${evalType === "first" ? "1st" : "2nd"} evaluation · ${formatDay(date)}`;
 }
 
 type OutcomeFilter = "all" | "passed" | "failed" | "open" | "voided";
@@ -45,16 +69,54 @@ function pipOutcome(pip: { status: string }): OutcomeFilter {
     return "open";
 }
 
+function formatScore(value: number): string {
+    return `${Math.round(value * 100) / 100}`;
+}
+
+function acknowledgementCopy(pip: {
+    employee_acknowledged_at: string | null;
+    employee_viewed_at: string | null;
+}): { text: string; date: string | null; acknowledged: boolean } {
+    if (pip.employee_acknowledged_at) {
+        return {
+            text: "Acknowledged",
+            date: formatDay(pip.employee_acknowledged_at),
+            acknowledged: true,
+        };
+    }
+    if (pip.employee_viewed_at) {
+        return {
+            text: "Viewed — awaiting acknowledgement",
+            date: formatDay(pip.employee_viewed_at),
+            acknowledged: false,
+        };
+    }
+    return { text: "Not acknowledged", date: null, acknowledged: false };
+}
+
+function pipRecencyKey(pip: {
+    pip_start_date: string | null;
+    pip_end_date: string | null;
+    closed_at: string | null;
+    updated_at: string | null;
+    created_at: string | null;
+}): string {
+    return pip.pip_end_date
+        ?? pip.pip_start_date
+        ?? pip.closed_at
+        ?? pip.updated_at
+        ?? pip.created_at
+        ?? "";
+}
+
 export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
     const [outcomeFilter, setOutcomeFilter] = useState<OutcomeFilter>("all");
     const orderedEvaluations = [...bundle.evaluations].sort((left, right) =>
-        left.eval_type === right.eval_type
-            ? left.evaluation_date.localeCompare(right.evaluation_date)
-            : left.eval_type === "first"
-              ? -1
-              : 1,
+        right.evaluation_date.localeCompare(left.evaluation_date) || right.id - left.id,
     );
-    const orderedPips = [...bundle.pips].sort((left, right) => left.id - right.id);
+    const orderedPips = [...bundle.pips].sort((left, right) =>
+        pipRecencyKey(right).localeCompare(pipRecencyKey(left)) || right.id - left.id,
+    );
     const totalCount = orderedEvaluations.length + orderedPips.length;
     const showFilter = totalCount > 7;
     const visibleEvaluations = showFilter && outcomeFilter !== "all"
@@ -106,7 +168,11 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                         </p>
                     ) : null}
                     <Accordion type="multiple" className="w-full">
-                        {visibleEvaluations.map((entry) => (
+                        {visibleEvaluations.map((entry) => {
+                            const items = bundle.evaluationItems
+                                .filter((item) => item.evaluation_id === entry.id)
+                                .sort((left, right) => left.sort_order - right.sort_order);
+                            return (
                             <AccordionItem key={`eval-${entry.id}`} value={`eval-${entry.id}`}>
                                 <AccordionTrigger>
                                     <span className="flex flex-wrap items-center gap-2">
@@ -123,10 +189,11 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                     </span>
                                 </AccordionTrigger>
                                 <AccordionContent>
-                                    <dl className="space-y-2 text-sm">
+                                    <div className="space-y-3 text-sm">
+                                    <dl className="space-y-2">
                                         <div className="flex items-center justify-between gap-2">
                                             <dt className="text-muted-foreground">Date</dt>
-                                            <dd className="font-medium tabular-nums">{entry.evaluation_date}</dd>
+                                            <dd className="font-medium tabular-nums">{formatDay(entry.evaluation_date)}</dd>
                                         </div>
                                         <div className="flex items-center justify-between gap-2">
                                             <dt className="text-muted-foreground">Total score</dt>
@@ -156,9 +223,83 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                             </div>
                                         ) : null}
                                     </dl>
+                                    {items.length > 0 ? (
+                                        <div className="space-y-2">
+                                            <p className="text-muted-foreground">KPI breakdown</p>
+                                            <div className="overflow-x-auto rounded-lg border border-border">
+                                                <table className="data-grid w-full min-w-[640px] border-0">
+                                                    <caption className="sr-only">
+                                                        Per-KPI ratings for the {entry.eval_type === "first" ? "1st" : "2nd"} evaluation on {formatDay(entry.evaluation_date)}
+                                                    </caption>
+                                                    <thead>
+                                                        <tr>
+                                                            <th scope="col">KPI category</th>
+                                                            <th scope="col">Description</th>
+                                                            <th scope="col" className="td-num whitespace-nowrap">
+                                                                Weight %
+                                                            </th>
+                                                            <th scope="col" className="td-num whitespace-nowrap">
+                                                                Rating / 5
+                                                            </th>
+                                                            <th scope="col" className="td-num whitespace-nowrap">
+                                                                Weighted score
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {items.map((item) => {
+                                                            const weighted = computeTotalScore([
+                                                                {
+                                                                    rating: item.rating,
+                                                                    weight_percentage_snapshot:
+                                                                        item.weight_percentage_snapshot,
+                                                                },
+                                                            ]);
+                                                            return (
+                                                                <tr key={item.id}>
+                                                                    <td className="font-medium">
+                                                                        {item.kpi_category_snapshot}
+                                                                    </td>
+                                                                    <td>
+                                                                        {item.kpi_description_snapshot}
+                                                                        {item.target_snapshot ? (
+                                                                            <span className="block text-xs text-muted-foreground">
+                                                                                Target: {item.target_snapshot}
+                                                                            </span>
+                                                                        ) : null}
+                                                                    </td>
+                                                                    <td className="td-num tabular-nums">
+                                                                        {formatScore(item.weight_percentage_snapshot)}
+                                                                    </td>
+                                                                    <td className="td-num tabular-nums">
+                                                                        {formatScore(item.rating)} / 5
+                                                                    </td>
+                                                                    <td className="td-num tabular-nums">
+                                                                        {formatScore(weighted)}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                    <tfoot>
+                                                        <tr className="border-t border-border">
+                                                            <td colSpan={4} className="font-semibold">
+                                                                Total
+                                                            </td>
+                                                            <td className="td-num font-semibold tabular-nums">
+                                                                {formatScore(entry.total_score)}
+                                                            </td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                    </div>
                                 </AccordionContent>
                             </AccordionItem>
-                        ))}
+                            );
+                        })}
                         {visiblePips.map((pip) => {
                             const areas = bundle.pipAreas
                                 .filter((area) => area.pip_id === pip.id)
@@ -168,11 +309,13 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                 .sort((left, right) => left.sort_order - right.sort_order);
                             const dateRange = [pip.pip_start_date, pip.pip_end_date]
                                 .filter((part) => part !== null && part !== "")
+                                .map((part) => formatDay(part))
                                 .join(" → ");
                             const dates = dateRange === "" ? "—" : dateRange;
                             const triggerTitle = dateRange === ""
                                 ? "PIP · outcome recorded"
                                 : `PIP · ${dateRange}`;
+                            const acknowledgement = acknowledgementCopy(pip);
                             return (
                                 <AccordionItem key={`pip-${pip.id}`} value={`pip-${pip.id}`}>
                                     <AccordionTrigger>
@@ -222,6 +365,21 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                                         </StatusBadge>
                                                     </dd>
                                                 </div>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <dt className="text-muted-foreground">Acknowledgement</dt>
+                                                    <dd className="text-right">
+                                                        <StatusBadge
+                                                            tone={acknowledgement.acknowledged ? "success" : "neutral"}
+                                                        >
+                                                            {acknowledgement.text}
+                                                        </StatusBadge>{" "}
+                                                        {acknowledgement.date ? (
+                                                            <span className="tabular-nums">
+                                                                {acknowledgement.date}
+                                                            </span>
+                                                        ) : null}
+                                                    </dd>
+                                                </div>
                                             </dl>
                                             {areas.length > 0 ? (
                                                 <div className="space-y-1">
@@ -251,7 +409,7 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                                                     <td>{plan.area_for_improvement}</td>
                                                                     <td>{plan.action_plan ?? "—"}</td>
                                                                     <td className="tabular-nums">
-                                                                        {plan.review_date ?? "—"}
+                                                                        {formatDay(plan.review_date)}
                                                                     </td>
                                                                     <td>
                                                                         {plan.result

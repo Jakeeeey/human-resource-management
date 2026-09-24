@@ -72,6 +72,7 @@ export async function POST(
         evaluationId: pip.evaluation_id,
         evalType: evalTypeById.get(pip.evaluation_id) ?? "first",
         status: pip.status,
+        acknowledgedAt: pip.employee_acknowledged_at,
       })),
     };
     if (deriveNextAction(facts)?.key !== "recommendation") {
