@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { JSX } from "react";
+import Link from "next/link";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -30,6 +30,7 @@ import {
   incompleteOutcomeIndices,
   reviewDateInRange,
 } from "../utils/pipGuards";
+import { SingleDatePicker } from "./SingleDatePicker";
 
 type PlanResult = "met" | "partially_met" | "not_met" | "";
 
@@ -56,9 +57,37 @@ function toDateInput(value: string | null): string {
   return value.slice(0, 10);
 }
 
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
 function toDisplayDate(value: string | null | undefined): string {
   if (!value) return "—";
-  return value.slice(0, 10);
+  const stamp = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (stamp) {
+    const [, year, month, day, hourRaw, minute] = stamp;
+    const hour = Number(hourRaw);
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}, ${hour12}:${minute} ${suffix}`;
+  }
+  const dayMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dayMatch) {
+    const [, year, month, day] = dayMatch;
+    return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`;
+  }
+  return value;
 }
 
 function parsePlanResult(value: string): PlanResult {
@@ -85,9 +114,10 @@ export function PipOutcomeForm(props: {
   userId: number;
   bundle: WorkspaceBundle;
   onSaved: () => void;
+  backHref: string;
   readOnly?: boolean;
 }): JSX.Element {
-  const { scope, bundle, onSaved, readOnly = false } = props;
+  const { scope, bundle, onSaved, backHref, readOnly = false } = props;
 
   const currentPip = useMemo(() => {
     if (bundle.pips.length === 0) return null;
@@ -167,12 +197,9 @@ export function PipOutcomeForm(props: {
     return (
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-base font-semibold">
-              Performance Improvement Plan
-            </CardTitle>
-            <StatusBadge tone="warning">PIP in progress</StatusBadge>
-          </div>
+          <CardTitle className="text-base font-semibold">
+            Performance Improvement Plan
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Alert>
@@ -259,7 +286,7 @@ export function PipOutcomeForm(props: {
     try {
       const input: UpdatePipInput = {
         action_plan: rows.map((row) => ({
-          pip_area_id: row.pipAreaId,
+          id: row.planId,
           review_date: row.reviewDate === "" ? null : row.reviewDate,
           result: row.result === "" ? null : row.result,
         })),
@@ -360,19 +387,28 @@ export function PipOutcomeForm(props: {
               This PIP has no action-plan rows.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="data-grid density-comfortable min-w-[860px]">
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="data-grid density-comfortable min-w-[860px] border-0">
+                <caption className="sr-only">
+                  Agreed action plan with per-row review date and result
+                </caption>
                 <thead>
                   <tr>
+                    <th scope="col" className="td-num w-12">
+                      #
+                    </th>
                     <th scope="col">Area for improvement</th>
                     <th scope="col">Action plan</th>
-                    <th scope="col">Review date</th>
-                    <th scope="col">Result</th>
+                    <th scope="col" className="whitespace-nowrap">Review date</th>
+                    <th scope="col" className="whitespace-nowrap">Result</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row, index) => (
                     <tr key={row.key}>
+                      <td className="td-num align-top text-muted-foreground tabular-nums">
+                        {index + 1}
+                      </td>
                       <td className="min-w-44 align-top text-sm">
                         {row.area}
                       </td>
@@ -386,17 +422,22 @@ export function PipOutcomeForm(props: {
                         >
                           {`Row ${index + 1} review date`}
                         </Label>
-                        <Input
-                          id={`pip-outcome-review-${row.key}`}
-                          type="date"
-                          value={row.reviewDate}
-                          disabled={isReadOnly || saving}
-                          onChange={(event) =>
-                            updateRow(row.key, {
-                              reviewDate: event.target.value,
-                            })
-                          }
-                        />
+                        {isReadOnly || saving ? (
+                          <span className="text-sm tabular-nums">
+                            {row.reviewDate === "" ? "—" : row.reviewDate}
+                          </span>
+                        ) : (
+                          <SingleDatePicker
+                            id={`pip-outcome-review-${row.key}`}
+                            value={row.reviewDate}
+                            onChange={(value) =>
+                              updateRow(row.key, {
+                                reviewDate: value,
+                              })
+                            }
+                            placeholder="Pick a date"
+                          />
+                        )}
                       </td>
                       <td className="min-w-36 align-top">
                         <Label
@@ -531,16 +572,29 @@ export function PipOutcomeForm(props: {
           </Alert>
         ) : null}
 
-        {!isReadOnly && outcomeAllowed ? (
+        <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
-            disabled={!canSave}
-            onClick={handleSave}
-            aria-disabled={!canSave}
+            variant="outline"
+            size="sm"
+            className="min-h-11 w-full sm:w-auto md:min-h-0"
+            asChild
           >
-            {saving ? "Saving…" : "Save Outcome"}
+            <Link href={backHref}>Back to workspace</Link>
           </Button>
-        ) : null}
+          {!isReadOnly && outcomeAllowed ? (
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-11 w-full sm:w-auto md:min-h-0"
+              disabled={!canSave}
+              onClick={handleSave}
+              aria-disabled={!canSave}
+            >
+              {saving ? "Saving…" : "Save Outcome"}
+            </Button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

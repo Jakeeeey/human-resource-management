@@ -48,7 +48,7 @@ export function RecommendationLetterPreviewModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-3xl">
+            <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl">
                 <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-6">
                     <DialogTitle className="text-base">Recommendation letter</DialogTitle>
                     <DialogDescription className="truncate text-xs" title={fileName}>
@@ -57,15 +57,15 @@ export function RecommendationLetterPreviewModal({
                 </DialogHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-3 sm:p-6">
                     {pdfUrl ? (
-                        <div className="mx-auto max-w-2xl overflow-hidden rounded-[var(--radius)] border bg-card shadow-md">
+                        <div className="mx-auto max-w-3xl overflow-hidden rounded-[var(--radius)] border bg-card shadow-md">
                             <iframe
                                 src={pdfUrl}
-                                className="h-[60vh] w-full border-0 sm:h-[65vh]"
+                                className="h-[68vh] w-full border-0 sm:h-[72vh]"
                                 title="Recommendation letter preview"
                             />
                         </div>
                     ) : (
-                        <div className="mx-auto flex max-w-2xl items-center justify-center rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">
+                        <div className="mx-auto flex max-w-3xl items-center justify-center rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">
                             <p className="text-center text-sm text-muted-foreground">
                                 Preview unavailable. Try issuing the letter again.
                             </p>

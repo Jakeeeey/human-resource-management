@@ -131,6 +131,19 @@ export async function getRoster(
   return requestParsed(rosterPath(scope, opts?.includeRegular), z.array(RosterRowSchema));
 }
 
+const DepartmentSuperiorSchema = z.object({
+  user_id: z.number().int(),
+  full_name: z.string(),
+  position: z.string().nullable(),
+  is_department_head: z.boolean(),
+});
+
+export type DepartmentSuperior = z.infer<typeof DepartmentSuperiorSchema>;
+
+export async function getDepartmentSuperiors(userId: number): Promise<DepartmentSuperior[]> {
+  return requestParsed(`${HR_BASE}/superiors?user_id=${userId}`, z.array(DepartmentSuperiorSchema));
+}
+
 export async function getWorkspace(scope: EvaluationScope, userId: number): Promise<WorkspaceBundle> {
   const base = scope === "hr" ? `${HR_BASE}/workspace` : HEAD_WORKSPACE_PATH;
   return requestParsed(`${base}?user_id=${userId}`, WorkspaceBundleSchema);

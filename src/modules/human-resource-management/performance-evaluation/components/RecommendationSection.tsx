@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { JSX } from "react";
 import { toast } from "sonner";
-import { Award, CheckCircle2, FileCheck, Stamp } from "lucide-react";
+import { Award, CheckCircle2, Eye, FileCheck, Stamp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -39,6 +39,40 @@ interface CompanyLogo {
 function errorMessage(err: unknown, fallback: string): string {
     if (err instanceof EvaluationClientError) return err.message;
     return fallback;
+}
+
+const MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+];
+
+function formatDay(value: string | null | undefined): string {
+    if (!value) return "—";
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return value;
+    const [, year, month, day] = match;
+    return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`;
+}
+
+function formatStamp(value: string | null | undefined): string {
+    if (!value) return "—";
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (!match) return formatDay(value);
+    const [, year, month, day, hourRaw, minute] = match;
+    const hour = Number(hourRaw);
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+    return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}, ${hour12}:${minute} ${suffix}`;
 }
 
 function StepMarker({ state, step }: { state: "done" | "active" | "upcoming"; step: number }): JSX.Element {
@@ -127,30 +161,34 @@ export function RecommendationSection({
     const employeeName = employee.full_name.trim() ? employee.full_name : `Employee #${userId}`;
     const fileName = `Recommendation-Letter-${employeeName.trim().replace(/\s+/g, "-")}.pdf`;
 
+    const openLetterPreview = () => {
+        const blob = buildRecommendationLetterPdf(
+            {
+                employeeName,
+                position: employee.position ?? "",
+                department: employee.department_name ?? "",
+                letterDate: todayPH(),
+                companyName,
+                headerAddress: "",
+                headerContact: "",
+                headerEmail: "",
+                signatoryName: "",
+                signatoryTitle: "",
+            },
+            logoDataUrl
+        );
+        setPreviewUrl((previous) => {
+            if (previous) URL.revokeObjectURL(previous);
+            return URL.createObjectURL(blob);
+        });
+        setPreviewOpen(true);
+    };
+
     const handleIssue = async () => {
         setIssuing(true);
         try {
             await issueRecommendation(userId);
-            const blob = buildRecommendationLetterPdf(
-                {
-                    employeeName,
-                    position: employee.position ?? "",
-                    department: employee.department_name ?? "",
-                    letterDate: todayPH(),
-                    companyName,
-                    headerAddress: "",
-                    headerContact: "",
-                    headerEmail: "",
-                    signatoryName: "",
-                    signatoryTitle: "",
-                },
-                logoDataUrl
-            );
-            setPreviewUrl((previous) => {
-                if (previous) URL.revokeObjectURL(previous);
-                return URL.createObjectURL(blob);
-            });
-            setPreviewOpen(true);
+            openLetterPreview();
             toast.success("Recommendation letter issued");
             onRefresh();
         } catch (err) {
@@ -204,13 +242,24 @@ export function RecommendationSection({
                                     </StatusBadge>
                                     {bundle.tracking?.recommendation_issued_at ? (
                                         <span className="text-sm font-medium tabular-nums">
-                                            {bundle.tracking.recommendation_issued_at}
+                                            {formatStamp(bundle.tracking.recommendation_issued_at)}
                                         </span>
                                     ) : null}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                     Step 1 of 2 complete. The letter can move to final approval.
                                 </p>
+                                {isHr ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={openLetterPreview}
+                                        className="mt-2"
+                                    >
+                                        <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                                        View letter
+                                    </Button>
+                                ) : null}
                             </div>
                         ) : (
                             <div className="flex flex-wrap items-center gap-2">
@@ -221,15 +270,26 @@ export function RecommendationSection({
                         {isHr ? (
                             recommendationIssued ? null : (
                                 <div className="space-y-2">
-                                    <Button
-                                        onClick={() => void handleIssue()}
-                                        disabled={!canIssue}
-                                        aria-describedby="issue-gating"
-                                        className="w-full sm:w-auto"
-                                    >
-                                        <Award className="mr-2 h-4 w-4" aria-hidden="true" />
-                                        {issuing ? "Saving…" : "Issue recommendation letter"}
-                                    </Button>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            onClick={() => void handleIssue()}
+                                            disabled={!canIssue}
+                                            aria-describedby="issue-gating"
+                                            className="w-full sm:w-auto"
+                                        >
+                                            <Award className="mr-2 h-4 w-4" aria-hidden="true" />
+                                            {issuing ? "Saving…" : "Issue recommendation letter"}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={openLetterPreview}
+                                            disabled={issuing}
+                                            className="w-full sm:w-auto"
+                                        >
+                                            <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                                            Preview letter
+                                        </Button>
+                                    </div>
                                     {!readyToRecommend ? (
                                         <p id="issue-gating" className="text-sm text-muted-foreground">
                                             Current stage: {workflowStageLabel(stage)}
@@ -265,7 +325,7 @@ export function RecommendationSection({
                                     </StatusBadge>
                                     {bundle.tracking?.regularized_at ? (
                                         <span className="text-sm font-medium tabular-nums">
-                                            {bundle.tracking.regularized_at}
+                                            {formatStamp(bundle.tracking.regularized_at)}
                                         </span>
                                     ) : null}
                                 </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -13,9 +13,20 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useEvaluationWorkspace } from "../hooks/useEvaluationWorkspace";
 import type { EvaluationScope } from "../providers/evaluationClient";
 import type { WorkspaceBundle } from "../types/performance-evaluation.schema";
-import { deriveNextAction, deriveStage, type WorkflowStage } from "../utils/workflow";
+import { formatHiredDate } from "../utils/probationClock";
+import {
+  deriveNextAction,
+  deriveProbationStatus,
+  deriveStage,
+  type WorkflowStage,
+} from "../utils/workflow";
 import { KpiSheetForm } from "./KpiSheetForm";
-import { buildWorkflowFacts, workflowStageLabel } from "./OverviewSection";
+import {
+  buildWorkflowFacts,
+  probationStatusLabel,
+  probationStatusTone,
+  workflowStageLabel,
+} from "./OverviewSection";
 import { PipForm } from "./PipForm";
 import { RecommendationSection } from "./RecommendationSection";
 
@@ -66,6 +77,7 @@ export function EvaluationStageView({
   const { bundle, loading, error, errorStatus, refresh } =
     useEvaluationWorkspace(scope, userId);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const selected = searchParams.get("selected");
   const workspaceHref =
     selected !== null && selected !== ""
@@ -74,15 +86,31 @@ export function EvaluationStageView({
 
   const facts = bundle ? buildWorkflowFacts(bundle) : null;
   const stage: WorkflowStage | null = facts ? deriveStage(facts) : null;
+  const status = facts ? deriveProbationStatus(facts) : null;
   const action = facts ? deriveNextAction(facts) : null;
   const actionOwnedByOther = action !== null && action.owner !== scope;
+  const currentPip =
+    bundle && bundle.pips.length > 0
+      ? [...bundle.pips].sort((a, b) => b.id - a.id)[0]
+      : null;
+  const pipPlanStillEditable =
+    currentPip !== null &&
+    currentPip.status === "open" &&
+    currentPip.employee_acknowledged_at == null;
+  const pipFormReadOnly = pipPlanStillEditable
+    ? scope !== "head"
+    : actionOwnedByOther;
 
   const handleRefresh = () => {
     void refresh();
   };
 
+  const handleSaved = () => {
+    router.push(workspaceHref);
+  };
+
   return (
-    <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
+    <div className="mx-auto min-h-screen w-full max-w-6xl space-y-6 p-2 sm:p-6 md:p-10">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Button
           asChild
@@ -125,7 +153,7 @@ export function EvaluationStageView({
             </Button>
           </AlertDescription>
         </Alert>
-      ) : error || !bundle || !stage ? (
+      ) : error || !bundle || !stage || !status ? (
         <Alert variant="destructive">
           <AlertTitle>Stage unavailable</AlertTitle>
           <AlertDescription className="space-y-3">
@@ -137,18 +165,56 @@ export function EvaluationStageView({
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="space-y-4">
-          <h1 className="text-base font-semibold">
-            {stage === "closed" ? "Closing summary" : workflowStageLabel(stage)}
-          </h1>
+        <div className="space-y-6">
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  {bundle.employee.date_hired
+                    ? `Hired ${formatHiredDate(bundle.employee.date_hired)}`
+                    : "No hire date on record"}
+                </p>
+                <h1 className="truncate text-xl font-semibold">
+                  {bundle.employee.full_name}
+                </h1>
+                {[bundle.employee.department_name, bundle.employee.position]
+                  .filter(
+                    (part): part is string =>
+                      part !== null && part !== undefined && part !== "",
+                  )
+                  .join(" · ") !== "" ? (
+                  <p className="truncate text-sm text-muted-foreground">
+                    {[
+                      bundle.employee.department_name,
+                      bundle.employee.position,
+                    ]
+                      .filter(
+                        (part): part is string =>
+                          part !== null && part !== undefined && part !== "",
+                      )
+                      .join(" · ")}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <StatusBadge tone={probationStatusTone(status)}>
+                  {probationStatusLabel(status)}
+                </StatusBadge>
+                <StatusBadge tone={stage === "closed" ? "neutral" : "info"}>
+                  {workflowStageLabel(stage)}
+                </StatusBadge>
+              </div>
+            </CardContent>
+          </Card>
           {stage === "first_evaluation" ? (
             <KpiSheetForm
               scope={scope}
               userId={userId}
               evalType="first"
               bundle={bundle}
-              onSaved={refresh}
+              onSaved={handleSaved}
               readOnly={actionOwnedByOther}
+              backHref={workspaceHref}
             />
           ) : stage === "second_evaluation" ? (
             <KpiSheetForm
@@ -156,16 +222,18 @@ export function EvaluationStageView({
               userId={userId}
               evalType="second"
               bundle={bundle}
-              onSaved={refresh}
+              onSaved={handleSaved}
               readOnly={actionOwnedByOther}
+              backHref={workspaceHref}
             />
           ) : stage === "pip_1" || stage === "pip_2" ? (
             <PipForm
               scope={scope}
               userId={userId}
               bundle={bundle}
-              onSaved={refresh}
-              readOnly={actionOwnedByOther}
+              onSaved={handleSaved}
+              readOnly={pipFormReadOnly}
+              backHref={workspaceHref}
             />
           ) : stage === "recommendation" || stage === "regularization" ? (
             <RecommendationSection

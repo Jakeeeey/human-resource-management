@@ -301,7 +301,7 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
                     </li>
                   ))}
                 </ul>
-                <div className="hidden max-h-[560px] overflow-auto sm:block">
+                <div className="hidden sm:block">
                   <Table className="data-grid density-compact">
                     <TableHeader>
                       <TableRow>

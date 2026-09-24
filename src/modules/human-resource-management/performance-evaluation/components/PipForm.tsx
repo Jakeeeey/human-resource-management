@@ -16,9 +16,10 @@ export function PipForm(props: {
   userId: number;
   bundle: WorkspaceBundle;
   onSaved: () => void;
+  backHref: string;
   readOnly?: boolean;
 }): JSX.Element {
-  const { scope, userId, bundle, onSaved, readOnly = false } = props;
+  const { scope, userId, bundle, onSaved, backHref, readOnly = false } = props;
 
   const currentPip = useMemo(() => {
     if (bundle.pips.length === 0) return null;
@@ -32,6 +33,7 @@ export function PipForm(props: {
         userId={userId}
         bundle={bundle}
         onSaved={onSaved}
+        backHref={backHref}
         readOnly={readOnly}
       />
     );
@@ -44,6 +46,7 @@ export function PipForm(props: {
         userId={userId}
         bundle={bundle}
         onSaved={onSaved}
+        backHref={backHref}
         readOnly
       />
     );
@@ -61,6 +64,7 @@ export function PipForm(props: {
         userId={userId}
         bundle={bundle}
         onSaved={onSaved}
+        backHref={backHref}
         readOnly={readOnly}
       />
     );
@@ -73,6 +77,7 @@ export function PipForm(props: {
         userId={userId}
         bundle={bundle}
         onSaved={onSaved}
+        backHref={backHref}
         readOnly={readOnly}
       />
       <Card>

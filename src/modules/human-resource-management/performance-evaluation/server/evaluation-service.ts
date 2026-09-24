@@ -184,6 +184,93 @@ function compareRosterRows(left: RosterRow, right: RosterRow): number {
   return left.user_id - right.user_id;
 }
 
+export interface DepartmentSuperior {
+  user_id: number;
+  full_name: string;
+  position: string | null;
+  is_department_head: boolean;
+}
+
+const DepartmentHeadIdSchema = z.object({
+  department_id: z.number().int(),
+  department_head_id: z
+    .union([z.number().int(), z.string().regex(/^\d+$/)])
+    .nullish(),
+});
+
+const SUPERIOR_FIELDS =
+  "user_id,user_fname,user_mname,user_lname,user_department,user_position,user_dateOfHire,isDeleted";
+
+export async function listDepartmentSuperiors(
+  userId: number
+): Promise<DepartmentSuperior[]> {
+  const userBody = await dFetch(
+    `/items/user/${userId}?fields=${SUPERIOR_FIELDS}`
+  );
+  const userRow = RosterEmployeeSchema.safeParse(unwrapData(userBody));
+  if (!userRow.success) return [];
+  const departmentId = toDepartmentId(userRow.data.user_department);
+  if (departmentId === null) return [];
+
+  const [memberBody, departmentBody] = await Promise.all([
+    dFetch(
+      `/items/user?filter[user_department][_eq]=${departmentId}&fields=${SUPERIOR_FIELDS}&limit=-1`
+    ),
+    dFetch(
+      `/items/department/${departmentId}?fields=department_id,department_head_id`
+    ),
+  ]);
+
+  const members = parseRowList(RosterEmployeeSchema, memberBody, "user");
+  const department = DepartmentHeadIdSchema.safeParse(unwrapData(departmentBody));
+  const headId =
+    department.success && department.data.department_head_id != null
+      ? Number(department.data.department_head_id)
+      : null;
+
+  const superiors = new Map<number, DepartmentSuperior>();
+  for (const member of members) {
+    if (member.user_id === userId) continue;
+    if (isDeletedValue(member.isDeleted ?? member.is_deleted ?? member.deleted)) {
+      continue;
+    }
+    superiors.set(member.user_id, {
+      user_id: member.user_id,
+      full_name: toFullName(member),
+      position: normalizeText(member.user_position),
+      is_department_head: member.user_id === headId,
+    });
+  }
+
+  if (headId !== null && headId !== userId && !superiors.has(headId)) {
+    const headBody = await dFetch(
+      `/items/user/${headId}?fields=${SUPERIOR_FIELDS}`
+    ).catch(() => null);
+    if (headBody !== null) {
+      const headRow = RosterEmployeeSchema.safeParse(unwrapData(headBody));
+      if (
+        headRow.success &&
+        !isDeletedValue(
+          headRow.data.isDeleted ??
+            headRow.data.is_deleted ??
+            headRow.data.deleted
+        )
+      ) {
+        superiors.set(headId, {
+          user_id: headId,
+          full_name: toFullName(headRow.data),
+          position: normalizeText(headRow.data.user_position),
+          is_department_head: true,
+        });
+      }
+    }
+  }
+
+  return [...superiors.values()].sort((left, right) =>
+    left.full_name.localeCompare(right.full_name)
+  );
+}
+
 export async function listEvaluationRoster(
   cap: EvaluationCapability,
   opts?: { includeRegular?: boolean; scopeDepartmentIds?: number[] }

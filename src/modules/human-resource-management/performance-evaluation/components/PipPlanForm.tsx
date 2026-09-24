@@ -2,26 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { JSX } from "react";
+import Link from "next/link";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
+import { ClipboardList, Plus, Trash2 } from "lucide-react";
 
 import {
   EvaluationClientError,
   createPip,
+  getDepartmentSuperiors,
   updatePip,
 } from "../providers/evaluationClient";
 import type {
   CreatePipInput,
+  DepartmentSuperior,
   UpdatePipInput,
 } from "../providers/evaluationClient";
 import type { WorkspaceBundle } from "../types/performance-evaluation.schema";
+import { SingleDatePicker } from "./SingleDatePicker";
+import { SuperiorCombobox } from "./SuperiorCombobox";
 
 type PlanRow = {
   key: string;
@@ -55,9 +61,10 @@ export function PipPlanForm(props: {
   userId: number;
   bundle: WorkspaceBundle;
   onSaved: () => void;
+  backHref: string;
   readOnly?: boolean;
 }): JSX.Element {
-  const { scope, bundle, onSaved, readOnly = false } = props;
+  const { scope, bundle, onSaved, backHref, readOnly = false } = props;
 
   const currentPip = useMemo(() => {
     if (bundle.pips.length === 0) return null;
@@ -90,6 +97,9 @@ export function PipPlanForm(props: {
   const [superiorId, setSuperiorId] = useState("");
   const [planRows, setPlanRows] = useState<PlanRow[]>([]);
   const [rowCounter, setRowCounter] = useState(0);
+  const [roster, setRoster] = useState<DepartmentSuperior[] | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [rosterReloadKey, setRosterReloadKey] = useState(0);
 
   useEffect(() => {
     const seed = currentPip ? currentPip.id : "new";
@@ -121,6 +131,57 @@ export function PipPlanForm(props: {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    setRoster(null);
+    setRosterError(null);
+    getDepartmentSuperiors(bundle.employee.user_id)
+      .then((rows) => {
+        if (cancelled) return;
+        setRoster(rows);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setRosterError(
+          err instanceof Error ? err.message : "Failed to load employees.",
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bundle.employee.user_id, rosterReloadKey]);
+
+  const departmentMembers = useMemo(() => {
+    if (!roster) return null;
+    return roster;
+  }, [roster]);
+
+  const superiorName = useMemo(() => {
+    const trimmed = superiorId.trim();
+    if (trimmed === "" || !departmentMembers) return null;
+    const match = departmentMembers.find(
+      (row) => `${row.user_id}` === trimmed,
+    );
+    return match ? match.full_name : null;
+  }, [superiorId, departmentMembers]);
+
+  const staleSuperiorId = useMemo(() => {
+    const trimmed = superiorId.trim();
+    if (trimmed === "" || !departmentMembers) return null;
+    const known = departmentMembers.some(
+      (row) => `${row.user_id}` === trimmed,
+    );
+    return known ? null : trimmed;
+  }, [superiorId, departmentMembers]);
+
+  const completedRows = useMemo(
+    () =>
+      planRows.filter(
+        (row) => row.area.trim() !== "" && row.action.trim() !== "",
+      ).length,
+    [planRows],
+  );
+
   const viewerLocked = readOnly;
   const isReadOnly = viewerLocked;
 
@@ -150,12 +211,6 @@ export function PipPlanForm(props: {
     for (const row of planRows) {
       if (row.area.trim() === "" || row.action.trim() === "") {
         return "Every action-plan row needs an area for improvement and an action plan.";
-      }
-    }
-    if (superiorId.trim() !== "") {
-      const parsed = Number(superiorId);
-      if (!Number.isInteger(parsed) || parsed <= 0) {
-        return "Immediate superior ID must be a positive whole number.";
       }
     }
     if (startDate !== "" && endDate !== "" && endDate < startDate) {
@@ -256,15 +311,9 @@ export function PipPlanForm(props: {
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <CardTitle className="text-base font-semibold">
-            Performance Improvement Plan
-          </CardTitle>
-          <StatusBadge tone="neutral">
-            {currentPip ? "Edit" : "Draft"}
-          </StatusBadge>
-          <StatusBadge tone="warning">PIP in progress</StatusBadge>
-        </div>
+        <CardTitle className="text-base font-semibold">
+          Performance Improvement Plan
+        </CardTitle>
         <p className="text-xs text-muted-foreground">
           {bundle.employee.full_name}
           {bundle.employee.department_name
@@ -323,96 +372,207 @@ export function PipPlanForm(props: {
           </p>
         </section>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="pip-start-date">PIP start date</Label>
-            <Input
-              id="pip-start-date"
-              type="date"
-              value={startDate}
-              disabled={isReadOnly || saving}
-              onChange={(event) => setStartDate(event.target.value)}
-            />
+        <section aria-label="PIP timeline" className="space-y-3">
+          <h3 className="text-sm font-semibold">PIP timeline</h3>
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-border p-4 sm:grid-cols-2 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="pip-start-date">PIP start date</Label>
+              {isReadOnly ? (
+                <p className="text-sm tabular-nums" id="pip-start-date">
+                  {startDate === "" ? "Not set" : startDate}
+                </p>
+              ) : (
+                <SingleDatePicker
+                  id="pip-start-date"
+                  value={startDate}
+                  onChange={setStartDate}
+                  placeholder="Pick a start date"
+                  disabled={saving}
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pip-end-date">PIP end date</Label>
+              {isReadOnly ? (
+                <p className="text-sm tabular-nums" id="pip-end-date">
+                  {endDate === "" ? "Not set" : endDate}
+                </p>
+              ) : (
+                <SingleDatePicker
+                  id="pip-end-date"
+                  value={endDate}
+                  onChange={setEndDate}
+                  placeholder="Pick an end date"
+                  disabled={saving}
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pip-superior">Immediate superior</Label>
+              {isReadOnly ? (
+                <p className="text-sm" id="pip-superior">
+                  {superiorId.trim() === ""
+                    ? "Not assigned"
+                    : (superiorName ?? `ID ${superiorId.trim()}`)}
+                </p>
+              ) : rosterError ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Failed to load employees</AlertTitle>
+                  <AlertDescription className="flex flex-wrap items-center gap-2">
+                    <span>{rosterError}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRosterReloadKey((key) => key + 1)}
+                    >
+                      Retry
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : departmentMembers == null ? (
+                <Skeleton className="h-10 w-full" aria-label="Loading employees" />
+              ) : departmentMembers.length === 0 && staleSuperiorId == null ? (
+                <p className="rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+                  {bundle.employee.department_id == null
+                    ? "No department is recorded for this employee, so there is no superior list to choose from."
+                    : "There is no one else in this department to assign as the immediate superior."}
+                </p>
+              ) : (
+                <>
+                  <SuperiorCombobox
+                    id="pip-superior"
+                    options={[
+                      { value: "", label: "No superior assigned" },
+                      ...departmentMembers.map((row) => ({
+                        value: `${row.user_id}`,
+                        label: row.is_department_head
+                          ? `${row.full_name} — Department head`
+                          : row.full_name,
+                      })),
+                      ...(staleSuperiorId != null
+                        ? [
+                            {
+                              value: staleSuperiorId,
+                              label: `ID ${staleSuperiorId} — not in the current department list`,
+                            },
+                          ]
+                        : []),
+                    ]}
+                    value={superiorId.trim()}
+                    onValueChange={setSuperiorId}
+                    placeholder="Select a superior"
+                    disabled={saving}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Only members of the employee&apos;s own department can be
+                    assigned.
+                  </p>
+                </>
+              )}
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="pip-end-date">PIP end date</Label>
-            <Input
-              id="pip-end-date"
-              type="date"
-              value={endDate}
-              disabled={isReadOnly || saving}
-              onChange={(event) => setEndDate(event.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="pip-superior-id">Immediate superior ID</Label>
-            <Input
-              id="pip-superior-id"
-              type="number"
-              min={1}
-              step={1}
-              value={superiorId}
-              disabled={isReadOnly || saving}
-              onChange={(event) => setSuperiorId(event.target.value)}
-              placeholder="Optional"
-            />
-          </div>
-        </div>
+        </section>
 
         <Separator />
 
-        <section aria-label="Action plan" className="space-y-3">
-          <div className="space-y-1">
-            <h3 className="text-sm font-semibold">Improvement and Action Plan</h3>
-            <p className="text-xs text-muted-foreground">
-              Each row links an area to its action plan. Review dates and
-              results are recorded later, once the employee acknowledges this
-              plan.
-            </p>
+        <section aria-label="Action plan" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold">
+                  Improvement and Action Plan
+                </h3>
+                <StatusBadge tone="neutral">
+                  {planRows.length === 1
+                    ? "1 item"
+                    : `${planRows.length} items`}
+                </StatusBadge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Each row links an area to its action plan.
+                {planRows.length === 0
+                  ? " Start with the first improvement below."
+                  : ` ${completedRows} of ${planRows.length} complete.`}{" "}
+                Review dates and results are recorded later, once the employee
+                acknowledges this plan.
+              </p>
+            </div>
           </div>
           {planRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No action-plan rows yet. Add the first improvement and its action
-              plan.
-            </p>
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border p-6 text-center">
+              <ClipboardList
+                className="h-5 w-5 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-sm font-semibold">No improvements listed</p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                Name the first area that needs work and the action that will
+                address it.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isReadOnly || saving}
+                onClick={addRow}
+              >
+                <Plus aria-hidden="true" />
+                Add the first improvement
+              </Button>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="data-grid density-comfortable min-w-[640px]">
-                <thead>
-                  <tr>
-                    <th scope="col">Area for improvement</th>
-                    <th scope="col">Action plan</th>
-                    <th scope="col">
-                      <span className="sr-only">Row actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {planRows.map((row, index) => (
-                    <tr key={row.key}>
-                      <td className="min-w-44 align-top">
-                        <Label
-                          htmlFor={`pip-plan-area-${row.key}`}
-                          className="sr-only"
-                        >
-                          {`Row ${index + 1} area for improvement`}
+            <ol className="space-y-3">
+              {planRows.map((row, index) => {
+                return (
+                  <li
+                    key={row.key}
+                    className="rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow duration-150 hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold tabular-nums"
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold">
+                          Improvement {index + 1}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        disabled={isReadOnly || saving}
+                        onClick={() => removeRow(row.key)}
+                        aria-label={`Remove improvement ${index + 1}`}
+                        title={`Remove improvement ${index + 1}`}
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </Button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-5">
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor={`pip-plan-area-${row.key}`}>
+                          Area for improvement
                         </Label>
-                        <Input
+                        <Textarea
                           id={`pip-plan-area-${row.key}`}
                           value={row.area}
                           disabled={isReadOnly || saving}
                           onChange={(event) =>
                             updateRow(row.key, { area: event.target.value })
                           }
-                          placeholder="Area for improvement"
+                          placeholder="e.g. On-time task delivery"
+                          rows={3}
                         />
-                      </td>
-                      <td className="min-w-56 align-top">
-                        <Label
-                          htmlFor={`pip-plan-action-${row.key}`}
-                          className="sr-only"
-                        >
-                          {`Row ${index + 1} action plan`}
+                      </div>
+                      <div className="space-y-2 md:col-span-3">
+                        <Label htmlFor={`pip-plan-action-${row.key}`}>
+                          Action plan
                         </Label>
                         <Textarea
                           id={`pip-plan-action-${row.key}`}
@@ -421,67 +581,29 @@ export function PipPlanForm(props: {
                           onChange={(event) =>
                             updateRow(row.key, { action: event.target.value })
                           }
-                          placeholder="Action plan"
-                          rows={2}
+                          placeholder="What will be done, by whom, and how progress is checked"
+                          rows={3}
                         />
-                      </td>
-                      <td className="align-top">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={isReadOnly || saving}
-                          onClick={() => removeRow(row.key)}
-                          aria-label={`Remove action-plan row ${index + 1}`}
-                        >
-                          Remove
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isReadOnly || saving}
-            onClick={addRow}
-          >
-            Add row
-          </Button>
-        </section>
-
-        <Separator />
-
-        <section aria-label="Acknowledgement" className="space-y-2">
-          <h3 className="text-sm font-semibold">Acknowledgement</h3>
-          <div className="rounded-lg border border-border p-4 text-sm">
-            {currentPip?.employee_acknowledged_at ? (
-              <p>
-                Acknowledged by the employee on{" "}
-                <span className="tabular-nums">
-                  {toDisplayDate(currentPip.employee_acknowledged_at)}
-                </span>
-                .
-              </p>
-            ) : currentPip?.employee_viewed_at ? (
-              <p className="text-muted-foreground">
-                Viewed by the employee on{" "}
-                <span className="tabular-nums">
-                  {toDisplayDate(currentPip.employee_viewed_at)}
-                </span>
-                , awaiting acknowledgement.
-              </p>
-            ) : (
-              <p className="text-muted-foreground">
-                Read-only. The employee acknowledges in their own module once
-                this PIP is saved.
-              </p>
-            )}
-          </div>
+          {planRows.length > 0 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full border-dashed"
+              disabled={isReadOnly || saving}
+              onClick={addRow}
+            >
+              <Plus aria-hidden="true" />
+              Add improvement
+            </Button>
+          ) : null}
         </section>
 
         {validationError && (currentPip || failedEvaluation) ? (
@@ -498,16 +620,29 @@ export function PipPlanForm(props: {
           </Alert>
         ) : null}
 
-        {!isReadOnly ? (
+        <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
-            disabled={!canSave}
-            onClick={handleSave}
-            aria-disabled={!canSave}
+            variant="outline"
+            size="sm"
+            className="min-h-11 w-full sm:w-auto md:min-h-0"
+            asChild
           >
-            {saving ? "Saving…" : currentPip ? "Save Changes" : "Save PIP"}
+            <Link href={backHref}>Back to workspace</Link>
           </Button>
-        ) : null}
+          {!isReadOnly ? (
+            <Button
+              type="button"
+              size="sm"
+              className="min-h-11 w-full sm:w-auto md:min-h-0"
+              disabled={!canSave}
+              onClick={handleSave}
+              aria-disabled={!canSave}
+            >
+              {saving ? "Saving…" : currentPip ? "Save Changes" : "Save PIP"}
+            </Button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

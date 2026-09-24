@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, RefreshCw } from "lucide-react";
+import { ClipboardCheck, RefreshCw } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -149,13 +149,23 @@ export function EvaluationWorkspace({
             ? `/hrm/performance-evaluation?selected=${userId}`
             : `/hrm/department-evaluation?selected=${userId}`;
     const activeOwnedByOther = action !== null && action.owner !== scope;
+    const latestPip =
+        bundle !== null && bundle.pips.length > 0
+            ? [...bundle.pips].sort((a, b) => b.id - a.id)[0]
+            : null;
+    const pipPlanEditable =
+        latestPip != null &&
+        latestPip.status === "open" &&
+        latestPip.employee_acknowledged_at == null;
+    const viewerCanAct =
+        !activeOwnedByOther || (pipPlanEditable && scope === "head");
     const ctaLabel = bundle ? stageCtaLabel(bundle) : null;
     const showStageCta =
         bundle !== null &&
         stage !== null &&
         stage !== "closed" &&
         action !== null &&
-        !activeOwnedByOther &&
+        viewerCanAct &&
         ctaLabel !== null;
 
     const handleRefresh = () => {
@@ -246,18 +256,15 @@ export function EvaluationWorkspace({
 
                     <StageRail facts={facts} stage={stage} />
 
-                    <NextActionCard action={action} scope={scope} status={status} dueDate={dueDate} />
-
-                    {showStageCta && ctaLabel ? (
-                        <div>
-                            <Button asChild size="sm" className="min-h-11 w-full sm:w-auto md:min-h-0">
-                                <Link href={stageHrefForAction(scope, userId)}>
-                                    {ctaLabel}
-                                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                                </Link>
-                            </Button>
-                        </div>
-                    ) : null}
+                    <NextActionCard
+                        action={action}
+                        scope={scope}
+                        status={status}
+                        dueDate={dueDate}
+                        ctaHref={stageHrefForAction(scope, userId)}
+                        ctaLabel={ctaLabel}
+                        showCta={showStageCta}
+                    />
 
                     {stage === "closed" ? <ClosingSummary bundle={bundle} /> : null}
 
