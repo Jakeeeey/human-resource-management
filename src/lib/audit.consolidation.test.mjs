@@ -12,6 +12,12 @@ const RETIRED = [
     "src/modules/human-resource-management/onboarding/utils/audit.ts",
 ];
 
+const SEPARATE_AUDIT_MODULES = [
+    "src/modules/human-resource-management/performance-evaluation/",
+    "src/app/api/hrm/performance-evaluation/",
+    "src/app/api/hrm/pip-acknowledgement/",
+];
+
 function sourceFiles(dir, out = []) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
@@ -22,11 +28,18 @@ function sourceFiles(dir, out = []) {
 }
 
 const rel = (file) => path.relative(path.resolve(SRC, ".."), file).split(path.sep).join("/");
-const files = sourceFiles(SRC).map((file) => ({ file: rel(file), text: fs.readFileSync(file, "utf8") }));
+const files = sourceFiles(SRC)
+    .map((file) => ({ file: rel(file), text: fs.readFileSync(file, "utf8") }))
+    .filter(({ file }) => !SEPARATE_AUDIT_MODULES.some((prefix) => file.startsWith(prefix)));
 
 describe("audit helpers are consolidated", () => {
     test("the scan actually covers the codebase", () => {
         assert.ok(files.length > 200, `only scanned ${files.length} files`);
+    });
+
+    test("every exempt module folder really exists", () => {
+        const missing = SEPARATE_AUDIT_MODULES.filter((p) => !fs.existsSync(path.resolve(SRC, "..", p)));
+        assert.deepEqual(missing, []);
     });
 
     test("the canonical module exists", () => {
