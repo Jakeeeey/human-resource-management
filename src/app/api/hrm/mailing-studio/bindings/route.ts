@@ -3,26 +3,30 @@ import {
     msBindingSchema,
     msSendConditionSchema,
 } from "@/modules/human-resource-management/mailing-studio/types/ms-binding.schema";
-import { msEventKeySchema } from "@/modules/human-resource-management/mailing-studio/types/ms-template.schema";
+import { msEventKeyShapeSchema } from "@/modules/human-resource-management/mailing-studio/types/ms-catalog.schema";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Bindings collection routes (T4) — READ-ONLY copy of the old
-// api/hrm/mailing/bindings route, retargeted to ms_bindings with the
-// mailing-studio schemas. Envelope { success, data?, message?, errors? } and
-// status codes mirror the old route byte-for-byte where they overlap.
+// Bindings collection routes (T4, catalog-driven per D4) — retargeted to
+// ms_bindings with the mailing-studio schemas. Envelope
+// { success, data?, message?, errors? } and status codes mirror the old
+// route byte-for-byte where they overlap.
 //
-// `event_key` is restricted to the 3 frozen keys and `send_condition` to the
-// `always|on_pass|on_fail` trio — both enforced by the frozen Zod enums, with
-// NO refinement layered on top. There is no condition DSL anywhere in this
+// `event_key` is validated against the event_catalog TABLE at runtime: shape
+// (^[a-z0-9_.]+$) via Zod, then existence + is_active via a ?filter= lookup.
+// A well-shaped key absent from the catalog (or retired) answers
+// 422 UNKNOWN_EVENT_KEY on writes; a filter for a key with no bindings is an
+// empty list, never an error. `send_condition` stays the frozen
+// `always|on_pass|on_fail` trio. There is no condition DSL anywhere in this
 // module: any object/array/nested payload for `send_condition` (or any other
 // field) is rejected with a 400 before it reaches Zod. PATCH
 // `is_enabled:false` is the soft unhook; hard unhook (DELETE) lives on
 // bindings/[id].
 
 const COLLECTION = "/items/ms_bindings";
+const CATALOG_COLLECTION = "/items/event_catalog";
 const FIELDS = "id,event_key,template_id,is_enabled,send_condition";
 
 const BODY_KEYS = ["event_key", "template_id", "is_enabled", "send_condition"] as const;
@@ -68,9 +72,25 @@ function validationFailed(errors: Record<string, string[]>) {
     );
 }
 
+// Catalog lookup (D4): true only when event_key names an ACTIVE catalog row.
+// Uses ?filter= (never /items/:id) so a missing key is an empty list.
+async function isActiveCatalogKey(event_key: string): Promise<boolean> {
+    const res = (await dFetch(
+        `${CATALOG_COLLECTION}?fields=event_key&filter[event_key][_eq]=${encodeURIComponent(event_key)}&filter[is_active][_eq]=true&limit=1`
+    )) as { data?: unknown[] };
+    return Array.isArray(res?.data) && res.data.length > 0;
+}
+
+function unknownEventKey(event_key: string) {
+    return NextResponse.json(
+        { success: false, message: "UNKNOWN_EVENT_KEY", event_key },
+        { status: 422 }
+    );
+}
+
 // GET /api/hrm/mailing-studio/bindings[?event_key=...][?send_condition=...][?is_enabled=...]
-// Lists bindings. Optional filters are validated against the frozen enums —
-// an unknown filter value is a 400, never a silent empty list.
+// Lists bindings. The event_key filter is shape-checked only — a well-shaped
+// key with no bindings is an empty list; a malformed shape is a 400.
 export async function GET(req: NextRequest) {
     try {
         const params = req.nextUrl.searchParams;
@@ -78,9 +98,9 @@ export async function GET(req: NextRequest) {
 
         const rawEventKey = params.get("event_key");
         if (rawEventKey !== null) {
-            const parsed = msEventKeySchema.safeParse(rawEventKey);
+            const parsed = msEventKeyShapeSchema.safeParse(rawEventKey);
             if (!parsed.success) {
-                return validationFailed({ event_key: ["Unknown event key"] });
+                return validationFailed({ event_key: ["Invalid event key shape"] });
             }
             filter.push(`event_key[eq]=${encodeURIComponent(parsed.data)}`);
         }
@@ -139,6 +159,10 @@ export async function POST(req: NextRequest) {
             return validationFailed(validation.error.flatten().fieldErrors);
         }
 
+        if (!(await isActiveCatalogKey(validation.data.event_key))) {
+            return unknownEventKey(validation.data.event_key);
+        }
+
         const res = (await dFetch(COLLECTION, {
             method: "POST",
             body: JSON.stringify(validation.data),
@@ -186,6 +210,13 @@ export async function PATCH(req: NextRequest) {
         const validation = msBindingSchema.partial().safeParse(patch);
         if (!validation.success) {
             return validationFailed(validation.error.flatten().fieldErrors);
+        }
+
+        if (
+            validation.data.event_key !== undefined &&
+            !(await isActiveCatalogKey(validation.data.event_key))
+        ) {
+            return unknownEventKey(validation.data.event_key);
         }
 
         const res = (await dFetch(`${COLLECTION}/${encodeURIComponent(String(rawId))}`, {

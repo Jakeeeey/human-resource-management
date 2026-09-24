@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, Clock, Minus, X } from "lucide-react";
 import "react-quill-new/dist/quill.snow.css";
 
 import { Button } from "@/components/ui/button";
@@ -13,14 +12,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 import type { MailOutboxStatus } from "../types/mail-outbox.schema";
 import { useMailOutbox } from "../hooks/useMailOutbox";
@@ -28,6 +20,7 @@ import type { MailOutboxRow } from "../providers/mailOutboxService";
 import { listSendNowApplicants } from "../providers/mailSendNowService";
 import { renderMailTemplate } from "../utils/mailRenderer";
 import { MailingTablePagination } from "./MailingTablePagination";
+import { MailOutcomeBadge } from "./MailOutcomeBadge";
 
 const SNAPSHOT_UNAVAILABLE_NOTE =
     "Template may have changed since send — snapshot unavailable for rows written before snapshots existed";
@@ -63,26 +56,6 @@ function formatOutboxTimestamp(value: unknown): string {
     if (Number.isNaN(date.getTime())) return String(value);
     const day = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     return day;
-}
-
-/**
- * Wireframe-correct status mark: icon + color, not a pill. Sent reads as
- * a green check, failed as a red X, everything else neutral.
- * @param status - The outbox row status.
- * @returns The status icon.
- */
-function StatusIcon({ status }: { status: MailOutboxRow["status"] }) {
-    const value = String(status);
-    if (value === "sent") {
-        return <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-label="Sent" />;
-    }
-    if (value === "failed") {
-        return <X className="h-4 w-4 text-destructive" aria-label="Failed" />;
-    }
-    if (value === "skipped") {
-        return <Minus className="h-4 w-4 text-muted-foreground" aria-label="Skipped" />;
-    }
-    return <Clock className="h-4 w-4 text-muted-foreground" aria-label={value} />;
 }
 
 /**
@@ -225,9 +198,9 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
 
     if (error) {
         return (
-            <div className="grid gap-3">
-                <p className="text-sm text-destructive">{error}</p>
-                <Button variant="outline" className="w-full sm:w-auto" onClick={() => void refresh()}>
+            <div className="rounded-lg border border-destructive/40 bg-card p-4" role="alert">
+                <p className="text-sm text-muted-foreground">{error}</p>
+                <Button variant="outline" size="sm" className="mt-2 w-full sm:w-auto" onClick={() => void refresh()}>
                     Refresh
                 </Button>
             </div>
@@ -237,33 +210,17 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
     return (
         <div className="grid gap-3">
             <div className={previewOpen ? "grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]" : "grid gap-3"}>
-                <div className="overflow-hidden rounded-2xl border border-border/50 bg-card shadow-sm">
-                    <div className="h-[560px] overflow-auto [&_[data-slot=table-container]]:h-full [&_[data-slot=table-container]]:overflow-x-visible">
-                    <Table className="min-w-[880px]">
-                        <TableHeader>
-                            <TableRow className="bg-muted/30">
-                                <TableHead className="w-16 text-center">Status</TableHead>
-                                <TableHead className="max-w-48">Recipient</TableHead>
-                                <TableHead className="max-w-56">Email</TableHead>
-                                <TableHead className="max-w-56">Subject</TableHead>
-                                <TableHead className="max-w-40">Date</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {rows.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                                        No outbox rows yet.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                            {rows.length > 0 && filtered.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                                        No rows match these filters.
-                                    </TableCell>
-                                </TableRow>
-                            )}
+                <div className="overflow-hidden rounded-lg border bg-card">
+                    {rows.length === 0 ? (
+                        <div className="flex items-center justify-center py-16">
+                            <p className="text-sm text-muted-foreground">No outbox rows yet.</p>
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="flex items-center justify-center py-16">
+                            <p className="text-sm text-muted-foreground">No rows match these filters.</p>
+                        </div>
+                    ) : (
+                        <ul aria-label="Outbox rows" className="flex max-h-[560px] flex-col gap-2 overflow-y-auto p-3">
                             {pagedFiltered.map((row, index) => {
                                 const isActive = activeRow === row;
                                 const linked = linkedFor(row);
@@ -275,42 +232,32 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                                           ? linked.subject
                                           : "—";
                                 return (
-                                    <TableRow
-                                        key={`${String(row.idempotency_key)}-${index}`}
-                                        aria-selected={isActive}
-                                        tabIndex={0}
-                                        onClick={() => handleSelect(row)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === "Enter" || event.key === " ") {
-                                                event.preventDefault();
-                                                handleSelect(row);
-                                            }
-                                        }}
-                                        className={`cursor-pointer ${isActive ? "border-primary/30 bg-primary/5 hover:bg-primary/10" : ""}`}
-                                    >
-                                        <TableCell className="w-16">
-                                            <span className="flex justify-center">
-                                                <StatusIcon status={row.status} />
+                                    <li key={`${String(row.idempotency_key)}-${index}`}>
+                                        <button
+                                            type="button"
+                                            aria-pressed={isActive}
+                                            onClick={() => handleSelect(row)}
+                                            className={cn(
+                                                "flex w-full flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-left transition-colors duration-150 hover:border-primary/40",
+                                                isActive ? "border-primary/60" : undefined,
+                                            )}
+                                        >
+                                            <MailOutcomeBadge status={String(row.status)} />
+                                            <span className="min-w-0 flex-1 truncate text-sm font-medium tabular-nums" title={`${recipientName} · ${row.to_email}`}>
+                                                {recipientName} · {row.to_email}
                                             </span>
-                                        </TableCell>
-                                        <TableCell className="max-w-48 truncate" title={recipientName}>
-                                            {recipientName}
-                                        </TableCell>
-                                        <TableCell className="max-w-56 truncate" title={row.to_email}>
-                                            {row.to_email}
-                                        </TableCell>
-                                        <TableCell className="max-w-56 truncate" title={subjectLine}>
-                                            {subjectLine}
-                                        </TableCell>
-                                        <TableCell className="max-w-40 truncate" title={String(row.sent_at ?? "")}>
-                                            {formatOutboxTimestamp(row.sent_at)}
-                                        </TableCell>
-                                    </TableRow>
+                                            <span className="min-w-0 basis-full truncate text-xs text-muted-foreground sm:basis-auto sm:max-w-56" title={subjectLine}>
+                                                {subjectLine}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground tabular-nums" title={String(row.sent_at ?? "")}>
+                                                {formatOutboxTimestamp(row.sent_at)}
+                                            </span>
+                                        </button>
+                                    </li>
                                 );
                             })}
-                        </TableBody>
-                    </Table>
-                    </div>
+                        </ul>
+                    )}
                     <MailingTablePagination
                         page={safePage}
                         pageSize={pageSize}
@@ -327,7 +274,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                 </div>
                 {previewOpen && (
                 <div className="hidden lg:block">
-                    <div className="flex h-[560px] flex-col gap-2">
+                    <div className="flex h-[560px] min-h-0 flex-col gap-3 overflow-y-auto rounded-lg border bg-card p-4">
                         {!activeRow ? (
                             <p className="min-h-0 flex-1 text-sm text-muted-foreground">Select a row to preview.</p>
                         ) : (
@@ -409,6 +356,12 @@ function MailOutboxDetailContent({
 
     return (
         <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-2 overflow-x-clip [overflow-wrap:break-word] [&_img]:h-auto [&_img]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_table]:max-w-full [&_table]:overflow-x-auto">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <MailOutcomeBadge status={String(row.status)} />
+                <span className="text-xs text-muted-foreground tabular-nums" title={String(row.sent_at ?? "")}>
+                    {formatOutboxTimestamp(row.sent_at)}
+                </span>
+            </div>
             {hasFallback && (
                 <p className="shrink-0 text-xs text-muted-foreground">{SNAPSHOT_UNAVAILABLE_NOTE}</p>
             )}

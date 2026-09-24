@@ -2,7 +2,8 @@
 // real /api/hrm/mailing-studio/bindings routes (list/create/update/delete).
 // Payloads are FLAT primitives only — both routes reject ANY object/array
 // value (or unknown key) with a 400 before Zod, so callers must never nest.
-// event_key is frozen to the 3 keys; send_condition to always|on_pass|on_fail.
+// event_key is catalog-driven (D4) — any active event_catalog key binds;
+// send_condition stays always|on_pass|on_fail.
 // No tokens — auth travels via cookies.
 
 import { msDelete, msGet, msPatch, msPost } from "./msApi";
@@ -14,6 +15,10 @@ export interface MsBindingRow {
     template_id: string | number;
     is_enabled: boolean | number | string;
     send_condition: string;
+    /** §6.2 — present once the Phase-1 DDL lands; absent rows use the UI default. */
+    recipient_path?: unknown;
+    /** §6.2 — present once the Phase-1 DDL lands; absent rows use the UI default. */
+    priority?: unknown;
 }
 
 /** Full-row payload for hooking a new binding. */
@@ -22,6 +27,8 @@ export interface MsBindingCreate {
     template_id: string | number;
     is_enabled: boolean;
     send_condition: string;
+    recipient_path?: string;
+    priority?: number;
 }
 
 /** Partial-row payload for updates (flat primitives only — never nested). */
@@ -30,6 +37,8 @@ export interface MsBindingPatch {
     template_id?: string | number;
     is_enabled?: boolean;
     send_condition?: string;
+    recipient_path?: string;
+    priority?: number;
 }
 
 /**

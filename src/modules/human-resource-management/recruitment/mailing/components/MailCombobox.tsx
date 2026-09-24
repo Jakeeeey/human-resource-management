@@ -64,7 +64,7 @@ export function MailCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className={cn("w-full min-w-0 max-w-full justify-between", !value && "text-muted-foreground", className)}
+                    className={cn("h-8 w-full min-w-0 max-w-full justify-between text-xs", !value && "text-muted-foreground", className)}
                     disabled={disabled}
                 >
                     <span className="min-w-0 flex-1 truncate text-left" title={selectedLabel ?? undefined}>

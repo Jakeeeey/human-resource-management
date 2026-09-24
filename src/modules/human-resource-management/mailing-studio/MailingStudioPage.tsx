@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 import { LayersPanel } from "./components/LayersPanel";
@@ -44,7 +45,11 @@ import { StageCanvas } from "./components/StageCanvas";
 import { useCanvasDoc } from "./hooks/useCanvasDoc";
 import { useDesignAutosave, type DesignAutosaveStatus } from "./hooks/useDesignAutosave";
 import { getDesign, previewDesign, sendCompiledTest } from "./providers/designService";
+import { fetchMsCatalog } from "./providers/msCatalog";
 import { canvasDocSchema, defaultBlockProps, type CanvasNodeType } from "./types/canvas-doc.schema";
+import type { MsCatalogRow } from "./types/ms-catalog.schema";
+import { extractPayloadExample } from "./utils/ms-variables";
+import { renderTemplate } from "./utils/template-render";
 
 /**
  * Mailing Studio — Wave-0 chrome + T8 live freeform canvas + T8c control matrix.
@@ -395,6 +400,27 @@ function useHistoryCounts(): { canUndo: boolean; canRedo: boolean } {
     return { canUndo: pastCount > 0, canRedo: futureCount > 0 };
 }
 
+function isActiveCatalogRow(row: MsCatalogRow): boolean {
+    const flag: unknown = row.is_active;
+    return flag === true || flag === 1 || flag === "1" || flag === "true";
+}
+
+function applyPreviewSample(
+    baseHtml: string,
+    baseWarnings: readonly string[],
+    row: MsCatalogRow | null,
+): { html: string; warnings: string[]; sampleKey: string | null } {
+    if (!row) return { html: baseHtml, warnings: [...baseWarnings], sampleKey: null };
+    const rendered = renderTemplate(baseHtml, {
+        payload: extractPayloadExample(row.payload_example),
+    });
+    return {
+        html: rendered.html,
+        warnings: [...baseWarnings, ...rendered.warnings],
+        sampleKey: row.event_key,
+    };
+}
+
 export function MailingStudioPage() {
     const [panel, setPanel] = useState<PanelId>("elements");
     const [templateName, setTemplateName] = useState<string>(DEFAULT_DESIGN_META.templateName);
@@ -402,6 +428,11 @@ export function MailingStudioPage() {
     const [previewing, setPreviewing] = useState(false);
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
     const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
+    const [previewSampleKey, setPreviewSampleKey] = useState<string | null>(null);
+    const [previewCatalog, setPreviewCatalog] = useState<readonly MsCatalogRow[]>([]);
+    const [previewEventKey, setPreviewEventKey] = useState<string | null>(null);
+    const [previewBaseHtml, setPreviewBaseHtml] = useState<string | null>(null);
+    const [previewBaseWarnings, setPreviewBaseWarnings] = useState<string[]>([]);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [previewError, setPreviewError] = useState<string | null>(null);
     const savedSelectionRef = useRef<string[]>([]);
@@ -482,7 +513,13 @@ export function MailingStudioPage() {
 
     // Preview = compiled receiver output. Snapshots the LIVE doc in-memory
     // (never saves), clears editor selection so no rings/handles persist, then
-    // compiles through the real export path. The preview tree mounts NO
+    // compiles through the real export path. The export preserves {{tokens}}
+    // verbatim (escapeText only escapes & < >), so the compiled HTML still
+    // carries the bare canonical tokens — the sample step below resolves them
+    // through the shared renderer against the preview-level event choice's
+    // payload_example (D3), a rendering aid only, not a binding. Raw tokens
+    // stay visible when no event is selected or the catalog cannot be read.
+    // The preview tree mounts NO
     // StageCanvas/Moveable — just an isolated iframe of the export HTML.
     const handlePreview = useCallback(async (): Promise<void> => {
         const store = useCanvasDoc.getState();
@@ -499,24 +536,66 @@ export function MailingStudioPage() {
         setPreviewError(null);
         setPreviewHtml(null);
         setPreviewWarnings([]);
+        setPreviewSampleKey(null);
         try {
             const result = await previewDesign(design_json, subject);
-            setPreviewHtml(result.html);
-            setPreviewWarnings(result.warnings);
+            let rows: MsCatalogRow[] = [];
+            try {
+                const fetched = await fetchMsCatalog({ is_active: true });
+                rows = fetched.filter(isActiveCatalogRow).sort((a, b) =>
+                    a.event_key.localeCompare(b.event_key),
+                );
+            } catch {
+                rows = [];
+            }
+            setPreviewCatalog(rows);
+            setPreviewBaseHtml(result.html);
+            setPreviewBaseWarnings(result.warnings);
+            const pick =
+                (previewEventKey
+                    ? rows.find((row) => row.event_key === previewEventKey)
+                    : undefined) ??
+                rows[0] ??
+                null;
+            setPreviewEventKey(pick?.event_key ?? null);
+            const applied = applyPreviewSample(result.html, result.warnings, pick);
+            setPreviewHtml(applied.html);
+            setPreviewWarnings(applied.warnings);
+            setPreviewSampleKey(applied.sampleKey);
         } catch (cause) {
             setPreviewError(cause instanceof Error ? cause.message : "Preview failed");
         } finally {
             setPreviewLoading(false);
         }
-    }, [subject]);
+    }, [subject, previewEventKey]);
+
+    const handlePreviewSampleChange = useCallback(
+        (nextKey: string | null): void => {
+            setPreviewEventKey(nextKey);
+            if (previewBaseHtml === null) return;
+            const pick =
+                (nextKey
+                    ? previewCatalog.find((row) => row.event_key === nextKey)
+                    : undefined) ?? null;
+            const applied = applyPreviewSample(previewBaseHtml, previewBaseWarnings, pick);
+            setPreviewHtml(applied.html);
+            setPreviewWarnings(applied.warnings);
+            setPreviewSampleKey(applied.sampleKey);
+        },
+        [previewBaseHtml, previewBaseWarnings, previewCatalog],
+    );
 
     // Exit restores the exact pre-preview editor state (selection included).
     const handleExitPreview = useCallback((): void => {
         setPreviewing(false);
         setPreviewHtml(null);
         setPreviewWarnings([]);
+        setPreviewSampleKey(null);
         setPreviewError(null);
         setPreviewLoading(false);
+        setPreviewCatalog([]);
+        setPreviewBaseHtml(null);
+        setPreviewBaseWarnings([]);
         const saved = savedSelectionRef.current;
         if (saved.length > 0) useCanvasDoc.getState().selectNodes(saved);
         savedSelectionRef.current = [];
@@ -598,6 +677,40 @@ export function MailingStudioPage() {
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                         Preview — receiver view
                     </span>
+                    {previewCatalog.length > 0 ? (
+                        <div className="flex shrink-0 items-center gap-1.5">
+                            <Label
+                                className="hidden text-[11px] font-medium text-muted-foreground lg:inline"
+                                htmlFor="preview-sample-event"
+                            >
+                                Preview sample data from:
+                            </Label>
+                            <NativeSelect
+                                aria-label="Preview sample data from event"
+                                className="h-8 text-xs"
+                                id="preview-sample-event"
+                                size="sm"
+                                value={previewEventKey ?? ""}
+                                onChange={(event) =>
+                                    handlePreviewSampleChange(event.target.value || null)
+                                }
+                            >
+                                {previewCatalog.map((row) => (
+                                    <NativeSelectOption key={row.event_key} value={row.event_key}>
+                                        {row.event_key}
+                                    </NativeSelectOption>
+                                ))}
+                            </NativeSelect>
+                        </div>
+                    ) : null}
+                    {previewSampleKey ? (
+                        <span
+                            className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex"
+                            data-testid="preview-sample"
+                        >
+                            Sample: {previewSampleKey}
+                        </span>
+                    ) : null}
                     {previewWarnings.length > 0 ? (
                         <span
                             className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex"

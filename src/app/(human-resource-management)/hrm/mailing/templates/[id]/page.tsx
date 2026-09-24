@@ -99,7 +99,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 </div>
             </header>
 
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-background p-2 sm:p-4">
                 <MailTemplatePage mode="edit" templateId={id} />
             </main>
         </div>

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
 import { MS_IMAGE_UPLOAD_TYPES, uploadImage } from "../providers/designService";
+import { extractTemplateTokens } from "../utils/template-render";
 import {
     CANVAS_TEXT_MAX,
     defaultBlockProps,
@@ -360,6 +361,130 @@ function TextContentField({ node }: { readonly node: CanvasNode }) {    const id
     );
 }
 
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const TOKEN_NAME_PATTERN = /^[A-Za-z0-9_.]+$/;
+
+function normaliseTokenName(raw: string): string | null {
+    const stripped = raw
+        .trim()
+        .replace(/^\{\{\s*/, "")
+        .replace(/\s*\}\}$/, "")
+        .trim()
+        .replace(/^payload\./, "");
+    if (!TOKEN_NAME_PATTERN.test(stripped)) return null;
+    return stripped;
+}
+
+function VariablesSection({ node }: { readonly node: CanvasNode }) {
+    const inputId = useId();
+    const updateProps = useCanvasDoc((state) => state.updateProps);
+    const [draft, setDraft] = useState("");
+    const [invalid, setInvalid] = useState(false);
+
+    const text = typeof node.props.text === "string" ? node.props.text : "";
+    const tokens = extractTemplateTokens(text);
+
+    const insertToken = (key: string): void => {
+        const separator =
+            text.length === 0 || text.endsWith(" ") || text.endsWith("\n") ? "" : " ";
+        updateProps(node.id, { text: `${text}${separator}{{${key}}}` });
+    };
+
+    const commitDraft = (): void => {
+        const name = normaliseTokenName(draft);
+        if (name === null) {
+            setInvalid(draft.trim().length > 0);
+            return;
+        }
+        setInvalid(false);
+        setDraft("");
+        insertToken(name);
+    };
+
+    const removeToken = (key: string): void => {
+        const pattern = new RegExp(
+            `\\{\\{\\s*(payload\\.)?${escapeRegExp(key)}\\s*\\}\\}`,
+            "g",
+        );
+        updateProps(node.id, { text: text.replace(pattern, "") });
+    };
+
+    return (
+        <div className="col-span-2 flex flex-col gap-2.5">
+            <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-medium text-muted-foreground" htmlFor={inputId}>
+                    Add a variable
+                </Label>
+                <div className="flex items-center gap-1.5">
+                    <Input
+                        aria-invalid={invalid}
+                        className={cn("h-8 font-mono text-xs", invalid && "border-destructive")}
+                        id={inputId}
+                        placeholder="employee_name"
+                        spellCheck={false}
+                        value={draft}
+                        onChange={(event) => {
+                            setDraft(event.target.value);
+                            setInvalid(false);
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                                event.preventDefault();
+                                commitDraft();
+                            }
+                        }}
+                    />
+                    <Button
+                        aria-label="Add variable to block"
+                        size="sm"
+                        type="button"
+                        onClick={commitDraft}
+                    >
+                        Add
+                    </Button>
+                </div>
+                {invalid ? (
+                    <p className="text-[11px] leading-snug text-destructive" role="alert">
+                        Use letters, numbers, dots or underscores — e.g. employee_name.
+                    </p>
+                ) : (
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                        Type any name and press Enter — it inserts {"{{name}}"} into this block.
+                    </p>
+                )}
+            </div>
+            {tokens.length > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                        In this block
+                    </span>
+                    <div className="flex flex-wrap gap-1" data-testid="block-tokens">
+                        {tokens.map((token) => (
+                            <span
+                                className="flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                                key={token}
+                            >
+                                {`{{${token}}}`}
+                                <button
+                                    aria-label={`Remove variable ${token}`}
+                                    className="font-sans text-xs leading-none transition-colors duration-150 hover:text-primary"
+                                    type="button"
+                                    onClick={() => removeToken(token)}
+                                >
+                                    ×
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 export function PropertyPanel() {
     const nodes = useCanvasDoc((state) => state.nodes);
     const selection = useCanvasDoc((state) => state.selection);
@@ -426,6 +551,12 @@ export function PropertyPanel() {
                             value={typeof node.props.href === "string" ? node.props.href : ""}
                             onCommit={(next) => updateProps(node.id, { href: next })}
                         />
+                    </Section>
+                ) : null}
+
+                {node.type === "text" || node.type === "button" ? (
+                    <Section title="Variables">
+                        <VariablesSection node={node} />
                     </Section>
                 ) : null}
 

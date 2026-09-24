@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { mailVarAllowlist } from "../types/mail-template.schema";
 import { renderMailTemplate } from "../utils/mailRenderer";
 import { scrubClientHtml } from "../utils/mailScrub";
+import { MailOutcomeBadge } from "./MailOutcomeBadge";
 
 const ALLOWLIST = new Set<string>(mailVarAllowlist as readonly string[]);
 const VAR_TOKEN = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
@@ -157,7 +158,7 @@ export function MailComposePreview({
                             onClick={() => setMode(option.value)}
                             aria-pressed={mode === option.value}
                             className={cn(
-                                "rounded-sm px-2.5 py-1 text-xs font-medium focus-visible:ring-1 focus-visible:outline-hidden",
+                                "rounded-sm px-2.5 py-1 text-xs font-medium transition-colors duration-150 focus-visible:ring-1 focus-visible:outline-hidden",
                                 mode === option.value
                                     ? "bg-background text-foreground shadow-sm"
                                     : "text-muted-foreground"
@@ -179,26 +180,24 @@ export function MailComposePreview({
             {unknownTokens.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                     {unknownTokens.map((name) => (
-                        <span
+                        <MailOutcomeBadge
                             key={name}
-                            className="inline-block max-w-full truncate rounded-md bg-muted px-1.5 py-0.5 align-baseline text-sm font-medium"
-                            title={`{{${name}}} is not a known variable and sends as blank`}
-                        >
-                            {`{{${name}}}`}
-                        </span>
+                            status="warning"
+                            label={`{{${name}}}`}
+                            className="max-w-full"
+                        />
                     ))}
                 </div>
             )}
             {renderWarnings.length > 0 && (
                 <div className="flex flex-wrap gap-1.5" role="alert">
                     {renderWarnings.map((warning) => (
-                        <span
+                        <MailOutcomeBadge
                             key={warning}
-                            className="max-w-full truncate rounded-md border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                            title={warning}
-                        >
-                            {warning}
-                        </span>
+                            status="warning"
+                            label={warning}
+                            className="max-w-full"
+                        />
                     ))}
                 </div>
             )}

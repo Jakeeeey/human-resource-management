@@ -27,6 +27,8 @@ export interface DesignRow {
     template_name: string;
     subject: string;
     design_json?: string | null;
+    /** Derived cache (§6.4): compiled on save from design_json, never hand-edited. */
+    variables?: string[] | null;
     body_html?: string | null;
     body_text?: string | null;
     is_active?: boolean | number;

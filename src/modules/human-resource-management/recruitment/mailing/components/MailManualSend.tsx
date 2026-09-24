@@ -36,6 +36,7 @@ import {
 } from "./MailConfirmDialog";
 import { MailTemplateEditor, toFriendlyMailVarName } from "./MailTemplateEditor";
 import type { MailTemplateEditorHandle } from "./MailTemplateEditor";
+import { MailOutcomeBadge } from "./MailOutcomeBadge";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -405,11 +406,12 @@ export function MailManualSend() {
 
     if (loadError) {
         return (
-            <div className="grid gap-3">
-                <p className="text-sm text-destructive" role="alert">{loadError}</p>
+            <div className="rounded-lg border border-destructive/40 bg-card p-4" role="alert">
+                <p className="text-sm text-muted-foreground">{loadError}</p>
                 <Button
                     variant="outline"
-                    className="w-full sm:w-auto"
+                    size="sm"
+                    className="mt-2 w-full sm:w-auto"
                     onClick={() => {
                         if (templatesError) void refreshTemplates();
                         if (applicantsError) {
@@ -439,11 +441,11 @@ export function MailManualSend() {
         <div className="mx-auto grid w-full max-w-[1200px] gap-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="grid min-w-0 gap-1">
-                    <h2 className="truncate text-lg font-semibold" title="Compose Email">
+                    <h2 className="truncate text-sm font-semibold" title="Compose Email">
                         Compose Email
                     </h2>
                         {!pickedTemplateName && (
-                            <p className="truncate text-sm text-muted-foreground" title="Pick an active template below to start.">
+                            <p className="truncate text-xs text-muted-foreground" title="Pick an active template below to start.">
                                 Pick an active template below to start.
                             </p>
                         )}
@@ -453,6 +455,7 @@ export function MailManualSend() {
                         <Button
                             type="button"
                             variant="outline"
+                            size="sm"
                             className="w-full sm:w-auto"
                             disabled={sending}
                             onClick={openVars}
@@ -477,7 +480,7 @@ export function MailManualSend() {
                     aria-label="Email settings"
                 >
                     <div className="grid min-w-0 gap-1.5">
-                        <Label htmlFor="mail-manualsend-applicant">Receiver</Label>
+                        <Label htmlFor="mail-manualsend-applicant" className="text-xs font-medium text-muted-foreground">Receiver</Label>
                         <MailCombobox
                             options={applicantOptions}
                             value={pickedId}
@@ -487,7 +490,7 @@ export function MailManualSend() {
                         />
                     </div>
                     <div className="grid min-w-0 gap-1.5">
-                        <Label htmlFor="mail-manualsend-email">Recipient email</Label>
+                        <Label htmlFor="mail-manualsend-email" className="text-xs font-medium text-muted-foreground">Recipient email</Label>
                         <Input
                             id="mail-manualsend-email"
                             type="email"
@@ -495,7 +498,7 @@ export function MailManualSend() {
                             onChange={(e) => setToEmail(e.target.value)}
                             placeholder="Applicant email"
                             disabled={sending}
-                            className="truncate"
+                            className="h-8 truncate text-xs"
                             title={toEmail ? toEmail : undefined}
                         />
                         {emailError && (
@@ -511,14 +514,14 @@ export function MailManualSend() {
                     </div>
                     {selectedTemplate && (
                         <div className="grid min-w-0 gap-1.5">
-                            <Label htmlFor="mail-manualsend-subject">Subject</Label>
+                            <Label htmlFor="mail-manualsend-subject" className="text-xs font-medium text-muted-foreground">Subject</Label>
                             <Input
                                 id="mail-manualsend-subject"
                                 value={subject}
                                 onChange={(e) => setSubject(e.target.value)}
                                 placeholder="Email subject"
                                 disabled={sending}
-                                className="truncate"
+                                className="h-8 truncate text-xs"
                                 title={subject ? subject : undefined}
                             />
                         </div>
@@ -551,6 +554,7 @@ export function MailManualSend() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                     <Button
                         variant="outline"
+                        size="sm"
                         className="w-full sm:w-auto"
                         disabled={sending}
                         onClick={() => setConfirmOpen(true)}
@@ -559,6 +563,7 @@ export function MailManualSend() {
                     </Button>
                     <Button
                         variant="outline"
+                        size="sm"
                         className="w-full sm:w-auto"
                         disabled={!selectedTemplate || sending}
                         onClick={handlePreview}
@@ -566,6 +571,7 @@ export function MailManualSend() {
                         Preview
                     </Button>
                     <Button
+                        size="sm"
                         className="w-full sm:w-auto"
                         disabled={sendBlocked}
                         onClick={() => void handleSend()}
@@ -601,7 +607,7 @@ export function MailManualSend() {
                                         onChange={(e) => setVar(name, e.target.value)}
                                         placeholder={MAIL_VAR_EXAMPLES[name] ?? friendly}
                                         disabled={sending}
-                                        className="truncate text-sm"
+                                        className="h-8 truncate text-xs"
                                         title={friendly}
                                     />
                                 </div>
@@ -610,13 +616,12 @@ export function MailManualSend() {
                             {tokens.unknown.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
                                     {tokens.unknown.map((name) => (
-                                        <span
+                                        <MailOutcomeBadge
                                             key={name}
-                                            className="inline-block max-w-full truncate rounded-md bg-muted px-1.5 py-0.5 align-baseline text-sm font-medium"
-                                            title={`{{${name}}} is not a known variable and sends as blank`}
-                                        >
-                                            {`{{${name}}}`}
-                                        </span>
+                                            status="warning"
+                                            label={`{{${name}}}`}
+                                            className="max-w-full"
+                                        />
                                     ))}
                                 </div>
                             )}

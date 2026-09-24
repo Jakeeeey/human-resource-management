@@ -2,29 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
 
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import type { MailTemplateRow } from "../providers/mailTemplateService";
 import { MailingTablePagination } from "./MailingTablePagination";
+import { MailOutcomeBadge } from "./MailOutcomeBadge";
 
 /**
  * Template list with dedicated-page create/edit navigation.
@@ -59,9 +44,9 @@ export function MailTemplateList() {
 
     if (error) {
         return (
-            <div className="grid gap-3">
-                <p className="text-sm text-destructive">{error}</p>
-                <Button variant="outline" className="w-full sm:w-auto" onClick={() => void refresh()}>
+            <div className="rounded-lg border border-destructive/40 bg-card p-4" role="alert">
+                <p className="text-sm text-muted-foreground">{error}</p>
+                <Button variant="outline" size="sm" className="mt-2 w-full sm:w-auto" onClick={() => void refresh()}>
                     Retry
                 </Button>
             </div>
@@ -76,71 +61,53 @@ export function MailTemplateList() {
     const pagedTemplates = templates.slice((safePage - 1) * pageSize, safePage * pageSize);
 
     return (
-        <div className="grid gap-3">
-            <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                <Table className="min-w-[640px]">
-                    <TableHeader>
-                        <TableRow className="bg-muted/30">
-                            <TableHead className="max-w-40">Key</TableHead>
-                            <TableHead className="max-w-56">Name</TableHead>
-                            <TableHead className="w-24">Status</TableHead>
-                            <TableHead className="w-40 text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {templates.length === 0 && (
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
-                                    No templates yet. Create the first one.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {pagedTemplates.map((row) => (
-                            <TableRow key={String(row.id)}>
-                                <TableCell className="max-w-40 truncate" title={row.template_key}>
-                                    {row.template_key}
-                                </TableCell>
-                                <TableCell className="max-w-56 truncate" title={row.template_name}>
-                                    {row.template_name}
-                                </TableCell>
-                                <TableCell>
-                                    <Badge
-                                        variant="outline"
-                                        className={
-                                            row.is_active
-                                                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                                                : "border-border bg-muted text-muted-foreground"
-                                        }
-                                    >
-                                        {row.is_active ? "Active" : "Inactive"}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                aria-label={`Template actions for ${row.template_name}`}
-                                                title={`Template actions for ${row.template_name}`}
-                                            >
-                                                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onSelect={() => openEdit(row)}>
-                                                <Pencil aria-hidden="true" />
-                                                Edit
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+        <section aria-label="Templates" className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold">Templates</h2>
+                    <span
+                        aria-live="polite"
+                        className="rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums"
+                    >
+                        {filteredCount}
+                    </span>
                 </div>
+            </div>
+            {pagedTemplates.length === 0 ? (
+                <div className="flex items-center justify-center rounded-lg border bg-card py-16">
+                    <p className="text-sm text-muted-foreground">No templates yet. Create the first one.</p>
+                </div>
+            ) : (
+                <ul className="flex flex-col gap-2">
+                    {pagedTemplates.map((row) => (
+                        <li
+                            key={String(row.id)}
+                            className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 transition-colors duration-150 hover:border-primary/40"
+                        >
+                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                <span className="truncate text-sm font-medium" title={row.template_name}>
+                                    {row.template_name}
+                                </span>
+                                <span className="truncate text-xs text-muted-foreground tabular-nums" title={`${row.template_key} · ${row.subject}`}>
+                                    {row.template_key} · {row.subject}
+                                </span>
+                            </div>
+                            <MailOutcomeBadge status={row.is_active ? "active" : "inactive"} />
+                            <Button
+                                aria-label={`Edit ${row.template_name}`}
+                                title={`Edit ${row.template_name}`}
+                                size="sm"
+                                variant="outline"
+                                className="w-full sm:w-auto"
+                                onClick={() => openEdit(row)}
+                            >
+                                Edit
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <div className="overflow-hidden rounded-lg border bg-card">
                 <MailingTablePagination
                     page={safePage}
                     pageSize={pageSize}
@@ -155,6 +122,6 @@ export function MailTemplateList() {
                     }}
                 />
             </div>
-        </div>
+        </section>
     );
 }

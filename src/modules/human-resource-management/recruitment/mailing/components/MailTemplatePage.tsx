@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +16,7 @@ import { useMailTemplates } from "../hooks/useMailTemplates";
 import { useMailTemplateForm } from "../hooks/useMailTemplateForm";
 import { MailTemplateEditor, toFriendlyMailVarName } from "./MailTemplateEditor";
 import type { MailTemplateEditorHandle } from "./MailTemplateEditor";
+import { MailOutcomeBadge } from "./MailOutcomeBadge";
 
 interface MailTemplatePageProps {
     mode: "create" | "edit";
@@ -78,8 +78,8 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                     <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                     Back to templates
                 </Button>
-                <Card className="shadow-none border-border overflow-hidden">
-                    <CardContent className="grid gap-2 p-6 text-center">
+                <Card className="overflow-hidden rounded-lg border bg-card shadow-none">
+                    <CardContent className="grid gap-2 p-4 text-center sm:p-6">
                         <p className="text-sm font-medium">Template not found.</p>
                         <p className="text-sm text-muted-foreground">
                             It may have been deleted. Return to the list and pick another template.
@@ -128,17 +128,16 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 onCheckedChange={form.setIsActive}
                                 disabled={form.busy}
                             />
-                            <Label htmlFor="mail-template-page-active">Active</Label>
+                            <Label htmlFor="mail-template-page-active" className="text-xs font-medium text-muted-foreground">Active</Label>
                             {form.dryRunReady && (
-                                <Badge variant="secondary" className="max-w-full truncate" title="Dry-run recorded — see the Outbox">
-                                            Dry-run recorded — see Outbox
-                                </Badge>
+                                <MailOutcomeBadge status="dry_run" label="Dry-run recorded — see Outbox" className="max-w-full" />
                             )}
                         </div>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <Button
                                 type="button"
                                 variant="outline"
+                                size="sm"
                                 disabled={form.busy}
                                 onClick={() => void form.handleDryRunTestSend()}
                                 className="w-full sm:w-auto"
@@ -147,6 +146,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                             </Button>
                             <Button
                                 type="button"
+                                size="sm"
                                 disabled={form.busy}
                                 onClick={() => void handleSaveAndBack()}
                                 className="w-full sm:w-auto"
@@ -161,51 +161,58 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
             {/* Content: constrained form column + wider preview rail. */}
             <div className="mx-auto grid w-full max-w-[1200px] gap-6 p-4 sm:p-6 md:p-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                 <div className="mx-auto grid w-full min-w-0 max-w-3xl gap-6 lg:mx-0">
-                    <Card className="shadow-none border-border overflow-hidden">
-                        <CardHeader>
-                            <CardTitle className="text-base">Details</CardTitle>
+                    <Card className="overflow-hidden rounded-lg border bg-card shadow-none">
+                        <CardHeader className="flex h-11 flex-row items-center border-b px-4">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                Details
+                            </span>
                         </CardHeader>
-                        <CardContent className="grid gap-4">
+                        <CardContent className="grid gap-4 p-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid min-w-0 gap-2">
-                                    <Label htmlFor="mail-template-page-key">Template key</Label>
+                                    <Label htmlFor="mail-template-page-key" className="text-xs font-medium text-muted-foreground">Template key</Label>
                                     <Input
                                         id="mail-template-page-key"
                                         value={form.templateKey}
                                         onChange={(e) => form.setTemplateKey(e.target.value)}
                                         placeholder="e.g. initial graded pass"
                                         disabled={form.busy}
+                                        className="h-8 text-xs"
                                     />
                                 </div>
                                 <div className="grid min-w-0 gap-2">
-                                    <Label htmlFor="mail-template-page-name">Template name</Label>
+                                    <Label htmlFor="mail-template-page-name" className="text-xs font-medium text-muted-foreground">Template name</Label>
                                     <Input
                                         id="mail-template-page-name"
                                         value={form.templateName}
                                         onChange={(e) => form.setTemplateName(e.target.value)}
                                         placeholder="e.g. Initial interview — passed"
                                         disabled={form.busy}
+                                        className="h-8 text-xs"
                                     />
                                 </div>
                             </div>
                             <div className="grid min-w-0 gap-2">
-                                <Label htmlFor="mail-template-page-subject">Subject</Label>
+                                <Label htmlFor="mail-template-page-subject" className="text-xs font-medium text-muted-foreground">Subject</Label>
                                 <Input
                                     id="mail-template-page-subject"
                                     value={form.subject}
                                     onChange={(e) => form.setSubject(e.target.value)}
                                     placeholder="e.g. Your interview result"
                                     disabled={form.busy}
+                                    className="h-8 text-xs"
                                 />
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="shadow-none border-border overflow-hidden">
-                        <CardHeader>
-                            <CardTitle className="text-base">Body</CardTitle>
+                    <Card className="overflow-hidden rounded-lg border bg-card shadow-none">
+                        <CardHeader className="flex h-11 flex-row items-center border-b px-4">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                Body
+                            </span>
                         </CardHeader>
-                        <CardContent className="grid gap-4">
+                        <CardContent className="grid gap-4 p-4">
                             <div
                                 className="flex max-h-[560px] min-h-[320px] min-w-0 flex-col gap-2"
                             >
@@ -216,7 +223,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 />
                             </div>
                             <div className="grid min-w-0 gap-2">
-                                <Label>Fields</Label>
+                                <Label className="text-xs font-medium text-muted-foreground">Fields</Label>
                                 <p className="text-xs text-muted-foreground">
                                     Click a field to add it to the email
                                 </p>
@@ -227,7 +234,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                             type="button"
                                             variant="outline"
                                             size="sm"
-                                            className="h-6 px-2 text-xs"
+                                            className="h-6 rounded-full px-2.5 text-xs font-medium transition-colors duration-150"
                                             title={`{{${name}}} — click to insert at cursor`}
                                             disabled={form.busy}
                                             onClick={() => form.insertVar(name)}
@@ -242,17 +249,17 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                 </div>
 
                 <div className="grid min-w-0 content-start gap-6">
-                    <Card className="shadow-none border-border overflow-hidden lg:sticky lg:top-24">
-                        <CardHeader>
-                            <CardTitle className="text-base">Preview</CardTitle>
+                    <Card className="overflow-hidden rounded-lg border bg-card shadow-none lg:sticky lg:top-24">
+                        <CardHeader className="flex h-11 flex-row items-center border-b px-4">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                Preview
+                            </span>
                         </CardHeader>
-                        <CardContent className="grid min-w-0 gap-3">
+                        <CardContent className="grid min-w-0 gap-3 p-4">
                             {form.preview.warnings.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
+                                <div className="flex flex-wrap gap-1.5" role="alert">
                                     {form.preview.warnings.map((warning) => (
-                                        <Badge key={warning} variant="destructive" className="max-w-full truncate" title={warning}>
-                                            {warning}
-                                        </Badge>
+                                        <MailOutcomeBadge key={warning} status="warning" label={warning} className="max-w-full" />
                                     ))}
                                 </div>
                             )}

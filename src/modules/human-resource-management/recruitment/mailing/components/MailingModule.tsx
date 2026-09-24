@@ -58,15 +58,15 @@ export function MailingModule() {
     };
 
     return (
-        <div className="grid gap-4 p-2 sm:p-6 md:p-10">
+        <div className="grid gap-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-3 bg-primary/10 rounded-2xl">
-                        <Mail className="h-6 w-6 text-primary" />
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                        <Mail className="size-4" aria-hidden="true" />
                     </div>
-                    <div className="grid gap-1">
-                        <h1 className="text-2xl font-semibold sm:text-4xl">Mailing</h1>
-                        <p className="text-base text-muted-foreground sm:text-lg">
+                    <div className="grid min-w-0 gap-0.5">
+                        <h1 className="truncate text-xl font-semibold">Mailing</h1>
+                        <p className="truncate text-sm text-muted-foreground">
                             Email templates, per-event send rules, and the mail log.
                         </p>
                     </div>
@@ -86,13 +86,13 @@ export function MailingModule() {
             <Tabs value={tab} onValueChange={handleTabChange} className="grid gap-4">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <TabsList className="justify-start group-data-[orientation=horizontal]/tabs:h-auto">
-                        <TabsTrigger value="outbox" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Outbox</TabsTrigger>
-                        <TabsTrigger value="send" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Compose</TabsTrigger>
-                        <TabsTrigger value="templates" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Templates</TabsTrigger>
-                        <TabsTrigger value="bindings" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Bindings</TabsTrigger>
+                        <TabsTrigger value="outbox" className="text-base max-sm:min-h-[44px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary">Outbox</TabsTrigger>
+                        <TabsTrigger value="send" className="text-base max-sm:min-h-[44px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary">Compose</TabsTrigger>
+                        <TabsTrigger value="templates" className="text-base max-sm:min-h-[44px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary">Templates</TabsTrigger>
+                        <TabsTrigger value="bindings" className="text-base max-sm:min-h-[44px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary">Bindings</TabsTrigger>
                     </TabsList>
                     {tab === "templates" && (
-                        <Button className="w-full sm:w-auto" onClick={() => router.push("/hrm/mailing/templates/new")}>
+                        <Button size="sm" className="w-full sm:w-auto" onClick={() => router.push("/hrm/mailing/templates/new")}>
                             New template
                         </Button>
                     )}
@@ -116,6 +116,7 @@ export function MailingModule() {
                                 value={outboxQuery}
                                 onChange={(event) => setOutboxQuery(event.target.value)}
                                 placeholder="Recipient or email…"
+                                className="h-8 text-xs"
                             />
                         </div>
                     )}

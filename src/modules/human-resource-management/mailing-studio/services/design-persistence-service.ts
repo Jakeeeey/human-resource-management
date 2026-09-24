@@ -1,6 +1,7 @@
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 import { MS_DESIGN_JSON_MAX } from "../types/ms-template.schema";
+import { compileVariablesFromDesignJson, normaliseVariablesList } from "../utils/ms-variables";
 
 // Mailing-studio design persistence (T10): direct ms_templates CRUD via shared
 // dFetch. Server-side implementation — T4's /api/hrm/mailing-studio/templates
@@ -15,7 +16,7 @@ import { MS_DESIGN_JSON_MAX } from "../types/ms-template.schema";
 
 const COLLECTION = "ms_templates";
 const FIELDS =
-    "id,template_key,template_name,subject,design_json,body_html,body_text,is_active,created_at,updated_at";
+    "id,template_key,template_name,subject,design_json,variables,body_html,body_text,is_active,created_at,updated_at";
 
 export interface SaveDesignInput {
     template_key: string;
@@ -34,6 +35,8 @@ export interface MsDesignRow {
     template_name: string;
     subject: string;
     design_json: string | null;
+    /** Derived cache (§6.4): distinct {{ key }} tokens in design_json, bare form. Compiled on save, never hand-edited. */
+    variables?: string[] | null;
     body_html?: string | null;
     body_text?: string | null;
     is_active?: boolean | number;
@@ -125,11 +128,13 @@ export async function saveDesign(input: SaveDesignInput): Promise<MsDesignRow> {
     const now = getPhilippineTime();
     const existing = await getDesign(template_key);
 
+    const variables = compileVariablesFromDesignJson(design_json);
     const payload: Record<string, unknown> = {
         template_key,
         template_name,
         subject,
         design_json,
+        variables,
         updated_at: now,
     };
     if (input.body_html !== undefined) payload.body_html = input.body_html;
@@ -154,6 +159,10 @@ export async function saveDesign(input: SaveDesignInput): Promise<MsDesignRow> {
     }
     if (verified.design_json !== design_json) {
         throw new Error("design_json did not persist (write-then-verify-read mismatch)");
+    }
+    const readBack = normaliseVariablesList(verified.variables);
+    if (JSON.stringify(readBack) !== JSON.stringify([...variables].sort())) {
+        throw new Error("variables did not persist (write-then-verify-read mismatch)");
     }
     return verified;
 }

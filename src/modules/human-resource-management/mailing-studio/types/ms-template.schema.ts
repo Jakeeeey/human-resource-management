@@ -29,8 +29,13 @@ function isValidJson(value: string): boolean {
 }
 
 // ms_templates row — mirrors the frozen mail_templates contract (mailing-templates.md
-// §3 field list) with exactly one addition: design_json. Deliberately NO variables /
-// merge-tag allowlist anywhere in this module (mailing-studio non-goal).
+// §3 field list) with exactly two additions: design_json, and variables — the
+// DERIVED cache compiled from the template's own content at save time (§6.4:
+// the distinct {{ key }} tokens in design_json, bare canonical form).
+// Never hand-edited (the save path computes it); optional here so rows
+// written before the Phase-1 DDL still parse. There is deliberately NO rename
+// layer and no variable_map anywhere in this module (§7.7): the token name IS
+// the payload key.
 export const msTemplateSchema = z
     .object({
         template_key: z.string().min(1, "Template key is required"),
@@ -47,6 +52,7 @@ export const msTemplateSchema = z
             .refine(isValidJson, "design_json must be valid JSON")
             .optional()
             .nullable(),
+        variables: z.array(z.string().min(1)).max(200).optional().nullable(),
         is_active: z.boolean(),
         created_at: z.string().optional().nullable(),
         updated_at: z.string().optional().nullable(),
