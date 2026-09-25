@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
             // empty list, dodging the Directus missing-single-item 403 gotcha.
             const res = (await dFetch(
                 `/items/ms_bindings?filter[id][_eq]=${encodeURIComponent(ref)}` +
-                    "&fields=id,event_key,template_id,is_enabled,send_condition&limit=1"
+                    "&fields=id,event_key,template_id,is_enabled&limit=1"
             )) as { data?: BindingLookupRow[]; errors?: { message?: string }[] };
             const row = Array.isArray(res?.data) ? res.data[0] : undefined;
             if (!row) {

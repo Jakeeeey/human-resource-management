@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,6 @@ import { useMsPagination } from "./hooks/useMsPagination";
 import { useMsTemplates } from "./hooks/useMsTemplates";
 import { createMsBinding, type MsBindingPatch, type MsBindingRow } from "./providers/msBindings";
 import type { MsCatalogRow } from "./catalog/ms-catalog.schema";
-import { CatalogTab } from "./catalog/CatalogTab";
 import { MsCombobox } from "./components/MsCombobox";
 import { MsConfirmDialog } from "./components/MsConfirmDialog";
 import { MsPager } from "./components/MsPager";
@@ -33,13 +33,9 @@ import {
     normaliseVariablesList,
 } from "./utils/ms-variables";
 
-const SEND_CONDITIONS = ["always", "on_pass", "on_fail"] as const;
-
-type SendCondition = (typeof SEND_CONDITIONS)[number];
-
 type BindingFilter = "all" | "attention" | "disabled";
 
-type BindingSort = "event" | "template" | "priority";
+type BindingSort = "event" | "template";
 
 const FILTERS: readonly { readonly value: BindingFilter; readonly label: string }[] = [
     { value: "all", label: "All" },
@@ -50,17 +46,7 @@ const FILTERS: readonly { readonly value: BindingFilter; readonly label: string 
 const SORT_OPTIONS: readonly { readonly value: BindingSort; readonly label: string }[] = [
     { value: "event", label: "Event key A–Z" },
     { value: "template", label: "Template A–Z" },
-    { value: "priority", label: "Priority (lowest first)" },
 ];
-
-const CONDITION_OPTIONS: readonly { readonly value: SendCondition; readonly label: string }[] = [
-    { value: "always", label: "always — fire on every dispatch" },
-    { value: "on_pass", label: "on_pass — fire when payload.verdict is pass" },
-    { value: "on_fail", label: "on_fail — fire when payload.verdict is fail" },
-];
-
-const DEFAULT_RECIPIENT_PATH = "$.payload.to";
-const DEFAULT_PRIORITY = 100;
 
 function isEnabled(value: unknown): boolean {
     return value === true || value === 1 || value === "1" || value === "true";
@@ -71,37 +57,9 @@ function catalogRowIsActive(row: MsCatalogRow): boolean {
     return value === true || value === 1 || value === "1" || value === "true";
 }
 
-function bindingRecipientPath(row: MsBindingRow): string {
-    return typeof row.recipient_path === "string" && row.recipient_path.length > 0
-        ? row.recipient_path
-        : DEFAULT_RECIPIENT_PATH;
-}
-
-function bindingPriority(row: MsBindingRow): number {
-    const raw = typeof row.priority === "string" ? Number(row.priority) : row.priority;
-    return typeof raw === "number" && Number.isInteger(raw) && raw >= 0
-        ? raw
-        : DEFAULT_PRIORITY;
-}
-
-function validateRecipientPath(raw: string): string | null {
-    if (raw.trim().length === 0) return "Recipient path is required.";
-    if (!raw.trim().startsWith("$.")) return "Recipient path must start with $.";
-    return null;
-}
-
-function validatePriority(raw: string): string | null {
-    if (raw.trim().length === 0) return "Priority is required.";
-    const parsed = Number(raw.trim());
-    if (!Number.isInteger(parsed) || parsed < 0) {
-        return "Priority must be a non-negative integer.";
-    }
-    return null;
-}
-
 function humaniseCreateError(message: string, eventKey: string): string {
     if (message.includes("UNKNOWN_EVENT_KEY")) {
-        return `Event key “${eventKey}” is not an active catalog key — register it in the catalog above or pick another key.`;
+        return `Event key “${eventKey}” is not an active catalog key — register it in the event registry or pick another key.`;
     }
     return message;
 }
@@ -132,60 +90,29 @@ function BindingRowCard({
     const [editing, setEditing] = useState(false);
     const [eventDraft, setEventDraft] = useState(row.event_key);
     const [templateDraft, setTemplateDraft] = useState(String(row.template_id));
-    const [conditionDraft, setConditionDraft] = useState<SendCondition>(
-        SEND_CONDITIONS.includes(row.send_condition as SendCondition)
-            ? (row.send_condition as SendCondition)
-            : SEND_CONDITIONS[0],
-    );
-    const [recipientDraft, setRecipientDraft] = useState(bindingRecipientPath(row));
-    const [priorityDraft, setPriorityDraft] = useState(String(bindingPriority(row)));
     const [editError, setEditError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
     const openEditor = (): void => {
         setEventDraft(row.event_key);
         setTemplateDraft(String(row.template_id));
-        setConditionDraft(
-            SEND_CONDITIONS.includes(row.send_condition as SendCondition)
-                ? (row.send_condition as SendCondition)
-                : SEND_CONDITIONS[0],
-        );
-        setRecipientDraft(bindingRecipientPath(row));
-        setPriorityDraft(String(bindingPriority(row)));
         setEditError(null);
         setEditing(true);
     };
 
     const handleSaveFields = async (): Promise<void> => {
         if (!eventDraft) {
-            setEditError("Event key is required — register one in the catalog above.");
+            setEditError("Event key is required — configure one in the event registry.");
             return;
         }
         if (!templateDraft.trim()) {
             setEditError("Template is required — pick one from the template list.");
             return;
         }
-        const recipientProblem = validateRecipientPath(recipientDraft);
-        if (recipientProblem !== null) {
-            setEditError(recipientProblem);
-            return;
-        }
-        const priorityProblem = validatePriority(priorityDraft);
-        if (priorityProblem !== null) {
-            setEditError(priorityProblem);
-            return;
-        }
         const patch: MsBindingPatch = {};
         if (eventDraft !== row.event_key) patch.event_key = eventDraft;
         if (templateDraft.trim() !== String(row.template_id)) {
             patch.template_id = templateDraft.trim();
-        }
-        if (conditionDraft !== row.send_condition) patch.send_condition = conditionDraft;
-        if (recipientDraft.trim() !== bindingRecipientPath(row)) {
-            patch.recipient_path = recipientDraft.trim();
-        }
-        if (Number(priorityDraft.trim()) !== bindingPriority(row)) {
-            patch.priority = Number(priorityDraft.trim());
         }
         if (Object.keys(patch).length === 0) {
             setEditing(false);
@@ -213,10 +140,9 @@ function BindingRowCard({
                     </span>
                     <span
                         className="truncate text-xs text-muted-foreground tabular-nums"
-                        title={`${templateName} · ${row.send_condition} · ${bindingRecipientPath(row)} · priority ${bindingPriority(row)}`}
+                        title={templateName}
                     >
-                        {templateName} · {row.send_condition}
-                        {` · ${bindingRecipientPath(row)} · priority ${bindingPriority(row)}`}
+                        {templateName}
                     </span>
                 </div>
                 <Badge variant={isEnabled(row.is_enabled) ? "default" : "outline"}>
@@ -301,47 +227,6 @@ function BindingRowCard({
                                 onValueChange={setTemplateDraft}
                             />
                         </div>
-                        <div className="flex flex-col gap-2">
-                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={`binding-condition-${String(row.id)}`}>
-                                Send condition
-                            </Label>
-                            <Select value={conditionDraft} onValueChange={(next) => setConditionDraft(next as SendCondition)}>
-                                <SelectTrigger className="h-8 w-full text-xs" id={`binding-condition-${String(row.id)}`} size="sm">
-                                    <SelectValue placeholder="Condition" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-60">
-                                    {CONDITION_OPTIONS.map((option) => (
-                                        <SelectItem key={option.value} value={option.value}>
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={`binding-recipient-${String(row.id)}`}>
-                                Recipient path
-                            </Label>
-                            <Input
-                                className="h-8 font-mono text-xs"
-                                id={`binding-recipient-${String(row.id)}`}
-                                spellCheck={false}
-                                value={recipientDraft}
-                                onChange={(event) => setRecipientDraft(event.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={`binding-priority-${String(row.id)}`}>
-                                Priority (lower runs first)
-                            </Label>
-                            <Input
-                                className="h-8 text-xs tabular-nums"
-                                id={`binding-priority-${String(row.id)}`}
-                                inputMode="numeric"
-                                value={priorityDraft}
-                                onChange={(event) => setPriorityDraft(event.target.value)}
-                            />
-                        </div>
                     </div>
                     {editError ? (
                         <p className="text-xs text-destructive" role="alert">
@@ -369,8 +254,7 @@ function BindingRowCard({
  * Bindings tab — hook event keys to templates via the real bindings routes.
  * The event-key picker is sourced from the event_catalog (D4): any active
  * registered key binds, replacing the old 3-key enum. The template picker is
- * sourced from the loaded templates — no recall-based ids. recipient_path +
- * priority editors ride the same flat write path. Each row reconciles the
+ * sourced from the loaded templates — no recall-based ids. Each row reconciles the
  * template's compiled variables against the bound event's payload_schema
  * (§7.7) — unmapped tokens are reported, never auto-repaired. Create
  * requires the full flat row; PATCH is_enabled:false is the soft unhook;
@@ -380,13 +264,11 @@ export function BindingsPage() {
     const { data, isLoading, error, refetch, update, remove } = useMsBindings();
     const catalog = useMsCatalog(true);
     const templates = useMsTemplates();
+    const router = useRouter();
 
     const [eventKey, setEventKey] = useState("");
     const [templateId, setTemplateId] = useState("");
-    const [sendCondition, setSendCondition] = useState<SendCondition>(SEND_CONDITIONS[0]);
     const [enabled, setEnabled] = useState(true);
-    const [recipientPath, setRecipientPath] = useState(DEFAULT_RECIPIENT_PATH);
-    const [priority, setPriority] = useState(String(DEFAULT_PRIORITY));
     const [formError, setFormError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -444,14 +326,6 @@ export function BindingsPage() {
         return { byId, byKey };
     }, [templates.data]);
 
-    const bindingCounts = useMemo(() => {
-        const counts = new Map<string, number>();
-        for (const row of data ?? []) {
-            counts.set(row.event_key, (counts.get(row.event_key) ?? 0) + 1);
-        }
-        return counts;
-    }, [data]);
-
     const resolveTemplateName = (ref: string | number): string => {
         const key = String(ref);
         return (
@@ -501,7 +375,6 @@ export function BindingsPage() {
             );
         });
         return [...rows].sort((a, b) => {
-            if (sort === "priority") return bindingPriority(a.row) - bindingPriority(b.row);
             if (sort === "template") {
                 return resolveTemplateName(a.row.template_id).localeCompare(
                     resolveTemplateName(b.row.template_id),
@@ -518,41 +391,22 @@ export function BindingsPage() {
     const handleCreate = async (): Promise<void> => {
         setFormError(null);
         if (resolvedEventKey === "") {
-            setFormError("Event key is required — register one in the catalog above.");
+            setFormError("Event key is required — configure one in the event registry.");
             return;
         }
         if (!templateId.trim()) {
             setFormError("Template is required — pick one from the template list.");
             return;
         }
-        const recipientProblem = validateRecipientPath(recipientPath);
-        if (recipientProblem !== null) {
-            setFormError(recipientProblem);
-            return;
-        }
-        const priorityProblem = validatePriority(priority);
-        if (priorityProblem !== null) {
-            setFormError(priorityProblem);
-            return;
-        }
-        const trimmedRecipient = recipientPath.trim();
-        const parsedPriority = Number(priority.trim());
         setCreating(true);
         try {
             await createMsBinding({
                 event_key: resolvedEventKey,
                 template_id: templateId.trim(),
                 is_enabled: enabled,
-                send_condition: sendCondition,
-                ...(trimmedRecipient !== DEFAULT_RECIPIENT_PATH
-                    ? { recipient_path: trimmedRecipient }
-                    : {}),
-                ...(parsedPriority !== DEFAULT_PRIORITY ? { priority: parsedPriority } : {}),
             });
             await refetch();
             setTemplateId("");
-            setRecipientPath(DEFAULT_RECIPIENT_PATH);
-            setPriority(String(DEFAULT_PRIORITY));
         } catch (cause) {
             const message = cause instanceof Error ? cause.message : String(cause);
             setFormError(humaniseCreateError(message, resolvedEventKey));
@@ -598,7 +452,22 @@ export function BindingsPage() {
 
     return (
         <section aria-label="Bindings" className="flex min-h-0 flex-1 flex-col gap-4">
-            <CatalogTab bindingCounts={bindingCounts} />
+            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4" data-testid="bindings-registry-link">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold">Event keys</h2>
+                    <Button
+                        className="min-h-11 md:min-h-0"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => router.push("/hrm/mailing-studio/studio-event-registry")}
+                    >
+                        Configure event keys
+                    </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                    Event keys and their payload variables are registered by developers in the event registry.
+                </p>
+            </div>
 
             <div className="flex flex-col gap-3 rounded-lg border bg-card p-4" data-testid="bindings-form">
                 <h2 className="text-sm font-semibold">Hook a binding</h2>
@@ -640,50 +509,6 @@ export function BindingsPage() {
                             searchPlaceholder="Search templates…"
                             value={templateId}
                             onValueChange={setTemplateId}
-                        />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="binding-condition">
-                            Send condition
-                        </Label>
-                        <Select value={sendCondition} onValueChange={(next) => setSendCondition(next as SendCondition)}>
-                            <SelectTrigger className="h-8 w-full text-xs" id="binding-condition" size="sm">
-                                <SelectValue placeholder="Condition" />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-60">
-                                {CONDITION_OPTIONS.map((option) => (
-                                    <SelectItem key={option.value} value={option.value}>
-                                        {option.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <p className="text-[11px] leading-snug text-muted-foreground">
-                            Matched against payload.verdict — always ignores the verdict.
-                        </p>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="binding-recipient">
-                            Recipient path
-                        </Label>
-                        <Input
-                            className="h-8 font-mono text-xs"
-                            id="binding-recipient"
-                            spellCheck={false}
-                            value={recipientPath}
-                            onChange={(event) => setRecipientPath(event.target.value)}
-                        />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="binding-priority">
-                            Priority (lower runs first)
-                        </Label>
-                        <Input
-                            className="h-8 text-xs tabular-nums"
-                            id="binding-priority"
-                            inputMode="numeric"
-                            value={priority}
-                            onChange={(event) => setPriority(event.target.value)}
                         />
                     </div>
                     <div className="flex items-end gap-2 pb-1">

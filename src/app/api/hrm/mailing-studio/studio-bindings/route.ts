@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-    msBindingSchema,
-    msSendConditionSchema,
-} from "@/modules/human-resource-management/mailing-studio/studio-bindings/types/ms-binding.schema";
+import { msBindingSchema } from "@/modules/human-resource-management/mailing-studio/studio-bindings/types/ms-binding.schema";
 import { msEventKeyShapeSchema } from "@/modules/human-resource-management/mailing-studio/studio-bindings/catalog/ms-catalog.schema";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
@@ -18,18 +15,16 @@ export const dynamic = "force-dynamic";
 // (^[a-z0-9_.]+$) via Zod, then existence + is_active via a ?filter= lookup.
 // A well-shaped key absent from the catalog (or retired) answers
 // 422 UNKNOWN_EVENT_KEY on writes; a filter for a key with no bindings is an
-// empty list, never an error. `send_condition` stays the frozen
-// `always|on_pass|on_fail` trio. There is no condition DSL anywhere in this
-// module: any object/array/nested payload for `send_condition` (or any other
-// field) is rejected with a 400 before it reaches Zod. PATCH
-// `is_enabled:false` is the soft unhook; hard unhook (DELETE) lives on
-// bindings/[id].
+// empty list, never an error. There is no condition DSL anywhere in this
+// module: any object/array/nested payload for any field is rejected with a
+// 400 before it reaches Zod. PATCH `is_enabled:false` is the soft unhook;
+// hard unhook (DELETE) lives on bindings/[id].
 
 const COLLECTION = "/items/ms_bindings";
 const CATALOG_COLLECTION = "/items/event_catalog";
-const FIELDS = "id,event_key,template_id,is_enabled,send_condition";
+const FIELDS = "id,event_key,template_id,is_enabled";
 
-const BODY_KEYS = ["event_key", "template_id", "is_enabled", "send_condition"] as const;
+const BODY_KEYS = ["event_key", "template_id", "is_enabled"] as const;
 type BodyKey = (typeof BODY_KEYS)[number];
 
 function isBodyKey(key: string): key is BodyKey {
@@ -88,7 +83,7 @@ function unknownEventKey(event_key: string) {
     );
 }
 
-// GET /api/hrm/mailing-studio/bindings[?event_key=...][?send_condition=...][?is_enabled=...]
+// GET /api/hrm/mailing-studio/bindings[?event_key=...][?is_enabled=...]
 // Lists bindings. The event_key filter is shape-checked only — a well-shaped
 // key with no bindings is an empty list; a malformed shape is a 400.
 export async function GET(req: NextRequest) {
@@ -103,15 +98,6 @@ export async function GET(req: NextRequest) {
                 return validationFailed({ event_key: ["Invalid event key shape"] });
             }
             filter.push(`event_key[eq]=${encodeURIComponent(parsed.data)}`);
-        }
-
-        const rawCondition = params.get("send_condition");
-        if (rawCondition !== null) {
-            const parsed = msSendConditionSchema.safeParse(rawCondition);
-            if (!parsed.success) {
-                return validationFailed({ send_condition: ["Unknown send condition"] });
-            }
-            filter.push(`send_condition[eq]=${encodeURIComponent(parsed.data)}`);
         }
 
         const rawEnabled = params.get("is_enabled");
