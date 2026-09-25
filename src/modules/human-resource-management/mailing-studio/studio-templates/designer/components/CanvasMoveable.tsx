@@ -14,6 +14,7 @@ interface CanvasMoveableProps {
     readonly stageEl: HTMLDivElement | null;
     readonly targetId: string | null;
     readonly width: number;
+    readonly enabled?: boolean;
 }
 
 interface ResizeCommit {
@@ -116,7 +117,7 @@ function applyRowSnap(
  * - Selecto marquee multi-selects `.canvas-block` targets; shift unions.
  * Loaded client-only via dynamic(..., { ssr: false }) from StageCanvas.
  */
-export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMoveableProps) {
+export default function CanvasMoveable({ stageEl, targetId, width, enabled = true }: CanvasMoveableProps) {
     const beginGesture = useCanvasDoc((state) => state.beginGesture);
     const endGesture = useCanvasDoc((state) => state.endGesture);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
@@ -160,7 +161,7 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
         return () => cancelAnimationFrame(frame);
     }, [targetId, targetX, targetY, targetW, targetH, targetRotation, width, selectionKey, isGroup]);
 
-    if (!stageEl) return null;
+    if (!stageEl || !enabled) return null;
 
     return (
         <>

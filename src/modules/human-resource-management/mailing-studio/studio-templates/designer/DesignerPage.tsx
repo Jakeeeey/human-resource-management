@@ -1511,7 +1511,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                     />
                 ) : null}
                 {panel === "help" ? <HelpPanel /> : null}
-                <StageCanvas width={width} onEmptyAdd={() => setPanel("elements")} />
+                <StageCanvas device={device} width={width} onEmptyAdd={() => setPanel("elements")} />
                 <PropertyPanel
                     catalog={variableCatalog}
                     variableEventKey={variableEventKey}
