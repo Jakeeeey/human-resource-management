@@ -2,7 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Archive, RotateCcw } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -13,19 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import type { QuizQuestionWithOptions } from "../types";
-
-function formatDate(value: string): string {
-    if (!value) return "—";
-    try {
-        return new Date(value).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    } catch {
-        return value;
-    }
-}
+import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
 
 const TYPE_LABELS: Record<string, string> = {
     true_false: "True / False",
@@ -119,7 +107,7 @@ export const createColumns = (
         ),
         meta: { headerClassName: "hidden sm:table-cell", cellClassName: "hidden sm:table-cell" },
         cell: ({ row }) => (
-            <div>{formatDate(row.getValue("created_at") as string)}</div>
+            <div>{formatPHT(row.getValue("created_at") as string, { includeTime: false })}</div>
         ),
     },
     {
@@ -150,7 +138,7 @@ export const createColumns = (
                                 onClick={() => onDelete(question)}
                                 className="text-destructive focus:text-destructive"
                             >
-                                <Trash2 className="mr-2 h-4 w-4" />
+                                <Archive className="mr-2 h-4 w-4" />
                                 Deactivate
                             </DropdownMenuItem>
                         ) : (

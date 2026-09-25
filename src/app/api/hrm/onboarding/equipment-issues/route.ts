@@ -16,6 +16,7 @@ import {
   listOnboardingTasks,
 } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,10 +29,6 @@ export const dynamic = "force-dynamic";
 // method column). Unknown employees → 400; unknown item keys → 400;
 // double-issue → 409. Asset tables are NEVER written here (Master List owns
 // assets).
-
-function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -161,7 +158,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     let created: { data?: AckLogRow };
     try {
       created = (await dFetch("/items/acknowledgement_logs", {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getPhilippineTime } from "./signingSetIo";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   findPaperworksByApplicant,
   findSigningEnvelopeByApplicant,
@@ -175,7 +175,7 @@ async function doFileSignedPaperwork(
     ...new Set(pending.map((entry) => entry.item.template_id)),
   ]);
   const listId = await ensureSignedDocsListId();
-  const now = getPhilippineTime();
+  const now = nowUTC();
   await insertFiledPdfRecords(
     pending.map((entry) => ({
       userId,

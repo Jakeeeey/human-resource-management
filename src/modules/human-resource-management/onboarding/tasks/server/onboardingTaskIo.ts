@@ -33,10 +33,6 @@ export const ONBOARDING_TASK_ERROR_CODES = {
 } as const;
 
 /** PH wall-time, MySQL-compatible `YYYY-MM-DD HH:mm:ss` (conventions §6). */
-export function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }

@@ -13,8 +13,8 @@ import {
 import {
   assertAssignmentOwner,
   normalizeTrainingAssignment,
-  getPhilippineTime,
 } from "@/modules/human-resource-management/onboarding/training/trainingTaking";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import { buildDrawInput } from "@/modules/human-resource-management/onboarding/training/trainingAssignmentAdapter";
 
 export const runtime = "nodejs";
@@ -103,7 +103,7 @@ export async function POST(
     const resumed = assignment.status === "in_progress";
     let current = assignment;
     if (!resumed) {
-      const now = getPhilippineTime();
+      const now = nowUTC();
       const updated = (await dFetch(`/items/training_assignments/${assignmentId}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "in_progress", updated_at: now }),

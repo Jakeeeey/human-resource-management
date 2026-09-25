@@ -1,6 +1,7 @@
 "use client";
 
 import { useManpowerApproval } from "../hooks/useManpowerApproval";
+import { requesterName } from "@/modules/human-resource-management/manpower-request/utils/requester";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Building2, Briefcase, FileText, Users, User, CheckCircle2, Check, X } from "lucide-react";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function ManpowerApprovalView() {
-    const { isViewOpen, setIsViewOpen, selectedRequest, departments, divisions, approveRequest, rejectRequest } = useManpowerApproval();
+    const { isViewOpen, setIsViewOpen, selectedRequest, departments, divisions, users, approveRequest, rejectRequest } = useManpowerApproval();
     const [confirmAction, setConfirmAction] = useState<'Approve' | 'Reject' | null>(null);
 
     if (!selectedRequest) return null;
@@ -70,9 +71,13 @@ export function ManpowerApprovalView() {
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Division</label>
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{divisionName}</div>
                             </div>
-                            <div className="md:col-span-3">
+                            <div className="md:col-span-2">
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Job Position / Title</label>
                                 <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRequest.position}</div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Requested By</label>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{requesterName(selectedRequest, users)}</div>
                             </div>
                         </div>
                     </div>

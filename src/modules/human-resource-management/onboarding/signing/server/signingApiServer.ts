@@ -11,10 +11,6 @@ import { COOKIE_NAME, decodeJwtPayload, type JwtPayload } from "@/lib/auth-utils
 // here, matching the existing convention) and answers 401 before any read
 // or write.
 
-export function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 export function readSigningSession(req: NextRequest): JwtPayload | null {
   const token = req.cookies.get(COOKIE_NAME)?.value;
   return token ? decodeJwtPayload(token) : null;

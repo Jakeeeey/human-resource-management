@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
@@ -6,6 +7,8 @@ import {
   type PaperworkTemplate,
   type PaperworkZone,
 } from "@/modules/human-resource-management/onboarding/paperwork/types/paperwork-template.schema";
+import { actorIdFromJwt, nowUTC, stampCreate } from "@/modules/human-resource-management/shared/utils/audit";
+import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +18,6 @@ export const dynamic = "force-dynamic";
 // (freeform-ink-only template), is_active defaults true. Company scoping
 // lives in the `paperwork_template_companies` junction via the
 // `[id]/companies` route — this collection carries no company column.
-
-function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -91,16 +90,21 @@ export async function POST(req: NextRequest) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
 
-    const now = getPhilippineTime();
-    const payload: Record<string, unknown> = {
-      title: validation.data.title,
-      zones: validation.data.zones ?? [],
-      is_active: validation.data.is_active ?? true,
-      source: "pdf",
-      pdf_file: validation.data.pdf_file ?? null,
-      created_at: now,
-      updated_at: now,
-    };
+    const now = nowUTC();
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const actorId = actorIdFromJwt(token ? decodeJwtPayload(token) : null);
+    const payload: Record<string, unknown> = stampCreate(
+      {
+        title: validation.data.title,
+        zones: validation.data.zones ?? [],
+        is_active: validation.data.is_active ?? true,
+        source: "pdf",
+        pdf_file: validation.data.pdf_file ?? null,
+        created_at: now,
+        updated_at: now,
+      },
+      actorId
+    );
     const created = (await dFetch("/items/paperwork_templates", {
       method: "POST",
       body: JSON.stringify(payload),

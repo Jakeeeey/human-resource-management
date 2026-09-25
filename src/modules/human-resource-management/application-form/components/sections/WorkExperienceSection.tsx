@@ -6,12 +6,16 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { EMPTY_WORK_EXPERIENCE, type ApplicationFormValues } from "../../types";
 import { RepeatingFieldArray } from "../RepeatingFieldArray";
+import { MonthYearPicker } from "../MonthYearPicker";
+import { contactError } from "../../lib/hardValidation";
 import { checkDateOrder } from "../../lib/softValidation";
 
 export function WorkExperienceSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
     const isFreshGraduate = useWatch({ control: form.control, name: "is_fresh_graduate" });
+    const rows = useWatch({ control: form.control, name: "work_experience" });
     const { fields, append, remove } = useFieldArray({
         control: form.control,
         name: "work_experience",
@@ -96,9 +100,10 @@ export function WorkExperienceSection({ form }: { form: UseFormReturn<Applicatio
                                         <FormItem>
                                             <FormLabel>From</FormLabel>
                                             <FormControl>
-                                                <Input
-                                                    placeholder="e.g. Jan 2022"
-                                                    {...field}
+                                                <MonthYearPicker
+                                                    aria-label="Work experience start"
+                                                    value={field.value}
+                                                    onChange={field.onChange}
                                                     onBlur={() => {
                                                         field.onBlur();
                                                         form.trigger(`work_experience.${index}.date_to`);
@@ -126,13 +131,43 @@ export function WorkExperienceSection({ form }: { form: UseFormReturn<Applicatio
                                         <FormItem>
                                             <FormLabel>To</FormLabel>
                                             <FormControl>
-                                                <Input placeholder="e.g. Present" {...field} />
+                                                <MonthYearPicker
+                                                    aria-label="Work experience end"
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    onBlur={field.onBlur}
+                                                    disabled={rows?.[index]?.currently_employed === true}
+                                                />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
                             </div>
+                            <FormField
+                                control={form.control}
+                                name={`work_experience.${index}.currently_employed`}
+                                render={({ field }) => (
+                                    <FormItem className="flex items-center gap-2 space-y-0 sm:col-span-2">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value}
+                                                onCheckedChange={(checked) => {
+                                                    const next = checked === true;
+                                                    field.onChange(next);
+                                                    if (next) {
+                                                        form.setValue(`work_experience.${index}.date_to`, "", { shouldDirty: true });
+                                                        form.setValue(`work_experience.${index}.salary_rate_end`, "", { shouldDirty: true });
+                                                        form.setValue(`work_experience.${index}.reason_for_leaving`, "", { shouldDirty: true });
+                                                        form.clearErrors(`work_experience.${index}.date_to`);
+                                                    }
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormLabel className="!mt-0 font-normal">I currently work here</FormLabel>
+                                    </FormItem>
+                                )}
+                            />
                             <div className="grid grid-cols-2 gap-3">
                                 <FormField
                                     control={form.control}
@@ -153,7 +188,13 @@ export function WorkExperienceSection({ form }: { form: UseFormReturn<Applicatio
                                         <FormItem>
                                             <FormLabel>Ending Salary</FormLabel>
                                             <FormControl>
-                                                <Input type="number" min={0} step="0.01" {...field} />
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    step="0.01"
+                                                    {...field}
+                                                    disabled={rows?.[index]?.currently_employed === true}
+                                                />
                                             </FormControl>
                                         </FormItem>
                                     )}
@@ -174,12 +215,14 @@ export function WorkExperienceSection({ form }: { form: UseFormReturn<Applicatio
                             <FormField
                                 control={form.control}
                                 name={`work_experience.${index}.supervisor_contact`}
+                                rules={{ validate: (v) => contactError(v ?? "") ?? true }}
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Supervisor Contact</FormLabel>
                                         <FormControl>
-                                            <Input {...field} />
+                                            <Input placeholder="Email or phone number" {...field} />
                                         </FormControl>
+                                        <FormMessage />
                                     </FormItem>
                                 )}
                             />
@@ -202,7 +245,7 @@ export function WorkExperienceSection({ form }: { form: UseFormReturn<Applicatio
                                     <FormItem className="sm:col-span-2">
                                         <FormLabel>Reason for Leaving</FormLabel>
                                         <FormControl>
-                                            <Input {...field} />
+                                            <Input {...field} disabled={rows?.[index]?.currently_employed === true} />
                                         </FormControl>
                                     </FormItem>
                                 )}

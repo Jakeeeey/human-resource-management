@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
@@ -6,6 +7,8 @@ import {
   type PaperworkTemplate,
   type PaperworkZone,
 } from "@/modules/human-resource-management/onboarding/paperwork/types/paperwork-template.schema";
+import { actorIdFromJwt, nowUTC, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
+import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,10 +18,6 @@ export const dynamic = "force-dynamic";
 // PATCH /api/hrm/onboarding/paperwork-templates/[id] — partial update; zones
 // replace wholesale (template_id → zones[] is one document, no per-zone
 // routes). Todo 7 reads zones from GET; the zones editor writes via PATCH.
-
-function getPhilippineTime(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 function validationFailed(errors: Record<string, string[]>) {
   return NextResponse.json(
@@ -146,11 +145,14 @@ export async function PATCH(
     if (data.is_active !== undefined) patch["is_active"] = data.is_active;
     if (data.source !== undefined) patch["source"] = data.source;
     if (data.pdf_file !== undefined) patch["pdf_file"] = data.pdf_file;
-    patch["updated_at"] = getPhilippineTime();
+    patch["updated_at"] = nowUTC();
+
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const actorId = actorIdFromJwt(token ? decodeJwtPayload(token) : null);
 
     const updated = (await dFetch(`/items/paperwork_templates/${templateId}`, {
       method: "PATCH",
-      body: JSON.stringify(patch),
+      body: JSON.stringify(stampUpdate(patch, actorId)),
     })) as { data?: Record<string, unknown> };
 
     if (!updated?.data) {

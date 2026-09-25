@@ -3,6 +3,7 @@ import { z } from "zod";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 import type { EquipmentCatalogItem } from "../equipmentCatalog";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   EquipmentIssuerSchema,
   type EquipmentIssuer,
@@ -30,10 +31,6 @@ export const EQUIPMENT_ITEM_ERROR_CODES = {
 } as const;
 
 /** PH wall-time, MySQL-compatible `YYYY-MM-DD HH:mm:ss` (conventions §6). */
-export function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }
@@ -206,7 +203,7 @@ export async function softDeleteEquipmentItemRow(
 ): Promise<OnboardingEquipmentItem> {
   return patchEquipmentItemRow(id, {
     is_active: 0,
-    updated_at: phTimeNow(),
+    updated_at: nowUTC(),
     ...(actorId != null ? { updated_by: actorId } : {}),
   });
 }
@@ -221,7 +218,7 @@ export async function reorderEquipmentItems(
   entries: readonly EquipmentItemOrderEntry[],
   actorId: number | null
 ): Promise<OnboardingEquipmentItem[]> {
-  const now = phTimeNow();
+  const now = nowUTC();
   const updated: OnboardingEquipmentItem[] = [];
   for (const entry of entries) {
     updated.push(

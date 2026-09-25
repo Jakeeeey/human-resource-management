@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { actorIdFromJwt, creationTimestamps, nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -89,6 +92,7 @@ async function createAnswerRows(
                         option_image: opt.option_image ?? null,
                         is_correct: opt.is_correct,
                         sort: index,
+                        ...creationTimestamps(),
                     }),
                 })
             )
@@ -98,13 +102,18 @@ async function createAnswerRows(
 
     if (!Array.isArray(expectedAnswers) || !expectedAnswers.length) return;
 
-    const rows: { question_id: number; blank_index: number; expected_answer_text: string }[] = [];
+    const rows: Record<string, unknown>[] = [];
     expectedAnswers.forEach((blank, blankIndex) => {
         (blank.answers || [])
             .map((a) => a.trim())
             .filter(Boolean)
             .forEach((answerText) => {
-                rows.push({ question_id: questionId, blank_index: blankIndex, expected_answer_text: answerText });
+                rows.push({
+                    question_id: questionId,
+                    blank_index: blankIndex,
+                    expected_answer_text: answerText,
+                    ...creationTimestamps(),
+                });
             });
     });
 
@@ -212,9 +221,14 @@ export async function POST(req: NextRequest) {
         [key: string]: unknown;
     };
 
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const payload = token ? decodeJwtPayload(token) : null;
+    const actorId = actorIdFromJwt(payload);
+
+    const now = nowUTC();
     const created = await dFetch(`/items/quiz_question`, {
         method: "POST",
-        body: JSON.stringify(questionData),
+        body: JSON.stringify(stampCreate({ ...questionData, created_at: now, updated_at: now }, actorId)),
     });
 
     const questionId = created?.data?.id;
@@ -236,9 +250,13 @@ export async function PATCH(req: NextRequest) {
         [key: string]: unknown;
     };
 
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const payload = token ? decodeJwtPayload(token) : null;
+    const actorId = actorIdFromJwt(payload);
+
     await dFetch(`/items/quiz_question/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(questionData),
+        body: JSON.stringify(stampUpdate({ ...questionData, updated_at: nowUTC() }, actorId)),
     });
 
     if (Array.isArray(options) || Array.isArray(expectedAnswers)) {
@@ -255,9 +273,13 @@ export async function DELETE(req: NextRequest) {
         return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const payload = token ? decodeJwtPayload(token) : null;
+    const actorId = actorIdFromJwt(payload);
+
     await dFetch(`/items/quiz_question/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ is_active: false }),
+        body: JSON.stringify(stampUpdate({ is_active: false, updated_at: nowUTC() }, actorId)),
     });
 
     return NextResponse.json({ success: true });
