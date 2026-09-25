@@ -7,14 +7,14 @@ export const dynamic = "force-dynamic";
 
 // Bindings by-id routes (T4) — READ-ONLY copy of the old
 // api/hrm/mailing/bindings/[id] route, retargeted to ms_bindings with
-// msBindingSchema. Same frozen-enum rules as the collection route: no
+// msBindingSchema. Same flat-shape rules as the collection route: no
 // refinement, no DSL, no objects anywhere. DELETE hard-deletes (unhook =
 // gone). Envelope { success, data?, message?, errors? } mirrors the old route.
 
 const COLLECTION = "/items/ms_bindings";
-const FIELDS = "id,event_key,template_id,is_enabled,send_condition";
+const FIELDS = "id,event_key,template_id,is_enabled";
 
-const BODY_KEYS = ["event_key", "template_id", "is_enabled", "send_condition"] as const;
+const BODY_KEYS = ["event_key", "template_id", "is_enabled"] as const;
 type BodyKey = (typeof BODY_KEYS)[number];
 
 function isBodyKey(key: string): key is BodyKey {

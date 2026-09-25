@@ -17,10 +17,9 @@ import { mailHtmlToText } from "../utils/ms-mail-text";
 // event key plus an ARBITRARY payload (`{ event_key, payload,
 // idempotency_key }`). The legacy recruitment-shaped context type is fully
 // retired from this path — the signature below is the only input shape.
-// Recipient resolution reads the binding's `recipient_path` out of the
-// payload (D1, P4-T1); subject/body render open `{{tokens}}` against the
-// payload with escaping (D3, P4-T2); bindings are selected by `priority`
-// (lower first) then id.
+// Recipient resolution reads the payload's `to` key (D1, P4-T1);
+// subject/body render open `{{tokens}}` against the payload with escaping
+// (D3, P4-T2); bindings are selected by lowest id.
 //
 // Server-only: pulls in nodemailer transitively via mail-transport — never
 // import this file (or mail-transport) from client components. Every exit
@@ -35,20 +34,11 @@ import { mailHtmlToText } from "../utils/ms-mail-text";
 // needs for the UPDATE. `writeOutboxRow` stays exported for the manual-send
 // route, which owns its own rows.
 //
-// Pipeline order: validate args → enabled bindings (priority order,
-// trigger rule, send_condition match) → recipient resolve → template fetch
-// → render + escape → scrub re-assert (rendered HTML) → plaintext →
-// rate-cap check → dry_run outcome OR multipart/alternative send → outcome.
-// No CC/BCC anywhere: single `to` only.
-//
-// Two deliberate choices (carried over):
-// - send_condition MISMATCH yields NO send outcome (the condition means
-//   "don't send for this outcome" — there is no send attempt to record),
-//   same as the no-enabled-binding path: outcome status `queued`.
-// - `send_condition` is retained and honoured for the interview bindings,
-//   but `trigger_filter` supersedes it: when a binding carries a non-empty
-//   `trigger_filter` it alone decides. The filter DSL is still reserved, so
-//   a non-empty filter fails closed (binding does not fire) with a log.
+// Pipeline order: validate args → enabled bindings (lowest id wins) →
+// recipient resolve → template fetch → render + escape → scrub re-assert
+// (rendered HTML) → plaintext → rate-cap check → dry_run outcome OR
+// multipart/alternative send → outcome. No CC/BCC anywhere: single `to`
+// only.
 
 /** Generic dispatch input — catalog key plus an arbitrary payload. */
 export interface DispatchInput {
@@ -86,10 +76,6 @@ interface BindingRow {
     event_key: string;
     template_id: string | number;
     is_enabled: boolean;
-    send_condition: string;
-    recipient_path: string;
-    priority: number;
-    trigger_filter: unknown;
 }
 
 interface TemplateRow {
@@ -98,12 +84,6 @@ interface TemplateRow {
     body_html: string;
     is_active: boolean;
 }
-
-/** Binding default when the column is absent (pre-DDL row). */
-const DEFAULT_PRIORITY = 100;
-
-/** Default recipient path when the column is absent (pre-DDL row). */
-const DEFAULT_RECIPIENT_PATH = "$.payload.to";
 
 // Module-level sliding-60s send window (Appendix Env row: MAIL_RATE_PER_MINUTE,
 // default 20). Pruned on every check; only real send attempts consume slots
@@ -138,63 +118,7 @@ export function getPhilippineTime(): string {
 }
 
 /**
- * Matches a binding's send_condition against the dispatch verdict (Appendix
- * Bindings row): `always` fires regardless; `on_pass` needs Passed/pass;
- * `on_fail` needs Failed/fail (case-insensitive).
- * @param condition - Binding send_condition value.
- * @param verdict - Dispatch verdict (may be undefined for generic emits).
- * @returns True when the binding fires for this verdict.
- */
-export function matchSendCondition(condition: unknown, verdict: unknown): boolean {
-    if (condition === "always") return true;
-    const normalized = typeof verdict === "string" ? verdict.trim().toLowerCase() : "";
-    if (condition === "on_pass") return normalized === "passed" || normalized === "pass";
-    if (condition === "on_fail") return normalized === "failed" || normalized === "fail";
-    return false;
-}
-
-/**
- * Decides whether a binding's trigger_filter lets it fire. An empty filter
- * ({}, [], null, undefined, blank string) DEFERS to send_condition; a
- * non-empty filter decides alone — and since the filter DSL is still
- * reserved, a non-empty filter fails closed (does not fire) with a log.
- * @param filter - Raw trigger_filter value from the binding row.
- * @param eventKey - Event key (for the log line only).
- * @returns "defer" when send_condition should decide, else the decision.
- */
-function matchTriggerFilter(filter: unknown, eventKey: string): "defer" | boolean {
-    let normalized: unknown = filter;
-    if (typeof normalized === "string") {
-        const trimmed = normalized.trim();
-        if (trimmed.length === 0) return "defer";
-        try {
-            normalized = JSON.parse(trimmed) as unknown;
-        } catch {
-            msLogRedacted("[dispatch-service] unparseable trigger_filter (failing closed):", {
-                event_key: eventKey,
-            });
-            return false;
-        }
-    }
-    if (normalized === null || normalized === undefined) return "defer";
-    if (Array.isArray(normalized)) {
-        return normalized.length === 0 ? "defer" : false;
-    }
-    if (isRecord(normalized)) {
-        if (Object.keys(normalized).length === 0) return "defer";
-        msLogRedacted("[dispatch-service] non-empty trigger_filter (reserved DSL, failing closed):", {
-            event_key: eventKey,
-        });
-        return false;
-    }
-    return "defer";
-}
-
-/**
- * Lists enabled bindings for the event (Directus filter), lowest `priority`
- * first, then lowest id. Fetches FULL rows (no `fields=` projection) so the
- * read survives both pre- and post-Phase-1-DDL shapes — missing
- * `recipient_path`/`priority`/`trigger_filter` columns fall back to defaults.
+ * Lists enabled bindings for the event (Directus filter), lowest id first.
  * @param eventKey - Catalog event key.
  * @returns Enabled binding rows (possibly empty).
  */
@@ -208,27 +132,20 @@ async function listEnabledBindings(eventKey: string): Promise<BindingRow[]> {
     const rows: BindingRow[] = [];
     for (const raw of res.data) {
         if (!isRecord(raw)) continue;
-        const priority =
-            typeof raw.priority === "number" && Number.isFinite(raw.priority)
-                ? raw.priority
-                : DEFAULT_PRIORITY;
         rows.push({
             id: (raw.id as string | number) ?? "",
             event_key: String(raw.event_key ?? ""),
             template_id: (raw.template_id as string | number) ?? "",
             is_enabled: toBool(raw.is_enabled),
-            send_condition: String(raw.send_condition ?? "always"),
-            recipient_path:
-                typeof raw.recipient_path === "string" && raw.recipient_path.length > 0
-                    ? raw.recipient_path
-                    : DEFAULT_RECIPIENT_PATH,
-            priority,
-            trigger_filter: raw.trigger_filter,
         });
     }
     rows.sort((a, b) => {
-        if (a.priority !== b.priority) return a.priority - b.priority;
-        return Number(a.id) - Number(b.id);
+        const left = Number(a.id);
+        const right = Number(b.id);
+        if (Number.isFinite(left) && Number.isFinite(right) && left !== right) {
+            return left - right;
+        }
+        return String(a.id).localeCompare(String(b.id));
     });
     return rows.filter((row) => row.is_enabled);
 }
@@ -319,8 +236,7 @@ export function takeRateSlot(cap: number): boolean {
 
 /**
  * Dispatches one mail for a catalog event. Resolves the enabled binding by
- * priority (+ trigger rule, then send_condition against `payload.verdict`),
- * resolves the recipient from the payload via `binding.recipient_path`
+ * lowest id, resolves the recipient from the payload's `to` key
  * (explicit `to_email` override wins), renders `{{tokens}}` with escaping,
  * re-asserts the RENDERED HTML, sends single-`to` multipart/alternative
  * through getMsMailTransport() (or a dry_run outcome when MAIL_DRY_RUN
@@ -345,7 +261,6 @@ export async function dispatchMail(
         const payload: Record<string, unknown> = isRecord(input.payload)
             ? input.payload
             : {};
-        const verdict = typeof payload.verdict === "string" ? payload.verdict : undefined;
 
         let bindings: BindingRow[];
         try {
@@ -354,20 +269,14 @@ export async function dispatchMail(
             msLogRedacted("[dispatch-service] binding lookup failed:", error);
             return { ok: false, reason: "binding-lookup-failed" };
         }
-        const binding = bindings.find((row) => {
-            const trigger = matchTriggerFilter(row.trigger_filter, eventKey);
-            if (trigger !== "defer") return trigger;
-            return matchSendCondition(row.send_condition, verdict);
-        });
+        const binding = bindings.length > 0 ? bindings[0] : undefined;
         if (!binding) {
-            const anyEnabled = bindings.length > 0;
-            msLogRedacted("[dispatch-service] no firing binding for event:", {
+            msLogRedacted("[dispatch-service] no enabled binding for event:", {
                 event_key: eventKey,
-                anyEnabled,
             });
             return {
                 ok: false,
-                reason: anyEnabled ? "condition-mismatch" : "no-enabled-binding",
+                reason: "no-enabled-binding",
                 outcome: {
                     status: "queued",
                     to_email: "pending",
@@ -385,7 +294,7 @@ export async function dispatchMail(
         const toEmail =
             override.length > 0
                 ? override
-                : resolveRecipient(payload, { recipient_path: binding.recipient_path });
+                : resolveRecipient(payload);
         if (!EMAIL_PATTERN.test(toEmail)) {
             return {
                 ok: false,

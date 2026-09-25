@@ -1,1 +1,1 @@
-export { CatalogTab } from "./CatalogTab";
+export type { MsCatalogRow } from "./ms-catalog.schema";
