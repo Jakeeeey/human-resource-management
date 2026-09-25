@@ -107,3 +107,19 @@ export function normaliseVariablesList(value: unknown): string[] {
         .filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
         .sort();
 }
+
+export function filterVariableNames(names: readonly string[], query: string): string[] {
+    const needle = query.trim().toLowerCase();
+    if (needle === "") return [...names];
+    return names.filter((name) => name.toLowerCase().includes(needle));
+}
+
+export function nextEmptyVariableName(
+    names: readonly string[],
+    values: Readonly<Record<string, string>>,
+): string | null {
+    for (const name of names) {
+        if ((values[name] ?? "").trim() === "") return name;
+    }
+    return null;
+}
