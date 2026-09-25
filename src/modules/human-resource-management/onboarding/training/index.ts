@@ -5,6 +5,5 @@ export {
   assertAssignmentOwner,
   normalizeTrainingAssignment,
   resolveEngineApplicant,
-  getPhilippineTime,
 } from "./trainingTaking";
 export * from "./trainingAssignmentAdapter";

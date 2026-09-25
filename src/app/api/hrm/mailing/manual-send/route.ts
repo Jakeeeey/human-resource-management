@@ -7,12 +7,12 @@ import {
 } from "@/modules/human-resource-management/recruitment/mailing/providers/mailTransport";
 import {
     fetchActiveTemplate,
-    getPhilippineTime,
     resolveRecipientEmail,
     takeRateSlot,
     writeOutboxRow,
 } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { buildManualIdempotencyKey } from "@/modules/human-resource-management/recruitment/mailing/utils/idempotency";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import { logRedacted, scrubSecretsFromText } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 import { renderMailTemplate } from "@/modules/human-resource-management/recruitment/mailing/utils/mailRenderer";
 import {
@@ -300,7 +300,7 @@ export async function POST(req: NextRequest) {
             status: "sent",
             warnings,
             error: null,
-            sent_at: getPhilippineTime(),
+            sent_at: nowUTC(),
             rendered_subject: renderedSubject.text,
             rendered_body_html: renderedBody.text,
         });

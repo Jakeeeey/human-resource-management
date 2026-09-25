@@ -15,7 +15,7 @@ export const ManpowerRequestSchema = z.object({
   qualification: z.enum(['Male', 'Female', 'Any'], { message: 'Gender preference is required' }),
   qualification_description: z.string().min(1, 'Other qualifications is required'),
   applicant_name: z.string().nullable().optional(),
-  rate: z.number().nullable().optional(),
+  rate: z.number().min(0, 'Proposed rate cannot be negative').nullable().optional(),
   requested_by: z.any().nullable().optional(),
   created_by: z.any().nullable().optional(),
   recommending_approval: z.number().nullable().optional(),

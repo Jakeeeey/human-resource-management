@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { actorIdFromJwt, nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -93,7 +96,7 @@ async function clearApplicantQuizFlagOnOthers(exceptId: number) {
         others.map((q) =>
             dFetch(`/items/quiz/${q.id}`, {
                 method: "PATCH",
-                body: JSON.stringify({ is_applicant_quiz: false }),
+                body: JSON.stringify({ is_applicant_quiz: false, updated_at: nowUTC() }),
             })
         )
     );
@@ -155,9 +158,14 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const payload = token ? decodeJwtPayload(token) : null;
+    const actorId = actorIdFromJwt(payload);
+
+    const now = nowUTC();
     const created = await dFetch(`/items/quiz`, {
         method: "POST",
-        body: JSON.stringify(quizData),
+        body: JSON.stringify(stampCreate({ ...quizData, created_at: now, updated_at: now }, actorId)),
     });
 
     const quizId = created?.data?.id;
@@ -212,9 +220,13 @@ export async function PATCH(req: NextRequest) {
         }
     }
 
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const payload = token ? decodeJwtPayload(token) : null;
+    const actorId = actorIdFromJwt(payload);
+
     await dFetch(`/items/quiz/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(rest),
+        body: JSON.stringify(stampUpdate({ ...rest, updated_at: nowUTC() }, actorId)),
     });
 
     if (Array.isArray(category_filter)) {

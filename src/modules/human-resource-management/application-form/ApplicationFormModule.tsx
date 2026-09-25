@@ -30,10 +30,20 @@ import {
 } from "./providers/fetchProvider";
 import { loadDraft, saveDraft, clearDraft, hasDraftContent, type StoredDraft } from "./lib/autosave";
 import { checkBirthdate } from "./lib/softValidation";
+import { CERTIFICATION_FIELD_ID, ATTACHMENTS_FIELD_ID } from "./lib/fieldIds";
+import { resumeError } from "./lib/attachmentRules";
+import { upgradeDraftValues } from "./lib/draftUpgrade";
 import { buildSubmitPayload, checkSectionDateRanges } from "./lib/applicationPayload";
 import type { SignaturePadHandle } from "./components/SignaturePad";
 import { ApplicationFormSections } from "./components/ApplicationFormSections";
 import { ApplicationFormNav, StickySubmitBar } from "./components/ApplicationFormNav";
+
+function revealField(containerId: string) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.querySelector<HTMLElement>('[role="checkbox"], input, button')?.focus({ preventScroll: true });
+}
 
 export function ApplicationFormModule() {
     const router = useRouter();
@@ -84,7 +94,7 @@ export function ApplicationFormModule() {
         if (!draftPrompt) return;
         form.reset({
             ...DEFAULT_APPLICATION_FORM,
-            ...draftPrompt.values,
+            ...upgradeDraftValues(draftPrompt.values),
             photo_selected: null,
             attachments: draftPrompt.values.attachments.length
                 ? draftPrompt.values.attachments.map((a) => ({ ...a, file: null }))
@@ -105,7 +115,7 @@ export function ApplicationFormModule() {
         }
         const birthdateErr = checkBirthdate(values.birthdate);
         if (birthdateErr) {
-            form.setError("birthdate", { message: birthdateErr });
+            form.setError("birthdate", { message: birthdateErr }, { shouldFocus: true });
             return;
         }
         const rangeErr = checkSectionDateRanges(values);
@@ -113,12 +123,19 @@ export function ApplicationFormModule() {
             toast.error(rangeErr);
             return;
         }
+        const missingResume = resumeError(values.attachments);
+        if (missingResume) {
+            toast.error(missingResume);
+            revealField(ATTACHMENTS_FIELD_ID);
+            return;
+        }
         if (!values.certification_agreed) {
             form.setError("certification_agreed", { message: "You must read and agree before submitting." });
+            revealField(CERTIFICATION_FIELD_ID);
             return;
         }
         if (values.how_heard === "Other" && !values.how_heard_other.trim()) {
-            form.setError("how_heard_other", { message: "Please specify." });
+            form.setError("how_heard_other", { message: "Please specify." }, { shouldFocus: true });
             return;
         }
         if (values.signature_typed_mode && !values.signature_typed_name.trim()) {
@@ -183,7 +200,7 @@ export function ApplicationFormModule() {
     };
 
     return (
-        <div className="mx-auto max-w-3xl lg:max-w-5xl px-4 py-8">
+        <div className="mx-auto max-w-3xl lg:max-w-5xl px-2 py-2 sm:px-4 sm:py-4">
             <Card>
                 <CardHeader>
                     <CardTitle>Employment Application</CardTitle>

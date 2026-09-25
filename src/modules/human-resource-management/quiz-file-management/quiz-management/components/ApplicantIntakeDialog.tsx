@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, UserPlus, CheckCircle2, Info } from "lucide-react";
 import { pluralize } from "../../utils/pluralize";
 
@@ -109,7 +108,7 @@ export function ApplicantIntakeDialog({ open, onOpenChange, quiz }: ApplicantInt
                             )}
 
                             {!isSearching && search.trim() && results.length > 0 && (
-                                <ScrollArea className="max-h-[200px] rounded-md border">
+                                <div className="max-h-[200px] overflow-y-auto overscroll-contain rounded-md border">
                                     <div className="p-1">
                                         {results.map((applicant) => (
                                             <button
@@ -127,7 +126,7 @@ export function ApplicantIntakeDialog({ open, onOpenChange, quiz }: ApplicantInt
                                             </button>
                                         ))}
                                     </div>
-                                </ScrollArea>
+                                </div>
                             )}
 
                             {!isSearching && search.trim() && results.length === 0 && (

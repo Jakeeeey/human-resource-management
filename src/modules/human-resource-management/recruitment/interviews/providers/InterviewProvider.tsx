@@ -85,7 +85,7 @@ const InterviewContext = createContext<InterviewContextType | undefined>(undefin
  * (`/hrm/interviews/grade/[id]`), which fetches and submits directly —
  * the provider carries no grade-dialog state.
  * Client sends no timestamps — the server injects interviewed_at/created_at
- * via nowPH() and interviewed_by/updated_by from the JWT.
+ * via nowUTC() and interviewed_by/updated_by from the JWT.
  */
 export function InterviewProvider({ children, initialStage = "Initial" }: { children: React.ReactNode; initialStage?: InterviewStageTab }) {
     const [interviews, setInterviews] = useState<Interview[]>([]);

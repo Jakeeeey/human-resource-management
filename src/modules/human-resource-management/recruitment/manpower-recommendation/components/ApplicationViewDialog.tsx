@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Eye, FileText } from "lucide-react";
 import { AttachmentPreviewDialog, type ApplicationAttachmentFile } from "./AttachmentPreviewDialog";
-import { formatDateLong } from "@/lib/utils";
+import { formatPHT, parseUtcInstant } from "@/modules/human-resource-management/shared/utils/time";
 
 import { Form } from "@/components/ui/form";
 import {
@@ -23,6 +23,7 @@ import {
     type ApplicationFormValues,
 } from "@/modules/human-resource-management/application-form/types";
 import { ApplicationDetailsSection } from "@/modules/human-resource-management/application-form/components/sections/ApplicationDetailsSection";
+import { PhotoCapture } from "@/modules/human-resource-management/application-form/components/PhotoCapture";
 import { PersonalInfoSection } from "@/modules/human-resource-management/application-form/components/sections/PersonalInfoSection";
 import { FamilyBackgroundSection } from "@/modules/human-resource-management/application-form/components/sections/FamilyBackgroundSection";
 import { CompanyRelativesSection } from "@/modules/human-resource-management/application-form/components/sections/CompanyRelativesSection";
@@ -59,6 +60,7 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
     const [loadError, setLoadError] = useState<string | null>(null);
     const [submittedAt, setSubmittedAt] = useState<string>("");
     const [signatureImage, setSignatureImage] = useState<string | null>(null);
+    const [photoImage, setPhotoImage] = useState<string | null>(null);
     const [attachmentFiles, setAttachmentFiles] = useState<ApplicationAttachmentFile[]>([]);
     const [previewFile, setPreviewFile] = useState<ApplicationAttachmentFile | null>(null);
 
@@ -77,14 +79,7 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                 if (!body.data || cancelled) return;
                 form.reset(mapApplicationToFormValues(body.data));
                 const photoUrl = (body.data as { photo_image?: unknown }).photo_image;
-                if (typeof photoUrl === "string" && photoUrl.startsWith("data:")) {
-                    try {
-                        const blob = (await (await fetch(photoUrl)).blob()) as Blob;
-                        form.setValue("photo_selected", new File([blob], "photo", { type: blob.type || "image/jpeg" }));
-                    } catch {
-                        form.setValue("photo_selected", null);
-                    }
-                }
+                setPhotoImage(typeof photoUrl === "string" && photoUrl.startsWith("data:") ? photoUrl : null);
                 const sigUrl = (body.data as { signature_image?: unknown }).signature_image;
                 setSignatureImage(typeof sigUrl === "string" && sigUrl.startsWith("data:") ? sigUrl : null);
                 const files = (body.data as { attachment_files?: unknown }).attachment_files;
@@ -101,12 +96,9 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         : []
                 );
                 const raw = body.data.application["submitted_at"];
-                if (typeof raw === "string") {
-                    const submittedDate = new Date(raw);
-                    setSubmittedAt(Number.isNaN(submittedDate.getTime()) ? "" : formatDateLong(submittedDate));
-                } else {
-                    setSubmittedAt("");
-                }
+                setSubmittedAt(
+                    typeof raw === "string" && parseUtcInstant(raw) ? formatPHT(raw) : ""
+                );
             })
             .catch((err: unknown) => {
                 if (cancelled) return;
@@ -154,9 +146,12 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         <p className="text-sm text-destructive text-center py-16">{loadError}</p>
                     ) : (
                         <Form {...form}>
+                            <div className="mb-8">
+                                <PhotoCapture value={null} readOnly imageUrl={photoImage} />
+                            </div>
                             <fieldset disabled inert aria-readonly="true" className="space-y-8 select-none opacity-90">
                                 <ApplicationDetailsSection form={form} />
-                                <PersonalInfoSection form={form} />
+                                <PersonalInfoSection form={form} readOnly />
                                 <FamilyBackgroundSection form={form} />
                                 <CompanyRelativesSection form={form} />
                                 <EducationSection form={form} />

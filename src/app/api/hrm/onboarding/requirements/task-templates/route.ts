@@ -9,7 +9,6 @@ import {
   REQUIREMENTS_ERROR_CODES,
   mapRequirementsFailure,
   nextSortOrder,
-  phTimeNow,
   readAllFlag,
   readRequirementsSession,
   requirementsConflict,
@@ -17,6 +16,7 @@ import {
   unauthorized,
   validationFailed,
 } from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   CreateTaskTemplateBodySchema,
   RequirementsTaskPhaseSchema,
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = phTimeNow();
+    const now = nowUTC();
     const write: TemplateWriteRow = {
       code: validation.data.code,
       title: validation.data.title,

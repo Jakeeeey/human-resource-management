@@ -8,8 +8,8 @@ import {
 } from "@/modules/human-resource-management/onboarding/training/types/training-taking.schema";
 import {
   normalizeTrainingAssignment,
-  getPhilippineTime,
 } from "@/modules/human-resource-management/onboarding/training/trainingTaking";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import { readUserExists } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
 
 export const runtime = "nodejs";
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const created = (await dFetch("/items/training_assignments", {
       method: "POST",
       body: JSON.stringify({

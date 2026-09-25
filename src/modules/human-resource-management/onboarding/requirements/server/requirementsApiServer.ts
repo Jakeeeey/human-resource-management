@@ -9,6 +9,7 @@ import {
   readOnboardingTaskSession,
   sessionActorId,
 } from "../../tasks/server/onboardingTaskApiServer";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // requirementsApiServer.ts — shared boundary helpers for the requirements
 // CRUD API (todo 13 of onboarding-requirements-config). Session handling
@@ -49,10 +50,6 @@ export function readRequirementsSession(
 }
 
 /** PH wall-time, MySQL-compatible `YYYY-MM-DD HH:mm:ss` (conventions §6). */
-export function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 /** `?all=1` includes deactivated rows; the default list is active only. */
 export function readAllFlag(req: NextRequest): boolean {
   return req.nextUrl.searchParams.get("all") === "1";
@@ -118,7 +115,7 @@ export async function reorderTemplateRows(
   entries: readonly { id: number; sort_order: number }[],
   actorId: number | null
 ): Promise<void> {
-  const now = phTimeNow();
+  const now = nowUTC();
   for (const entry of entries) {
     await patchTemplateRow(entry.id, {
       sort_order: entry.sort_order,

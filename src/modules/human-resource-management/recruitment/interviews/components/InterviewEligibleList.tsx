@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useInterview } from "../hooks/useInterview";
+import { paginate, PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "../lib/paginate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +47,7 @@ export function InterviewEligibleList() {
     const [verdictFilter, setVerdictFilter] = useState<"All" | "Pending" | "Passed" | "Failed">("All");
     const [pageInitial, setPageInitial] = useState(1);
     const [pageFinal, setPageFinal] = useState(1);
+    const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
     if (error) {
         return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
@@ -56,13 +58,16 @@ export function InterviewEligibleList() {
     const visibleFinal =
         verdictFilter === "All" ? filteredFinal : filteredFinal.filter((row) => row.latestFinalVerdict === verdictFilter);
 
-    const PAGE_SIZE = 10;
-    const totalPagesInitial = Math.max(1, Math.ceil(visibleInitial.length / PAGE_SIZE));
-    const totalPagesFinal = Math.max(1, Math.ceil(visibleFinal.length / PAGE_SIZE));
-    const safePageInitial = Math.min(pageInitial, totalPagesInitial);
-    const safePageFinal = Math.min(pageFinal, totalPagesFinal);
-    const pagedInitial = visibleInitial.slice((safePageInitial - 1) * PAGE_SIZE, safePageInitial * PAGE_SIZE);
-    const pagedFinal = visibleFinal.slice((safePageFinal - 1) * PAGE_SIZE, safePageFinal * PAGE_SIZE);
+    const initialPage = paginate(visibleInitial, pageInitial, pageSize);
+    const finalPage = paginate(visibleFinal, pageFinal, pageSize);
+    const { pageItems: pagedInitial, page: safePageInitial, totalPages: totalPagesInitial } = initialPage;
+    const { pageItems: pagedFinal, page: safePageFinal, totalPages: totalPagesFinal } = finalPage;
+
+    const changePageSize = (size: number) => {
+        setPageSize(size);
+        setPageInitial(1);
+        setPageFinal(1);
+    };
 
     const filtersActive = searchQuery.trim() !== "" || verdictFilter !== "All";
 
@@ -336,7 +341,11 @@ export function InterviewEligibleList() {
                         page={safePageInitial}
                         totalPages={totalPagesInitial}
                         total={visibleInitial.length}
+                        pageSize={pageSize}
+                        rangeStart={initialPage.rangeStart}
+                        rangeEnd={initialPage.rangeEnd}
                         onChange={setPageInitial}
+                        onPageSizeChange={changePageSize}
                     />
                 </div>
             ) : (
@@ -467,7 +476,11 @@ export function InterviewEligibleList() {
                         page={safePageFinal}
                         totalPages={totalPagesFinal}
                         total={visibleFinal.length}
+                        pageSize={pageSize}
+                        rangeStart={finalPage.rangeStart}
+                        rangeEnd={finalPage.rangeEnd}
                         onChange={setPageFinal}
+                        onPageSizeChange={changePageSize}
                     />
                 </div>
             )}
@@ -481,14 +494,47 @@ export function InterviewEligibleList() {
  * @param verdict - Latest stage verdict, or null when never graded.
  * @returns Colored pill chip for the verdict.
  */
-function Pager({ page, totalPages, total, onChange }: { page: number; totalPages: number; total: number; onChange: (page: number) => void }) {
-    if (totalPages <= 1) return null;
+function Pager({
+    page,
+    totalPages,
+    total,
+    pageSize,
+    rangeStart,
+    rangeEnd,
+    onChange,
+    onPageSizeChange,
+}: {
+    page: number;
+    totalPages: number;
+    total: number;
+    pageSize: number;
+    rangeStart: number;
+    rangeEnd: number;
+    onChange: (page: number) => void;
+    onPageSizeChange: (size: number) => void;
+}) {
+    if (total === 0) return null;
     return (
         <div className="flex items-center justify-between px-2 border-t border-border/50 py-2">
             <div className="flex-1 text-sm text-muted-foreground">
-                {total} total rows
+                Showing {rangeStart}-{rangeEnd} of {total} rows
             </div>
             <div className="flex items-center space-x-6 lg:space-x-8">
+                <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium">Rows per page</span>
+                    <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
+                        <SelectTrigger className="h-8 w-[80px]" aria-label="Rows per page">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {PAGE_SIZE_OPTIONS.map((size) => (
+                                <SelectItem key={size} value={String(size)}>
+                                    {size}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
                 <div className="flex w-[100px] items-center justify-center text-sm font-medium">
                     Page {page} of {totalPages}
                 </div>

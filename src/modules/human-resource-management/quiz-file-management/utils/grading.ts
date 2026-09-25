@@ -1,4 +1,5 @@
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
 
@@ -216,6 +217,7 @@ export async function persistGradedAttempt(params: {
 }) {
     const { quizId, applicantId, administeredBy, startedAt, grade, applicationId } = params;
 
+    const createdAt = nowUTC();
     const createdAttempt = await dFetch(`/items/quiz_attempt`, {
         method: "POST",
         body: JSON.stringify({
@@ -230,6 +232,7 @@ export async function persistGradedAttempt(params: {
             passed: grade.passed,
             started_at: startedAt || null,
             completed_at: new Date().toISOString(),
+            created_at: createdAt,
         }),
     });
 
@@ -238,7 +241,7 @@ export async function persistGradedAttempt(params: {
         await dFetch(`/items/quiz_attempt_answer`, {
             method: "POST",
             body: JSON.stringify(
-                grade.gradedAnswers.map((ans) => ({ attempt_id: attemptId, ...ans }))
+                grade.gradedAnswers.map((ans) => ({ attempt_id: attemptId, ...ans, created_at: createdAt }))
             ),
         });
     }

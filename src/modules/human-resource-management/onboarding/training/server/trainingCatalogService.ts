@@ -28,9 +28,9 @@ import {
   createTemplateRows,
   listTemplateRows,
   patchTemplateRow,
-  phTimeNow,
   type TemplateWriteRow,
 } from "../../tasks/server/onboardingTaskIo";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { OnboardingOwnerRole } from "../../types/onboarding-task.schema";
 
 // trainingCatalogService.ts — the training-template DOMAIN layer over
@@ -306,7 +306,7 @@ export async function createTrainingTemplate(
   }
 
   const departmentIds = [...new Set(parsed.data.department_ids ?? [])];
-  const now = phTimeNow();
+  const now = nowUTC();
   const row: TrainingTemplateWriteRow = {
     code: parsed.data.code,
     title: parsed.data.title,
@@ -364,7 +364,7 @@ export async function updateTrainingTemplate(input: {
   const { department_ids: departmentIds, ...rest } = parsed.data;
   const patch: Record<string, unknown> = {
     ...rest,
-    updated_at: phTimeNow(),
+    updated_at: nowUTC(),
     ...(actorId != null ? { updated_by: actorId } : {}),
   };
   if (departmentIds !== undefined) {
@@ -387,7 +387,7 @@ export async function updateTrainingTemplate(input: {
 
 /**
  * Soft-deletes one template (`is_active=false`). Read-back verified through
- * `updateTrainingTemplate`, which owns the `phTimeNow()` audit stamps.
+ * `updateTrainingTemplate`, which owns the `nowUTC()` audit stamps.
  * @throws Coded `templateNotFound` / `writeNotVisible` / IO failures.
  */
 export function deactivateTrainingTemplate(input: {
@@ -447,7 +447,7 @@ export async function createTrainingItem(
     );
   }
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const row: TrainingItemWriteRow = {
     template_id: templateId,
     code: parsed.data.code,
@@ -500,7 +500,7 @@ export async function updateTrainingItem(input: {
 
   const updated = await patchTrainingItemRow(input.id, {
     ...parsed.data,
-    updated_at: phTimeNow(),
+    updated_at: nowUTC(),
     ...(actorId != null ? { updated_by: actorId } : {}),
   });
   const verified = await readItemById(updated.id);
@@ -515,7 +515,7 @@ export async function updateTrainingItem(input: {
 
 /**
  * Soft-deletes one item (`is_active=false`). Read-back verified through
- * `updateTrainingItem`, which owns the `phTimeNow()` audit stamps.
+ * `updateTrainingItem`, which owns the `nowUTC()` audit stamps.
  * @throws Coded `itemNotFound` / `writeNotVisible` / IO failures.
  */
 export function deactivateTrainingItem(input: {
@@ -555,7 +555,7 @@ export async function syncTrainingDerivedTemplates(
     });
   }
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const desired = items
     .filter((item) => templateActive.has(item.template_id))
     .map((item) => ({

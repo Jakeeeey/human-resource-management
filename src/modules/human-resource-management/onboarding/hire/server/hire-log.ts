@@ -1,6 +1,6 @@
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
-import { philippineTime } from "./hire-time";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // hire-log.ts — audit writer for the post-hire orchestrator (todo 16).
 //
@@ -53,7 +53,7 @@ export async function logHireActivity(entry: HireActivityLogEntry): Promise<void
         user_email: entry.userEmail,
         type: HIRE_ACTIVITY_TYPE,
         status: entry.ok ? "SUCCESS" : "FAILED",
-        timestamp: philippineTime(),
+        timestamp: nowUTC(),
         reason: entry.reason,
       }),
     });

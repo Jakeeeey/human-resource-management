@@ -36,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Trash2, Upload, X } from "lucide-react";
+import { CategoryCombobox } from "./CategoryCombobox";
 import Image from "next/image";
 import { toast } from "sonner";
 
@@ -442,7 +443,7 @@ export function QuestionDialog({
                                 <FormItem>
                                     <FormLabel>Category (optional)</FormLabel>
                                     <FormControl>
-                                        <Input placeholder="e.g. Safety, Onboarding" {...field} />
+                                        <CategoryCombobox value={field.value} onChange={field.onChange} />
                                     </FormControl>
                                     <FormDescription>
                                         Groups questions in the pool so a quiz can be set to draw
