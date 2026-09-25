@@ -116,6 +116,8 @@ export async function listDesigns(): Promise<DesignRow[]> {
 export interface PreviewResult {
     html: string;
     warnings: string[];
+    /** Catalog event the HTML was sample-resolved against; null = raw compile. */
+    sampleKey: string | null;
 }
 
 export interface CompiledTestSendArgs {
@@ -176,20 +178,29 @@ export async function sendCompiledTest(
 }
 /**
  * Compiles the live (possibly unsaved) canvas doc through the real export
- * path without persisting anything.
+ * path without persisting anything. When `eventKey` is given, the route
+ * sample-resolves `{{tokens}}` against that event's `payload_example`
+ * through the dispatch renderer (unknown paths warn `unknown-var:*` and
+ * render empty); without it the raw compile comes back with sampleKey null.
  * @param design_json - Stringified canvas doc from the live store.
  * @param subject - Becomes the export document title.
- * @returns Compiled receiver HTML + export warnings.
+ * @param eventKey - Catalog event key for sample-data resolution.
+ * @returns Compiled receiver HTML + export warnings + resolving sample key.
  * @throws Error when the route rejects (e.g. empty canvas).
  */
 export async function previewDesign(
     design_json: string,
     subject?: string,
+    eventKey?: string | null,
 ): Promise<PreviewResult> {
     const res = await fetch("/api/hrm/mailing-studio/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ design_json, ...(subject ? { subject } : {}) }),
+        body: JSON.stringify({
+            design_json,
+            ...(subject ? { subject } : {}),
+            ...(eventKey ? { event_key: eventKey } : {}),
+        }),
     });
     let envelope: { success: boolean; data?: PreviewResult; message?: string } | null =
         null;

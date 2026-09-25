@@ -19,6 +19,7 @@ import {
     type BlockAlign,
     type CanvasNode,
 } from "../types/canvas-doc.schema";
+import { layerLabel } from "./LayersPanel";
 
 /**
  * Live properties panel (T8c): edits the first selected node through the store.
@@ -485,13 +486,18 @@ function VariablesSection({ node }: { readonly node: CanvasNode }) {
     );
 }
 
-export function PropertyPanel() {
+export function PropertyPanel({ sheet = false }: { readonly sheet?: boolean }) {
     const nodes = useCanvasDoc((state) => state.nodes);
     const selection = useCanvasDoc((state) => state.selection);
+    const selectNodes = useCanvasDoc((state) => state.selectNodes);
     const updateProps = useCanvasDoc((state) => state.updateProps);
     const moveNode = useCanvasDoc((state) => state.moveNode);
     const resizeNode = useCanvasDoc((state) => state.resizeNode);
     const rotateNode = useCanvasDoc((state) => state.rotateNode);
+    const shell = cn(
+        "w-[280px] shrink-0 flex-col border-l bg-card",
+        sheet ? "flex h-full min-h-0 overflow-hidden" : "hidden 2xl:flex",
+    );
 
     const node =
         selection.length === 1 && selection[0] !== undefined
@@ -501,7 +507,7 @@ export function PropertyPanel() {
     if (!node) {
         const multi = selection.length > 1;
         return (
-            <aside className="hidden w-[280px] shrink-0 flex-col border-l bg-card xl:flex">
+            <aside className={shell}>
                 <div className="flex h-11 shrink-0 items-center border-b px-4">
                     <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                         Properties
@@ -521,8 +527,10 @@ export function PropertyPanel() {
         );
     }
 
+    const parent = node.parentId !== "stage" ? nodes[node.parentId] : undefined;
+
     return (
-        <aside className="hidden w-[280px] shrink-0 flex-col border-l bg-card xl:flex">
+        <aside className={shell}>
             <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
                 <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                     Properties
@@ -532,7 +540,31 @@ export function PropertyPanel() {
                 </span>
             </div>
 
-            <div className="flex flex-col gap-5 overflow-y-auto p-4">
+            <nav
+                aria-label="Selection path"
+                className="flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-b px-4 py-1.5 text-[11px] text-muted-foreground"
+            >
+                <span>Stage</span>
+                <span aria-hidden="true">›</span>
+                {parent ? (
+                    <>
+                        <button
+                            className="max-w-24 truncate rounded px-0.5 transition-colors duration-150 hover:text-primary hover:underline"
+                            type="button"
+                            title={`Select parent ${layerLabel(parent)}`}
+                            onClick={() => selectNodes([parent.id])}
+                        >
+                            {layerLabel(parent)}
+                        </button>
+                        <span aria-hidden="true">›</span>
+                    </>
+                ) : null}
+                <span aria-current="page" className="max-w-24 truncate font-medium text-foreground">
+                    {layerLabel(node)}
+                </span>
+            </nav>
+
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
                 {node.type === "text" ? (
                     <Section title="Content">
                         <TextContentField node={node} />

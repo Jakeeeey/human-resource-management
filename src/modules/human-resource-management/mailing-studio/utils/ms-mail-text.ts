@@ -7,8 +7,12 @@
 const LINK_TAG = /<a\s[^>]*href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a\s*>/gi;
 const BR_TAG = /<br\s*\/?>/gi;
 const BLOCK_CLOSE = /<\/(p|h1|h2|ul|ol|li|div|tr|blockquote)\s*>/gi;
-const BLOCK_OPEN_LI = /<(p|h1|h2|ul|ol|li|div|tr|blockquote)[\s>]/gi;
+const BLOCK_OPEN = /<(p|h1|h2|ul|ol|li|div|tr|blockquote)(\s+(?:"[^"]*"|'[^']*'|[^>"'])*)?>/gi;
 const ANY_TAG = /<[^>]*>/g;
+const COMMENT_TAG = /<!--[\s\S]*?-->/g;
+const HEAD_BLOCK = /<head[\s>][\s\S]*?<\/head\s*>/gi;
+const STYLE_BLOCK = /<style[\s>][\s\S]*?<\/style\s*>/gi;
+const SCRIPT_BLOCK = /<script[\s>][\s\S]*?<\/script\s*>/gi;
 
 const ENTITIES: Array<[RegExp, string]> = [
     [/&amp;/g, "&"],
@@ -32,7 +36,12 @@ function decodeEntities(text: string): string {
  */
 export function mailHtmlToText(html: string): string {
     if (typeof html !== "string" || html.length === 0) return "";
-    const withLinks = html.replace(
+    const withoutNoise = html
+        .replace(COMMENT_TAG, "")
+        .replace(HEAD_BLOCK, "")
+        .replace(STYLE_BLOCK, "")
+        .replace(SCRIPT_BLOCK, "");
+    const withLinks = withoutNoise.replace(
         LINK_TAG,
         (_match, _q1: string, dq: string, sq: string, bare: string, label: string) => {
             const url = (dq ?? sq ?? bare ?? "").trim();
@@ -41,7 +50,7 @@ export function mailHtmlToText(html: string): string {
             return text.length > 0 ? text : url;
         }
     );
-    const withBreaks = withLinks.replace(BR_TAG, "\n").replace(BLOCK_CLOSE, "\n").replace(BLOCK_OPEN_LI, "\n");
+    const withBreaks = withLinks.replace(BR_TAG, "\n").replace(BLOCK_CLOSE, "\n").replace(BLOCK_OPEN, "\n");
     const stripped = stripTags(withBreaks);
     const decoded = decodeEntities(stripped);
     return decoded

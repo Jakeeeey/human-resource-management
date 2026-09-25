@@ -123,6 +123,31 @@ function tokensToChipSpans(html: string): string {
     });
 }
 
+const NESTED_CHIP_SPAN_PATTERN = /<span[^>]*\bql-var-chip\b[^>]*>([\s\S]*?)<\/span>([\s\S]*?)<\/span>/g;
+const FLAT_CHIP_SPAN_PATTERN = /<span[^>]*\bql-var-chip\b[^>]*>([^<]*)<\/span>/g;
+
+function chipMatchToToken(match: string): string {
+    const name = /data-var="(\w+)"/.exec(match)?.[1];
+    return name ? `{{${name}}}` : match;
+}
+
+/**
+ * Normalizes editor display HTML back to the stored {{token}} form for
+ * dirty comparison. Quill re-serializes chip spans with a nested
+ * contenteditable label span on load, so the raw state string differs from
+ * the stored row even with zero edits — both sides must pass through here.
+ * @param html - Editor display HTML (chip spans) or stored HTML (tokens).
+ * @returns The HTML with every chip span restored to its {{token}}.
+ */
+export function mailEditorHtmlToStoredTokens(html: string): string {
+    if (typeof html !== "string" || html.indexOf("ql-var-chip") === -1) return html;
+    return html
+        .replace(NESTED_CHIP_SPAN_PATTERN, (match) =>
+            match.indexOf("contenteditable") === -1 ? match : chipMatchToToken(match),
+        )
+        .replace(FLAT_CHIP_SPAN_PATTERN, chipMatchToToken);
+}
+
 interface MailTemplateEditorProps {
     value: string;
     onChange: (value: string) => void;

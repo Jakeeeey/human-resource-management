@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { toOutboxRow } from "@/modules/human-resource-management/recruitment/mailing/utils/mailMask";
+import { toMaskedOutboxRow } from "@/modules/human-resource-management/recruitment/mailing/utils/mailMask";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,9 +10,10 @@ export const dynamic = "force-dynamic";
 // GET /api/hrm/mailing/outbox/[id]
 //
 // Status-only single-row viewer (D17 — no resend endpoint exists on this
-// path). LOGIN-GATED like the list route (user order 2026-09-08 —
-// `to_email` unmasked): 401 AUTH_DENIED without a valid session.
-// Unknown id answers 404 (never 500, never an empty row).
+// path). LOGIN-GATED like the list route: 401 AUTH_DENIED without a valid
+// session. Masked at the edge via utils/mailMask (toMaskedOutboxRow) —
+// full addresses never leave the server, including `warnings`/`error`
+// echoes. Unknown id answers 404 (never 500, never an empty row).
 
 const OUTBOX_FIELDS_RENDERED =
     "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at,rendered_subject,rendered_body_html";
@@ -77,7 +78,7 @@ export async function GET(
 
         return NextResponse.json({
             success: true,
-            data: toOutboxRow(row),
+            data: toMaskedOutboxRow(row),
         });
     } catch (error) {
         console.error("[mailing-outbox] get-by-id error:", error);

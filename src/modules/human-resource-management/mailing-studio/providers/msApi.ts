@@ -19,6 +19,8 @@ interface MsEnvelope<T> {
  * @param res - Fetch Response from a mailing-studio route.
  * @returns The envelope data (may be undefined for empty successes).
  * @throws Error carrying the route message on non-2xx, !success, or bad JSON.
+ * Field-level `errors` ride along in the message (first field first) so form
+ * slots can name the offending field instead of showing a bare reason.
  */
 async function unwrap<T>(res: Response): Promise<T | undefined> {
     let envelope: MsEnvelope<T> | null = null;
@@ -28,9 +30,26 @@ async function unwrap<T>(res: Response): Promise<T | undefined> {
         envelope = null;
     }
     if (!res.ok || !envelope || envelope.success !== true) {
-        throw new Error(envelope?.message ?? `Mailing Studio request failed (HTTP ${res.status})`);
+        const fallback = `Mailing Studio request failed (HTTP ${res.status})`;
+        const message = envelope?.message ?? fallback;
+        const details = fieldErrorDetails(envelope?.errors);
+        throw new Error(details ? `${message} — ${details}` : message);
     }
     return envelope.data;
+}
+
+/**
+ * Flattens a route field-errors map to a short human sentence.
+ * @param errors - The envelope `errors` map (field → messages).
+ * @returns "field: reason; field: reason", or null when there is nothing to say.
+ */
+function fieldErrorDetails(errors: Record<string, string[]> | undefined): string | null {
+    if (!errors) return null;
+    const parts: string[] = [];
+    for (const [field, messages] of Object.entries(errors)) {
+        if (messages.length > 0) parts.push(`${field}: ${messages.join(", ")}`);
+    }
+    return parts.length > 0 ? parts.join("; ") : null;
 }
 
 /**

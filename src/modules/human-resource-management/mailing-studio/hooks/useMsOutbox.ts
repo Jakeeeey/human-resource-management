@@ -1,39 +1,58 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { fetchMsOutbox } from "../providers/msOutbox";
-import type { MsMaskedOutboxRow } from "../utils/ms-mask";
+import {
+    fetchMsOutbox,
+    MS_OUTBOX_PAGE_SIZE,
+    type MsOutboxPage,
+    type MsOutboxQuery,
+} from "../providers/msOutbox";
 
 export interface UseMsOutboxResult {
-    data: MsMaskedOutboxRow[] | null;
+    data: MsOutboxPage | null;
     isLoading: boolean;
     error: string | null;
     refetch: () => Promise<void>;
 }
 
 /**
- * Lists masked outbox rows via the real outbox route (read-only viewer —
- * there is no resend endpoint, so this hook exposes no mutation).
- * @param status - Optional status filter (queued|sent|failed|skipped|dry_run).
+ * Lists one server-paged slice of masked outbox rows via the real outbox
+ * route (read-only viewer — there is no resend endpoint, so this hook
+ * exposes no mutation). The query identity drives the refetch; callers
+ * reset to page 1 whenever a filter, sort, or search input changes (QA §11).
+ * @param query - Status/event/search/sort/page/limit for the route.
  * @returns { data, isLoading, error, refetch } — rows carry masked recipients.
  */
-export function useMsOutbox(status?: string): UseMsOutboxResult {
-    const [data, setData] = useState<MsMaskedOutboxRow[] | null>(null);
+export function useMsOutbox(query: MsOutboxQuery = {}): UseMsOutboxResult {
+    const [data, setData] = useState<MsOutboxPage | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const requestSeq = useRef(0);
+
+    const status = query.status;
+    const eventKey = query.eventKey;
+    const search = query.search;
+    const sort = query.sort;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? MS_OUTBOX_PAGE_SIZE;
 
     const refetch = useCallback(async (): Promise<void> => {
+        const seq = requestSeq.current + 1;
+        requestSeq.current = seq;
         setIsLoading(true);
         setError(null);
         try {
-            setData(await fetchMsOutbox(status));
+            const result = await fetchMsOutbox({ status, eventKey, search, sort, page, limit });
+            if (requestSeq.current !== seq) return;
+            setData(result);
         } catch (cause) {
+            if (requestSeq.current !== seq) return;
             setError(cause instanceof Error ? cause.message : String(cause));
         } finally {
-            setIsLoading(false);
+            if (requestSeq.current === seq) setIsLoading(false);
         }
-    }, [status]);
+    }, [status, eventKey, search, sort, page, limit]);
 
     useEffect(() => {
         void refetch();

@@ -22,6 +22,7 @@ import {
     type SendNowApplicant,
 } from "../providers/mailSendNowService";
 import { MailCombobox } from "./MailCombobox";
+import { sendFailureCopy } from "./MailManualSend";
 
 interface MailSendNowDialogProps {
     // Invite binding the dialog was opened from (null = closed). The event
@@ -112,7 +113,7 @@ export function MailSendNowDialog({ binding, onClose }: MailSendNowDialogProps) 
                 toast.success("Invite sent (logged to outbox).");
                 onClose();
             } else {
-                toast.error(`Not sent (${result.data?.reason ?? "unknown"}).`);
+                toast.error(sendFailureCopy("failed", result.data?.reason));
             }
         } finally {
             setSending(false);

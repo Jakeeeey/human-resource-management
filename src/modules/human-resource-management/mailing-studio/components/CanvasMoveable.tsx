@@ -45,9 +45,11 @@ function applyRowSnap(
     primaryId: string,
     dx: number,
     dy: number,
+    snapEnabled: boolean,
 ): RowSnapResult {
     const primary = nodes[primaryId];
     if (!primary) return { dx, dy, overlay: null };
+    if (!snapEnabled) return { dx, dy, overlay: null };
     const dragged = new Set(draggedIds);
     const siblings = Object.values(nodes).filter(
         (node) => node.parentId === primary.parentId && !dragged.has(node.id),
@@ -119,6 +121,7 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
     const endGesture = useCanvasDoc((state) => state.endGesture);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
     const selection = useCanvasDoc((state) => state.selection);
+    const zoom = useCanvasDoc((state) => state.viewport.zoom);
     const selectoRef = useRef<Selecto>(null);
     const moveableRef = useRef<Moveable>(null);
     const [snap, setSnap] = useState<RowSnapOverlay | null>(null);
@@ -237,6 +240,7 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                             primaryId,
                             rawDx,
                             rawDy,
+                            store.snapEnabled,
                         );
                         if (snapped.dx === 0 && snapped.dy === 0) return;
                         store.moveNodesBy(store.selection, snapped.dx, snapped.dy);
@@ -250,6 +254,7 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                     ref={moveableRef}
                     snappable={false}
                     targets={groupTargets}
+                    zoom={zoom}
                 />
             ) : targetId ? (
                 <Moveable
@@ -266,7 +271,14 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                             : [targetId];
                         const rawDx = Math.round(event.left) - primary.x;
                         const rawDy = Math.round(event.top) - primary.y;
-                        const snapped = applyRowSnap(store.nodes, ids, targetId, rawDx, rawDy);
+                        const snapped = applyRowSnap(
+                            store.nodes,
+                            ids,
+                            targetId,
+                            rawDx,
+                            rawDy,
+                            store.snapEnabled,
+                        );
                         store.moveNodesBy(ids, snapped.dx, snapped.dy);
                         setSnap(snapped.overlay);
                     }}
@@ -323,6 +335,7 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                     rotatable
                     snappable={false}
                     target={`[data-id="${targetId}"]`}
+                    zoom={zoom}
                 />
             ) : null}
             <SnapGuidesOverlay

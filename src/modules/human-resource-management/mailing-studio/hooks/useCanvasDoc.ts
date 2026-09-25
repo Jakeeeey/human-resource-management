@@ -25,6 +25,8 @@ export interface CanvasDocState {
     selection: string[];
     hover: string | null;
     viewport: CanvasViewport;
+    /** Canvas snap-to-sibling guides (P1-13). UI pref — never enters history. */
+    snapEnabled: boolean;
     version: number;
     gestureActive: boolean;
     gesturePre: CanvasHistory | null;
@@ -40,9 +42,11 @@ export interface CanvasDocState {
     selectNodes: (ids: string[]) => void;
     setHover: (id: string | null) => void;
     setViewport: (patch: Partial<CanvasViewport>) => void;
+    setSnapEnabled: (enabled: boolean) => void;
     beginGesture: () => void;
     endGesture: () => void;
     hydrate: (doc: CanvasHistory) => void;
+    loadDoc: (doc: CanvasHistory) => void;
     undo: () => void;
     redo: () => void;
 }
@@ -50,14 +54,33 @@ export interface CanvasDocState {
 const HISTORY_LIMIT = 100;
 const STAGE_PARENT = "stage";
 
+export const ZOOM_MIN = 0.5;
+export const ZOOM_MAX = 2;
+export const ZOOM_STEP = 0.25;
+
+export function clampZoom(value: number): number {
+    if (!Number.isFinite(value)) return 1;
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+}
+
 type HistoryStore = StoreApi<TemporalState<CanvasHistory>>;
 
 function partializeHistory(state: CanvasDocState): CanvasHistory {
     return { nodes: state.nodes, rootIds: state.rootIds };
 }
 
-function jsonEquality(past: CanvasHistory, current: CanvasHistory): boolean {
-    return JSON.stringify(past) === JSON.stringify(current);
+function historyEquality(past: CanvasHistory, current: CanvasHistory): boolean {
+    if (past.nodes === current.nodes && past.rootIds === current.rootIds) return true;
+    if (past.rootIds.length !== current.rootIds.length) return false;
+    for (let index = 0; index < current.rootIds.length; index += 1) {
+        if (past.rootIds[index] !== current.rootIds[index]) return false;
+    }
+    const currentKeys = Object.keys(current.nodes);
+    if (currentKeys.length !== Object.keys(past.nodes).length) return false;
+    for (const key of currentKeys) {
+        if (past.nodes[key] !== current.nodes[key]) return false;
+    }
+    return true;
 }
 
 export function createCanvasDocStore() {
@@ -77,6 +100,7 @@ export function createCanvasDocStore() {
                     selection: [],
                     hover: null,
                     viewport: { zoom: 1, panX: 0, panY: 0 },
+                    snapEnabled: true,
                     version: 0,
                     gestureActive: false,
                     gesturePre: null,
@@ -226,6 +250,10 @@ export function createCanvasDocStore() {
                         set((state) => ({ viewport: { ...state.viewport, ...patch } }));
                     },
 
+                    setSnapEnabled: (enabled) => {
+                        set({ snapEnabled: enabled });
+                    },
+
                     beginGesture: () => {
                         const state = get();
                         if (state.gestureActive) return;
@@ -268,6 +296,17 @@ export function createCanvasDocStore() {
                         history.getState().clear();
                     },
 
+                    loadDoc: (doc) => {
+                        set({
+                            nodes: { ...doc.nodes },
+                            rootIds: [...doc.rootIds],
+                            selection: [],
+                            gestureActive: false,
+                            gesturePre: null,
+                        });
+                        history.getState().clear();
+                    },
+
                     undo: () => {
                         const temporalState = history.getState();
                         if (temporalState.pastStates.length === 0) return;
@@ -286,7 +325,7 @@ export function createCanvasDocStore() {
             {
                 partialize: partializeHistory,
                 limit: HISTORY_LIMIT,
-                equality: jsonEquality,
+                equality: historyEquality,
             },
         ),
     );

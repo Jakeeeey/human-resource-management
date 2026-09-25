@@ -35,6 +35,18 @@ export function MailingTablePagination({
   const onFirstPage = page <= 1;
   const onLastPage = page >= totalPages;
 
+  if (totalPages <= 1) {
+    return (
+      <div className="flex flex-col gap-3 border-t border-border/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
+          {filteredCount === 0
+            ? "Showing 0 of 0"
+            : `Showing ${rangeStart}-${rangeEnd} of ${filteredCount}`}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3 border-t border-border/50 p-3 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
@@ -75,7 +87,7 @@ export function MailingTablePagination({
           >
             Previous
           </Button>
-          <span className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
+          <span className="text-sm text-muted-foreground tabular-nums whitespace-nowrap" aria-live="polite">
             {page} of {totalPages}
           </span>
           <Button

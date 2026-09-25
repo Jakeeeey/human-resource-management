@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
@@ -12,9 +12,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 
 import { mailVarAllowlist } from "../types/mail-template.schema";
+import { mailHtmlToText } from "../utils/mailText";
+import { scrubClientHtml } from "../utils/mailScrub";
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import { useMailTemplateForm } from "../hooks/useMailTemplateForm";
-import { MailTemplateEditor, toFriendlyMailVarName } from "./MailTemplateEditor";
+import {
+    MailConfirmDialog,
+    MailConfirmDialogAction,
+    MailConfirmDialogCancel,
+    MailConfirmDialogContent,
+    MailConfirmDialogDescription,
+    MailConfirmDialogFooter,
+    MailConfirmDialogHeader,
+    MailConfirmDialogTitle,
+} from "./MailConfirmDialog";
+import { MailTemplateEditor, mailEditorHtmlToStoredTokens, toFriendlyMailVarName } from "./MailTemplateEditor";
 import type { MailTemplateEditorHandle } from "./MailTemplateEditor";
 import { MailOutcomeBadge } from "./MailOutcomeBadge";
 
@@ -41,6 +53,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
             : (templates.find((row) => String(row.id) === String(templateId ?? "")) ?? null);
 
     const editorRef = useRef<MailTemplateEditorHandle | null>(null);
+    const [backConfirmOpen, setBackConfirmOpen] = useState(false);
 
     const form = useMailTemplateForm({
         template,
@@ -54,7 +67,34 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
         },
     });
 
+    const normalizedTemplateBody = (html: string): string => {
+        const tokens = mailEditorHtmlToStoredTokens(html);
+        try {
+            return scrubClientHtml(tokens);
+        } catch {
+            return tokens;
+        }
+    };
+
     const goBack = () => router.push("/hrm/mailing");
+
+    const requestBack = () => {
+        const cleanBody = editorRef.current?.getCleanHtml() ?? form.bodyHtml;
+        const dirty = isCreate
+            ? form.templateKey.trim() !== "" ||
+              form.templateName.trim() !== "" ||
+              form.subject.trim() !== "" ||
+              mailHtmlToText(normalizedTemplateBody(cleanBody)).trim() !== "" ||
+              !form.isActive
+            : form.templateKey !== (template?.template_key ?? "") ||
+              form.templateName !== (template?.template_name ?? "") ||
+              form.subject !== (template?.subject ?? "") ||
+              normalizedTemplateBody(cleanBody) !==
+                  normalizedTemplateBody(template?.body_html ?? "") ||
+              form.isActive !== (template?.is_active ?? true);
+        if (dirty) setBackConfirmOpen(true);
+        else goBack();
+    };
 
     const handleSaveAndBack = async () => {
         const saved = await form.handleSave();
@@ -74,7 +114,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
     if (!isCreate && !template) {
         return (
             <div className="mx-auto grid w-full max-w-[1200px] gap-4 p-2 sm:p-6 md:p-10">
-                <Button variant="ghost" className="w-full sm:w-auto justify-start" onClick={goBack}>
+                <Button variant="ghost" className="w-full sm:w-auto justify-start" onClick={requestBack}>
                     <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                     Back to templates
                 </Button>
@@ -101,7 +141,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={goBack}
+                            onClick={requestBack}
                             disabled={form.busy}
                             aria-label="Back to templates"
                             className="shrink-0"
@@ -140,7 +180,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 size="sm"
                                 disabled={form.busy}
                                 onClick={() => void form.handleDryRunTestSend()}
-                                className="w-full sm:w-auto"
+                                className="min-h-11 w-full sm:w-auto md:min-h-0"
                             >
                                 {form.testing ? "Saving…" : "Save + dry-run test-send"}
                             </Button>
@@ -149,7 +189,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                 size="sm"
                                 disabled={form.busy}
                                 onClick={() => void handleSaveAndBack()}
-                                className="w-full sm:w-auto"
+                                className="min-h-11 w-full sm:w-auto md:min-h-0"
                             >
                                 {saving ? "Saving…" : "Save template"}
                             </Button>
@@ -170,38 +210,56 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                         <CardContent className="grid gap-4 p-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid min-w-0 gap-2">
-                                    <Label htmlFor="mail-template-page-key" className="text-xs font-medium text-muted-foreground">Template key</Label>
+                                    <Label htmlFor="mail-template-page-key" className="text-xs font-medium text-muted-foreground">Template key <span className="text-destructive" aria-hidden="true">*</span></Label>
                                     <Input
                                         id="mail-template-page-key"
                                         value={form.templateKey}
                                         onChange={(e) => form.setTemplateKey(e.target.value)}
                                         placeholder="e.g. initial graded pass"
                                         disabled={form.busy}
+                                        aria-invalid={form.fieldErrors.templateKey !== null}
                                         className="h-8 text-xs"
                                     />
+                                    {form.fieldErrors.templateKey && (
+                                        <p className="text-xs text-destructive" role="alert">
+                                            {form.fieldErrors.templateKey}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="grid min-w-0 gap-2">
-                                    <Label htmlFor="mail-template-page-name" className="text-xs font-medium text-muted-foreground">Template name</Label>
+                                    <Label htmlFor="mail-template-page-name" className="text-xs font-medium text-muted-foreground">Template name <span className="text-destructive" aria-hidden="true">*</span></Label>
                                     <Input
                                         id="mail-template-page-name"
                                         value={form.templateName}
                                         onChange={(e) => form.setTemplateName(e.target.value)}
                                         placeholder="e.g. Initial interview — passed"
                                         disabled={form.busy}
+                                        aria-invalid={form.fieldErrors.templateName !== null}
                                         className="h-8 text-xs"
                                     />
+                                    {form.fieldErrors.templateName && (
+                                        <p className="text-xs text-destructive" role="alert">
+                                            {form.fieldErrors.templateName}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="grid min-w-0 gap-2">
-                                <Label htmlFor="mail-template-page-subject" className="text-xs font-medium text-muted-foreground">Subject</Label>
+                                <Label htmlFor="mail-template-page-subject" className="text-xs font-medium text-muted-foreground">Subject <span className="text-destructive" aria-hidden="true">*</span></Label>
                                 <Input
                                     id="mail-template-page-subject"
                                     value={form.subject}
                                     onChange={(e) => form.setSubject(e.target.value)}
                                     placeholder="e.g. Your interview result"
                                     disabled={form.busy}
+                                    aria-invalid={form.fieldErrors.subject !== null}
                                     className="h-8 text-xs"
                                 />
+                                {form.fieldErrors.subject && (
+                                    <p className="text-xs text-destructive" role="alert">
+                                        {form.fieldErrors.subject}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -221,6 +279,11 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                                     value={form.bodyHtml}
                                     onChange={form.setBodyHtml}
                                 />
+                                {form.fieldErrors.body && (
+                                    <p className="text-xs text-destructive" role="alert">
+                                        {form.fieldErrors.body}
+                                    </p>
+                                )}
                             </div>
                             <div className="grid min-w-0 gap-2">
                                 <Label className="text-xs font-medium text-muted-foreground">Fields</Label>
@@ -274,6 +337,22 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
                     </Card>
                 </div>
             </div>
+            <MailConfirmDialog open={backConfirmOpen} onOpenChange={setBackConfirmOpen}>
+                <MailConfirmDialogContent>
+                    <MailConfirmDialogHeader>
+                        <MailConfirmDialogTitle>Discard unsaved changes?</MailConfirmDialogTitle>
+                        <MailConfirmDialogDescription>
+                            Your edits to this template will be lost. Saved templates are unaffected.
+                        </MailConfirmDialogDescription>
+                    </MailConfirmDialogHeader>
+                    <MailConfirmDialogFooter>
+                        <MailConfirmDialogCancel>Keep editing</MailConfirmDialogCancel>
+                        <MailConfirmDialogAction onClick={goBack}>
+                            Discard
+                        </MailConfirmDialogAction>
+                    </MailConfirmDialogFooter>
+                </MailConfirmDialogContent>
+            </MailConfirmDialog>
         </div>
     );
 }

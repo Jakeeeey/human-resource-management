@@ -14,6 +14,16 @@ import { useMailBindings } from "../hooks/useMailBindings";
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import type { MailBindingRow } from "../providers/mailBindingService";
 import { MailCombobox } from "./MailCombobox";
+import {
+    MailConfirmDialog,
+    MailConfirmDialogAction,
+    MailConfirmDialogCancel,
+    MailConfirmDialogContent,
+    MailConfirmDialogDescription,
+    MailConfirmDialogFooter,
+    MailConfirmDialogHeader,
+    MailConfirmDialogTitle,
+} from "./MailConfirmDialog";
 import { MailingTablePagination } from "./MailingTablePagination";
 
 const MANUAL_ONLY_EVENT_KEYS: readonly MailEventKey[] = ["final_interview.invited"];
@@ -53,6 +63,7 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
     const [isEnabled, setIsEnabled] = useState(true);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
+    const [pendingUnhook, setPendingUnhook] = useState<MailBindingRow | null>(null);
 
     const templateOptions = useMemo(
         () =>
@@ -96,13 +107,15 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
         else toast.success(next ? "Binding enabled." : "Binding disabled.");
     };
 
-    const handleUnhook = async (row: MailBindingRow) => {
-        const result = await unhookBinding(row.id);
+    const confirmUnhook = async () => {
+        if (!pendingUnhook) return;
+        const result = await unhookBinding(pendingUnhook.id);
         if (!result.ok) toast.error(result.message);
         else toast.success("Binding unhooked.");
+        setPendingUnhook(null);
     };
 
-    if (loading) {
+    if (loading && bindings.length === 0) {
         return (
             <div className="grid gap-2">
                 <Skeleton className="h-9 w-full" />
@@ -135,32 +148,38 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                 <h2 className="text-sm font-semibold">New binding</h2>
                 <div className="grid gap-3 sm:grid-cols-2">
                     <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground">Event key</Label>
+                        <Label htmlFor="mail-binding-event" className="text-xs font-medium text-muted-foreground">Event key</Label>
                         <MailCombobox
                             options={EVENT_KEY_OPTIONS}
                             value={eventKey}
                             onValueChange={(v) => setEventKey(v as MailEventKey)}
                             placeholder="Select event…"
+                            searchPlaceholder="Search events…"
+                            triggerId="mail-binding-event"
                             disabled={mutating}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground">Template</Label>
+                        <Label htmlFor="mail-binding-template" className="text-xs font-medium text-muted-foreground">Template</Label>
                         <MailCombobox
                             options={templateOptions}
                             value={templateId}
                             onValueChange={setTemplateId}
                             placeholder="Select template…"
+                            searchPlaceholder="Search templates…"
+                            triggerId="mail-binding-template"
                             disabled={mutating}
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground">Send condition</Label>
+                        <Label htmlFor="mail-binding-condition" className="text-xs font-medium text-muted-foreground">Send condition</Label>
                         <MailCombobox
                             options={CONDITION_OPTIONS}
                             value={sendCondition}
                             onValueChange={(v) => setSendCondition(v as MailSendCondition)}
                             placeholder="Select condition…"
+                            searchPlaceholder="Search conditions…"
+                            triggerId="mail-binding-condition"
                             disabled={mutating}
                         />
                     </div>
@@ -172,7 +191,7 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                     </div>
                 </div>
                 <div>
-                    <Button size="sm" className="w-full sm:w-auto" disabled={mutating} onClick={() => void handleCreate()}>
+                    <Button size="sm" className="min-h-11 w-full sm:w-auto md:min-h-0" disabled={mutating} onClick={() => void handleCreate()}>
                         Add binding
                     </Button>
                 </div>
@@ -204,7 +223,7 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                                     {row.event_key}
                                 </span>
                                 <span className="truncate text-xs text-muted-foreground tabular-nums" title={`${templateLabel(row.template_id)} · ${row.send_condition}`}>
-                                    template {templateLabel(row.template_id)} · {row.send_condition}
+                                    {templateLabel(row.template_id)} · {row.send_condition}
                                 </span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -212,7 +231,7 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                                     checked={row.is_enabled}
                                     onCheckedChange={(next) => void handleToggle(row, next)}
                                     disabled={mutating}
-                                    aria-label={`Enabled for ${row.event_key}`}
+                                    aria-label={`${row.is_enabled ? "Disable" : "Enable"} ${row.event_key} → ${templateLabel(row.template_id)}`}
                                 />
                                 <span className="text-xs text-muted-foreground">
                                     {row.is_enabled ? "Enabled" : "Disabled"}
@@ -228,7 +247,8 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                                 size="sm"
                                 className="w-full text-destructive sm:w-auto"
                                 disabled={mutating}
-                                onClick={() => void handleUnhook(row)}
+                                aria-label={`Unhook ${row.event_key} → ${templateLabel(row.template_id)}`}
+                                onClick={() => setPendingUnhook(row)}
                             >
                                 Unhook
                             </Button>
@@ -251,6 +271,27 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                     }}
                 />
             </div>
+            <MailConfirmDialog open={pendingUnhook !== null} onOpenChange={(next) => { if (!next) setPendingUnhook(null); }}>
+                <MailConfirmDialogContent>
+                    <MailConfirmDialogHeader>
+                        <MailConfirmDialogTitle>
+                            {pendingUnhook
+                                ? `Unhook "${pendingUnhook.event_key} → ${templateLabel(pendingUnhook.template_id)}"?`
+                                : "Unhook this binding?"}
+                        </MailConfirmDialogTitle>
+                        <MailConfirmDialogDescription>
+                            This permanently removes the binding. Automatic sends for this event will stop.
+                            This cannot be undone.
+                        </MailConfirmDialogDescription>
+                    </MailConfirmDialogHeader>
+                    <MailConfirmDialogFooter>
+                        <MailConfirmDialogCancel>Keep binding</MailConfirmDialogCancel>
+                        <MailConfirmDialogAction onClick={() => void confirmUnhook()}>
+                            Unhook binding
+                        </MailConfirmDialogAction>
+                    </MailConfirmDialogFooter>
+                </MailConfirmDialogContent>
+            </MailConfirmDialog>
         </section>
     );
 }

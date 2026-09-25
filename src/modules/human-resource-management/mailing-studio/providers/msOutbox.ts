@@ -8,16 +8,56 @@
 import type { MsMaskedOutboxRow } from "../utils/ms-mask";
 import { msGet } from "./msApi";
 
+/** Studio outbox list page size (QA §11 default). */
+export const MS_OUTBOX_PAGE_SIZE = 10;
+
+/** List query — every field optional; the route applies its own defaults. */
+export interface MsOutboxQuery {
+    status?: string;
+    eventKey?: string;
+    search?: string;
+    sort?: string;
+    page?: number;
+    limit?: number;
+}
+
+/** One server-paged list answer (rows carry masked recipients). */
+export interface MsOutboxPage {
+    rows: MsMaskedOutboxRow[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
 /**
  * Lists masked ms_outbox rows, newest first, via the real outbox route.
- * @param status - Optional status filter (queued|sent|failed|skipped|dry_run).
- * Unknown values are rejected by the route with a 400 (surfaced as Error).
- * @returns Masked rows (to_email is the j***@domain display form).
+ * The route pages server-side (default 10, QA §11), filters by status and
+ * event key, searches recipient/event/key substrings, and sorts by an
+ * allowlisted column — the list payload never ships `rendered_body_html`
+ * (fetched per-row via fetchMsOutboxRow on select).
+ * @param query - Optional status/eventKey/search/sort/page/limit.
+ * Unknown status values are rejected by the route with a 400 (surfaced as
+ * Error).
+ * @returns Masked page ({ rows, total, page, limit }).
  */
-export async function fetchMsOutbox(status?: string): Promise<MsMaskedOutboxRow[]> {
-    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-    const data = await msGet<MsMaskedOutboxRow[]>(`/outbox${qs}`);
-    return data ?? [];
+export async function fetchMsOutbox(query?: MsOutboxQuery): Promise<MsOutboxPage> {
+    const params = new URLSearchParams();
+    if (query?.status) params.set("status", query.status);
+    if (query?.eventKey) params.set("event_key", query.eventKey);
+    if (query?.search) params.set("search", query.search);
+    if (query?.sort) params.set("sort", query.sort);
+    if (query?.page !== undefined) params.set("page", String(query.page));
+    if (query?.limit !== undefined) params.set("limit", String(query.limit));
+    const qs = params.size > 0 ? `?${params.toString()}` : "";
+    const data = await msGet<MsOutboxPage>(`/outbox${qs}`);
+    return (
+        data ?? {
+            rows: [],
+            total: 0,
+            page: query?.page ?? 1,
+            limit: query?.limit ?? MS_OUTBOX_PAGE_SIZE,
+        }
+    );
 }
 
 /**

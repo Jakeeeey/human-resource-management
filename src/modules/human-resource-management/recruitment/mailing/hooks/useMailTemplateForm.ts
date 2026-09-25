@@ -28,6 +28,37 @@ interface UseMailTemplateFormOptions {
     ) => Promise<{ ok: boolean; message?: string }>;
 }
 
+// Human copy for dry-run probe failure reasons (machine codes stay in
+// the outbox row only — never in toast copy).
+const DRY_RUN_REASON_COPY: Record<string, string> = {
+    "send-failed": "Couldn't reach the mail provider — nothing was sent.",
+    "template-missing": "The template could not be found — nothing was sent.",
+    "render-failed": "The template could not be rendered — nothing was sent.",
+};
+
+function dryRunFailureCopy(reason: string | undefined): string {
+    if (reason) {
+        const trimmed = reason.trim();
+        const hit = DRY_RUN_REASON_COPY[trimmed] ?? DRY_RUN_REASON_COPY[trimmed.toLowerCase()];
+        if (hit) return hit;
+    }
+    return "Dry-run probe failed. Please try again later.";
+}
+
+export interface MailTemplateFieldErrors {
+    templateKey: string | null;
+    templateName: string | null;
+    subject: string | null;
+    body: string | null;
+}
+
+const EMPTY_FIELD_ERRORS: MailTemplateFieldErrors = {
+    templateKey: null,
+    templateName: null,
+    subject: null,
+    body: null,
+};
+
 // Preview sample vars (Appendix Renderer row): allowlisted blanks render
 // `________________` cosmetically at the UI layer only — never in storage.
 const SAMPLE_VARS = Object.fromEntries(mailVarAllowlist.map((name) => [name, "________________"]));
@@ -47,6 +78,7 @@ export function useMailTemplateForm({ template, saving, editorRef, onSave }: Use
     const [isActive, setIsActive] = useState(true);
     const [testing, setTesting] = useState(false);
     const [dryRunReady, setDryRunReady] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<MailTemplateFieldErrors>(EMPTY_FIELD_ERRORS);
 
     useEffect(() => {
         setTemplateKey(template?.template_key ?? "");
@@ -79,38 +111,50 @@ export function useMailTemplateForm({ template, saving, editorRef, onSave }: Use
     }, [subject, bodyHtml, editorRef]);
 
     const buildPayload = () => {
+        const nextErrors: MailTemplateFieldErrors = { ...EMPTY_FIELD_ERRORS };
         if (!templateKey.trim()) {
-            toast.error("Template key is required.");
-            return null;
+            nextErrors.templateKey = "Template key is required.";
         }
         if (!templateName.trim()) {
-            toast.error("Template name is required.");
-            return null;
+            nextErrors.templateName = "Template name is required.";
         }
         if (!subject.trim()) {
-            toast.error("Subject is required.");
-            return null;
+            nextErrors.subject = "Subject is required.";
         }
-        let scrubbed: string;
+        let scrubbed = "";
+        let bodyError: string | null = null;
         try {
             // Chip pills are editor-only chrome: serialize them back to
             // {{tokens}} first so storage/scrub/dispatch see plain variables.
             const editorHtml = editorRef.current?.getCleanHtml() ?? bodyHtml;
             scrubbed = scrubClientHtml(editorHtml);
         } catch {
-            toast.error("Editor content is unavailable. Please try again.");
+            bodyError = "Editor content is unavailable. Please try again.";
+        }
+        if (!bodyError) {
+            if (!scrubbed.trim()) {
+                bodyError = "Body is required.";
+            } else if (!mailHtmlToText(scrubbed).trim()) {
+                bodyError = "Body has no readable text.";
+            }
+        }
+        nextErrors.body = bodyError;
+        const failed =
+            nextErrors.templateKey !== null ||
+            nextErrors.templateName !== null ||
+            nextErrors.subject !== null ||
+            nextErrors.body !== null;
+        if (failed) {
+            setFieldErrors(nextErrors);
+            if (nextErrors.templateKey) toast.error(nextErrors.templateKey);
+            else if (nextErrors.templateName) toast.error(nextErrors.templateName);
+            else if (nextErrors.subject) toast.error(nextErrors.subject);
+            else if (nextErrors.body) toast.error(nextErrors.body);
             return null;
         }
-        if (!scrubbed.trim()) {
-            toast.error("Body is required.");
-            return null;
-        }
+        setFieldErrors({ ...EMPTY_FIELD_ERRORS });
         // Save path: editor HTML → client scrub → auto-generate body_text.
         const body_text = mailHtmlToText(scrubbed);
-        if (!body_text.trim()) {
-            toast.error("Body has no readable text.");
-            return null;
-        }
         return {
             template_key: templateKey.trim(),
             template_name: templateName.trim(),
@@ -156,7 +200,7 @@ export function useMailTemplateForm({ template, saving, editorRef, onSave }: Use
                 } | null;
                 recorded = res.ok && body?.success === true && body?.data?.ok === true;
                 if (!recorded && body?.data?.reason) {
-                    toast.error(`Dry-run probe failed: ${body.data.reason}.`);
+                    toast.error(dryRunFailureCopy(body.data.reason));
                     return;
                 }
             } catch {
@@ -187,20 +231,37 @@ export function useMailTemplateForm({ template, saving, editorRef, onSave }: Use
 
     const busy = saving || testing;
 
+    const clearFieldError = (key: keyof MailTemplateFieldErrors) => {
+        setFieldErrors((prev) => (prev[key] === null ? prev : { ...prev, [key]: null }));
+    };
+
     return {
         templateKey,
-        setTemplateKey,
+        setTemplateKey: (value: string) => {
+            clearFieldError("templateKey");
+            setTemplateKey(value);
+        },
         templateName,
-        setTemplateName,
+        setTemplateName: (value: string) => {
+            clearFieldError("templateName");
+            setTemplateName(value);
+        },
         subject,
-        setSubject,
+        setSubject: (value: string) => {
+            clearFieldError("subject");
+            setSubject(value);
+        },
         bodyHtml,
-        setBodyHtml,
+        setBodyHtml: (value: string) => {
+            clearFieldError("body");
+            setBodyHtml(value);
+        },
         isActive,
         setIsActive,
         testing,
         dryRunReady,
         preview,
+        fieldErrors,
         buildPayload,
         handleSave,
         handleDryRunTestSend,

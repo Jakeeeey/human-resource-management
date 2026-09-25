@@ -19,12 +19,17 @@ export interface UseDesignAutosaveOptions {
     subject: string;
 }
 
+export interface DesignSaveResult {
+    ok: boolean;
+    message: string | null;
+}
+
 export interface UseDesignAutosaveResult {
     status: DesignAutosaveStatus;
     error: string | null;
     message: string | null;
     dirty: boolean;
-    save: () => Promise<boolean>;
+    save: () => Promise<DesignSaveResult>;
 }
 
 /**
@@ -57,7 +62,7 @@ export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignA
     const [savedMeta, setSavedMeta] = useState(options);
     const savedVersionRef = useRef<number | null>(null);
 
-    const save = useCallback(async (): Promise<boolean> => {
+    const save = useCallback(async (): Promise<DesignSaveResult> => {
         const versionAtSave = useCanvasDoc.getState().version;
         setStatus("saving");
         setError(null);
@@ -76,11 +81,11 @@ export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignA
             // Edits landing mid-flight stay dirty instead of being swallowed.
             setDirty(useCanvasDoc.getState().version !== versionAtSave);
             setStatus("saved");
-            return true;
+            return { ok: true, message: envelopeMessage };
         } catch (cause) {
             setStatus("error");
             setError(cause instanceof Error ? cause.message : String(cause));
-            return false;
+            return { ok: false, message: null };
         }
     }, [options]);
 

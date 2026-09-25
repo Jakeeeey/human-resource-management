@@ -58,6 +58,10 @@ export interface MsMaskedOutboxRow {
     warnings: string[];
     error: string | null;
     sent_at: unknown;
+    /** Relay attempt count (§7.6) — null when the column carries no grant. */
+    attempts: number | null;
+    /** Next scheduled attempt (PH wall-clock) — null when none is scheduled. */
+    next_attempt_at: string | null;
     /** Rendered snapshot subject — sender's own content, no addresses. */
     rendered_subject: string | null;
     /** Rendered snapshot body HTML — sender's own content, no addresses. */
@@ -97,6 +101,8 @@ export function msToMaskedOutboxRow(
     const rawError = row.error;
     const rawSubject = row.rendered_subject;
     const rawBody = row.rendered_body_html;
+    const rawAttempts = row.attempts;
+    const rawNextAttempt = row.next_attempt_at;
     return {
         id: row.id ?? null,
         idempotency_key: row.idempotency_key ?? null,
@@ -110,6 +116,14 @@ export function msToMaskedOutboxRow(
                 ? null
                 : msMaskEmailsInFreeText(String(rawError)),
         sent_at: row.sent_at ?? null,
+        attempts:
+            typeof rawAttempts === "number" && Number.isInteger(rawAttempts) && rawAttempts >= 0
+                ? rawAttempts
+                : null,
+        next_attempt_at:
+            typeof rawNextAttempt === "string" && rawNextAttempt.length > 0
+                ? rawNextAttempt
+                : null,
         rendered_subject: typeof rawSubject === "string" ? rawSubject : null,
         rendered_body_html: typeof rawBody === "string" ? rawBody : null,
     };

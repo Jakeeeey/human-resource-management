@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
+import { TemplateDetail } from "@/modules/human-resource-management/mailing-studio/templates";
+
 import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
@@ -57,11 +59,12 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
     };
 }
 
-export default async function Page() {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
 
     const headerUser = buildHeaderUserFromToken(token);
+    const { id } = await params;
 
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -101,8 +104,8 @@ export default async function Page() {
             </header>
 
             <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-                <div className="flex flex-1 items-center justify-center p-6">
-                    <p className="text-sm text-muted-foreground">Template Detail</p>
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6">
+                    <TemplateDetail id={id} />
                 </div>
             </main>
         </div>

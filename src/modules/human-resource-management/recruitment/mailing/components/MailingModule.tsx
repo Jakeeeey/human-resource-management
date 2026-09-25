@@ -127,6 +127,11 @@ export function MailingModule() {
                         templateFilter={outboxTemplate}
                         query={outboxQuery}
                         templates={templates}
+                        onClearFilters={() => {
+                            setOutboxStatus("");
+                            setOutboxTemplate("");
+                            setOutboxQuery("");
+                        }}
                     />
                 </TabsContent>
                 <TabsContent value="send" forceMount hidden={tab !== "send"}>

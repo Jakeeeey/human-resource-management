@@ -33,7 +33,7 @@ export function MailTemplateList() {
         router.push(`/hrm/mailing/templates/${String(row.id)}`);
     };
 
-    if (loading) {
+    if (loading && templates.length === 0) {
         return (
             <div className="grid gap-2">
                 <Skeleton className="h-9 w-40" />

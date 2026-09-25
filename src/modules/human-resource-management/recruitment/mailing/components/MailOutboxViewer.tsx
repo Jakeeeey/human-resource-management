@@ -82,9 +82,10 @@ interface MailOutboxViewerProps {
     templateFilter: string;
     query: string;
     templates: { id: unknown; template_name: string; subject: string; body_html: string }[];
+    onClearFilters?: () => void;
 }
 
-export function MailOutboxViewer({ status, templateFilter, query, templates }: MailOutboxViewerProps) {
+export function MailOutboxViewer({ status, templateFilter, query, templates, onClearFilters }: MailOutboxViewerProps) {
     const { rows, loading, error, refresh } = useMailOutbox(status);
 
     useEffect(() => {
@@ -187,7 +188,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
         if (!isLarge) setDialogRow(row);
     };
 
-    if (loading) {
+    if (loading && rows.length === 0) {
         return (
             <div className="grid gap-2">
                 <Skeleton className="h-9 w-full" />
@@ -207,17 +208,31 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
         );
     }
 
+    const filtersActive = status !== "" || templateFilter !== "" || query.trim() !== "";
+
     return (
         <div className="grid gap-3">
             <div className={previewOpen ? "grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]" : "grid gap-3"}>
                 <div className="overflow-hidden rounded-lg border bg-card">
                     {rows.length === 0 ? (
-                        <div className="flex items-center justify-center py-16">
-                            <p className="text-sm text-muted-foreground">No outbox rows yet.</p>
+                        <div className="flex flex-col items-center justify-center gap-3 py-16">
+                            <p className="text-sm text-muted-foreground">
+                                {filtersActive ? "No rows match these filters." : "No outbox rows yet."}
+                            </p>
+                            {filtersActive && onClearFilters && (
+                                <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={onClearFilters}>
+                                    Clear filters
+                                </Button>
+                            )}
                         </div>
                     ) : filtered.length === 0 ? (
-                        <div className="flex items-center justify-center py-16">
+                        <div className="flex flex-col items-center justify-center gap-3 py-16">
                             <p className="text-sm text-muted-foreground">No rows match these filters.</p>
+                            {onClearFilters && (
+                                <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={onClearFilters}>
+                                    Clear filters
+                                </Button>
+                            )}
                         </div>
                     ) : (
                         <ul aria-label="Outbox rows" className="flex max-h-[560px] flex-col gap-2 overflow-y-auto p-3">
@@ -249,7 +264,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                                             <span className="min-w-0 basis-full truncate text-xs text-muted-foreground sm:basis-auto sm:max-w-56" title={subjectLine}>
                                                 {subjectLine}
                                             </span>
-                                            <span className="text-xs text-muted-foreground tabular-nums" title={String(row.sent_at ?? "")}>
+                                            <span className="text-xs text-muted-foreground tabular-nums" title={formatOutboxTimestamp(row.sent_at)}>
                                                 {formatOutboxTimestamp(row.sent_at)}
                                             </span>
                                         </button>
@@ -358,7 +373,7 @@ function MailOutboxDetailContent({
         <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-2 overflow-x-clip [overflow-wrap:break-word] [&_img]:h-auto [&_img]:max-w-full [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_table]:max-w-full [&_table]:overflow-x-auto">
             <div className="flex shrink-0 flex-wrap items-center gap-2">
                 <MailOutcomeBadge status={String(row.status)} />
-                <span className="text-xs text-muted-foreground tabular-nums" title={String(row.sent_at ?? "")}>
+                <span className="text-xs text-muted-foreground tabular-nums" title={formatOutboxTimestamp(row.sent_at)}>
                     {formatOutboxTimestamp(row.sent_at)}
                 </span>
             </div>

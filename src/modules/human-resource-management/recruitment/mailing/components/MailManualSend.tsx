@@ -40,6 +40,21 @@ import { MailOutcomeBadge } from "./MailOutcomeBadge";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const SEND_REASON_COPY: Record<string, string> = {
+    "send-failed": "Couldn't reach the mail provider — nothing was sent. Retry or check provider settings.",
+    "template-missing": "The template could not be found — nothing was sent.",
+    "render-failed": "The email could not be rendered — nothing was sent.",
+    "applicant-missing": "The applicant record could not be found — nothing was sent.",
+};
+
+export function sendFailureCopy(status: string, reason: string | undefined): string {
+    const trimmed = reason?.trim().toLowerCase();
+    const hit = trimmed ? SEND_REASON_COPY[trimmed] : undefined;
+    if (hit) return hit;
+    if (status === "skipped") return "Send skipped — nothing was emailed. Please try again.";
+    return "Couldn't reach the mail provider — nothing was sent. Retry or check provider settings.";
+}
+
 // Port of the job-offer salutation rule (JobOfferModule salutationPrefix +
 // surnameOf — ported, never imported, per the module-boundary ban): Mr. for
 // Male, Mrs. for Female + Married, Ms. for other Female, null when unknown.
@@ -386,16 +401,16 @@ export function MailManualSend() {
                 setSubject(selectedSubject);
                 setBodyHtml(selectedBody);
             } else if (outcome?.status === "skipped") {
-                toast.error(`Skipped (${outcome.reason ?? "unknown"}).`);
+                toast.error(sendFailureCopy("skipped", outcome.reason));
             } else {
-                toast.error(`Failed (${outcome?.reason ?? "unknown"}).`);
+                toast.error(sendFailureCopy("failed", outcome?.reason));
             }
         } finally {
             setSending(false);
         }
     };
 
-    if (loading) {
+    if (loading && templates.length === 0 && applicants.length === 0) {
         return (
             <div className="grid gap-2">
                 <Skeleton className="h-9 w-full" />
@@ -437,6 +452,13 @@ export function MailManualSend() {
     const sendBlocked =
         sending || !picked || !templateId || emailMissing || emailError !== null || missingVars.length > 0;
 
+    const hasDraft =
+        pickedId !== "" ||
+        toEmail.trim() !== "" ||
+        subject !== selectedSubject ||
+        bodyHtml !== selectedBody ||
+        Object.keys(vars).length > 0;
+
     return (
         <div className="mx-auto grid w-full max-w-[1200px] gap-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -468,8 +490,9 @@ export function MailManualSend() {
                         value={templateId}
                         onValueChange={setTemplateId}
                         placeholder="Load Template"
+                        searchPlaceholder="Search templates…"
                         disabled={sending}
-                        className="w-56 max-w-full"
+                        className="w-56 max-w-full min-h-11 md:min-h-0"
                     />
                 </div>
             </div>
@@ -480,14 +503,19 @@ export function MailManualSend() {
                     aria-label="Email settings"
                 >
                     <div className="grid min-w-0 gap-1.5">
-                        <Label htmlFor="mail-manualsend-applicant" className="text-xs font-medium text-muted-foreground">Receiver</Label>
+                        <Label htmlFor="mail-manualsend-applicant" className="text-xs font-medium text-muted-foreground">Receiver <span className="text-destructive" aria-hidden="true">*</span></Label>
                         <MailCombobox
                             options={applicantOptions}
                             value={pickedId}
                             onValueChange={setPickedId}
                             placeholder="Search applicants…"
+                            searchPlaceholder="Search applicants…"
+                            triggerId="mail-manualsend-applicant"
                             disabled={sending}
                         />
+                        <p id="mail-manualsend-receiver-hint" className="text-xs text-muted-foreground">
+                            Required — pick the applicant above. Typing an email alone will not enable Send Now.
+                        </p>
                     </div>
                     <div className="grid min-w-0 gap-1.5">
                         <Label htmlFor="mail-manualsend-email" className="text-xs font-medium text-muted-foreground">Recipient email</Label>
@@ -555,8 +583,8 @@ export function MailManualSend() {
                     <Button
                         variant="outline"
                         size="sm"
-                        className="w-full sm:w-auto"
-                        disabled={sending}
+                        className="min-h-11 w-full sm:w-auto md:min-h-0"
+                        disabled={sending || !hasDraft}
                         onClick={() => setConfirmOpen(true)}
                     >
                         Cancel
@@ -564,7 +592,7 @@ export function MailManualSend() {
                     <Button
                         variant="outline"
                         size="sm"
-                        className="w-full sm:w-auto"
+                        className="min-h-11 w-full sm:w-auto md:min-h-0"
                         disabled={!selectedTemplate || sending}
                         onClick={handlePreview}
                     >
@@ -572,8 +600,9 @@ export function MailManualSend() {
                     </Button>
                     <Button
                         size="sm"
-                        className="w-full sm:w-auto"
+                        className="min-h-11 w-full sm:w-auto md:min-h-0"
                         disabled={sendBlocked}
+                        aria-describedby="mail-manualsend-receiver-hint"
                         onClick={() => void handleSend()}
                     >
                         {sending ? "Sending…" : "Send Now"}

@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -6,11 +8,14 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
+
+import { getDesign } from "@/modules/human-resource-management/mailing-studio/services/design-persistence-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,11 +62,26 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
     };
 }
 
-export default async function Page() {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
 
     const headerUser = buildHeaderUserFromToken(token);
+    const { id } = await params;
+
+    let templateKey: string | null = null;
+    let failed = false;
+    try {
+        const ref = /^\d+$/.test(id.trim()) ? Number(id.trim()) : id;
+        const row = await getDesign(ref);
+        templateKey = row?.template_key ?? null;
+    } catch {
+        failed = true;
+    }
+
+    if (templateKey) {
+        redirect(`/hrm/mailing-studio?key=${encodeURIComponent(templateKey)}`);
+    }
 
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -101,8 +121,17 @@ export default async function Page() {
             </header>
 
             <main className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-                <div className="flex flex-1 items-center justify-center p-6">
-                    <p className="text-sm text-muted-foreground">Canvas Editor</p>
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 sm:p-6">
+                    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-3 rounded-lg border bg-card py-16 text-center">
+                        <p className="text-sm text-muted-foreground">
+                            {failed
+                                ? "Could not load that template — please try again later."
+                                : `No template found for “${id}”.`}
+                        </p>
+                        <Button size="sm" asChild>
+                            <Link href="/hrm/mailing-studio/templates">Back to templates</Link>
+                        </Button>
+                    </div>
                 </div>
             </main>
         </div>

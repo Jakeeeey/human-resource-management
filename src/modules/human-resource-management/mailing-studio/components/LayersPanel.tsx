@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
 import { Box, ChevronDown, ChevronUp, Image, Minus, MousePointerClick, MoveVertical, Trash2, Type } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
@@ -17,7 +20,7 @@ const TYPE_ICON: Record<CanvasNodeType, typeof Type> = {
     box: Box,
 };
 
-function layerLabel(node: CanvasNode): string {
+export function layerLabel(node: CanvasNode): string {
     const text = node.props.text;
     if (typeof text === "string" && text.trim().length > 0) {
         return text.trim().slice(0, 28);
@@ -44,6 +47,7 @@ export function LayersPanel() {
     const beginGesture = useCanvasDoc((state) => state.beginGesture);
     const endGesture = useCanvasDoc((state) => state.endGesture);
     const reorderNode = useCanvasDoc((state) => state.reorderNode);
+    const [filter, setFilter] = useState("");
 
     const rows: { node: CanvasNode; depth: number }[] = [];
     for (const rootId of rootIds) {
@@ -57,6 +61,16 @@ export function LayersPanel() {
         }
     }
 
+    const query = filter.trim().toLowerCase();
+    const visibleRows =
+        query.length === 0
+            ? rows
+            : rows.filter(
+                  ({ node }) =>
+                      layerLabel(node).toLowerCase().includes(query) ||
+                      node.type.includes(query),
+              );
+
     const selectedId = selection[0] ?? null;
 
     return (
@@ -65,9 +79,25 @@ export function LayersPanel() {
                 <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                     Layers
                 </span>
-                <span className="tabular-nums text-[10px] font-medium text-muted-foreground">
-                    {rows.length}
+                <span
+                    aria-live="polite"
+                    className="tabular-nums text-[10px] font-medium text-muted-foreground"
+                >
+                    {query.length === 0
+                        ? `${rows.length}`
+                        : `${visibleRows.length} of ${rows.length}`}
                 </span>
+            </div>
+
+            <div className="shrink-0 border-b p-2">
+                <Input
+                    aria-label="Filter layers"
+                    className="h-8 text-xs"
+                    placeholder="Filter by name or type…"
+                    type="search"
+                    value={filter}
+                    onChange={(event) => setFilter(event.target.value)}
+                />
             </div>
 
             <div className="flex-1 overflow-y-auto p-2">
@@ -75,9 +105,13 @@ export function LayersPanel() {
                     <p className="px-2 py-6 text-center text-[11px] leading-relaxed text-muted-foreground">
                         No blocks yet — add one from Elements.
                     </p>
+                ) : visibleRows.length === 0 ? (
+                    <p className="px-2 py-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+                        No layers match “{filter.trim()}”.
+                    </p>
                 ) : (
                     <ul className="flex flex-col gap-0.5">
-                        {rows.map(({ node, depth }) => {
+                        {visibleRows.map(({ node, depth }) => {
                             const Icon = TYPE_ICON[node.type];
                             const isSelected = node.id === selectedId;
                             const rootIndex = depth === 0 ? rootIds.indexOf(node.id) : -1;
@@ -123,7 +157,10 @@ export function LayersPanel() {
                                             <>
                                                 <Button
                                                     aria-label={`Move ${node.type} block up`}
-                                                    className="size-6 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                                    className={cn(
+                                                        "size-6 shrink-0 opacity-40 group-hover:opacity-100 focus-visible:opacity-100",
+                                                        isSelected && "opacity-100",
+                                                    )}
                                                     disabled={!canMoveUp}
                                                     size="icon"
                                                     variant="ghost"
@@ -136,7 +173,10 @@ export function LayersPanel() {
                                                 </Button>
                                                 <Button
                                                     aria-label={`Move ${node.type} block down`}
-                                                    className="size-6 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                                    className={cn(
+                                                        "size-6 shrink-0 opacity-40 group-hover:opacity-100 focus-visible:opacity-100",
+                                                        isSelected && "opacity-100",
+                                                    )}
                                                     disabled={!canMoveDown}
                                                     size="icon"
                                                     variant="ghost"
@@ -151,7 +191,10 @@ export function LayersPanel() {
                                         ) : null}
                                         <Button
                                             aria-label={`Delete ${node.type} block`}
-                                            className="size-6 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                                            className={cn(
+                                                "size-6 shrink-0 opacity-40 group-hover:opacity-100 focus-visible:opacity-100",
+                                                isSelected && "opacity-100",
+                                            )}
                                             size="icon"
                                             variant="ghost"
                                             onClick={(event) => {

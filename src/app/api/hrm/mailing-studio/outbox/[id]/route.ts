@@ -15,9 +15,9 @@ export const dynamic = "force-dynamic";
 // api/hrm/mailing/outbox/[id] route (READ-ONLY reference).
 
 const OUTBOX_FIELDS_RENDERED =
-    "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at,rendered_subject,rendered_body_html";
+    "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at,attempts,next_attempt_at,rendered_subject,rendered_body_html";
 const OUTBOX_FIELDS_FULL =
-    "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at";
+    "id,idempotency_key,to_email,template_id,event_key,status,warnings,error,sent_at,attempts,next_attempt_at";
 const OUTBOX_FIELDS_BASE =
     "id,idempotency_key,to_email,template_id,event_key,status,error,sent_at";
 

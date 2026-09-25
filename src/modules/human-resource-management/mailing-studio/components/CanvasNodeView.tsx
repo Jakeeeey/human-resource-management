@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { CSSProperties } from "react";
 import type { CanvasBadge } from "./canvas-badges";
+import { layerLabel } from "./LayersPanel";
 
 interface CanvasNodeViewProps {
     readonly node: CanvasNode;
@@ -218,18 +219,22 @@ export function SnapGuidesOverlay({ xLines, yLines, mates, rowLabel }: SnapGuide
  */
 export default function CanvasNodeView({ node, nodes, badgesById }: CanvasNodeViewProps) {
     const selected = useCanvasDoc((state) => state.selection.includes(node.id));
+    const selectNodes = useCanvasDoc((state) => state.selectNodes);
     const badges = badgesById[node.id] ?? [];
     const children = Object.values(nodes).filter((child) => child.parentId === node.id);
+    const label = layerLabel(node);
 
     return (
         <div
+            aria-label={`${node.type} block: ${label}`}
             className={cn(
-                "canvas-block absolute rounded-md border border-border/60 bg-background transition-shadow duration-150",
+                "canvas-block absolute rounded-md border border-border/60 bg-background transition-shadow duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 selected
                     ? "ring-2 ring-primary"
                     : "hover:ring-1 hover:ring-primary/50",
             )}
             data-id={node.id}
+            role="button"
             style={{
                 left: node.x,
                 top: node.y,
@@ -237,6 +242,14 @@ export default function CanvasNodeView({ node, nodes, badgesById }: CanvasNodeVi
                 height: node.h,
                 transform: `rotate(${node.rotation}deg)`,
                 zIndex: node.z,
+            }}
+            tabIndex={0}
+            onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    selectNodes([node.id]);
+                }
             }}
         >
             {badges.length > 0 ? (
