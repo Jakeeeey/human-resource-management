@@ -8,6 +8,7 @@ import { logRedacted, scrubSecretsFromText } from "./mailLog";
 import { hasForbiddenMailHtml, assertMailableHtml } from "./mailScrub";
 import { renderMailTemplate } from "./mailRenderer";
 import { mailHtmlToText } from "./mailText";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // Dispatch core (mailing-module todo 10, Appendix DispatchCtx row).
 //
@@ -112,10 +113,6 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * wall time for sent_at on real sends. Never server default / UTC toISOString.
  * @returns Current Philippine time as a MySQL-compatible string.
  */
-export function getPhilippineTime(): string {
-    return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 /**
  * Matches a binding's send_condition against the dispatch verdict (Appendix
  * Bindings row): `always` fires regardless; `on_pass` needs Passed/pass;
@@ -487,7 +484,7 @@ export async function dispatchMail(
             status: "sent",
             warnings,
             error: null,
-            sent_at: getPhilippineTime(),
+            sent_at: nowUTC(),
             rendered_subject: renderedSubject.text,
             rendered_body_html: renderedBody.text,
         });

@@ -25,6 +25,7 @@
  * (`import type` — zero runtime coupling, zero edits).
  */
 
+import { parseUtcInstant } from "@/modules/human-resource-management/shared/utils/time";
 import type {
     AnswerInput,
     GradeResult,
@@ -116,16 +117,20 @@ export function transitionAssignment(
 // ---------------------------------------------------------------------------
 
 /**
- * Derived overdue flag: a non-completed assignment whose `due` has passed.
- * `due === null` means no deadline (never overdue). Never persisted.
+ * Derived overdue flag: a non-completed assignment whose deadline moment has passed.
+ * `due` is a UTC moment (a value with no zone, as Directus returns it, is read as UTC), so
+ * this compares real moments, never text. `due === null` means no deadline and an
+ * unreadable `due` cannot be judged: neither is ever overdue. Never persisted.
  */
 export function isAssignmentOverdue(
     assignment: Pick<TrainingAssignment, "status" | "due">,
     nowIso: string = new Date().toISOString()
 ): boolean {
     if (assignment.status === "completed") return false;
-    if (assignment.due === null) return false;
-    return nowIso > assignment.due;
+    const due = parseUtcInstant(assignment.due);
+    const now = parseUtcInstant(nowIso);
+    if (!due || !now) return false;
+    return now.getTime() > due.getTime();
 }
 
 // ---------------------------------------------------------------------------

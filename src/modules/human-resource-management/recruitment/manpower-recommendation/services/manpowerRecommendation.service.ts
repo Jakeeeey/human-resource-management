@@ -1,6 +1,6 @@
 import { ManpowerRecommendation, ManpowerRecommendationCreateInput } from "../types";
 import { isApplicantSlotOccupying } from "../utils/applicantPipeline";
-import { stampCreate, stampUpdate } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;
@@ -9,16 +9,6 @@ const headers = {
     Authorization: `Bearer ${STATIC_TOKEN}`,
     "Content-Type": "application/json",
 };
-
-/**
- * Current Philippine wall time as MySQL-compatible 'YYYY-MM-DD HH:mm:ss' (no offset).
- * Single producer for ALL timestamp writes in this module — never rely on DB
- * CURRENT_TIMESTAMP (see conventions §6 Timestamp convention).
- * @returns PH wall time string.
- */
-export function nowPH(): string {
-    return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
 
 export const manpowerRecommendationService = {
     /**
@@ -157,14 +147,14 @@ export const manpowerRecommendationService = {
 
     /**
      * Create a new manpower recommendation, auto-filling recommended_at plus
-     * explicit PH created_at/updated_at (never DB CURRENT_TIMESTAMP).
+     * explicit UTC created_at/updated_at (never DB CURRENT_TIMESTAMP).
      * @param data - Recommendation create input.
      * @param actorId - Acting user id for the row audit stamp (optional).
      * @returns The created recommendation record.
      */
     async create(data: ManpowerRecommendationCreateInput, actorId?: number | null): Promise<ManpowerRecommendation> {
         try {
-            const body = stampCreate({ ...data, recommended_by: data.recommended_by ?? null, recommended_at: data.recommended_at ?? nowPH(), created_at: nowPH(), updated_at: nowPH() }, actorId ?? null);
+            const body = stampCreate({ ...data, recommended_by: data.recommended_by ?? null, recommended_at: data.recommended_at ?? nowUTC(), created_at: nowUTC(), updated_at: nowUTC() }, actorId ?? null);
 
             const response = await fetch(`${API_BASE_URL}/items/manpower_recommendation`, {
                 method: "POST",
@@ -186,7 +176,7 @@ export const manpowerRecommendationService = {
     },
 
     /**
-     * Update a manpower recommendation by ID, always stamping explicit PH updated_at
+     * Update a manpower recommendation by ID, always stamping explicit UTC updated_at
      * (never DB ON UPDATE CURRENT_TIMESTAMP).
      * @param id - Recommendation record ID.
      * @param data - Partial recommendation fields to update.
@@ -198,7 +188,7 @@ export const manpowerRecommendationService = {
             const response = await fetch(`${API_BASE_URL}/items/manpower_recommendation/${id}`, {
                 method: "PATCH",
                 headers,
-                body: JSON.stringify(stampUpdate({ ...data, updated_at: nowPH() }, actorId ?? null)),
+                body: JSON.stringify(stampUpdate({ ...data, updated_at: nowUTC() }, actorId ?? null)),
             });
 
             if (!response.ok) {

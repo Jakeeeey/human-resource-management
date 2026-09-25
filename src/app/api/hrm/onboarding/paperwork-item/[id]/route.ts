@@ -15,7 +15,7 @@ import {
   signPaperworkItem,
 } from "@/modules/human-resource-management/onboarding/signing/server/signing-rollup-service";
 import { PaperworkItemSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { actorIdFromJwt } from "@/modules/human-resource-management/onboarding/utils/audit";
+import { actorIdFromJwt } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

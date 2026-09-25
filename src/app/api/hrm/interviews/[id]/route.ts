@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
-import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +90,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 template_id,
                 verdict,
                 interviewed_by: typeof userId === "number" ? userId : null,
-                interviewed_at: typeof body.interviewed_at === "string" && body.interviewed_at ? body.interviewed_at : nowPH(),
+                interviewed_at: typeof body.interviewed_at === "string" && body.interviewed_at ? body.interviewed_at : nowUTC(),
                 notes: typeof body.notes === "string" && body.notes ? body.notes : null,
                 items: body.items,
             }, actorId);
@@ -128,7 +128,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         // The client sends only { verdict, notes, interviewed_by } — it has no
         // userId in scope. NEVER trust client-supplied updated_by; always
-        // overwrite server-side. updated_at is stamped by the service via nowPH().
         const validated = InterviewSchema.omit({ id: true }).partial().parse(body);
 
         const data = await interviewService.updateInterview(id, validated, actorId);

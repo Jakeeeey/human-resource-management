@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // orientationTopicTemplateSync.ts — the topic → derived
 // `onboarding_task_template` `is_active` sync (todo 2's pin; used by todo 3's
@@ -28,10 +29,6 @@ export function orientationTopicCode(topicCode: string): string {
 }
 
 /** PH wall-time, MySQL-compatible `YYYY-MM-DD HH:mm:ss` (conventions §6). */
-function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }
@@ -82,7 +79,7 @@ export async function syncDerivedTemplateActive(
       method: "PATCH",
       body: JSON.stringify({
         is_active: topic.is_active,
-        updated_at: phTimeNow(),
+        updated_at: nowUTC(),
         ...(actorId != null ? { updated_by: actorId } : {}),
       }),
     }

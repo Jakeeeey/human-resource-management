@@ -22,6 +22,7 @@ import {
 import { AddressSelectors } from "@/modules/human-resource-management/employee-admin/employee-masterlist/components/AddressSelectors";
 import { CIVIL_STATUS_OPTIONS, type ApplicationFormValues } from "../../types";
 import { checkBirthdate, checkFormat, checkHeightCm, checkUnlikelyAge, checkWeightKg } from "../../lib/softValidation";
+import { govIdError, maskGovId, maskPhone, phoneError } from "../../lib/hardValidation";
 import { SoftWarning } from "../SoftWarning";
 import { PhotoCapture } from "../PhotoCapture";
 
@@ -36,17 +37,19 @@ function computeAge(iso: string): number | null {
     return age >= 0 && age < 130 ? age : null;
 }
 
-export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
+export function PersonalInfoSection({
+    form,
+    readOnly = false,
+}: {
+    form: UseFormReturn<ApplicationFormValues>;
+    readOnly?: boolean;
+}) {
+    const soft = (message: string | null) => (readOnly ? null : message);
     const birthdate = useWatch({ control: form.control, name: "birthdate" });
     const province = useWatch({ control: form.control, name: "province" });
     const city = useWatch({ control: form.control, name: "city" });
     const brgy = useWatch({ control: form.control, name: "brgy" });
-    const phone = useWatch({ control: form.control, name: "phone" });
     const email = useWatch({ control: form.control, name: "email" });
-    const sss = useWatch({ control: form.control, name: "sss_no" });
-    const tin = useWatch({ control: form.control, name: "tin" });
-    const philhealth = useWatch({ control: form.control, name: "philhealth_no" });
-    const pagibig = useWatch({ control: form.control, name: "pagibig_no" });
     const heightCm = useWatch({ control: form.control, name: "height_cm" });
     const weightKg = useWatch({ control: form.control, name: "weight_kg" });
     const photoSelected = useWatch({ control: form.control, name: "photo_selected" });
@@ -133,16 +136,20 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                 <FormField
                     control={form.control}
                     name="phone"
-                    rules={{ required: "Enter your contact number." }}
+                    rules={{ required: "Enter your contact number.", validate: (v) => phoneError(v) ?? true }}
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>
                                 Contact Number <span className="text-destructive">*</span>
                             </FormLabel>
                             <FormControl>
-                                <Input placeholder="09XXXXXXXXX" inputMode="tel" {...field} />
+                                <Input
+                                    placeholder="09XXXXXXXXX"
+                                    inputMode="tel"
+                                    {...field}
+                                    onChange={(e) => field.onChange(maskPhone(e.target.value))}
+                                />
                             </FormControl>
-                            <SoftWarning message={checkFormat("phone", phone)} />
                             <FormMessage />
                         </FormItem>
                     )}
@@ -156,7 +163,7 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                             <FormControl>
                                 <Input type="email" placeholder="you@example.com" {...field} />
                             </FormControl>
-                            <SoftWarning message={checkFormat("email", email)} />
+                            <SoftWarning message={soft(checkFormat("email", email))} />
                             <FormMessage />
                         </FormItem>
                     )}
@@ -184,7 +191,7 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                                         {...field}
                                     />
                                 </FormControl>
-                                <SoftWarning message={checkUnlikelyAge(birthdate)} />
+                                <SoftWarning message={soft(checkUnlikelyAge(birthdate))} />
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -245,7 +252,7 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                             <FormControl>
                                 <Input type="number" min={0} step="0.1" {...field} />
                             </FormControl>
-                            <SoftWarning message={checkHeightCm(heightCm)} />
+                            <SoftWarning message={soft(checkHeightCm(heightCm))} />
                             <FormMessage />
                         </FormItem>
                     )}
@@ -259,7 +266,7 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                             <FormControl>
                                 <Input type="number" min={0} step="0.1" {...field} />
                             </FormControl>
-                            <SoftWarning message={checkWeightKg(weightKg)} />
+                            <SoftWarning message={soft(checkWeightKg(weightKg))} />
                             <FormMessage />
                         </FormItem>
                     )}
@@ -307,52 +314,76 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                 <FormField
                     control={form.control}
                     name="sss_no"
+                    rules={{ validate: (v) => govIdError("sss", v) ?? true }}
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>SSS No.</FormLabel>
                             <FormControl>
-                                <Input placeholder="##-#######-#" {...field} />
+                                <Input
+                                    placeholder="##-#######-#"
+                                    inputMode="numeric"
+                                    {...field}
+                                    onChange={(e) => field.onChange(maskGovId("sss", e.target.value))}
+                                />
                             </FormControl>
-                            <SoftWarning message={checkFormat("sss", sss)} />
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
                 <FormField
                     control={form.control}
                     name="tin"
+                    rules={{ validate: (v) => govIdError("tin", v) ?? true }}
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>TIN</FormLabel>
                             <FormControl>
-                                <Input placeholder="###-###-###-###" {...field} />
+                                <Input
+                                    placeholder="###-###-###-###"
+                                    inputMode="numeric"
+                                    {...field}
+                                    onChange={(e) => field.onChange(maskGovId("tin", e.target.value))}
+                                />
                             </FormControl>
-                            <SoftWarning message={checkFormat("tin", tin)} />
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
                 <FormField
                     control={form.control}
                     name="philhealth_no"
+                    rules={{ validate: (v) => govIdError("philhealth", v) ?? true }}
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>PhilHealth No.</FormLabel>
                             <FormControl>
-                                <Input placeholder="##-#########-#" {...field} />
+                                <Input
+                                    placeholder="##-#########-#"
+                                    inputMode="numeric"
+                                    {...field}
+                                    onChange={(e) => field.onChange(maskGovId("philhealth", e.target.value))}
+                                />
                             </FormControl>
-                            <SoftWarning message={checkFormat("philhealth", philhealth)} />
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
                 <FormField
                     control={form.control}
                     name="pagibig_no"
+                    rules={{ validate: (v) => govIdError("pagibig", v) ?? true }}
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Pag-IBIG No.</FormLabel>
                             <FormControl>
-                                <Input placeholder="####-####-####" {...field} />
+                                <Input
+                                    placeholder="####-####-####"
+                                    inputMode="numeric"
+                                    {...field}
+                                    onChange={(e) => field.onChange(maskGovId("pagibig", e.target.value))}
+                                />
                             </FormControl>
-                            <SoftWarning message={checkFormat("pagibig", pagibig)} />
+                            <FormMessage />
                         </FormItem>
                     )}
                 />
@@ -372,10 +403,12 @@ export function PersonalInfoSection({ form }: { form: UseFormReturn<ApplicationF
                 )}
             />
 
-            <PhotoCapture
-                value={photoSelected}
-                onChange={(file) => form.setValue("photo_selected", file)}
-            />
+            {!readOnly && (
+                <PhotoCapture
+                    value={photoSelected}
+                    onChange={(file) => form.setValue("photo_selected", file)}
+                />
+            )}
         </div>
     );
 }

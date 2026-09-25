@@ -1,5 +1,6 @@
 import {
     DEFAULT_APPLICATION_FORM,
+    EMPTY_FAMILY_MEMBER,
     type ApplicationFormValues,
     type AttachmentType,
     type CompanyRelativeRow,
@@ -46,16 +47,20 @@ function d(v: unknown): string {
 }
 
 function emptyMember(): FamilyMemberFields {
-    return { name: "", age: "", occupation: "", company: "", education: "" };
+    return { ...EMPTY_FAMILY_MEMBER };
 }
 
 function toMember(r: Row): FamilyMemberFields {
     return {
         name: s(r["name"]),
-        age: s(r["age"]),
+        date_of_birth: d(r["date_of_birth"]),
+        is_deceased: r["is_deceased"] === true || r["is_deceased"] === 1,
         occupation: s(r["occupation"]),
         company: s(r["company"]),
         education: s(r["education"]),
+        contact_number: s(r["contact_number"]),
+        address: s(r["address"]),
+        age: s(r["age"]),
     };
 }
 
@@ -97,6 +102,7 @@ function toWorkExperience(r: Row): WorkExperienceRow {
         job_title: s(r["job_title"]),
         date_from: s(r["date_from"]),
         date_to: s(r["date_to"]),
+        currently_employed: r["currently_employed"] === true || r["currently_employed"] === 1,
         salary_rate_start: s(r["salary_rate_start"]),
         salary_rate_end: s(r["salary_rate_end"]),
         supervisor_name: s(r["supervisor_name"]),

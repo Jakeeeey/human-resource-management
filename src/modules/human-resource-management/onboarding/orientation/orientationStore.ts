@@ -20,7 +20,6 @@ import {
   listActiveTopicRows,
   listTopicRows,
   patchTopicRow,
-  phTimeNow,
   readTopicRowByCode,
   syncDerivedTemplateActive,
   type OrientationTopicRow,
@@ -31,6 +30,7 @@ import type {
   OrientationTopic,
   OrientationTrack,
 } from "./types/orientation.schema";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export { orientationTopicCode } from "./server/orientationTopicIo";
 
@@ -124,7 +124,7 @@ export async function upsertTopic(
 ): Promise<OrientationTopic> {
   const code = input.id ?? slugify(input.title);
   const existing = await readTopicRowByCode(code);
-  const now = phTimeNow();
+  const now = nowUTC();
   const actorId = input.actorId ?? null;
 
   if (existing) {
@@ -188,7 +188,7 @@ export async function patchTopic(
   if (Object.keys(rowPatch).length === 0) return toTopic(existing);
 
   const actorId = patch.actorId ?? null;
-  rowPatch.updated_at = phTimeNow();
+  rowPatch.updated_at = nowUTC();
   if (actorId != null) rowPatch.updated_by = actorId;
   const updated = await patchTopicRow(existing.id, rowPatch);
 

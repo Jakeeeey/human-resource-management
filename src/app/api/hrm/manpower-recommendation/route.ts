@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { manpowerRecommendationService, nowPH } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
+import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
 import { ALLOWED_TRANSITIONS, setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
-import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 // manpower-recommendation — the recommendation row is a recruitment ARTIFACT
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
 
         body.recommended_by = userId;
-        body.recommended_at = nowPH();
+        body.recommended_at = nowUTC();
         body.status = body.status || "Recommended";
 
         const validated = ManpowerRecommendationSchema.parse(body);

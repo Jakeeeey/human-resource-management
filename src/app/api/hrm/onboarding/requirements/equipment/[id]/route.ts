@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listEquipmentItemRows,
   patchEquipmentItemRow,
-  phTimeNow,
   softDeleteEquipmentItemRow,
 } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   hardDeleteItem,
   invalidId,
@@ -69,7 +69,7 @@ export async function PATCH(
     if (Object.keys(patch).length === 0) {
       return NextResponse.json({ success: true, data: current });
     }
-    patch.updated_at = phTimeNow();
+    patch.updated_at = nowUTC();
     patch.updated_by = session.actorId;
 
     const updated = await patchEquipmentItemRow(id, patch);

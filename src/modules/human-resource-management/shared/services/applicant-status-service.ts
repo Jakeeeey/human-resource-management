@@ -6,6 +6,7 @@ import {
   type ApplicantStatus,
 } from "@/modules/human-resource-management/onboarding/types/applicant-status";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // applicant-status-service.ts — the SINGLE writer of `applicant.status`
 // (todo 2 of onboarding-hub-replan). Every module that advances or closes an
@@ -132,7 +133,7 @@ async function patchApplicantStatus(
       ? { status }
       : { status, manpower_request_id: manpowerRequestId }),
     ...(actorId != null ? { updated_by: actorId } : {}),
-    updated_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" }),
+    updated_at: nowUTC(),
   };
   const body: unknown = await dFetch(`/items/${DIRECTUS_COLLECTION}/${applicantId}`, {
     method: "PATCH",
