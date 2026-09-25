@@ -10,9 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { saveDesign } from "./providers/designService";
-import { MS_EVENT_KEY_PATTERN } from "./types/ms-catalog.schema";
-
-const TEMPLATE_KEY_HINT = "Lowercase letters, numbers, dots and underscores only (e.g. onboarding.welcome).";
+import { MS_TEMPLATE_KEY_HINT, MS_TEMPLATE_KEY_PATTERN } from "./utils/ms-template-key";
 
 function starterDesignJson(templateName: string): string {
     return JSON.stringify({
@@ -44,7 +42,7 @@ function starterDesignJson(templateName: string): string {
 
 /**
  * New-template form — the only create path for ms_templates rows. Validates
- * the event-key-shaped template_key client-side (naming the rule), POSTs the
+ * the template key client-side (naming the rule), POSTs the
  * templates route with a single-block starter canvas, then navigates to the
  * designer for the new key. The editor itself carries no event selector —
  * event wiring lives on bindings (§7.7).
@@ -64,8 +62,8 @@ export function NewTemplateForm() {
             setFormError("Template key is required.");
             return;
         }
-        if (!MS_EVENT_KEY_PATTERN.test(key)) {
-            setFormError(`Template key: ${TEMPLATE_KEY_HINT}`);
+        if (!MS_TEMPLATE_KEY_PATTERN.test(key)) {
+            setFormError(`Template key: ${MS_TEMPLATE_KEY_HINT}`);
             return;
         }
         if (templateName.trim().length === 0) {
@@ -117,7 +115,7 @@ export function NewTemplateForm() {
                         value={templateKey}
                         onChange={(event) => setTemplateKey(event.target.value)}
                     />
-                    <p className="text-[11px] leading-snug text-muted-foreground">{TEMPLATE_KEY_HINT}</p>
+                    <p className="text-[11px] leading-snug text-muted-foreground">{MS_TEMPLATE_KEY_HINT}</p>
                 </div>
                 <div className="flex flex-col gap-2">
                     <Label className="text-xs font-medium text-muted-foreground" htmlFor="new-template-name">

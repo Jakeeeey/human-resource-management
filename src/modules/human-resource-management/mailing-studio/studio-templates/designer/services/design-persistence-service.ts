@@ -19,6 +19,7 @@ const FIELDS =
     "id,template_key,template_name,subject,design_json,variables,body_html,body_text,is_active,created_at,updated_at";
 
 export interface SaveDesignInput {
+    id?: number | string;
     template_key: string;
     template_name: string;
     subject: string;
@@ -110,7 +111,6 @@ export async function listDesigns(): Promise<MsDesignRow[]> {
 }
 
 /**
- * Create-or-PATCH by template_key with write-then-verify-read.
  * body_html/body_text are written only when the caller passes them (undefined
  * = leave the stored value alone; null = clear). created_at is set on create
  * only and never rewritten by updates.
@@ -126,7 +126,21 @@ export async function saveDesign(input: SaveDesignInput): Promise<MsDesignRow> {
     assertDesignJson(design_json);
 
     const now = getPhilippineTime();
-    const existing = await getDesign(template_key);
+    const rawId = input.id;
+    const idText = rawId === undefined || rawId === null ? "" : String(rawId).trim();
+    let target: MsDesignRow | null = null;
+    if (idText !== "") {
+        target = await getDesign(/^\d+$/.test(idText) ? Number(idText) : idText);
+        if (!target) throw new Error("Mail template not found");
+        if (template_key !== target.template_key) {
+            const holder = await getDesign(template_key);
+            if (holder && String(holder.id) !== String(target.id)) {
+                throw new Error(`template_key "${template_key}" is already in use`);
+            }
+        }
+    } else {
+        target = await getDesign(template_key);
+    }
 
     const variables = compileVariablesFromDesignJson(design_json);
     const payload: Record<string, unknown> = {
@@ -141,21 +155,23 @@ export async function saveDesign(input: SaveDesignInput): Promise<MsDesignRow> {
     if (input.body_text !== undefined) payload.body_text = input.body_text;
     if (input.is_active !== undefined) payload.is_active = input.is_active;
 
-    const isUpdate = existing !== null && existing.id !== undefined && existing.id !== null;
+    const isUpdate = target !== null && target.id !== undefined && target.id !== null;
     if (!isUpdate) payload.created_at = now;
 
     const written = (await dFetch(
-        isUpdate ? `/items/${COLLECTION}/${String(existing.id)}` : `/items/${COLLECTION}`,
+        isUpdate && target ? `/items/${COLLECTION}/${String(target.id)}` : `/items/${COLLECTION}`,
         { method: isUpdate ? "PATCH" : "POST", body: JSON.stringify(payload) }
     )) as DirectusEnvelope<MsDesignRow>;
     if (!written?.data) {
         throw new Error(written?.errors?.[0]?.message ?? "ms_templates write failed");
     }
 
-    // write-then-verify-read: trust the re-read row, never the write echo.
     const verified = await getDesign(template_key);
     if (!verified) {
         throw new Error("ms_templates write not found on read-back");
+    }
+    if (idText !== "" && target && String(verified.id) !== String(target.id)) {
+        throw new Error("ms_templates write landed on the wrong row");
     }
     if (verified.design_json !== design_json) {
         throw new Error("design_json did not persist (write-then-verify-read mismatch)");

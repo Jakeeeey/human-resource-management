@@ -1,5 +1,7 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
+
 import {
     AlertDialog,
     AlertDialogAction,
@@ -46,6 +48,7 @@ export function MsConfirmDialog({
                         disabled={busy}
                         onClick={onConfirm}
                     >
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                         {busy && busyLabel ? busyLabel : confirmLabel}
                     </AlertDialogAction>
                 </AlertDialogFooter>

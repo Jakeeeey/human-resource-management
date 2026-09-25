@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { saveDesign, type DesignSavePayload } from "../../providers/designService";
+import { saveDesign, type DesignRow, type DesignSavePayload } from "../../providers/designService";
 
 import { useCanvasDoc } from "./useCanvasDoc";
 
@@ -14,6 +14,7 @@ import { useCanvasDoc } from "./useCanvasDoc";
 export type DesignAutosaveStatus = "idle" | "saving" | "saved" | "error";
 
 export interface UseDesignAutosaveOptions {
+    templateId?: number | string;
     templateKey: string;
     templateName: string;
     subject: string;
@@ -22,6 +23,7 @@ export interface UseDesignAutosaveOptions {
 export interface DesignSaveResult {
     ok: boolean;
     message: string | null;
+    row: DesignRow | null;
 }
 
 export interface UseDesignAutosaveResult {
@@ -74,18 +76,21 @@ export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignA
                 design_json: snapshotDesignJson(),
                 is_active: true,
             };
-            const { message: envelopeMessage } = await saveDesign(payload);
+            const saveId = options.templateId;
+            if (saveId !== undefined && saveId !== null && String(saveId).trim() !== "") {
+                payload.id = saveId;
+            }
+            const { row, message: envelopeMessage } = await saveDesign(payload);
             setMessage(envelopeMessage);
             savedVersionRef.current = versionAtSave;
             setSavedMeta(options);
-            // Edits landing mid-flight stay dirty instead of being swallowed.
             setDirty(useCanvasDoc.getState().version !== versionAtSave);
             setStatus("saved");
-            return { ok: true, message: envelopeMessage };
+            return { ok: true, message: envelopeMessage, row };
         } catch (cause) {
             setStatus("error");
             setError(cause instanceof Error ? cause.message : String(cause));
-            return { ok: false, message: null };
+            return { ok: false, message: null, row: null };
         }
     }, [options]);
 

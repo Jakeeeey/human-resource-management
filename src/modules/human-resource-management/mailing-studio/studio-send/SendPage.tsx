@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Loader2, MailOpen, Send } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +30,46 @@ type SendMode = "event" | "binding";
 
 function catalogRowIsActive(value: unknown): boolean {
     return value === true || value === 1 || value === "1" || value === "true";
+}
+
+const SEND_ERROR_COPY: Record<string, string> = {
+    "send-failed":
+        "Couldn't reach the mail provider — nothing was sent. Retry or check provider settings.",
+    "rate-capped": "Too many sends in the last minute — wait a moment, then retry.",
+    skipped: "Send skipped — the recipient or template was not usable.",
+    "binding-lookup-failed": "Couldn't read the send configuration — retry.",
+    "no-enabled-binding": "No enabled binding exists for sending — hook one up in Bindings first.",
+    "invalid-args": "Send request was invalid — retry.",
+    "internal-error": "Something went wrong while sending — retry.",
+};
+
+function stripMachineCode(message: string): string {
+    const stripped = message.replace(/^[A-Z][A-Z0-9_]+:\s*/, "").trim();
+    return stripped === "" ? message.trim() : stripped;
+}
+
+function humaniseSendError(message: string): string {
+    const key = message.trim();
+    const direct = SEND_ERROR_COPY[key];
+    if (direct) return direct;
+    const stripped = stripMachineCode(key);
+    const mapped = SEND_ERROR_COPY[stripped];
+    if (mapped) return mapped;
+    if (stripped !== "") return stripped;
+    return "Something went wrong — please try again.";
+}
+
+function sendFailureCopy(reason: string | undefined): string {
+    if (typeof reason !== "string") return "No reason given.";
+    const key = reason.trim();
+    if (key === "") return "No reason given.";
+    const direct = SEND_ERROR_COPY[key];
+    if (direct) return direct;
+    const stripped = stripMachineCode(key);
+    const mapped = SEND_ERROR_COPY[stripped];
+    if (mapped) return mapped;
+    if (stripped !== "") return stripped;
+    return "Send failed — retry or check provider settings.";
 }
 
 interface MailMode {
@@ -70,6 +112,7 @@ export function SendPage() {
     const [bindingId, setBindingId] = useState("");
     const [formError, setFormError] = useState<string | null>(null);
     const [mailMode, setMailMode] = useState<MailMode | null>(null);
+    const [lookupBusy, setLookupBusy] = useState(false);
 
     useEffect(() => {
         let live = true;
@@ -133,6 +176,12 @@ export function SendPage() {
         return classifyTokens(selectedTemplate?.variables ?? [], providedKeys);
     }, [selectedTemplate, providedKeys]);
 
+    const outcomeDetails = data
+        ? [data.status ? `status: ${data.status}` : null, data.idempotency_key ? `key: ${data.idempotency_key}` : null]
+            .filter(Boolean)
+            .join(" · ") || "no further details"
+        : "";
+
     const mailModeCopy = mailMode === null
         ? "Checking send mode…"
         : mailMode.dryRun
@@ -147,12 +196,17 @@ export function SendPage() {
             setLookupNote("Enter an application id first.");
             return;
         }
-        const email = await lookupApplicantEmail(id);
-        if (email) {
-            setToEmail(email);
-            setLookupNote("Recipient filled from the applicant record.");
-        } else {
-            setLookupNote("No valid email found for that application id.");
+        setLookupBusy(true);
+        try {
+            const email = await lookupApplicantEmail(id);
+            if (email) {
+                setToEmail(email);
+                setLookupNote("Recipient filled from the applicant record.");
+            } else {
+                setLookupNote("No valid email found for that application id.");
+            }
+        } finally {
+            setLookupBusy(false);
         }
     };
 
@@ -208,12 +262,28 @@ export function SendPage() {
 
     return (
         <section aria-label="Send" className="flex min-h-0 flex-1 flex-col gap-4" data-testid="send-form">
+            <header className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                    <span className="p-3 bg-primary/10 rounded-2xl text-primary">
+                        <Send className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                        <h1 className="text-lg font-semibold tracking-tight">Send</h1>
+                        <p className="text-sm text-muted-foreground">Compose and fire a one-off email, or exercise an event-triggered send.</p>
+                    </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button className="min-h-11 md:min-h-0" size="sm" variant="outline" onClick={handleReset}>
+                        Reset form
+                    </Button>
+                </div>
+            </header>
             <div className="grid gap-3 xl:grid-cols-2">
                 <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
                     <h2 className="text-sm font-semibold">Manual send</h2>
                     <div className="flex flex-col gap-2">
                         <Label className="text-xs font-medium text-muted-foreground" htmlFor="send-template">
-                            Template
+                            Template <span className="text-destructive">*</span>
                         </Label>
                         <MsCombobox
                             ariaLabel="Template"
@@ -239,7 +309,8 @@ export function SendPage() {
                                 value={applicationId}
                                 onChange={(event) => setApplicationId(event.target.value)}
                             />
-                            <Button className="min-h-11 md:min-h-0" size="sm" variant="outline" onClick={() => void handleLookup()}>
+                            <Button className="min-h-11 md:min-h-0" disabled={lookupBusy} size="sm" variant="outline" onClick={() => void handleLookup()}>
+                                {lookupBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                 Fill
                             </Button>
                         </div>
@@ -251,7 +322,7 @@ export function SendPage() {
                     </div>
                     <div className="flex flex-col gap-2">
                         <Label className="text-xs font-medium text-muted-foreground" htmlFor="send-to">
-                            Recipient
+                            Recipient <span className="text-destructive">*</span>
                         </Label>
                         <Input
                             className="h-8 text-xs"
@@ -291,7 +362,8 @@ export function SendPage() {
                             size="sm"
                             onClick={() => void handleManualSend()}
                         >
-                            {isLoading ? "Sending…" : "Send email"}
+                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Send email
                         </Button>
                     </div>
                 </div>
@@ -315,7 +387,7 @@ export function SendPage() {
                     {sendMode === "event" ? (
                         <div className="flex flex-col gap-2">
                             <Label className="text-xs font-medium text-muted-foreground" htmlFor="sendnow-event">
-                                Event key
+                                Event key <span className="text-destructive">*</span>
                             </Label>
                             <MsCombobox
                                 disabled={catalog.isLoading || eventOptions.length === 0}
@@ -329,14 +401,14 @@ export function SendPage() {
                             />
                             {catalog.error ? (
                                 <p className="text-[11px] leading-snug text-destructive" role="alert">
-                                    Catalog failed to load: {catalog.error}
+                                    Catalog failed to load: {humaniseSendError(catalog.error)}
                                 </p>
                             ) : null}
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2">
                             <Label className="text-xs font-medium text-muted-foreground" htmlFor="sendnow-binding">
-                                Binding id
+                                Binding id <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 className="h-8 text-xs"
@@ -360,7 +432,8 @@ export function SendPage() {
                             variant="outline"
                             onClick={() => void handleSendNow()}
                         >
-                            {isLoading ? "Dispatching…" : "Dispatch"}
+                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Dispatch
                         </Button>
                     </div>
                 </div>
@@ -369,32 +442,25 @@ export function SendPage() {
             <div className="flex flex-col gap-3 rounded-lg border bg-card p-4" data-testid="send-tokens">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-sm font-semibold">Tokens &amp; send mode</h2>
-                    <Button
-                        className="min-h-11 md:min-h-0"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleReset}
-                    >
-                        Reset form
-                    </Button>
                 </div>
                 <p className="text-xs text-muted-foreground" role="status">
                     {mailModeCopy}
                 </p>
                 {selectedTemplate ? (
                     <>
-                        <p className="text-xs text-muted-foreground">
-                            <span className="font-medium text-foreground">
+                        <p className="min-w-0 text-xs text-muted-foreground">
+                            <span className="block max-w-full truncate font-medium text-foreground" title={selectedTemplate.template_name}>
                                 {selectedTemplate.template_name}
-                            </span>{" "}
-                            against{" "}
-                            <span className="font-medium text-foreground tabular-nums">
+                            </span>
+                            <span className="block max-w-full truncate font-mono" title={sendMode === "event" && resolvedEventKey ? resolvedEventKey : "no event selected"}>
                                 {sendMode === "event" && resolvedEventKey
                                     ? resolvedEventKey
                                     : "no event selected"}
                             </span>
-                            . Provided tokens resolve from the event payload; unmapped
-                            tokens render empty to the recipient.
+                            <span>
+                                Provided tokens resolve from the event payload; unmapped
+                                tokens render empty to the recipient.
+                            </span>
                         </p>
                         {tokenGroups.provided.length > 0 ? (
                             <div className="flex flex-col gap-1">
@@ -404,7 +470,7 @@ export function SendPage() {
                                 <ul className="flex flex-wrap gap-1">
                                     {tokenGroups.provided.map((token) => (
                                         <li
-                                            className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums"
+                                            className="max-w-48 truncate rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px]"
                                             key={token}
                                             title={`{{${token}}} resolves from this event`}
                                         >
@@ -422,7 +488,7 @@ export function SendPage() {
                                 <ul className="flex flex-wrap gap-1">
                                     {tokenGroups.unmapped.map((token) => (
                                         <li
-                                            className="rounded border border-destructive/40 px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-destructive"
+                                            className="max-w-48 truncate rounded border border-destructive/40 px-1.5 py-0.5 font-mono text-[11px] text-destructive"
                                             key={token}
                                             title={`{{${token}}} is not sent by this event — renders empty`}
                                         >
@@ -454,10 +520,11 @@ export function SendPage() {
                         </div>
                     </>
                 ) : (
-                    <p className="text-xs text-muted-foreground">
-                        Pick a template above to see its tokens against the chosen event,
-                        with a preview link.
-                    </p>
+                    <div className="flex flex-col items-center gap-2 py-8 text-center">
+                        <MailOpen className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Pick a template above to see its tokens.</p>
+                        <p className="text-xs text-muted-foreground">Tokens are checked against the chosen event, with a preview link.</p>
+                    </div>
                 )}
             </div>
 
@@ -468,22 +535,41 @@ export function SendPage() {
             ) : null}
             {error ? (
                 <p className="text-sm text-destructive" data-testid="send-error" role="alert">
-                    {error}
+                    {humaniseSendError(error)}
                 </p>
             ) : null}
             {data ? (
                 <div
-                    className="rounded-lg border bg-card p-4"
+                    className="flex min-w-0 flex-col gap-2 rounded-lg border bg-card p-4"
                     data-testid="send-outcome"
                     role="status"
                 >
-                    <p className="text-sm font-medium">
-                        {data.ok ? "Recorded." : `Not sent — ${data.reason ?? "no reason given"}`}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                        {[data.status ? `status: ${data.status}` : null, data.idempotency_key ? `key: ${data.idempotency_key}` : null]
-                            .filter(Boolean)
-                            .join(" · ") || "no further details"}
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Badge
+                            className={data.ok
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                : "border-destructive/40 bg-destructive/10 text-destructive"}
+                            variant="outline"
+                        >
+                            {data.ok ? "Recorded" : "Not sent"}
+                        </Badge>
+                        <p className="min-w-0 flex-1 truncate text-sm font-medium" title={data.ok ? "Recorded." : sendFailureCopy(data.reason)}>
+                            {data.ok ? "Recorded." : sendFailureCopy(data.reason)}
+                        </p>
+                    </div>
+                    <p className="min-w-0 truncate text-xs text-muted-foreground" title={outcomeDetails}>
+                        {data.status ? (
+                            <span>
+                                status: {data.status}
+                            </span>
+                        ) : null}
+                        {data.status && data.idempotency_key ? <span> · </span> : null}
+                        {data.idempotency_key ? (
+                            <span className="font-mono" title={data.idempotency_key}>
+                                {data.idempotency_key}
+                            </span>
+                        ) : null}
+                        {!data.status && !data.idempotency_key ? "no further details" : null}
                     </p>
                 </div>
             ) : null}

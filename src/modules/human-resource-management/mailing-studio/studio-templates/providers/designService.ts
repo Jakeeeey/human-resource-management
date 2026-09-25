@@ -4,7 +4,6 @@
 //   { success: boolean, data?: T, message?: string }
 // Verb contract (T4 handlers delegate straight to
 // services/design-persistence-service.ts):
-//   POST ""                       → save (create-or-PATCH by template_key)
 //   GET  ?template_key=...        → single row (null data when absent)
 //   GET  (no params)              → list, newest first
 // Pure client — no dFetch/Directus here (that lives server-side in
@@ -12,6 +11,7 @@
 // useDesignAutosave surfaces status "error". Never touches mail_outbox.
 
 export interface DesignSavePayload {
+    id?: number | string;
     template_key: string;
     template_name: string;
     subject: string;
@@ -76,7 +76,6 @@ async function request<T>(
 }
 
 /**
- * Saves a design (server upserts by template_key via design-persistence-service).
  * @param payload - Template meta + stringified design_json.
  * @returns The verified row plus the envelope message (export warnings, if any).
  * @throws Error when the route rejects or returns no data.
@@ -84,6 +83,16 @@ async function request<T>(
 export async function saveDesign(
     payload: DesignSavePayload,
 ): Promise<{ row: DesignRow; message: string | null }> {
+    const { id, ...body } = payload;
+    const idText = id === undefined || id === null ? "" : String(id).trim();
+    if (idText !== "") {
+        const { data: row, message } = await request<DesignRow>(
+            `/${encodeURIComponent(idText)}`,
+            { method: "PATCH", body: JSON.stringify(body) },
+        );
+        if (!row) throw new Error("Design save returned no data");
+        return { row, message };
+    }
     const { data: row, message } = await request<DesignRow>("", {
         method: "POST",
         body: JSON.stringify(payload),

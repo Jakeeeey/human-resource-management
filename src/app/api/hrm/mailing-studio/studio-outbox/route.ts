@@ -1,31 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { msOutboxStatusSchema } from "@/modules/human-resource-management/mailing-studio/studio-outbox/types/ms-outbox.schema";
-import { msToMaskedOutboxRow } from "@/modules/human-resource-management/mailing-studio/studio-outbox/utils/ms-mask";
+import { msToOutboxRow } from "@/modules/human-resource-management/mailing-studio/studio-outbox/types/ms-outbox-row";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-// GET /api/hrm/mailing-studio/outbox?status=<queued|sent|failed|skipped|dry_run>
-//
-// Status-only outbox viewer (D17 — NO resend endpoint exists on this path;
-// PATCH/DELETE are not exported, so Next answers 405). Unlike the old
-// login-gated unmasked viewer, this route MASKS `to_email` at the edge via
-// utils/ms-mask (msToMaskedOutboxRow): full addresses never leave the server,
-// including `warnings`/`error` echoes (scrubbed for email-like substrings).
-// No Zod body validation: GET has no body; the `status` query value is
-// validated against msOutboxStatusSchema and an unknown value answers 400
-// (never 500, never an ambiguous empty 200). Byte-parity with the old
-// api/hrm/mailing/outbox route (READ-ONLY reference) for envelope + status
-// codes; rows are masked projections of ms_outbox.
-//
-// List shape (S3-05): server status + event-key filters, contains `search`
-// across to_email/event_key/idempotency_key, allowlisted `sort`, and
-// page/limit pagination (default 10, QA §11) with `meta=filter_count` for
-// the total. The list NEVER ships `rendered_body_html` (fetched per-row via
-// the by-id route on select) and carries no `warnings`/`error` echoes —
-// the detail pane owns those. Envelope data is
-// { rows, total, page, limit }.
 
 const OUTBOX_LIST_FIELDS =
     "id,idempotency_key,to_email,template_id,event_key,status,sent_at,attempts,next_attempt_at";
@@ -97,12 +76,6 @@ export async function GET(req: NextRequest) {
         const limit = clampInt(params.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
         const offset = (page - 1) * limit;
 
-        // Snapshot columns (`rendered_subject`/`rendered_body_html`) never
-        // ship in the list — the by-id route serves them on row select.
-        // `attempts`/`next_attempt_at` may lack a Directus read grant —
-        // Directus answers unknown fields with 400 (surfaced by dFetch as a
-        // body without `data`), so degrade to the base field set instead of
-        // breaking the list. Each step runs only on a no-`data` answer.
         const base =
             `/items/ms_outbox?fields=${OUTBOX_LIST_FIELDS}` +
             `&sort=${encodeURIComponent(sortParam)}&limit=${limit}&offset=${offset}` +
@@ -137,7 +110,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             success: true,
             data: {
-                rows: rows.map(msToMaskedOutboxRow),
+                rows: rows.map(msToOutboxRow),
                 total: total ?? rows.length,
                 page,
                 limit,

@@ -2,17 +2,19 @@
 
 import type { LucideIcon } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useStore } from "zustand";
 
 import {
+    ArrowLeft,
     Box,
     ChevronDown,
     Eye,
     HelpCircle,
     Layers,
     LayoutGrid,
+    Loader2,
     Mail,
     Minus,
     MousePointer2,
@@ -55,7 +57,8 @@ import { useDesignAutosave, type DesignAutosaveStatus } from "./hooks/useDesignA
 import { getDesign, previewDesign, sendCompiledTest } from "../providers/designService";
 import { fetchMsCatalog } from "./providers/msCatalog";
 import { canvasDocSchema, defaultBlockProps, type CanvasNode, type CanvasNodeType } from "./types/canvas-doc.schema";
-import { MS_EVENT_KEY_PATTERN, type MsCatalogRow } from "../types/ms-catalog.schema";
+import { type MsCatalogRow } from "../types/ms-catalog.schema";
+import { MS_TEMPLATE_KEY_HINT, MS_TEMPLATE_KEY_PATTERN } from "../utils/ms-template-key";
 import { extractPayloadExample } from "../utils/ms-variables";
 import { renderTemplate } from "../utils/template-render";
 
@@ -157,7 +160,7 @@ interface TemplateKeyResolution {
 function useTemplateKey(propKey?: string): TemplateKeyResolution {
     const params = useSearchParams();
     const requestedKey = propKey ?? params.get("key") ?? params.get("template_key");
-    if (requestedKey !== null && MS_EVENT_KEY_PATTERN.test(requestedKey)) {
+    if (requestedKey !== null && MS_TEMPLATE_KEY_PATTERN.test(requestedKey)) {
         return { templateKey: requestedKey, requestedKey, keyRewritten: false };
     }
     return {
@@ -210,6 +213,8 @@ function warningTargetIds(
 function StudioTopBar({
     name,
     onNameChange,
+    onBack,
+    backBusy,
     onUndo,
     onRedo,
     canUndo,
@@ -227,6 +232,8 @@ function StudioTopBar({
 }: {
     readonly name: string;
     readonly onNameChange: (next: string) => void;
+    readonly onBack: () => void;
+    readonly backBusy: boolean;
     readonly onUndo: () => void;
     readonly onRedo: () => void;
     readonly canUndo: boolean;
@@ -245,6 +252,16 @@ function StudioTopBar({
     return (
         <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-card px-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
+                <Button
+                    aria-label="Back to templates"
+                    className="shrink-0"
+                    disabled={backBusy}
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={onBack}
+                >
+                    {backBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeft />}
+                </Button>
                 <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
                     <Mail aria-hidden="true" />
                 </div>
@@ -418,6 +435,8 @@ function ElementsPanel() {
 function SettingsPanel({
     templateName,
     onTemplateNameChange,
+    templateKey,
+    onTemplateKeyChange,
     subject,
     onSubjectChange,
     device,
@@ -426,6 +445,8 @@ function SettingsPanel({
 }: {
     readonly templateName: string;
     readonly onTemplateNameChange: (next: string) => void;
+    readonly templateKey: string;
+    readonly onTemplateKeyChange: (next: string) => void;
     readonly subject: string;
     readonly onSubjectChange: (next: string) => void;
     readonly device: StudioDevice;
@@ -474,6 +495,22 @@ function SettingsPanel({
                             value={subject}
                             onChange={(event) => onSubjectChange(event.target.value)}
                         />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="settings-template-key">
+                            Template key
+                        </Label>
+                        <Input
+                            aria-label="Template key"
+                            className="h-8 font-mono text-xs"
+                            id="settings-template-key"
+                            spellCheck={false}
+                            value={templateKey}
+                            onChange={(event) => onTemplateKeyChange(event.target.value)}
+                        />
+                        <p className="text-[11px] leading-relaxed text-muted-foreground">
+                            {MS_TEMPLATE_KEY_HINT}
+                        </p>
                     </div>
                 </section>
 
@@ -651,6 +688,8 @@ function applyPreviewSample(
 
 const UNKNOWN_VAR_PREFIX = "unknown-var:";
 
+const VARIABLE_EVENT_STORAGE_KEY = "ms.mailingStudio.variableEventKey";
+
 function unknownTokenPaths(warnings: readonly string[]): string[] {
     return warnings
         .filter((warning) => warning.startsWith(UNKNOWN_VAR_PREFIX))
@@ -695,11 +734,14 @@ function StudioLoadingFallback() {
 
 function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?: string }) {
     const { templateKey, requestedKey, keyRewritten } = useTemplateKey(propTemplateKey);
+    const router = useRouter();
     const [panel, setPanel] = useState<PanelId>("elements");
     const [device, setDevice] = useState<StudioDevice>("desktop");
     const [propsOpen, setPropsOpen] = useState(false);
     const [templateName, setTemplateName] = useState<string>(DEFAULT_DESIGN_META.templateName);
     const [subject, setSubject] = useState<string>(DEFAULT_DESIGN_META.subject);
+    const [templateKeyDraft, setTemplateKeyDraft] = useState<string | null>(null);
+    const [templateId, setTemplateId] = useState<number | string | null>(null);
     const [previewing, setPreviewing] = useState(false);
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
     const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
@@ -711,9 +753,13 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
     const [previewNoticesOpen, setPreviewNoticesOpen] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [previewError, setPreviewError] = useState<string | null>(null);
+    const [variableCatalog, setVariableCatalog] = useState<readonly MsCatalogRow[]>([]);
+    const [variableCatalogLoaded, setVariableCatalogLoaded] = useState(false);
+    const [variableEventKey, setVariableEventKey] = useState("");
     const savedSelectionRef = useRef<string[]>([]);
     const previewDesignJsonRef = useRef<string | null>(null);
     const [sending, setSending] = useState(false);
+    const [backBusy, setBackBusy] = useState(false);
     const [sendOpen, setSendOpen] = useState(false);
     const [sendEmail, setSendEmail] = useState("");
     const [sendError, setSendError] = useState<string | null>(null);
@@ -727,13 +773,16 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
 
     const width = STUDIO_DEVICE_WIDTHS[device];
 
+    const effectiveKey = templateKeyDraft ?? templateKey;
+
     const autosaveOptions = useMemo(
         () => ({
-            templateKey,
+            templateId: templateId ?? undefined,
+            templateKey: effectiveKey,
             templateName,
             subject,
         }),
-        [templateKey, templateName, subject],
+        [templateId, effectiveKey, templateName, subject],
     );
     const { save, status, error, dirty } = useDesignAutosave(autosaveOptions);
 
@@ -745,7 +794,13 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
             try {
                 const row = await getDesign(templateKey);
                 if (cancelled) return;
-                if (keyRewritten && requestedKey && invalidKeyToastedRef.current !== requestedKey) {
+                setTemplateId(row?.id ?? null);
+                if (
+                    keyRewritten &&
+                    requestedKey &&
+                    requestedKey !== TEMPLATE_KEY_FALLBACK &&
+                    invalidKeyToastedRef.current !== requestedKey
+                ) {
                     invalidKeyToastedRef.current = requestedKey;
                     setKeyNotice(
                         `Unknown template key "${requestedKey}" — opened "${TEMPLATE_KEY_FALLBACK}" instead. Nothing was changed.`,
@@ -838,9 +893,72 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
         }
     }, [status, error]);
 
+    useEffect(() => {
+        try {
+            const stored = window.localStorage.getItem(VARIABLE_EVENT_STORAGE_KEY);
+            if (stored) setVariableEventKey(stored);
+        } catch {
+            setVariableEventKey("");
+        }
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const fetched = await fetchMsCatalog({ is_active: true });
+                if (cancelled) return;
+                setVariableCatalog(
+                    fetched
+                        .filter(isActiveCatalogRow)
+                        .sort((a, b) => a.event_key.localeCompare(b.event_key)),
+                );
+            } catch {
+                if (!cancelled) setVariableCatalog([]);
+            } finally {
+                if (!cancelled) setVariableCatalogLoaded(true);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!variableCatalogLoaded || variableEventKey === "") return;
+        if (!variableCatalog.some((row) => row.event_key === variableEventKey)) {
+            setVariableEventKey("");
+            try {
+                window.localStorage.removeItem(VARIABLE_EVENT_STORAGE_KEY);
+            } catch {
+                return;
+            }
+        }
+    }, [variableCatalogLoaded, variableCatalog, variableEventKey]);
+
+    const handleVariableEventChange = useCallback((next: string): void => {
+        setVariableEventKey(next);
+        try {
+            if (next) window.localStorage.setItem(VARIABLE_EVENT_STORAGE_KEY, next);
+            else window.localStorage.removeItem(VARIABLE_EVENT_STORAGE_KEY);
+        } catch {
+            return;
+        }
+    }, []);
+
     const handleSave = useCallback(async (): Promise<void> => {
-        const { ok, message: saveMessage } = await save();
+        if (!MS_TEMPLATE_KEY_PATTERN.test(effectiveKey)) {
+            toast.error(`Template key: ${MS_TEMPLATE_KEY_HINT}`);
+            return;
+        }
+        const { ok, message: saveMessage, row } = await save();
         if (!ok) return;
+        if (row && row.template_key !== templateKey) {
+            setTemplateKeyDraft(row.template_key);
+            router.replace(
+                `/hrm/mailing-studio/studio-templates/${encodeURIComponent(row.template_key)}/design`,
+            );
+        }
         toast.success("Design saved.");
         if (saveMessage) {
             setExportNotes(saveMessage);
@@ -848,7 +966,21 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                 warningTargetIds(saveMessage, useCanvasDoc.getState().nodes),
             );
         }
-    }, [save]);
+    }, [save, effectiveKey, templateKey, router]);
+
+    const handleBack = useCallback(async (): Promise<void> => {
+        if (!dirty) {
+            router.push("/hrm/mailing-studio/studio-templates");
+            return;
+        }
+        setBackBusy(true);
+        try {
+            const { ok } = await save();
+            if (ok) router.push("/hrm/mailing-studio/studio-templates");
+        } finally {
+            setBackBusy(false);
+        }
+    }, [dirty, save, router]);
 
     // Preview = compiled receiver output. Snapshots the LIVE doc in-memory
     // (never saves), clears editor selection so no rings/handles persist, then
@@ -1022,7 +1154,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                 rootIds: store.rootIds,
             });
             const compiled = await previewDesign(design_json, subject);
-            const row = await getDesign(templateKey);
+            const row = await getDesign(effectiveKey);
             if (row?.id === undefined || row.id === null) {
                 throw new Error("Save your design once before sending a test.");
             }
@@ -1044,7 +1176,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
         } finally {
             setSending(false);
         }
-    }, [sendEmail, sending, subject, templateKey]);
+    }, [sendEmail, sending, subject, effectiveKey]);
 
     if (hydrating) {
         return <StudioLoadingFallback />;
@@ -1239,6 +1371,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
     return (
         <div className="flex min-h-0 w-full flex-1 flex-col bg-background">
             <StudioTopBar
+                backBusy={backBusy}
                 canRedo={canRedo}
                 canUndo={canUndo}
                 device={device}
@@ -1247,6 +1380,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                 propsOpen={propsOpen}
                 saveStatus={status}
                 sending={sending}
+                onBack={() => void handleBack()}
                 onDeviceChange={setDevice}
                 onNameChange={setTemplateName}
                 onPreview={() => void handlePreview()}
@@ -1368,15 +1502,21 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                         device={device}
                         exportNotes={exportNotes}
                         subject={subject}
+                        templateKey={effectiveKey}
                         templateName={templateName}
                         onDeviceChange={setDevice}
                         onSubjectChange={setSubject}
+                        onTemplateKeyChange={setTemplateKeyDraft}
                         onTemplateNameChange={setTemplateName}
                     />
                 ) : null}
                 {panel === "help" ? <HelpPanel /> : null}
                 <StageCanvas width={width} onEmptyAdd={() => setPanel("elements")} />
-                <PropertyPanel />
+                <PropertyPanel
+                    catalog={variableCatalog}
+                    variableEventKey={variableEventKey}
+                    onVariableEventChange={handleVariableEventChange}
+                />
                 {propsOpen ? (
                     <div className="fixed inset-0 z-40 2xl:hidden">
                         <button
@@ -1386,7 +1526,12 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                             onClick={() => setPropsOpen(false)}
                         />
                         <div className="absolute bottom-0 right-0 top-0 flex max-h-[100dvh] w-[280px] flex-col overflow-hidden border-l bg-card shadow-xl">
-                            <PropertyPanel sheet />
+                            <PropertyPanel
+                                catalog={variableCatalog}
+                                sheet
+                                variableEventKey={variableEventKey}
+                                onVariableEventChange={handleVariableEventChange}
+                            />
                         </div>
                     </div>
                 ) : null}

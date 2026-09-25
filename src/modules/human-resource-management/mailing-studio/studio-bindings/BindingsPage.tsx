@@ -1,10 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+    Link2,
+    Loader2,
+    MoreVertical,
+    RefreshCw,
+    SearchX,
+    TriangleAlert,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -37,6 +61,8 @@ type BindingFilter = "all" | "attention" | "disabled";
 
 type BindingSort = "event" | "template";
 
+type BindingDialogMode = "create" | "edit";
+
 const FILTERS: readonly { readonly value: BindingFilter; readonly label: string }[] = [
     { value: "all", label: "All" },
     { value: "attention", label: "Needs attention" },
@@ -57,220 +83,288 @@ function catalogRowIsActive(row: MsCatalogRow): boolean {
     return value === true || value === 1 || value === "1" || value === "true";
 }
 
-function humaniseCreateError(message: string, eventKey: string): string {
+function stripMachineCode(message: string): string {
+    const stripped = message.replace(/^[A-Z][A-Z0-9_]+:\s*/, "").trim();
+    return stripped === "" ? message.trim() : stripped;
+}
+
+function humaniseBindingError(message: string, eventKey = ""): string {
     if (message.includes("UNKNOWN_EVENT_KEY")) {
-        return `Event key “${eventKey}” is not an active catalog key — register it in the event registry or pick another key.`;
+        return eventKey === ""
+            ? "This event key is not an active catalog key — configure it in the event registry or pick another key."
+            : `Event key “${eventKey}” is not an active catalog key — configure it in the event registry or pick another key.`;
     }
-    return message;
+    const stripped = stripMachineCode(message);
+    if (stripped !== "") return stripped;
+    return "Something went wrong — please try again.";
+}
+
+function MsBindingDialog({
+    open,
+    onOpenChange,
+    mode,
+    binding,
+    eventOptions,
+    templateOptions,
+    catalogLoading,
+    catalogError,
+    templatesLoading,
+    submitting,
+    onSubmit,
+}: {
+    readonly open: boolean;
+    readonly onOpenChange: (open: boolean) => void;
+    readonly mode: BindingDialogMode;
+    readonly binding: MsBindingRow | null;
+    readonly eventOptions: readonly { readonly value: string; readonly label: string }[];
+    readonly templateOptions: readonly { readonly value: string; readonly label: string }[];
+    readonly catalogLoading: boolean;
+    readonly catalogError: string | null;
+    readonly templatesLoading: boolean;
+    readonly submitting: boolean;
+    readonly onSubmit: (draft: { eventKeyId: string; templateId: string; enabled: boolean }) => Promise<string | null>;
+}) {
+    const initialEvent = binding ? String(binding.event_key_id) : (eventOptions[0]?.value ?? "");
+    const initialTemplate = binding ? String(binding.template_id) : "";
+    const initialEnabled = binding ? isEnabled(binding.is_enabled) : true;
+
+    const [eventDraft, setEventDraft] = useState(initialEvent);
+    const [templateDraft, setTemplateDraft] = useState(initialTemplate);
+    const [enabledDraft, setEnabledDraft] = useState(initialEnabled);
+    const [localError, setLocalError] = useState<string | null>(null);
+
+    const title = mode === "create" ? "Hook binding" : "Edit binding";
+    const description =
+        mode === "create"
+            ? "Hook a registered event key to a template so the studio knows what to send."
+            : "Change which event key or template this binding points at.";
+    const submitLabel = mode === "create" ? "Hook binding" : "Save fields";
+    const eventId = binding ? `binding-event-${String(binding.id)}` : "binding-event";
+    const templateId = binding ? `binding-template-${String(binding.id)}` : "binding-template";
+
+    const handleSubmit = (event: React.FormEvent): void => {
+        event.preventDefault();
+        if (!eventDraft) {
+            setLocalError(humaniseBindingError("Event key is required — configure one in the event registry."));
+            return;
+        }
+        if (!templateDraft.trim()) {
+            setLocalError(humaniseBindingError("Template is required — pick one from the template list."));
+            return;
+        }
+        setLocalError(null);
+        void onSubmit({ eventKeyId: eventDraft, templateId: templateDraft.trim(), enabled: enabledDraft }).then(
+            (failure) => {
+                if (failure !== null) setLocalError(humaniseBindingError(failure, eventDraft));
+            },
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[85vh] w-[95vw] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-[500px]">
+                <DialogHeader className="px-6 pt-6">
+                    <DialogTitle className="line-clamp-1">{title}</DialogTitle>
+                    <DialogDescription>{description}</DialogDescription>
+                </DialogHeader>
+                <form data-testid="bindings-form" onSubmit={handleSubmit}>
+                    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={eventId}>
+                                Event key <span className="text-destructive">*</span>
+                            </Label>
+                            {catalogLoading && eventOptions.length === 0 ? (
+                                <Skeleton className="h-8 w-full" />
+                            ) : (
+                                <MsCombobox
+                                    disabled={eventOptions.length === 0}
+                                    emptyText="No active event keys."
+                                    id={eventId}
+                                    options={eventOptions}
+                                    placeholder={eventOptions.length === 0 ? "No active event keys" : "Select an event key"}
+                                    searchPlaceholder="Search event keys…"
+                                    value={eventDraft}
+                                    onValueChange={setEventDraft}
+                                />
+                            )}
+                            {catalogError ? (
+                                <p className="text-[11px] leading-snug text-destructive" role="alert">
+                                    Event catalog failed to load: {humaniseBindingError(catalogError)}
+                                </p>
+                            ) : null}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={templateId}>
+                                Template <span className="text-destructive">*</span>
+                            </Label>
+                            <MsCombobox
+                                disabled={templatesLoading}
+                                emptyText="No templates found."
+                                id={templateId}
+                                options={templateOptions}
+                                placeholder={templatesLoading ? "Loading templates…" : "Select a template"}
+                                searchPlaceholder="Search templates…"
+                                value={templateDraft}
+                                onValueChange={setTemplateDraft}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Switch
+                                aria-label="Binding enabled"
+                                checked={enabledDraft}
+                                onCheckedChange={setEnabledDraft}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                {enabledDraft ? "Enabled" : "Disabled"}
+                            </span>
+                        </div>
+                        {localError ? (
+                            <p className="text-xs text-destructive" role="alert">
+                                {localError}
+                            </p>
+                        ) : null}
+                    </div>
+                    <DialogFooter className="border-t bg-muted/20 px-6 py-4">
+                        <DialogClose asChild>
+                            <Button className="min-h-11 md:min-h-0" size="sm" type="button" variant="outline">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button className="min-h-11 md:min-h-0" disabled={submitting} size="sm" type="submit">
+                            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            {submitLabel}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 function BindingRowCard({
     row,
+    eventKeyText,
     unmapped,
     unresolvable,
     templateName,
-    eventOptions,
-    templateOptions,
     onToggle,
     onRemove,
-    onPatch,
+    onEdit,
     busy,
 }: {
     readonly row: MsBindingRow;
+    readonly eventKeyText: string;
     readonly unmapped: readonly string[];
     readonly unresolvable: string | null;
     readonly templateName: string;
-    readonly eventOptions: readonly { readonly value: string; readonly label: string }[];
-    readonly templateOptions: readonly { readonly value: string; readonly label: string }[];
     readonly onToggle: () => void;
     readonly onRemove: () => void;
-    readonly onPatch: (patch: MsBindingPatch) => Promise<boolean>;
+    readonly onEdit: () => void;
     readonly busy: boolean;
 }) {
-    const [editing, setEditing] = useState(false);
-    const [eventDraft, setEventDraft] = useState(row.event_key);
-    const [templateDraft, setTemplateDraft] = useState(String(row.template_id));
-    const [editError, setEditError] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
-
-    const openEditor = (): void => {
-        setEventDraft(row.event_key);
-        setTemplateDraft(String(row.template_id));
-        setEditError(null);
-        setEditing(true);
-    };
-
-    const handleSaveFields = async (): Promise<void> => {
-        if (!eventDraft) {
-            setEditError("Event key is required — configure one in the event registry.");
-            return;
-        }
-        if (!templateDraft.trim()) {
-            setEditError("Template is required — pick one from the template list.");
-            return;
-        }
-        const patch: MsBindingPatch = {};
-        if (eventDraft !== row.event_key) patch.event_key = eventDraft;
-        if (templateDraft.trim() !== String(row.template_id)) {
-            patch.template_id = templateDraft.trim();
-        }
-        if (Object.keys(patch).length === 0) {
-            setEditing(false);
-            return;
-        }
-        setSaving(true);
-        try {
-            const ok = await onPatch(patch);
-            if (ok) setEditing(false);
-            else setEditError("Save was rejected — the list banner holds the reason.");
-        } finally {
-            setSaving(false);
-        }
-    };
+    const enabled = isEnabled(row.is_enabled);
 
     return (
         <li
             className="flex flex-col gap-2 rounded-lg border bg-card p-3"
             data-testid="binding-row"
         >
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-start gap-3">
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-sm font-medium tabular-nums" title={row.event_key}>
-                        {row.event_key}
+                    <span className="truncate font-mono text-sm font-medium" title={eventKeyText}>
+                        {eventKeyText}
                     </span>
                     <span
-                        className="truncate text-xs text-muted-foreground tabular-nums"
+                        className="truncate font-mono text-xs text-muted-foreground"
                         title={templateName}
                     >
                         {templateName}
                     </span>
                 </div>
-                <Badge variant={isEnabled(row.is_enabled) ? "default" : "outline"}>
-                    {isEnabled(row.is_enabled) ? "Enabled" : "Disabled"}
+                <Badge
+                    className={
+                        enabled
+                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                            : "border-muted-foreground/30 bg-muted text-muted-foreground"
+                    }
+                    variant="outline"
+                >
+                    {enabled ? "Enabled" : "Disabled"}
                 </Badge>
                 {unmapped.length > 0 ? (
                     <Badge variant="outline" data-testid="binding-unmapped-badge">
                         Unmapped {unmapped.length}
                     </Badge>
                 ) : null}
-                <Button
-                    aria-label={`${editing ? "Close field editor for" : "Fields for"} binding ${String(row.id)}`}
-                    className="min-h-11 md:min-h-0"
-                    disabled={busy}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => (editing ? setEditing(false) : openEditor())}
-                >
-                    {editing ? "Close" : "Fields"}
-                </Button>
-                <Button
-                    aria-label={`${isEnabled(row.is_enabled) ? "Disable" : "Enable"} binding ${String(row.id)}`}
-                    className="min-h-11 md:min-h-0"
-                    disabled={busy}
-                    size="sm"
-                    variant="outline"
-                    onClick={onToggle}
-                >
-                    {isEnabled(row.is_enabled) ? "Disable" : "Enable"}
-                </Button>
-                <Button
-                    aria-label={`Unhook binding ${String(row.id)}`}
-                    className="min-h-11 md:min-h-0"
-                    disabled={busy}
-                    size="sm"
-                    variant="outline"
-                    onClick={onRemove}
-                >
-                    Unhook
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            aria-label={`Actions for binding ${String(row.id)}`}
+                            className="h-8 w-8 shrink-0"
+                            disabled={busy}
+                            size="icon"
+                            variant="ghost"
+                        >
+                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[180px]">
+                        <DropdownMenuItem disabled={busy} onSelect={onEdit}>
+                            Edit fields
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled={busy} onSelect={onToggle}>
+                            {enabled ? "Disable" : "Enable"}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                            disabled={busy}
+                            onSelect={onRemove}
+                        >
+                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Unhook
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
             {unresolvable !== null ? (
-                <p className="text-xs text-destructive" data-testid="binding-unresolved" role="alert">
-                    {unresolvable}
-                </p>
+                <div
+                    className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
+                    data-testid="binding-unresolved"
+                    role="alert"
+                >
+                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{unresolvable}</span>
+                </div>
             ) : unmapped.length > 0 ? (
-                <p className="text-xs text-destructive" data-testid="binding-unmapped" role="alert">
-                    Unmapped variables: {unmapped.join(", ")} — the template uses
-                    {unmapped.length === 1 ? " this key" : " these keys"} but the event does
-                    not provide {unmapped.length === 1 ? "it" : "them"}. Fix the token or
-                    the event schema; nothing is auto-repaired.
-                </p>
-            ) : null}
-            {editing ? (
-                <div className="flex flex-col gap-3 border-t pt-3">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="flex flex-col gap-2">
-                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={`binding-event-${String(row.id)}`}>
-                                Event key
-                            </Label>
-                            <MsCombobox
-                                emptyText="No active event keys."
-                                id={`binding-event-${String(row.id)}`}
-                                options={eventOptions}
-                                placeholder="Select an event key"
-                                searchPlaceholder="Search event keys…"
-                                value={eventDraft}
-                                onValueChange={setEventDraft}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={`binding-template-${String(row.id)}`}>
-                                Template
-                            </Label>
-                            <MsCombobox
-                                emptyText="No templates found."
-                                id={`binding-template-${String(row.id)}`}
-                                options={templateOptions}
-                                placeholder="Select a template"
-                                searchPlaceholder="Search templates…"
-                                value={templateDraft}
-                                onValueChange={setTemplateDraft}
-                            />
-                        </div>
-                    </div>
-                    {editError ? (
-                        <p className="text-xs text-destructive" role="alert">
-                            {editError}
-                        </p>
-                    ) : null}
-                    <div>
-                        <Button
-                            aria-label={`Save fields for binding ${String(row.id)}`}
-                            className="min-h-11 md:min-h-0"
-                            disabled={saving}
-                            size="sm"
-                            onClick={() => void handleSaveFields()}
-                        >
-                            {saving ? "Saving…" : "Save fields"}
-                        </Button>
-                    </div>
+                <div
+                    className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
+                    data-testid="binding-unmapped"
+                    role="alert"
+                >
+                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                        Unmapped variables: {unmapped.join(", ")} — the template uses
+                        {unmapped.length === 1 ? " this key" : " these keys"} but the event does
+                        not provide {unmapped.length === 1 ? "it" : "them"}. Fix the token or
+                        the event schema; nothing is auto-repaired.
+                    </span>
                 </div>
             ) : null}
         </li>
     );
 }
 
-/**
- * Bindings tab — hook event keys to templates via the real bindings routes.
- * The event-key picker is sourced from the event_catalog (D4): any active
- * registered key binds, replacing the old 3-key enum. The template picker is
- * sourced from the loaded templates — no recall-based ids. Each row reconciles the
- * template's compiled variables against the bound event's payload_schema
- * (§7.7) — unmapped tokens are reported, never auto-repaired. Create
- * requires the full flat row; PATCH is_enabled:false is the soft unhook;
- * DELETE is the hard unhook (confirm-first, row is gone).
- */
 export function BindingsPage() {
     const { data, isLoading, error, refetch, update, remove } = useMsBindings();
     const catalog = useMsCatalog(true);
     const templates = useMsTemplates();
     const router = useRouter();
 
-    const [eventKey, setEventKey] = useState("");
-    const [templateId, setTemplateId] = useState("");
-    const [enabled, setEnabled] = useState(true);
-    const [formError, setFormError] = useState<string | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editingRow, setEditingRow] = useState<MsBindingRow | null>(null);
     const [creating, setCreating] = useState(false);
+    const [retrying, setRetrying] = useState(false);
     const [busyId, setBusyId] = useState<string | null>(null);
     const [unhookId, setUnhookId] = useState<string | null>(null);
     const [search, setSearch] = useState("");
@@ -281,12 +375,11 @@ export function BindingsPage() {
         return (catalog.data ?? [])
             .filter(catalogRowIsActive)
             .map((row) => ({
-                value: row.event_key,
+                value: String(row.id),
                 label: `${row.event_key} — ${row.label}${row.module ? ` · ${row.module}` : ""}`,
             }))
-            .sort((a, b) => a.value.localeCompare(b.value));
+            .sort((a, b) => a.label.localeCompare(b.label));
     }, [catalog.data]);
-    const resolvedEventKey = eventKey !== "" ? eventKey : (eventOptions[0]?.value ?? "");
 
     const templateOptions = useMemo(() => {
         return (templates.data ?? []).map((row) => ({
@@ -295,11 +388,18 @@ export function BindingsPage() {
         }));
     }, [templates.data]);
 
-    const catalogByKey = useMemo(() => {
+    const catalogById = useMemo(() => {
         const map = new Map<string, MsCatalogRow>();
-        for (const row of catalog.data ?? []) map.set(row.event_key, row);
+        for (const row of catalog.data ?? []) map.set(String(row.id), row);
         return map;
     }, [catalog.data]);
+
+    const resolveBindingKey = useCallback(
+        (eventKeyId: string | number): string => {
+            return catalogById.get(String(eventKeyId))?.event_key ?? "Unknown event";
+        },
+        [catalogById],
+    );
 
     const templateNameByRef = useMemo(() => {
         const byId = new Map<string, string>();
@@ -326,25 +426,28 @@ export function BindingsPage() {
         return { byId, byKey };
     }, [templates.data]);
 
-    const resolveTemplateName = (ref: string | number): string => {
-        const key = String(ref);
-        return (
-            templateNameByRef.byId.get(key) ??
-            templateNameByRef.byKey.get(key) ??
-            `template ${key}`
-        );
-    };
+    const resolveTemplateName = useCallback(
+        (ref: string | number): string => {
+            const key = String(ref);
+            return (
+                templateNameByRef.byId.get(key) ??
+                templateNameByRef.byKey.get(key) ??
+                "Unnamed template"
+            );
+        },
+        [templateNameByRef],
+    );
 
     const analysed = useMemo(() => {
         return (data ?? []).map((row) => {
-            const catalogRow = catalogByKey.get(row.event_key);
+            const catalogRow = catalogById.get(String(row.event_key_id));
             if (!catalogRow) {
-                return { row, unmapped: [] as string[], unresolvable: `Event key ${row.event_key} is not in the catalog.` as string | null };
+                return { row, unmapped: [] as string[], unresolvable: "This binding points at an event that is not in the catalog." as string | null };
             }
             const ref = String(row.template_id);
             const variables = templateVariables.byId.get(ref) ?? templateVariables.byKey.get(ref);
             if (!variables) {
-                return { row, unmapped: [] as string[], unresolvable: `Template ${ref} is not loaded — variables unknown.` as string | null };
+                return { row, unmapped: [] as string[], unresolvable: "This binding points at a template that is not loaded — variables unknown." as string | null };
             }
             const provided = extractPayloadKeys(catalogRow.payload_schema, catalogRow.payload_example);
             return {
@@ -353,7 +456,7 @@ export function BindingsPage() {
                 unresolvable: null as string | null,
             };
         });
-    }, [data, catalogByKey, templateVariables]);
+    }, [data, catalogById, templateVariables]);
 
     const attentionCount = useMemo(() => {
         return analysed.filter((item) => item.unmapped.length > 0 || item.unresolvable !== null).length;
@@ -369,7 +472,7 @@ export function BindingsPage() {
             if (!query) return true;
             const templateName = resolveTemplateName(item.row.template_id).toLowerCase();
             return (
-                item.row.event_key.toLowerCase().includes(query) ||
+                resolveBindingKey(item.row.event_key_id).toLowerCase().includes(query) ||
                 templateName.includes(query) ||
                 String(item.row.template_id).toLowerCase().includes(query)
             );
@@ -380,38 +483,55 @@ export function BindingsPage() {
                     resolveTemplateName(b.row.template_id),
                 );
             }
-            return a.row.event_key.localeCompare(b.row.event_key);
+            return resolveBindingKey(a.row.event_key_id).localeCompare(
+                resolveBindingKey(b.row.event_key_id),
+            );
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [analysed, filter, search, sort, templateNameByRef]);
+    }, [analysed, filter, search, sort, resolveTemplateName, resolveBindingKey]);
 
     const { page, totalPages, pageItems, setPage, resetPage } = useMsPagination(filtered.length);
     const visible = pageItems(filtered);
 
-    const handleCreate = async (): Promise<void> => {
-        setFormError(null);
-        if (resolvedEventKey === "") {
-            setFormError("Event key is required — configure one in the event registry.");
-            return;
-        }
-        if (!templateId.trim()) {
-            setFormError("Template is required — pick one from the template list.");
-            return;
-        }
+    const handleCreateSubmit = async (draft: { eventKeyId: string; templateId: string; enabled: boolean }): Promise<string | null> => {
         setCreating(true);
         try {
             await createMsBinding({
-                event_key: resolvedEventKey,
-                template_id: templateId.trim(),
-                is_enabled: enabled,
+                event_key_id: draft.eventKeyId,
+                template_id: draft.templateId,
+                is_enabled: draft.enabled,
             });
             await refetch();
-            setTemplateId("");
+            setCreateOpen(false);
+            return null;
         } catch (cause) {
             const message = cause instanceof Error ? cause.message : String(cause);
-            setFormError(humaniseCreateError(message, resolvedEventKey));
+            return message;
         } finally {
             setCreating(false);
+        }
+    };
+
+    const handleEditSubmit = async (draft: { eventKeyId: string; templateId: string; enabled: boolean }): Promise<string | null> => {
+        if (!editingRow) return "No binding is selected for editing — close and try again.";
+        const patch: MsBindingPatch = {};
+        if (draft.eventKeyId !== String(editingRow.event_key_id)) patch.event_key_id = draft.eventKeyId;
+        if (draft.templateId !== String(editingRow.template_id)) {
+            patch.template_id = draft.templateId;
+        }
+        if (draft.enabled !== isEnabled(editingRow.is_enabled)) patch.is_enabled = draft.enabled;
+        if (Object.keys(patch).length === 0) {
+            setEditingRow(null);
+            return null;
+        }
+        const key = String(editingRow.id);
+        setBusyId(key);
+        try {
+            const row = await update(editingRow.id, patch);
+            if (row === null) return "Save was rejected — the list banner holds the reason.";
+            setEditingRow(null);
+            return null;
+        } finally {
+            setBusyId(null);
         }
     };
 
@@ -420,20 +540,6 @@ export function BindingsPage() {
         setBusyId(key);
         try {
             await update(id, { is_enabled: !isEnabled(current) });
-        } finally {
-            setBusyId(null);
-        }
-    };
-
-    const handlePatchFields = async (
-        id: string | number,
-        patch: MsBindingPatch,
-    ): Promise<boolean> => {
-        const key = String(id);
-        setBusyId(key);
-        try {
-            const row = await update(id, patch);
-            return row !== null;
         } finally {
             setBusyId(null);
         }
@@ -450,130 +556,47 @@ export function BindingsPage() {
         }
     };
 
+    const handleRetry = async (): Promise<void> => {
+        setRetrying(true);
+        try {
+            await refetch();
+        } finally {
+            setRetrying(false);
+        }
+    };
+
     return (
         <section aria-label="Bindings" className="flex min-h-0 flex-1 flex-col gap-4">
-            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4" data-testid="bindings-registry-link">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-sm font-semibold">Event keys</h2>
+            <header className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                    <span className="p-3 bg-primary/10 rounded-2xl text-primary">
+                        <Link2 className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                        <h1 className="text-lg font-semibold tracking-tight">Bindings</h1>
+                        <p className="text-sm text-muted-foreground">Hook a registered event key to a template so the studio knows what to send.</p>
+                    </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
                         className="min-h-11 md:min-h-0"
+                        data-testid="bindings-registry-link"
                         size="sm"
                         variant="outline"
                         onClick={() => router.push("/hrm/mailing-studio/studio-event-registry")}
                     >
                         Configure event keys
                     </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                    Event keys and their payload variables are registered by developers in the event registry.
-                </p>
-            </div>
-
-            <div className="flex flex-col gap-3 rounded-lg border bg-card p-4" data-testid="bindings-form">
-                <h2 className="text-sm font-semibold">Hook a binding</h2>
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="binding-event">
-                            Event key <span className="text-destructive">*</span>
-                        </Label>
-                        {catalog.isLoading && !catalog.data ? (
-                            <Skeleton className="h-8 w-full" data-testid="bindings-catalog-loading" />
-                        ) : (
-                            <MsCombobox
-                                disabled={eventOptions.length === 0}
-                                emptyText="No active event keys."
-                                id="binding-event"
-                                options={eventOptions}
-                                placeholder={eventOptions.length === 0 ? "No active event keys" : "Select an event key"}
-                                searchPlaceholder="Search event keys…"
-                                value={resolvedEventKey}
-                                onValueChange={setEventKey}
-                            />
-                        )}
-                        {catalog.error ? (
-                            <p className="text-[11px] leading-snug text-destructive" role="alert">
-                                Catalog failed to load: {catalog.error}
-                            </p>
-                        ) : null}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="binding-template">
-                            Template <span className="text-destructive">*</span>
-                        </Label>
-                        <MsCombobox
-                            disabled={templates.isLoading}
-                            emptyText="No templates found."
-                            id="binding-template"
-                            options={templateOptions}
-                            placeholder={templates.isLoading ? "Loading templates…" : "Select a template"}
-                            searchPlaceholder="Search templates…"
-                            value={templateId}
-                            onValueChange={setTemplateId}
-                        />
-                    </div>
-                    <div className="flex items-end gap-2 pb-1">
-                        <Switch
-                            aria-label="Binding enabled"
-                            checked={enabled}
-                            onCheckedChange={setEnabled}
-                        />
-                        <span className="text-xs text-muted-foreground">
-                            {enabled ? "Enabled" : "Disabled"}
-                        </span>
-                    </div>
-                </div>
-                {formError ? (
-                    <p className="text-xs text-destructive" role="alert">
-                        {formError}
-                    </p>
-                ) : null}
-                <div>
-                    <Button
-                        className="min-h-11 md:min-h-0"
-                        disabled={creating}
-                        size="sm"
-                        onClick={() => void handleCreate()}
-                    >
-                        {creating ? "Hooking…" : "Hook binding"}
+                    <Button className="min-h-11 md:min-h-0" size="sm" onClick={() => setCreateOpen(true)}>
+                        Hook binding
                     </Button>
                 </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold">Hooked bindings</h2>
-                    {data ? (
-                        <span
-                            className="rounded-full border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground tabular-nums"
-                            data-testid="bindings-count"
-                        >
-                            {data.length}
-                        </span>
-                    ) : null}
-                </div>
-                <Button
-                    aria-label="Refresh bindings"
-                    className="min-h-11 md:min-h-0"
-                    disabled={isLoading}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void refetch()}
-                >
-                    Refresh
-                </Button>
-            </div>
-
-            {data && data.length > 0 ? (
-                <p className="text-xs text-muted-foreground tabular-nums" data-testid="bindings-summary" role="status">
-                    {data.length} binding{data.length === 1 ? "" : "s"}
-                    {attentionCount > 0 ? ` · ${attentionCount} need${attentionCount === 1 ? "s" : ""} attention` : " · all reconciled"}
-                </p>
-            ) : null}
+            </header>
 
             <div className="flex flex-wrap items-center gap-2">
                 <Input
                     aria-label="Search bindings"
-                    className="h-8 max-w-xs text-xs"
+                    className="h-8 w-full text-xs sm:max-w-xs"
                     placeholder="Search event key or template…"
                     value={search}
                     onChange={(event) => {
@@ -620,12 +643,44 @@ export function BindingsPage() {
                         ))}
                     </SelectContent>
                 </Select>
+                <Button
+                    aria-label="Refresh bindings"
+                    className="min-h-11 md:min-h-0"
+                    disabled={isLoading}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void refetch()}
+                >
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                </Button>
+                {data ? (
+                    <span
+                        className="ms-auto rounded-full border bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
+                        data-testid="bindings-count"
+                    >
+                        {data.length} {data.length === 1 ? "binding" : "bindings"}
+                    </span>
+                ) : null}
             </div>
+
+            {data && data.length > 0 ? (
+                <p className="text-xs text-muted-foreground tabular-nums" data-testid="bindings-summary" role="status">
+                    {data.length} binding{data.length === 1 ? "" : "s"}
+                    {attentionCount > 0 ? ` · ${attentionCount} need${attentionCount === 1 ? "s" : ""} attention` : " · all reconciled"}
+                </p>
+            ) : null}
 
             {isLoading && !data ? (
                 <div className="flex flex-col gap-2" data-testid="bindings-loading" role="status" aria-label="Loading bindings">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
+                    <div className="rounded-lg border bg-card p-3">
+                        <Skeleton className="h-4 w-2/3" />
+                        <Skeleton className="mt-2 h-3 w-1/3" />
+                    </div>
+                    <div className="rounded-lg border bg-card p-3">
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="mt-2 h-3 w-1/4" />
+                    </div>
                     <span className="sr-only">Loading bindings…</span>
                 </div>
             ) : null}
@@ -636,8 +691,9 @@ export function BindingsPage() {
                     data-testid="bindings-error"
                     role="alert"
                 >
-                    <p className="text-sm text-destructive">{error}</p>
-                    <Button className="mt-2 min-h-11 md:min-h-0" size="sm" variant="outline" onClick={() => void refetch()}>
+                    <p className="text-sm text-destructive">{humaniseBindingError(error)}</p>
+                    <Button className="mt-2 min-h-11 md:min-h-0" disabled={retrying} size="sm" variant="outline" onClick={() => void handleRetry()}>
+                        {retrying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                         Retry
                     </Button>
                 </div>
@@ -645,9 +701,10 @@ export function BindingsPage() {
 
             {!isLoading && !error && data && data.length === 0 ? (
                 <div
-                    className="flex items-center justify-center rounded-lg border bg-card py-16"
+                    className="flex flex-col items-center gap-2 rounded-lg border bg-card py-16 text-center"
                     data-testid="bindings-empty"
                 >
+                    <Link2 className="h-6 w-6 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">No bindings hooked yet.</p>
                 </div>
             ) : null}
@@ -657,6 +714,7 @@ export function BindingsPage() {
                     className="flex flex-col items-center gap-2 rounded-lg border bg-card py-16 text-center"
                     data-testid="bindings-no-match"
                 >
+                    <SearchX className="h-6 w-6 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">No bindings match this view.</p>
                     <p className="text-xs text-muted-foreground">Try a different search or filter.</p>
                 </div>
@@ -667,14 +725,13 @@ export function BindingsPage() {
                     {visible.map((item) => (
                         <BindingRowCard
                             busy={busyId === String(item.row.id)}
-                            eventOptions={eventOptions}
+                            eventKeyText={resolveBindingKey(item.row.event_key_id)}
                             key={String(item.row.id)}
                             row={item.row}
                             templateName={resolveTemplateName(item.row.template_id)}
-                            templateOptions={templateOptions}
                             unmapped={item.unmapped}
                             unresolvable={item.unresolvable}
-                            onPatch={(patch) => handlePatchFields(item.row.id, patch)}
+                            onEdit={() => setEditingRow(item.row)}
                             onRemove={() => setUnhookId(String(item.row.id))}
                             onToggle={() => void handleToggle(item.row.id, item.row.is_enabled)}
                         />
@@ -682,6 +739,39 @@ export function BindingsPage() {
                 </ul>
             ) : null}
             <MsPager page={page} totalPages={totalPages} onPage={setPage} />
+            {createOpen ? (
+                <MsBindingDialog
+                    binding={null}
+                    catalogError={catalog.error}
+                    catalogLoading={catalog.isLoading}
+                    eventOptions={eventOptions}
+                    mode="create"
+                    open
+                    submitting={creating}
+                    templateOptions={templateOptions}
+                    templatesLoading={templates.isLoading}
+                    onOpenChange={setCreateOpen}
+                    onSubmit={handleCreateSubmit}
+                />
+            ) : null}
+            {editingRow ? (
+                <MsBindingDialog
+                    binding={editingRow}
+                    catalogError={catalog.error}
+                    catalogLoading={catalog.isLoading}
+                    eventOptions={eventOptions}
+                    key={String(editingRow.id)}
+                    mode="edit"
+                    open
+                    submitting={busyId === String(editingRow.id)}
+                    templateOptions={templateOptions}
+                    templatesLoading={templates.isLoading}
+                    onOpenChange={(next) => {
+                        if (!next) setEditingRow(null);
+                    }}
+                    onSubmit={handleEditSubmit}
+                />
+            ) : null}
             <MsConfirmDialog
                 confirmLabel="Unhook binding"
                 description="The row is deleted and the event stops resolving to this template. Re-hooking needs the full form again."

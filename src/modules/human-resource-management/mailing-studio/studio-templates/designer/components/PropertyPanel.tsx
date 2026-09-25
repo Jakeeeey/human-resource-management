@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils";
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
 import { MS_IMAGE_UPLOAD_TYPES, uploadImage } from "../../providers/designService";
 import { extractTemplateTokens } from "../../utils/template-render";
+import { extractPayloadKeys, parseJsonDocument } from "../../utils/ms-variables";
+import type { MsCatalogRow } from "../../types/ms-catalog.schema";
+import { MsCombobox } from "./MsCombobox";
 import {
     CANVAS_TEXT_MAX,
     defaultBlockProps,
@@ -366,27 +369,60 @@ function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const TOKEN_NAME_PATTERN = /^[A-Za-z0-9_.]+$/;
-
-function normaliseTokenName(raw: string): string | null {
-    const stripped = raw
-        .trim()
-        .replace(/^\{\{\s*/, "")
-        .replace(/\s*\}\}$/, "")
-        .trim()
-        .replace(/^payload\./, "");
-    if (!TOKEN_NAME_PATTERN.test(stripped)) return null;
-    return stripped;
+function variableTypeLabel(name: string, schema: unknown): string {
+    const doc = parseJsonDocument(schema);
+    if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return name;
+    const properties = (doc as Record<string, unknown>)["properties"];
+    if (typeof properties !== "object" || properties === null || Array.isArray(properties))
+        return name;
+    const entry = (properties as Record<string, unknown>)[name];
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return name;
+    const type = (entry as Record<string, unknown>)["type"];
+    return typeof type === "string" && type.length > 0 ? `${name} · ${type}` : name;
 }
 
-function VariablesSection({ node }: { readonly node: CanvasNode }) {
-    const inputId = useId();
+interface VariablesSectionProps {
+    readonly node: CanvasNode;
+    readonly catalog?: readonly MsCatalogRow[];
+    readonly variableEventKey?: string;
+    readonly onVariableEventChange?: (value: string) => void;
+}
+
+function VariablesSection({
+    node,
+    catalog = [],
+    variableEventKey = "",
+    onVariableEventChange,
+}: VariablesSectionProps) {
+    const eventId = useId();
+    const variableId = useId();
     const updateProps = useCanvasDoc((state) => state.updateProps);
-    const [draft, setDraft] = useState("");
-    const [invalid, setInvalid] = useState(false);
+    const [variableName, setVariableName] = useState("");
+    const [prevEventKey, setPrevEventKey] = useState(variableEventKey);
+    const [prevNodeId, setPrevNodeId] = useState(node.id);
+    if (prevEventKey !== variableEventKey) {
+        setPrevEventKey(variableEventKey);
+        setVariableName("");
+    }
+    if (prevNodeId !== node.id) {
+        setPrevNodeId(node.id);
+        setVariableName("");
+    }
 
     const text = typeof node.props.text === "string" ? node.props.text : "";
     const tokens = extractTemplateTokens(text);
+    const selectedRow = catalog.find((row) => row.event_key === variableEventKey) ?? null;
+    const variableNames = selectedRow
+        ? extractPayloadKeys(selectedRow.payload_schema, selectedRow.payload_example)
+        : [];
+    const eventOptions = catalog.map((row) => ({
+        value: row.event_key,
+        label: row.label ? `${row.event_key} — ${row.label}` : row.event_key,
+    }));
+    const variableOptions = variableNames.map((name) => ({
+        value: name,
+        label: selectedRow ? variableTypeLabel(name, selectedRow.payload_schema) : name,
+    }));
 
     const insertToken = (key: string): void => {
         const separator =
@@ -394,15 +430,10 @@ function VariablesSection({ node }: { readonly node: CanvasNode }) {
         updateProps(node.id, { text: `${text}${separator}{{${key}}}` });
     };
 
-    const commitDraft = (): void => {
-        const name = normaliseTokenName(draft);
-        if (name === null) {
-            setInvalid(draft.trim().length > 0);
-            return;
-        }
-        setInvalid(false);
-        setDraft("");
-        insertToken(name);
+    const handleAdd = (): void => {
+        if (variableName === "") return;
+        insertToken(variableName);
+        setVariableName("");
     };
 
     const removeToken = (key: string): void => {
@@ -416,45 +447,66 @@ function VariablesSection({ node }: { readonly node: CanvasNode }) {
     return (
         <div className="col-span-2 flex flex-col gap-2.5">
             <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium text-muted-foreground" htmlFor={inputId}>
-                    Add a variable
+                <Label className="text-xs font-medium text-muted-foreground" htmlFor={eventId}>
+                    Event
                 </Label>
-                <div className="flex items-center gap-1.5">
-                    <Input
-                        aria-invalid={invalid}
-                        className={cn("h-8 font-mono text-xs", invalid && "border-destructive")}
-                        id={inputId}
-                        placeholder="employee_name"
-                        spellCheck={false}
-                        value={draft}
-                        onChange={(event) => {
-                            setDraft(event.target.value);
-                            setInvalid(false);
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                                event.preventDefault();
-                                commitDraft();
-                            }
-                        }}
-                    />
-                    <Button
-                        aria-label="Add variable to block"
-                        size="sm"
-                        type="button"
-                        onClick={commitDraft}
-                    >
-                        Add
-                    </Button>
-                </div>
-                {invalid ? (
-                    <p className="text-[11px] leading-snug text-destructive" role="alert">
-                        Use letters, numbers, dots or underscores — e.g. employee_name.
+                <MsCombobox
+                    ariaLabel="Variable event"
+                    emptyText="No events found."
+                    id={eventId}
+                    options={eventOptions}
+                    placeholder="Select event…"
+                    searchPlaceholder="Search events…"
+                    value={variableEventKey}
+                    onValueChange={(next) => onVariableEventChange?.(next)}
+                />
+            </div>
+            <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-medium text-muted-foreground" htmlFor={variableId}>
+                    Variable
+                </Label>
+                {variableEventKey === "" ? (
+                    <>
+                        <MsCombobox
+                            ariaLabel="Variable name"
+                            disabled
+                            emptyText="No variables found."
+                            id={variableId}
+                            options={[]}
+                            placeholder="Select variable…"
+                            value=""
+                            onValueChange={setVariableName}
+                        />
+                        <p className="text-[11px] leading-snug text-muted-foreground">
+                            Pick an event to see its variables.
+                        </p>
+                    </>
+                ) : variableNames.length === 0 ? (
+                    <p className="text-[11px] leading-snug text-muted-foreground">
+                        This event has no variables registered yet.
                     </p>
                 ) : (
-                    <p className="text-[11px] leading-snug text-muted-foreground">
-                        Type any name and press Enter — it inserts {"{{name}}"} into this block.
-                    </p>
+                    <>
+                        <MsCombobox
+                            ariaLabel="Variable name"
+                            emptyText="No variables found."
+                            id={variableId}
+                            options={variableOptions}
+                            placeholder="Select variable…"
+                            searchPlaceholder="Search variables…"
+                            value={variableName}
+                            onValueChange={setVariableName}
+                        />
+                        <Button
+                            aria-label="Add variable to block"
+                            disabled={variableName === ""}
+                            size="sm"
+                            type="button"
+                            onClick={handleAdd}
+                        >
+                            Add
+                        </Button>
+                    </>
                 )}
             </div>
             {tokens.length > 0 ? (
@@ -486,7 +538,19 @@ function VariablesSection({ node }: { readonly node: CanvasNode }) {
     );
 }
 
-export function PropertyPanel({ sheet = false }: { readonly sheet?: boolean }) {
+interface PropertyPanelProps {
+    readonly sheet?: boolean;
+    readonly catalog?: readonly MsCatalogRow[];
+    readonly variableEventKey?: string;
+    readonly onVariableEventChange?: (value: string) => void;
+}
+
+export function PropertyPanel({
+    sheet = false,
+    catalog = [],
+    variableEventKey = "",
+    onVariableEventChange,
+}: PropertyPanelProps) {
     const nodes = useCanvasDoc((state) => state.nodes);
     const selection = useCanvasDoc((state) => state.selection);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
@@ -588,7 +652,12 @@ export function PropertyPanel({ sheet = false }: { readonly sheet?: boolean }) {
 
                 {node.type === "text" || node.type === "button" ? (
                     <Section title="Variables">
-                        <VariablesSection node={node} />
+                        <VariablesSection
+                            catalog={catalog}
+                            node={node}
+                            variableEventKey={variableEventKey}
+                            onVariableEventChange={onVariableEventChange}
+                        />
                     </Section>
                 ) : null}
 

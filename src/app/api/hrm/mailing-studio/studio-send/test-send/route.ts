@@ -12,22 +12,6 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Template test-send endpoint (T4) — dry-run probe. Template-scoped, NOT
-// event-scoped: it reads the saved ms_templates row, re-asserts the final
-// canvas HTML with the scrub predicates, and records ONE `dry_run` ms_outbox
-// row per click — it NEVER touches the transporter, so nothing is ever
-// emailed. Rides the MANUAL-ONLY frozen event `final_interview.invited`
-// (msEventKeySchema is frozen, so no new event key is invented); the row is
-// marked with a `template-test` warning plus a `test:<template_key>:<epochMs>`
-// idempotency key (buildTestIdempotencyKey — the dispatch-service test key
-// formula) so probes are trivially distinguishable from real manual sends in
-// the viewer.
-//
-// STRICT body: `{ template_key, to_email? }`. Absent to_email falls back to
-// the probe constant (the row never sends — the address is label-only).
-// No auth gate (mailing-probe posture like the sibling routes: the response
-// carries only { ok, reason? } outcome booleans, never PII).
-
 const TEST_PROBE_EMAIL = "dry-run@example.com";
 const TEST_EVENT_KEY = "final_interview.invited" as const;
 
@@ -45,8 +29,6 @@ function validationFailed(errors: Record<string, string[]>) {
     );
 }
 
-// POST /api/hrm/mailing-studio/test-send — record one dry_run probe row.
-// Body: `{ template_key, to_email? }`. Never emails.
 export async function POST(req: NextRequest) {
     try {
         const body: unknown = await req.json().catch(() => null);
@@ -57,14 +39,10 @@ export async function POST(req: NextRequest) {
 
         const { template_key, to_email } = validation.data;
 
-        // getDesign reads ms_templates by template_key (?filter= — a missing
-        // row is null, never the Directus missing-single-item 403).
         let template: Awaited<ReturnType<typeof getDesign>>;
         try {
             template = await getDesign(template_key);
         } catch (error) {
-            // Directus envelope errors answer the old probe's not-found shape;
-            // transport/network failures (TypeError) fall through to 500.
             if (error instanceof TypeError) throw error;
             template = null;
         }
@@ -76,7 +54,6 @@ export async function POST(req: NextRequest) {
         const bodyHtml = typeof template.body_html === "string" ? template.body_html : "";
         const warnings: string[] = [];
 
-        // Canvas HTML is final (no renderer) — scrub re-assert only.
         const forbiddenReason = msAssertMailableHtml(bodyHtml);
         if (msHasForbiddenMailHtml(bodyHtml) || forbiddenReason) {
             warnings.push(`forbidden-html:${forbiddenReason ?? "rejected"}`);

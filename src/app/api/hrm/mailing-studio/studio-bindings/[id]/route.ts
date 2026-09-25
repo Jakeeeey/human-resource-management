@@ -5,16 +5,11 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Bindings by-id routes (T4) — READ-ONLY copy of the old
-// api/hrm/mailing/bindings/[id] route, retargeted to ms_bindings with
-// msBindingSchema. Same flat-shape rules as the collection route: no
-// refinement, no DSL, no objects anywhere. DELETE hard-deletes (unhook =
-// gone). Envelope { success, data?, message?, errors? } mirrors the old route.
-
 const COLLECTION = "/items/ms_bindings";
-const FIELDS = "id,event_key,template_id,is_enabled";
+const CATALOG_COLLECTION = "/items/event_catalog";
+const FIELDS = "id,event_key_id,template_id,is_enabled";
 
-const BODY_KEYS = ["event_key", "template_id", "is_enabled"] as const;
+const BODY_KEYS = ["event_key_id", "template_id", "is_enabled"] as const;
 type BodyKey = (typeof BODY_KEYS)[number];
 
 function isBodyKey(key: string): key is BodyKey {
@@ -50,7 +45,21 @@ function validationFailed(errors: Record<string, string[]>) {
     );
 }
 
-// GET /api/hrm/mailing-studio/bindings/:id — single binding or 404.
+async function isActiveCatalogId(eventKeyId: string | number): Promise<boolean> {
+    const ref = String(eventKeyId);
+    const res = (await dFetch(
+        `${CATALOG_COLLECTION}?fields=id&filter[id][_eq]=${encodeURIComponent(ref)}&filter[is_active][_eq]=true&limit=1`
+    )) as { data?: unknown[] };
+    return Array.isArray(res?.data) && res.data.length > 0;
+}
+
+function unknownEventKeyId(event_key_id: string | number) {
+    return NextResponse.json(
+        { success: false, message: "UNKNOWN_EVENT_KEY", event_key_id },
+        { status: 422 }
+    );
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -76,7 +85,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     }
 }
 
-// PATCH /api/hrm/mailing-studio/bindings/:id — partial update (incl. soft unhook).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -93,6 +101,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const validation = msBindingSchema.partial().safeParse(body);
         if (!validation.success) {
             return validationFailed(validation.error.flatten().fieldErrors);
+        }
+
+        if (
+            validation.data.event_key_id !== undefined &&
+            !(await isActiveCatalogId(validation.data.event_key_id))
+        ) {
+            return unknownEventKeyId(validation.data.event_key_id);
         }
 
         const res = (await dFetch(`${COLLECTION}/${encodeURIComponent(id)}`, {
@@ -115,7 +130,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 }
 
-// DELETE /api/hrm/mailing-studio/bindings/:id — hard-delete (unhook = gone).
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;

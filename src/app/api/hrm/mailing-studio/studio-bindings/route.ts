@@ -1,39 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { msBindingSchema } from "@/modules/human-resource-management/mailing-studio/studio-bindings/types/ms-binding.schema";
-import { msEventKeyShapeSchema } from "@/modules/human-resource-management/mailing-studio/studio-bindings/catalog/ms-catalog.schema";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Bindings collection routes (T4, catalog-driven per D4) — retargeted to
-// ms_bindings with the mailing-studio schemas. Envelope
-// { success, data?, message?, errors? } and status codes mirror the old
-// route byte-for-byte where they overlap.
-//
-// `event_key` is validated against the event_catalog TABLE at runtime: shape
-// (^[a-z0-9_.]+$) via Zod, then existence + is_active via a ?filter= lookup.
-// A well-shaped key absent from the catalog (or retired) answers
-// 422 UNKNOWN_EVENT_KEY on writes; a filter for a key with no bindings is an
-// empty list, never an error. There is no condition DSL anywhere in this
-// module: any object/array/nested payload for any field is rejected with a
-// 400 before it reaches Zod. PATCH `is_enabled:false` is the soft unhook;
-// hard unhook (DELETE) lives on bindings/[id].
-
 const COLLECTION = "/items/ms_bindings";
 const CATALOG_COLLECTION = "/items/event_catalog";
-const FIELDS = "id,event_key,template_id,is_enabled";
+const FIELDS = "id,event_key_id,template_id,is_enabled";
 
-const BODY_KEYS = ["event_key", "template_id", "is_enabled"] as const;
+const BODY_KEYS = ["event_key_id", "template_id", "is_enabled"] as const;
 type BodyKey = (typeof BODY_KEYS)[number];
 
 function isBodyKey(key: string): key is BodyKey {
     return (BODY_KEYS as readonly string[]).includes(key);
 }
 
-// Rejects prototype-pollution keys, unknown keys, and ANY non-primitive
-// value (objects, arrays, nested DSL shapes like {field,op,value}).
-// Returns a field-level errors map, or null when the payload is clean.
 function rejectSuspiciousPayload(body: unknown, allowId: boolean): Record<string, string[]> | null {
     if (typeof body !== "object" || body === null || Array.isArray(body)) {
         return { _body: ["Request body must be a JSON object"] };
@@ -67,37 +49,47 @@ function validationFailed(errors: Record<string, string[]>) {
     );
 }
 
-// Catalog lookup (D4): true only when event_key names an ACTIVE catalog row.
-// Uses ?filter= (never /items/:id) so a missing key is an empty list.
-async function isActiveCatalogKey(event_key: string): Promise<boolean> {
+function parseEventKeyId(value: unknown): string | null {
+    if (typeof value === "number") {
+        if (!Number.isInteger(value) || value <= 0) return null;
+        return String(value);
+    }
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!/^\d+$/.test(trimmed)) return null;
+        if (Number(trimmed) <= 0) return null;
+        return trimmed;
+    }
+    return null;
+}
+
+async function isActiveCatalogId(eventKeyId: string | number): Promise<boolean> {
+    const ref = String(eventKeyId);
     const res = (await dFetch(
-        `${CATALOG_COLLECTION}?fields=event_key&filter[event_key][_eq]=${encodeURIComponent(event_key)}&filter[is_active][_eq]=true&limit=1`
+        `${CATALOG_COLLECTION}?fields=id&filter[id][_eq]=${encodeURIComponent(ref)}&filter[is_active][_eq]=true&limit=1`
     )) as { data?: unknown[] };
     return Array.isArray(res?.data) && res.data.length > 0;
 }
 
-function unknownEventKey(event_key: string) {
+function unknownEventKeyId(event_key_id: string | number) {
     return NextResponse.json(
-        { success: false, message: "UNKNOWN_EVENT_KEY", event_key },
+        { success: false, message: "UNKNOWN_EVENT_KEY", event_key_id },
         { status: 422 }
     );
 }
 
-// GET /api/hrm/mailing-studio/bindings[?event_key=...][?is_enabled=...]
-// Lists bindings. The event_key filter is shape-checked only — a well-shaped
-// key with no bindings is an empty list; a malformed shape is a 400.
 export async function GET(req: NextRequest) {
     try {
         const params = req.nextUrl.searchParams;
         const filter: string[] = [];
 
-        const rawEventKey = params.get("event_key");
-        if (rawEventKey !== null) {
-            const parsed = msEventKeyShapeSchema.safeParse(rawEventKey);
-            if (!parsed.success) {
-                return validationFailed({ event_key: ["Invalid event key shape"] });
+        const rawEventKeyId = params.get("event_key_id");
+        if (rawEventKeyId !== null) {
+            const parsed = parseEventKeyId(rawEventKeyId);
+            if (parsed === null) {
+                return validationFailed({ event_key_id: ["Invalid event key id"] });
             }
-            filter.push(`event_key[eq]=${encodeURIComponent(parsed.data)}`);
+            filter.push(`event_key_id[eq]=${encodeURIComponent(parsed)}`);
         }
 
         const rawEnabled = params.get("is_enabled");
@@ -133,7 +125,6 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/hrm/mailing-studio/bindings — hook a new binding (full row required).
 export async function POST(req: NextRequest) {
     try {
         const body: unknown = await req.json();
@@ -145,8 +136,8 @@ export async function POST(req: NextRequest) {
             return validationFailed(validation.error.flatten().fieldErrors);
         }
 
-        if (!(await isActiveCatalogKey(validation.data.event_key))) {
-            return unknownEventKey(validation.data.event_key);
+        if (!(await isActiveCatalogId(validation.data.event_key_id))) {
+            return unknownEventKeyId(validation.data.event_key_id);
         }
 
         const res = (await dFetch(COLLECTION, {
@@ -170,8 +161,6 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// PATCH /api/hrm/mailing-studio/bindings — body carries `{ id, ...partial }`.
-// PATCH `is_enabled:false` is the soft unhook (row survives, disabled).
 export async function PATCH(req: NextRequest) {
     try {
         const body: unknown = await req.json();
@@ -199,10 +188,10 @@ export async function PATCH(req: NextRequest) {
         }
 
         if (
-            validation.data.event_key !== undefined &&
-            !(await isActiveCatalogKey(validation.data.event_key))
+            validation.data.event_key_id !== undefined &&
+            !(await isActiveCatalogId(validation.data.event_key_id))
         ) {
-            return unknownEventKey(validation.data.event_key);
+            return unknownEventKeyId(validation.data.event_key_id);
         }
 
         const res = (await dFetch(`${COLLECTION}/${encodeURIComponent(String(rawId))}`, {

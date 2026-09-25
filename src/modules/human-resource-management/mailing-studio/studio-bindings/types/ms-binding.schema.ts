@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-import { msEventKeyShapeSchema } from "../catalog/ms-catalog.schema";
-
 export const msBindingSchema = z.object({
-    event_key: msEventKeyShapeSchema,
+    event_key_id: z.union([z.string().min(1), z.number().int().positive()], {
+        error: "Event key id is required",
+    }),
     template_id: z.union([z.string().min(1), z.number().int().positive()], {
         error: "Template id is required",
     }),

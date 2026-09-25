@@ -29,10 +29,6 @@ export const dynamic = "force-dynamic";
 //
 // GET: old ?is_active= list filter (invalid value → 400, byte-parity) plus the
 // T10 designService ?template_key= single-row read (null data when absent).
-// POST: create-or-upsert by template_key via saveDesign.
-// PATCH: updates by body { id | _id, ...fields } like the old route;
-// compile-on-update whenever design_json is present (template_key renames are
-// rejected — saveDesign upserts by key, so a rename would fork a new row).
 // No DELETE by design (parity with the old templates route).
 
 function validationFailed(errors: Record<string, string[]>) {
@@ -69,6 +65,7 @@ const designJsonSchema = z
     .refine(isValidJson, "design_json must be valid JSON");
 
 const templateCreateSchema = z.object({
+    id: z.union([z.number(), z.string()]).optional(),
     template_key: z.string().min(1, "Template key is required"),
     template_name: z.string().min(1, "Template name is required"),
     subject: z.string().min(1, "Subject is required"),
@@ -181,18 +178,44 @@ export async function GET(req: NextRequest) {
     }
 }
 
-/**
- * Creates (or upserts by template_key) an ms_templates row: compile-on-save
- * then saveDesign with the compiled bodies.
- * @param req - Request with the template JSON body (design_json required).
- * @returns 200 { success:true, data } on save; 400 on validation/export/save rejects.
- */
 export async function POST(req: NextRequest) {
     try {
         const body: unknown = await req.json().catch(() => null);
         const parsed = templateCreateSchema.safeParse(body);
         if (!parsed.success) {
             return validationFailed(parsed.error.flatten().fieldErrors);
+        }
+
+        const rawId = parsed.data.id;
+        const idText = rawId === undefined || rawId === null ? "" : String(rawId).trim();
+        let target: MsDesignRow | null = null;
+        if (idText !== "") {
+            try {
+                target = await getDesign(/^\d+$/.test(idText) ? Number(idText) : idText);
+            } catch (error) {
+                return unexpected("[mailing-studio-templates] POST lookup error:", error);
+            }
+            if (!target) {
+                return NextResponse.json(
+                    { success: false, message: "Mail template not found" },
+                    { status: 404 }
+                );
+            }
+            if (parsed.data.template_key !== target.template_key) {
+                let holder: MsDesignRow | null;
+                try {
+                    holder = await getDesign(parsed.data.template_key);
+                } catch (error) {
+                    return unexpected("[mailing-studio-templates] POST lookup error:", error);
+                }
+                if (holder && String(holder.id) !== String(target.id)) {
+                    const reason = `template_key "${parsed.data.template_key}" is already in use`;
+                    return NextResponse.json(
+                        { success: false, message: reason, errors: { template_key: [reason] } },
+                        { status: 409 }
+                    );
+                }
+            }
         }
 
         let compiled: CompiledDesign;
@@ -209,6 +232,7 @@ export async function POST(req: NextRequest) {
 
         try {
             const row = await saveDesign({
+                ...(target ? { id: target.id } : {}),
                 template_key: parsed.data.template_key,
                 template_name: parsed.data.template_name,
                 subject: parsed.data.subject,
@@ -232,6 +256,12 @@ export async function POST(req: NextRequest) {
                 error instanceof Error && error.message
                     ? error.message
                     : "Failed to save mail template";
+            if (reason.includes("already in use")) {
+                return NextResponse.json(
+                    { success: false, message: reason, errors: { template_key: [reason] } },
+                    { status: 409 }
+                );
+            }
             return NextResponse.json(
                 { success: false, message: reason, errors: { warnings: compiled.warnings } },
                 { status: 400 }
@@ -296,11 +326,21 @@ export async function PATCH(req: NextRequest) {
             );
         }
 
-        // saveDesign upserts BY template_key — a rename would fork a new row.
-        if (patch.template_key !== undefined && patch.template_key !== existing.template_key) {
-            return validationFailed({
-                template_key: ["template_key cannot be changed on an existing template"],
-            });
+        const nextKey = patch.template_key ?? existing.template_key;
+        if (nextKey !== existing.template_key) {
+            let holder: MsDesignRow | null;
+            try {
+                holder = await getDesign(nextKey);
+            } catch (error) {
+                return unexpected("[mailing-studio-templates] PATCH lookup error:", error);
+            }
+            if (holder && String(holder.id) !== String(existing.id)) {
+                const reason = `template_key "${nextKey}" is already in use`;
+                return NextResponse.json(
+                    { success: false, message: reason, errors: { template_key: [reason] } },
+                    { status: 409 }
+                );
+            }
         }
 
         let compiled: CompiledDesign | null = null;
@@ -328,7 +368,8 @@ export async function PATCH(req: NextRequest) {
 
         try {
             const row = await saveDesign({
-                template_key: existing.template_key,
+                id: existing.id,
+                template_key: nextKey,
                 template_name: patch.template_name ?? existing.template_name,
                 subject: patch.subject ?? existing.subject,
                 design_json: designJson,
@@ -348,6 +389,12 @@ export async function PATCH(req: NextRequest) {
                 error instanceof Error && error.message
                     ? error.message
                     : "Failed to save mail template";
+            if (reason.includes("already in use")) {
+                return NextResponse.json(
+                    { success: false, message: reason, errors: { template_key: [reason] } },
+                    { status: 409 }
+                );
+            }
             return NextResponse.json(
                 {
                     success: false,

@@ -1,5 +1,7 @@
 "use client";
 
+import { Plus, Trash2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,15 +111,15 @@ export function VariableBuilder({ rows, onChange, idPrefix }: VariableBuilderPro
                                 onChange={(event) => patchRow(index, { example: event.target.value })}
                             />
                         </div>
-                        <div className="flex items-end">
+                        <div className="flex items-end justify-end">
                             <Button
-                                aria-label={`Remove variable row ${index + 1}`}
-                                className="min-h-11 md:min-h-0"
-                                size="sm"
-                                variant="outline"
+                                aria-label={`Remove variable ${index + 1}`}
+                                className="h-8 w-8"
+                                size="icon"
+                                variant="ghost"
                                 onClick={() => removeRow(index)}
                             >
-                                Remove
+                                <Trash2 className="h-4 w-4" />
                             </Button>
                         </div>
                     </li>
@@ -128,9 +130,10 @@ export function VariableBuilder({ rows, onChange, idPrefix }: VariableBuilderPro
                     aria-label="Add variable"
                     className="min-h-11 md:min-h-0"
                     size="sm"
-                    variant="outline"
+                    variant="secondary"
                     onClick={addRow}
                 >
+                    <Plus className="h-4 w-4" />
                     Add variable
                 </Button>
             </div>

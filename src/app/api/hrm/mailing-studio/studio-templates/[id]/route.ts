@@ -192,11 +192,21 @@ export async function PATCH(
             );
         }
 
-        // saveDesign upserts BY template_key — a rename would fork a new row.
-        if (patch.template_key !== undefined && patch.template_key !== existing.template_key) {
-            return validationFailed({
-                template_key: ["template_key cannot be changed on an existing template"],
-            });
+        const nextKey = patch.template_key ?? existing.template_key;
+        if (nextKey !== existing.template_key) {
+            let holder: MsDesignRow | null;
+            try {
+                holder = await getDesign(nextKey);
+            } catch (error) {
+                return unexpected("[mailing-studio-templates] PATCH lookup error:", error);
+            }
+            if (holder && String(holder.id) !== String(existing.id)) {
+                const reason = `template_key "${nextKey}" is already in use`;
+                return NextResponse.json(
+                    { success: false, message: reason, errors: { template_key: [reason] } },
+                    { status: 409 }
+                );
+            }
         }
 
         let compiled: CompiledDesign | null = null;
@@ -224,7 +234,8 @@ export async function PATCH(
 
         try {
             const row = await saveDesign({
-                template_key: existing.template_key,
+                id: existing.id,
+                template_key: nextKey,
                 template_name: patch.template_name ?? existing.template_name,
                 subject: patch.subject ?? existing.subject,
                 design_json: designJson,
@@ -244,6 +255,12 @@ export async function PATCH(
                 error instanceof Error && error.message
                     ? error.message
                     : "Failed to save mail template";
+            if (reason.includes("already in use")) {
+                return NextResponse.json(
+                    { success: false, message: reason, errors: { template_key: [reason] } },
+                    { status: 409 }
+                );
+            }
             return NextResponse.json(
                 {
                     success: false,

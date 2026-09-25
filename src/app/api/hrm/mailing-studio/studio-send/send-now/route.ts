@@ -2,31 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { dispatchMail } from "@/modules/human-resource-management/mailing-studio/studio-bindings/events/services/dispatch-service";
-import { msEventKeySchema } from "@/modules/human-resource-management/mailing-studio/studio-bindings/events/types/ms-template.schema";
+import { msEventKeyShapeSchema } from "@/modules/human-resource-management/mailing-studio/studio-bindings/catalog/ms-catalog.schema";
 import { buildManualIdempotencyKey } from "@/modules/human-resource-management/mailing-studio/studio-bindings/events/utils/ms-idempotency";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Manual Send-now endpoint (T4) — binding-triggered dispatch through
-// services/dispatch-service. STRICT body: `{ event_key | binding_id, to_email }`
-// (`.strict()` + exactly-one-of: no count/bulk/ids/application parameters are
-// accepted — any extra key answers 400). `event_key` is restricted to the
-// frozen msEventKeySchema; `binding_id` resolves an ms_bindings row first
-// (missing → 404, disabled → 400) and dispatches its frozen event.
-//
-// One POST = ONE dispatchMail call with a FRESH manual idempotency key
-// `<event_key>:<ref>:manual-<epochMs>` (built via buildManualIdempotencyKey —
-// never rebuilt inline), so every click dispatches (never deduped). The
-// recipient comes from the body's to_email (single `to`, no CC/BCC anywhere).
-// Envelope { success, data?, message?, errors? }; data carries the
-// dispatch-service { ok, reason? } outcome — never PII.
-
 interface BindingLookupRow {
     id?: unknown;
-    event_key?: unknown;
+    event_key_id?: unknown;
     is_enabled?: unknown;
+}
+
+interface CatalogLookupRow {
+    id?: unknown;
+    event_key?: unknown;
+    is_active?: unknown;
 }
 
 function toBool(value: unknown): boolean {
@@ -40,9 +32,41 @@ function validationFailed(errors: Record<string, string[]>) {
     );
 }
 
+async function isActiveCatalogKey(key: string): Promise<boolean> {
+    try {
+        const res = (await dFetch(
+            `/items/event_catalog?fields=event_key&filter[event_key][_eq]=${encodeURIComponent(key)}&filter[is_active][_eq]=true&limit=1`
+        )) as { data?: unknown[] };
+        return Array.isArray(res?.data) && res.data.length > 0;
+    } catch {
+        return false;
+    }
+}
+
+async function resolveActiveCatalogKeyById(eventKeyId: string | number): Promise<string | null> {
+    try {
+        const res = (await dFetch(
+            `/items/event_catalog?fields=id,event_key&filter[id][_eq]=${encodeURIComponent(String(eventKeyId))}&filter[is_active][_eq]=true&limit=1`
+        )) as { data?: CatalogLookupRow[] };
+        const row = Array.isArray(res?.data) ? res.data[0] : undefined;
+        if (!row || !toBool(row.is_active)) return null;
+        if (typeof row.event_key !== "string" || row.event_key.length === 0) return null;
+        return row.event_key;
+    } catch {
+        return null;
+    }
+}
+
+function unknownEventKey(eventKey: string) {
+    return NextResponse.json(
+        { success: false, message: "UNKNOWN_EVENT_KEY", event_key: eventKey },
+        { status: 422 }
+    );
+}
+
 const sendNowSchema = z
     .object({
-        event_key: msEventKeySchema.optional(),
+        event_key: msEventKeyShapeSchema.optional(),
         binding_id: z.union([z.string().min(1), z.number()]).optional(),
         to_email: z.string().email("Recipient email must be valid"),
     })
@@ -59,8 +83,6 @@ const sendNowSchema = z
         }
     });
 
-// POST /api/hrm/mailing-studio/send-now — single binding-triggered dispatch.
-// Body: `{ event_key | binding_id, to_email }`.
 export async function POST(req: NextRequest) {
     try {
         const body: unknown = await req.json().catch(() => null);
@@ -76,11 +98,9 @@ export async function POST(req: NextRequest) {
         if (validation.data.binding_id !== undefined) {
             const bindingId = validation.data.binding_id;
             ref = String(bindingId);
-            // Filter-based lookup (never /items/:id) — a missing row is an
-            // empty list, dodging the Directus missing-single-item 403 gotcha.
             const res = (await dFetch(
                 `/items/ms_bindings?filter[id][_eq]=${encodeURIComponent(ref)}` +
-                    "&fields=id,event_key,template_id,is_enabled&limit=1"
+                    "&fields=id,event_key_id,template_id,is_enabled&limit=1"
             )) as { data?: BindingLookupRow[]; errors?: { message?: string }[] };
             const row = Array.isArray(res?.data) ? res.data[0] : undefined;
             if (!row) {
@@ -93,14 +113,24 @@ export async function POST(req: NextRequest) {
                     { status: 400 }
                 );
             }
-            const keyCheck = msEventKeySchema.safeParse(row.event_key);
-            if (!keyCheck.success) {
+            const rawKeyId = row.event_key_id;
+            if (
+                (typeof rawKeyId !== "string" || rawKeyId.trim() === "") &&
+                typeof rawKeyId !== "number"
+            ) {
                 return validationFailed({ event_key: ["Unknown event key"] });
             }
-            eventKey = keyCheck.data;
+            const resolved = await resolveActiveCatalogKeyById(rawKeyId as string | number);
+            if (resolved === null) {
+                return validationFailed({ event_key: ["Unknown event key"] });
+            }
+            eventKey = resolved;
         } else {
             eventKey = validation.data.event_key as string;
             ref = eventKey;
+            if (!(await isActiveCatalogKey(eventKey))) {
+                return unknownEventKey(eventKey);
+            }
         }
 
         const idempotencyKey = buildManualIdempotencyKey(eventKey, ref, Date.now());

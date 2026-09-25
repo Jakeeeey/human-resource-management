@@ -94,6 +94,7 @@ function getPhilippineTime(): string {
 }
 
 const registryPatchSchema = z.object({
+    event_key: msEventKeyShapeSchema.optional(),
     label: z.string().min(1, "Label is required").optional(),
     description: z.string().optional().nullable(),
     module: z.string().optional().nullable(),
@@ -136,10 +137,9 @@ export async function PATCH(
         if (suspicious) return validationFailed(suspicious);
         const record = { ...(body as Record<string, unknown>) };
 
-        if (record.event_key !== undefined && record.event_key !== key) {
-            return validationFailed({ event_key: ["event_key cannot be changed"] });
+        if (record.event_key !== undefined && record.event_key === key) {
+            delete record.event_key;
         }
-        delete record.event_key;
         if (Object.keys(record).length === 0) {
             return validationFailed({ _body: ["Nothing to update"] });
         }
@@ -147,6 +147,18 @@ export async function PATCH(
         const validation = registryPatchSchema.safeParse(record);
         if (!validation.success) {
             return validationFailed(validation.error.flatten().fieldErrors);
+        }
+
+        const nextKey = validation.data.event_key;
+        const renamed = nextKey !== undefined && nextKey !== key;
+        if (nextKey !== undefined && nextKey !== key) {
+            const clash = await getCatalogRow(nextKey);
+            if (clash && String(clash.id) !== String(existing.id)) {
+                return NextResponse.json(
+                    { success: false, message: "Event key already exists.", event_key: nextKey },
+                    { status: 409 }
+                );
+            }
         }
 
         const rows = validation.data.variables;
@@ -179,7 +191,7 @@ export async function PATCH(
             );
         }
 
-        const verified = await getCatalogRow(key);
+        const verified = await getCatalogRow(renamed && nextKey !== undefined ? nextKey : key);
         if (!verified) {
             console.error("[mailing-studio-event-registry] update: write not found on read-back");
             return NextResponse.json(

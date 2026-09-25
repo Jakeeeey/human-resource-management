@@ -16,14 +16,6 @@ export interface UseMsOutboxResult {
     refetch: () => Promise<void>;
 }
 
-/**
- * Lists one server-paged slice of masked outbox rows via the real outbox
- * route (read-only viewer — there is no resend endpoint, so this hook
- * exposes no mutation). The query identity drives the refetch; callers
- * reset to page 1 whenever a filter, sort, or search input changes (QA §11).
- * @param query - Status/event/search/sort/page/limit for the route.
- * @returns { data, isLoading, error, refetch } — rows carry masked recipients.
- */
 export function useMsOutbox(query: MsOutboxQuery = {}): UseMsOutboxResult {
     const [data, setData] = useState<MsOutboxPage | null>(null);
     const [isLoading, setIsLoading] = useState(true);

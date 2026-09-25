@@ -11,6 +11,7 @@ export interface MsCatalogCreate {
 }
 
 export interface MsCatalogPatch {
+    event_key?: string;
     label?: string;
     description?: string | null;
     module?: string | null;
