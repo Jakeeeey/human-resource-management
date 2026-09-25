@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-const ROOT = path.resolve(import.meta.dirname, "..", "..");
+const ROOT = path.resolve(import.meta.dirname, "..", "..", "..", "..", "..");
 const M = "src/modules/human-resource-management";
 const A = "src/app/api/hrm";
+const CANONICAL_AUDIT = `${M}/shared/utils/audit.ts`;
 const IN_SCOPE = [
     `${M}/onboarding`, `${M}/recruitment`, `${M}/employee-portal`, `${M}/application-form`,
     `${M}/manpower-request`, `${M}/quiz-file-management`, `${M}/interview-criteria`,
@@ -39,13 +40,16 @@ describe("recruitment/onboarding timestamps are UTC", () => {
     });
 
     test("no private Philippine-time producers", () => {
-        const offenders = files.filter(({ text }) => /toLocaleString\(\s*["']sv-SE["']|DateTimeFormat\(\s*["']sv-SE["']/.test(text)).map((f) => f.file);
+        const offenders = files
+            .filter(({ file }) => file !== CANONICAL_AUDIT)
+            .filter(({ text }) => /toLocaleString\(\s*["']sv-SE["']|DateTimeFormat\(\s*["']sv-SE["']/.test(text))
+            .map((f) => f.file);
         assert.deepEqual(offenders, []);
     });
 
     test("nowPH() is only called by the documented legacy exceptions", () => {
         const offenders = files
-            .filter(({ file, text }) => /\bnowPH\s*\(/.test(text) && !(file in LEGACY_ALLOWLIST))
+            .filter(({ file, text }) => file !== CANONICAL_AUDIT && /\bnowPH\s*\(/.test(text) && !(file in LEGACY_ALLOWLIST))
             .map((f) => f.file);
         assert.deepEqual(offenders, []);
     });

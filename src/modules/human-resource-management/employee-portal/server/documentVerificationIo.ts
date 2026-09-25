@@ -4,7 +4,7 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 
 import { PortalDocVerificationStateSchema } from "../types/portal-checklist.schema";
 import type { PortalDocVerificationState } from "../types/portal-checklist.schema";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export interface DocumentVerificationEntry {
   state: PortalDocVerificationState;

@@ -30,7 +30,7 @@ import {
   patchTemplateRow,
   type TemplateWriteRow,
 } from "../../tasks/server/onboardingTaskIo";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { OnboardingOwnerRole } from "../../types/onboarding-task.schema";
 
 // trainingCatalogService.ts — the training-template DOMAIN layer over

@@ -12,7 +12,7 @@ import type {
   SigningEnvelope,
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
 import { SIGNING_SET_ERROR_CODES } from "./signingSetIo";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   findSigningEnvelopeByApplicant,
   insertJobOffer,

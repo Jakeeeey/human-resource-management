@@ -5,7 +5,7 @@ import {
   patchDocSlotRow,
   softDeleteDocSlotRow,
 } from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   hardDeleteItem,
   invalidId,

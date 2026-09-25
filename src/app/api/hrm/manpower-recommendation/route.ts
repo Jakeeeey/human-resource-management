@@ -6,7 +6,7 @@ import { ManpowerRecommendationSchema } from "@/modules/human-resource-managemen
 import { ALLOWED_TRANSITIONS, setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
-import { actorIdFromJwt, nowUTC } from "@/lib/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 // manpower-recommendation — the recommendation row is a recruitment ARTIFACT

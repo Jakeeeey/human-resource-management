@@ -25,7 +25,7 @@
  * (`import type` — zero runtime coupling, zero edits).
  */
 
-import { parseUtcInstant } from "@/lib/time";
+import { parseUtcInstant } from "@/modules/human-resource-management/shared/utils/time";
 import type {
     AnswerInput,
     GradeResult,

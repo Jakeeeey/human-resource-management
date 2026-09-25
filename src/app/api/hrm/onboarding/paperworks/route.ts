@@ -8,7 +8,7 @@ import {
   unauthorized,
   validationFailed,
 } from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
-import { actorIdFromJwt, nowUTC, stampCreate } from "@/lib/audit";
+import { actorIdFromJwt, nowUTC, stampCreate } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   PaperworksCreateSchema,
   PaperworksListQuerySchema,

@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-const SRC = path.resolve(import.meta.dirname, "..");
-const CANONICAL = "src/lib/audit.ts";
+const SRC = path.resolve(import.meta.dirname, "..", "..", "..", "..");
+const CANONICAL = "src/modules/human-resource-management/shared/utils/audit.ts";
 const NAMES = ["actorIdFromJwt", "stampCreate", "stampUpdate", "nowPH"];
 const RETIRED = [
     "src/modules/human-resource-management/manpower-request/utils/audit.ts",
@@ -61,14 +61,14 @@ describe("audit helpers are consolidated", () => {
         assert.deepEqual(definitions.sort(), NAMES.map((n) => `${n} in ${CANONICAL}`).sort());
     });
 
-    test("every import of a helper comes from @/lib/audit", () => {
+    test("every import of a helper comes from @/modules/human-resource-management/shared/utils/audit", () => {
         const offenders = [];
         const importRe = /import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g;
         for (const { file, text } of files) {
             if (file === CANONICAL) continue;
             for (const match of text.matchAll(importRe)) {
                 const imported = match[1].split(",").map((s) => s.trim().split(/\s+as\s+/)[0].replace(/^type\s+/, ""));
-                if (imported.some((n) => NAMES.includes(n)) && match[2] !== "@/lib/audit") offenders.push(`${file} imports from "${match[2]}"`);
+                if (imported.some((n) => NAMES.includes(n)) && match[2] !== "@/modules/human-resource-management/shared/utils/audit") offenders.push(`${file} imports from "${match[2]}"`);
             }
         }
         assert.deepEqual(offenders, []);

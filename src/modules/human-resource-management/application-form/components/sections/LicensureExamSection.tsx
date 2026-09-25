@@ -9,7 +9,7 @@ import { EMPTY_LICENSURE_EXAM, type ApplicationFormValues } from "../../types";
 import { RepeatingFieldArray } from "../RepeatingFieldArray";
 import { checkPastDate } from "../../lib/softValidation";
 import { maskDecimal } from "../../lib/hardValidation";
-import { phToday } from "@/lib/time";
+import { phToday } from "@/modules/human-resource-management/shared/utils/time";
 
 export function LicensureExamSection({ form }: { form: UseFormReturn<ApplicationFormValues> }) {
     const { fields, append, remove } = useFieldArray({

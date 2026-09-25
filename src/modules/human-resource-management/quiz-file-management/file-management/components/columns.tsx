@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import type { QuizQuestionWithOptions } from "../types";
-import { formatPHT } from "@/lib/time";
+import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
 
 const TYPE_LABELS: Record<string, string> = {
     true_false: "True / False",

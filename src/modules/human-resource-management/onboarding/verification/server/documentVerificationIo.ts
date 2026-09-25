@@ -4,7 +4,7 @@ import { dFetch } from "@/modules/human-resource-management/shared/utils/directu
 
 import type { DocumentVerificationState } from "../types/document-verification.schema";
 import { DocumentVerificationSchema } from "../types/document-verification.schema";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export interface DocumentVerificationEntry {
   state: DocumentVerificationState;

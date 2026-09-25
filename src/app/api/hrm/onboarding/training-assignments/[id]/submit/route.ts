@@ -20,7 +20,7 @@ import {
   normalizeTrainingAssignment,
   resolveEngineApplicant,
 } from "@/modules/human-resource-management/onboarding/training/trainingTaking";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   abandonedInProgress,
   buildCompletionScalars,

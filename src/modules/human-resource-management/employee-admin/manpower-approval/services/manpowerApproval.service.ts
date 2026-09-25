@@ -1,5 +1,5 @@
 import type { ManpowerRequest } from "../types";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 const getHeaders = () => {
     return {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { actorIdFromJwt, nowUTC, stampCreate, stampUpdate } from "@/lib/audit";
+import { actorIdFromJwt, nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;

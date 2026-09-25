@@ -9,7 +9,7 @@ import {
 import {
   normalizeTrainingAssignment,
 } from "@/modules/human-resource-management/onboarding/training/trainingTaking";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import { readUserExists } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
 
 export const runtime = "nodejs";

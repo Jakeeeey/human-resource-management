@@ -12,7 +12,7 @@ import {
 } from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
 import { JobOfferUpdateSchema } from "@/modules/human-resource-management/onboarding/signing/types/signing-api.schema";
 import { JobOfferSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { actorIdFromJwt, stampUpdate, nowUTC } from "@/lib/audit";
+import { actorIdFromJwt, stampUpdate, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

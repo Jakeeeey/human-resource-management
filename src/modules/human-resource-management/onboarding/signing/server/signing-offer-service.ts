@@ -12,7 +12,7 @@ import {
   type ApplicantStatus,
 } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { patchRow } from "./signingSetIo";
-import { stampUpdate, nowUTC } from "@/lib/audit";
+import { stampUpdate, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import { findSigningEnvelopeByApplicant } from "./signingSetRows";
 import { readJobOfferById } from "./signingRollupIo";
 import { recomputeSigningRollups } from "./signing-rollup-service";

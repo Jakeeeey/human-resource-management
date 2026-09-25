@@ -11,7 +11,7 @@ import {
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
 import { patchRow } from "./signingSetIo";
 import { readJobOfferById } from "./signingRollupIo";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // signing-closeout-service.ts — terminal close-out for NON-SIGNING applicants
 // (todo 18). The locked mapping:

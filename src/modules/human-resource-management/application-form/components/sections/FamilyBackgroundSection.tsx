@@ -18,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { phToday } from "@/lib/time";
+import { phToday } from "@/modules/human-resource-management/shared/utils/time";
 import {
     DEPENDENT_RELATION_OPTIONS,
     EMPTY_FAMILY_DEPENDENT,

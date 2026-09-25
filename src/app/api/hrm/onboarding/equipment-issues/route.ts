@@ -16,7 +16,7 @@ import {
   listOnboardingTasks,
 } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -16,7 +16,7 @@ import {
   hireeSigner,
   parseEquipmentDocRef,
 } from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -7,7 +7,7 @@ import {
   type PaperworkTemplate,
   type PaperworkZone,
 } from "@/modules/human-resource-management/onboarding/paperwork/types/paperwork-template.schema";
-import { actorIdFromJwt, nowUTC, stampCreate } from "@/lib/audit";
+import { actorIdFromJwt, nowUTC, stampCreate } from "@/modules/human-resource-management/shared/utils/audit";
 import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";

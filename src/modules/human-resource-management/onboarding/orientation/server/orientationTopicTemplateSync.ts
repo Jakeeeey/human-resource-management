@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // orientationTopicTemplateSync.ts — the topic → derived
 // `onboarding_task_template` `is_active` sync (todo 2's pin; used by todo 3's

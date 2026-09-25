@@ -8,7 +8,7 @@ import {
   type HireApplicantRow,
   type HireApplicationRow,
 } from "../types/hire.schema";
-import { phToday } from "@/lib/time";
+import { phToday } from "@/modules/human-resource-management/shared/utils/time";
 import { extractEmailDomain } from "./hire-email";
 import { placeholderApplicantEmail } from "./hire-log";
 import type { SpringUserCreatePayload } from "@/modules/human-resource-management/shared/services/spring-user-service";

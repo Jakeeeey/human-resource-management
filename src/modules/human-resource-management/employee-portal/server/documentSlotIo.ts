@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // documentSlotIo.ts — Directus primitives for the hiree document checklist
 // catalog (`onboarding_document_slot`, todo 4 of onboarding-requirements-config).

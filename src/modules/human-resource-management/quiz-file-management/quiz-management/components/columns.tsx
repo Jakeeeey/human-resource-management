@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import type { Quiz } from "../types";
-import { formatPHT } from "@/lib/time";
+import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline"> = {
     active: "default",

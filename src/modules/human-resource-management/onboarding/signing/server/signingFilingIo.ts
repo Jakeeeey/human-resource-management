@@ -7,7 +7,7 @@ import {
   insertRows,
   readList,
 } from "./signingSetIo";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // signingFilingIo.ts — Directus IO primitives for the deferred filing service
 // (todo 17). The flow decisions live in `signing-filing-service.ts`; this file

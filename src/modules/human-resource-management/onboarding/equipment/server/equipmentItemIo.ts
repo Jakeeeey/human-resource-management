@@ -3,7 +3,7 @@ import { z } from "zod";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
 import type { EquipmentCatalogItem } from "../equipmentCatalog";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   EquipmentIssuerSchema,
   type EquipmentIssuer,

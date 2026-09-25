@@ -11,7 +11,7 @@ import { ensureOnboardingTaskTemplates } from "./task-template-service";
 import { listOnboardingTaskTemplates } from "./task-template-service";
 import { readUserDepartmentId } from "../../training/server/trainingCatalogIo";
 import { filterMaterializableTrainingTemplates } from "../../training/server/trainingCatalogService";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type {
   OnboardingOwnerRole,
   OnboardingTask,

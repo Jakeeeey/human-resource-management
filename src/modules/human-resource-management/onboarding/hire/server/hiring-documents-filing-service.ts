@@ -8,7 +8,7 @@ import {
 import { listActiveDocSlotConfig } from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
 
 import { readHireApplicationByApplicant } from "./hire-application";
-import { nowPH } from "@/lib/audit";
+import { nowPH } from "@/modules/human-resource-management/shared/utils/audit";
 
 // hiring-documents-filing-service.ts — auto-files hiring documents into the
 // employee's 201 file (`employee_file_records`) under Pre-Employment &

@@ -7,7 +7,7 @@ import {
   type OrientationTrack,
 } from "../types/orientation.schema";
 import { syncDerivedTemplateActive } from "./orientationTopicTemplateSync";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // `orientationTopicCode` (the ONLY topic↔template formula) and
 // `syncDerivedTemplateActive` are re-exported so the store keeps one surface.

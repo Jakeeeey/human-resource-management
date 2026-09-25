@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Eye, FileText } from "lucide-react";
 import { AttachmentPreviewDialog, type ApplicationAttachmentFile } from "./AttachmentPreviewDialog";
-import { formatPHT, parseUtcInstant } from "@/lib/time";
+import { formatPHT, parseUtcInstant } from "@/modules/human-resource-management/shared/utils/time";
 
 import { Form } from "@/components/ui/form";
 import {

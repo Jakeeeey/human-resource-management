@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { manpowerRequestService } from "@/modules/human-resource-management/manpower-request/services/manpowerRequest.service";
 import { ManpowerRequestSchema } from "@/modules/human-resource-management/manpower-request/types";
-import { actorIdFromJwt, nowUTC, stampUpdate } from "@/lib/audit";
+import { actorIdFromJwt, nowUTC, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 const COOKIE_NAME = "vos_access_token";

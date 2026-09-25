@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { phToday } from "@/lib/time";
+import { phToday } from "@/modules/human-resource-management/shared/utils/time";
 
 const MONTHS = [
     "January",

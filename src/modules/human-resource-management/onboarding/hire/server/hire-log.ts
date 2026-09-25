@@ -1,6 +1,6 @@
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // hire-log.ts — audit writer for the post-hire orchestrator (todo 16).
 //

@@ -12,7 +12,7 @@ import {
     nowUTC,
     stampCreate,
     stampUpdate,
-} from "@/lib/audit";
+} from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

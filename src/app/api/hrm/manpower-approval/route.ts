@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { manpowerApprovalService } from "@/modules/human-resource-management/employee-admin/manpower-approval/services/manpowerApproval.service";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { actorIdFromJwt } from "@/lib/audit";
+import { actorIdFromJwt } from "@/modules/human-resource-management/shared/utils/audit";
 
 export async function GET() {
     try {

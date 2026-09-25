@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrainingAssignments } from "../hooks/useTrainingAssignments";
 import { useTrainingAssignmentFetch } from "../providers/trainingAssignmentProvider";
-import { formatPHT, phLocalToUtcIso } from "@/lib/time";
+import { formatPHT, phLocalToUtcIso } from "@/modules/human-resource-management/shared/utils/time";
 
 // TrainingOverviewTab.tsx — HR overview per hire (Todo 12).
 //

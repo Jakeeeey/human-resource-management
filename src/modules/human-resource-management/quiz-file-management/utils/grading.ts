@@ -1,5 +1,5 @@
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
 

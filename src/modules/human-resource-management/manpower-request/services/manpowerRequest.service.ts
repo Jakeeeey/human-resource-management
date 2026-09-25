@@ -1,5 +1,5 @@
 import type { ManpowerRequest } from "../types";
-import { creationTimestamps, nowUTC } from "@/lib/audit";
+import { creationTimestamps, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;

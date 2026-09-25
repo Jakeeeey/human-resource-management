@@ -30,7 +30,7 @@ import type {
   OrientationTopic,
   OrientationTrack,
 } from "./types/orientation.schema";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export { orientationTopicCode } from "./server/orientationTopicIo";
 

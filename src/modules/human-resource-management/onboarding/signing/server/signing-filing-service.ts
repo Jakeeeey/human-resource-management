@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   findPaperworksByApplicant,
   findSigningEnvelopeByApplicant,

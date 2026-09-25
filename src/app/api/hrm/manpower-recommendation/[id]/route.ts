@@ -4,7 +4,7 @@ import { manpowerRecommendationService } from "@/modules/human-resource-manageme
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
 import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
-import { actorIdFromJwt, nowUTC } from "@/lib/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";

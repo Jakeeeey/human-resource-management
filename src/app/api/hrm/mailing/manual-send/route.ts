@@ -12,7 +12,7 @@ import {
     writeOutboxRow,
 } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { buildManualIdempotencyKey } from "@/modules/human-resource-management/recruitment/mailing/utils/idempotency";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import { logRedacted, scrubSecretsFromText } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 import { renderMailTemplate } from "@/modules/human-resource-management/recruitment/mailing/utils/mailRenderer";
 import {

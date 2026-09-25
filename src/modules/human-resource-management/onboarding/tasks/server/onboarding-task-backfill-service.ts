@@ -7,7 +7,7 @@ import {
 import { materializeOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { completeTaskByCode } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 import { LEGACY_TRAINING_TEMPLATE_CODES } from "@/modules/human-resource-management/onboarding/training/server/trainingCatalogService";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // onboarding-task-backfill-service.ts — maintenance sweep for hires who are
 // ALREADY mid-onboarding.

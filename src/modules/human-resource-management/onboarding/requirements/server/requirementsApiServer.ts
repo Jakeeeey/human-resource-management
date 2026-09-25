@@ -9,7 +9,7 @@ import {
   readOnboardingTaskSession,
   sessionActorId,
 } from "../../tasks/server/onboardingTaskApiServer";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // requirementsApiServer.ts — shared boundary helpers for the requirements
 // CRUD API (todo 13 of onboarding-requirements-config). Session handling

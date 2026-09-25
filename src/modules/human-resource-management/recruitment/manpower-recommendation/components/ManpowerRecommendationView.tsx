@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Building2, FileText, UserCheck, Loader2, Pencil } from "lucide-react";
 import { ApplicationViewDialog } from "./ApplicationViewDialog";
-import { formatPHT } from "@/lib/time";
+import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
 
 const STATUS_OPTIONS = ["Recommended", "Approved", "Hired", "Rejected", "Withdrawn"] as const;
 

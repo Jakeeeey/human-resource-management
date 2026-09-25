@@ -17,7 +17,7 @@ import {
   listTopicRows,
   type TopicWriteRow,
 } from "../../orientation/server/orientationTopicIo";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // catalogSeed.ts — RUNTIME create-missing seeding for the three new catalogs
 // (todo 6 of onboarding-requirements-config): `orientation_topic`,

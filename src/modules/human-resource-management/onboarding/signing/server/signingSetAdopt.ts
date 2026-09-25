@@ -3,7 +3,7 @@ import {
   type ApplicantStatus,
 } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { SigningEnvelope } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { nowUTC } from "@/lib/audit";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   findJobOfferByApplicant,
   findPaperworksByApplicant,
