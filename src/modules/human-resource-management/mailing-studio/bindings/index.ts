@@ -1,1 +1,0 @@
-export { BindingsTab } from "./BindingsTab";
