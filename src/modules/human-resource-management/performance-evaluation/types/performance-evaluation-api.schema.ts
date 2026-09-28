@@ -57,7 +57,7 @@ const EvaluationRatingSchema = z.object({
 export const CreateEvaluationSchema = z
   .object({
     user_id: z.number().int().positive(),
-    eval_type: z.enum(["first", "second"]),
+    eval_type: z.enum(["first", "second", "third"]),
     evaluation_date: DateStringSchema,
     result: z.enum(["passed", "failed"]),
     evaluator_comments: z.string().max(4000).nullable().optional(),
@@ -70,7 +70,7 @@ export type CreateEvaluationInput = z.infer<typeof CreateEvaluationSchema>;
 export const UpdateEvaluationSchema = z
   .object({
     user_id: z.number().int().positive().optional(),
-    eval_type: z.enum(["first", "second"]).optional(),
+    eval_type: z.enum(["first", "second", "third"]).optional(),
     evaluation_date: DateStringSchema.optional(),
     result: z.enum(["passed", "failed"]).optional(),
     evaluator_comments: z.string().max(4000).nullable().optional(),

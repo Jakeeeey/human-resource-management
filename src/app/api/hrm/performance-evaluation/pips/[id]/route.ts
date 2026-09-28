@@ -21,7 +21,6 @@ import { resolveEvaluationCapability } from "@/modules/human-resource-management
 import {
   EmployeePipActionPlanSchema,
   EmployeePipAreaSchema,
-  EvaluationTrackingSchema,
   type EmployeePip,
   type EmployeePipActionPlan,
 } from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation.schema";
@@ -89,101 +88,6 @@ async function deleteChildRows(collection: string, pipId: number) {
       body: JSON.stringify(ids),
     });
   }
-}
-
-async function stampTrackingTerminated(
-  pip: EmployeePip,
-  actorId: number,
-  now: string
-): Promise<NextResponse | null> {
-  let trackingBody: unknown;
-  try {
-    trackingBody = await dFetch(
-      `/items/employee_evaluation_tracking?filter[user_id][_eq]=${pip.user_id}&limit=1`
-    );
-  } catch (error) {
-    console.error(
-      "[performance-evaluation-pips] tracking read failed:",
-      error
-    );
-    return serverError();
-  }
-  let trackingRows: unknown[];
-  try {
-    trackingRows = unwrapData<unknown[]>(trackingBody);
-  } catch (error) {
-    console.error(
-      "[performance-evaluation-pips] tracking read failed:",
-      error
-    );
-    return serverError();
-  }
-  const firstRow = Array.isArray(trackingRows) ? trackingRows[0] : undefined;
-  const trackingParsed =
-    firstRow === undefined
-      ? null
-      : EvaluationTrackingSchema.safeParse(firstRow);
-  if (trackingParsed && !trackingParsed.success) {
-    console.error(
-      "[performance-evaluation-pips] tracking row contract mismatch:",
-      JSON.stringify(trackingParsed.error.flatten())
-    );
-    return serverError();
-  }
-  if (trackingParsed) {
-    const stamped = (await dFetch(
-      `/items/employee_evaluation_tracking/${trackingParsed.data.id}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(
-          stampUpdate(
-            {
-              terminated_at: now,
-              terminated_by: actorId,
-              separation_type: "failed_probation",
-              updated_at: now,
-            },
-            actorId
-          )
-        ),
-      }
-    )) as { data?: unknown; errors?: unknown };
-    if (stamped?.errors) {
-      console.error(
-        "[performance-evaluation-pips] tracking termination stamp failed:",
-        JSON.stringify(stamped)
-      );
-      return mapWriteFailure(stamped);
-    }
-  } else {
-    const createdTracking = (await dFetch(
-      "/items/employee_evaluation_tracking",
-      {
-        method: "POST",
-        body: JSON.stringify(
-          stampCreate(
-            {
-              user_id: pip.user_id,
-              terminated_at: now,
-              terminated_by: actorId,
-              separation_type: "failed_probation",
-              created_at: now,
-              updated_at: now,
-            },
-            actorId
-          )
-        ),
-      }
-    )) as { data?: unknown; errors?: unknown };
-    if (createdTracking?.errors || !createdTracking?.data) {
-      console.error(
-        "[performance-evaluation-pips] tracking create failed:",
-        JSON.stringify(createdTracking)
-      );
-      return mapWriteFailure(createdTracking);
-    }
-  }
-  return null;
 }
 
 async function readBundle(pipId: number) {
@@ -377,15 +281,6 @@ async function handleOutcomePath(
       );
       return mapWriteFailure(patched);
     }
-  }
-
-  if (input.status === "failed") {
-    const trackingFailure = await stampTrackingTerminated(
-      current,
-      actorId,
-      now
-    );
-    if (trackingFailure) return trackingFailure;
   }
 
   const bundle = await readBundle(current.id);

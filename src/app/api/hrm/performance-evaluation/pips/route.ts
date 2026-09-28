@@ -26,6 +26,7 @@ import { CreatePipSchema } from "@/modules/human-resource-management/performance
 import {
   assertEmployeeOpen,
   assertNoExistingPip,
+  assertNoExistingPipForUser,
   assertPipDatesCoherent,
   distinctPipAreas,
   fetchLiveFailedEvaluation,
@@ -129,6 +130,7 @@ export async function POST(req: NextRequest) {
 
     try {
       await assertNoExistingPip(input.evaluation_id);
+      await assertNoExistingPipForUser(evaluationUserId);
       assertEmployeeOpen(await fetchTrackingByUserId(evaluationUserId));
     } catch (error) {
       if (error instanceof PipGateError) {

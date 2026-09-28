@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { ApplicantStatusSchema } from "@/modules/human-resource-management/onboarding/types/applicant-status";
-import type { ApplicantStatus } from "@/modules/human-resource-management/onboarding/types/applicant-status";
 import {
   ActivePaperworkTemplateSchema,
   insertRows,
@@ -27,9 +25,8 @@ const SIGNED_DOCS_TYPE_DESCRIPTION =
 const SIGNED_DOCS_LIST_DESCRIPTION =
   "Signed onboarding paperwork auto-filed on hire — one record per signed paperwork item.";
 
-const ApplicantStatusRowSchema = z.looseObject({
-  id: z.number().int().positive(),
-  status: ApplicantStatusSchema,
+const EmployeeUserRowSchema = z.looseObject({
+  user_id: z.number().int(),
 });
 
 const RecordTypeRowSchema = z.looseObject({
@@ -65,15 +62,15 @@ export interface FiledPdfRecordInput {
   now: string;
 }
 
-/** The applicant's current status (null when the read returns no row). */
-export async function readApplicantStatus(
-  applicantId: number
-): Promise<ApplicantStatus | null> {
+/** The employee `user_id` (null when no such `user` row exists). */
+export async function readEmployeeUserId(
+  userId: number
+): Promise<number | null> {
   const rows = await readList(
-    `/items/applicant?filter[id][_eq]=${applicantId}&fields=id,status&limit=1`,
-    ApplicantStatusRowSchema
+    `/items/user?filter[user_id][_eq]=${userId}&fields=user_id&limit=1`,
+    EmployeeUserRowSchema
   );
-  return rows[0]?.status ?? null;
+  return rows[0]?.user_id ?? null;
 }
 
 /** Records already filed to this employee for the staged PDFs (any state). */

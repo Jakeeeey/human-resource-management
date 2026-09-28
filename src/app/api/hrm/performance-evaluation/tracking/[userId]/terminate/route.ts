@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
@@ -17,7 +18,10 @@ import {
   assertCapability,
   resolveEvaluationCapability,
 } from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
-import { getEvaluationWorkspace } from "@/modules/human-resource-management/performance-evaluation/server/evaluation-service";
+import {
+  getEvaluationWorkspace,
+  SEPARATION_TYPES,
+} from "@/modules/human-resource-management/performance-evaluation/server/evaluation-service";
 import { EvaluationTrackingSchema } from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation.schema";
 import {
   actorIdFromJwt,
@@ -25,14 +29,21 @@ import {
   stampCreate,
   stampUpdate,
 } from "@/modules/human-resource-management/performance-evaluation/utils/audit";
-import { hasCompletedProbation } from "@/modules/human-resource-management/performance-evaluation/utils/probationClock";
 import {
+  countFailures,
   type EvalType,
   type WorkflowFacts,
 } from "@/modules/human-resource-management/performance-evaluation/utils/workflow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const TerminateSchema = z
+  .object({
+    separation_type: z.enum(SEPARATION_TYPES),
+    termination_reason: z.string().max(4000).nullable().optional(),
+  })
+  .strict();
 
 export async function POST(
   req: NextRequest,
@@ -50,6 +61,12 @@ export async function POST(
     const userId = Number(userIdParam);
     if (!Number.isInteger(userId) || userId <= 0) {
       return validationFailed({ user_id: ["Must be a positive integer"] });
+    }
+
+    const body: unknown = await req.json().catch(() => null);
+    const validation = TerminateSchema.safeParse(body);
+    if (!validation.success) {
+      return validationFailed(validation.error.flatten().fieldErrors);
     }
 
     const workspace = await getEvaluationWorkspace(userId);
@@ -87,22 +104,18 @@ export async function POST(
         { status: 409 }
       );
     }
-    const viaRecommendation = facts.recommendationIssuedAt !== null;
-    const viaSixMonthCutoff = hasCompletedProbation(facts.dateHired);
-    if (!viaRecommendation && !viaSixMonthCutoff) {
-      const openPip = facts.pips.some((pip) => pip.status === "open");
-      if (openPip) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Close the open PIP before regularizing this employee.",
-          },
-          { status: 409 }
-        );
-      }
+    if (countFailures(facts) < 2) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Termination requires two recorded failures.",
+        },
+        { status: 422 }
+      );
     }
 
     const now = nowPH();
+    const trimmedReason = validation.data.termination_reason?.trim() ?? "";
     if (workspace.tracking) {
       const patched = (await dFetch(
         `/items/employee_evaluation_tracking/${workspace.tracking.id}`,
@@ -111,8 +124,10 @@ export async function POST(
           body: JSON.stringify(
             stampUpdate(
               {
-                regularized_at: now,
-                regularized_by: actorId,
+                terminated_at: now,
+                terminated_by: actorId,
+                separation_type: validation.data.separation_type,
+                termination_reason: trimmedReason === "" ? null : trimmedReason,
                 updated_at: now,
               },
               actorId
@@ -129,8 +144,10 @@ export async function POST(
             {
               user_id: userId,
               date_hired_snapshot: workspace.employee.date_hired,
-              regularized_at: now,
-              regularized_by: actorId,
+              terminated_at: now,
+              terminated_by: actorId,
+              separation_type: validation.data.separation_type,
+              termination_reason: trimmedReason === "" ? null : trimmedReason,
               created_at: now,
               updated_at: now,
             },

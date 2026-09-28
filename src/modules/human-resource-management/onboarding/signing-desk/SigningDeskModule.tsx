@@ -523,10 +523,10 @@ function DeskBody() {
           </h2>
           <p
             className="truncate text-xs text-muted-foreground sm:text-sm"
-            title="Offer + paperwork created on Final Approved — open a set to sign or review"
+            title="Paperwork created on Final Approved — create the offer in the Job Offer module, then open a set to sign or review"
           >
-            Offer + paperwork created on Final Approved — open a set to sign or
-            review
+            Paperwork created on Final Approved — create the offer in the Job
+            Offer module, then open a set to sign or review
           </p>
         </div>
         <SigningDeskQueueCards

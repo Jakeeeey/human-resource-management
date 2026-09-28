@@ -256,7 +256,7 @@ export function SigningItemView({
           className="px-3 pt-2 text-xs text-amber-600 sm:px-4 dark:text-amber-400"
           title={validityMessage}
         >
-          Signing blocked: {validityMessage}.
+          {validityMessage}.
         </p>
       )}
       {pdfError !== null && (

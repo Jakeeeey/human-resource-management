@@ -1,3 +1,4 @@
+import { countFailures } from "./workflow";
 import type { WorkflowFacts, WorkflowStage } from "./workflow";
 
 export type RailState = "done" | "active" | "upcoming" | "terminated";
@@ -11,29 +12,27 @@ export interface RailNode {
 type EvaluationFact = WorkflowFacts["evaluations"][number];
 type PipFact = WorkflowFacts["pips"][number];
 
-/**
- * A PIP only ever exists because an evaluation failed — it is the intermediary
- * action a failed evaluation triggers. PIP nodes are therefore conditional:
- * they appear once a PIP exists or once the evaluation that would trigger one
- * has failed. The base pipeline never advertises them up front.
- */
 export function deriveRailNodes(facts: WorkflowFacts, stage: WorkflowStage): RailNode[] {
   const live = facts.evaluations.filter((entry) => entry.voidedAt === null);
   const first = live.find((entry) => entry.evalType === "first");
   const second = live.find((entry) => entry.evalType === "second");
-  const pip1 = facts.pips.find((pip) => pip.evalType === "first");
-  const pip2 = facts.pips.find((pip) => pip.evalType === "second");
-  const failed =
-    facts.pips.some((pip) => pip.status === "failed") || facts.terminatedAt !== null;
+  const third = live.find((entry) => entry.evalType === "third");
+  const pip = facts.pips.length > 0 ? [...facts.pips].sort((a, b) => a.evaluationId - b.evaluationId)[0] : undefined;
+  const pipEval: EvaluationFact | undefined =
+    pip === undefined
+      ? undefined
+      : (live.find((entry) => entry.evalType === pip.evalType) ?? first);
+  const flagged = countFailures(facts) >= 2 && facts.terminatedAt === null && facts.regularizedAt === null;
+  const failed = facts.terminatedAt !== null || flagged;
   const unreached: RailState = failed ? "terminated" : "upcoming";
 
   const pipState = (
-    pip: PipFact | undefined,
+    current: PipFact | undefined,
     evaluation: EvaluationFact | undefined,
   ): RailState => {
-    if (pip?.status === "failed") return "terminated";
-    if (pip?.status === "passed") return "done";
-    if (pip?.status === "open") return "active";
+    if (current?.status === "failed") return "terminated";
+    if (current?.status === "passed") return "done";
+    if (current?.status === "open") return "active";
     if (evaluation === undefined) return unreached;
     return failed ? "terminated" : "active";
   };
@@ -46,8 +45,8 @@ export function deriveRailNodes(facts: WorkflowFacts, stage: WorkflowStage): Rai
     },
   ];
 
-  if (pip1 !== undefined || first?.result === "failed") {
-    nodes.push({ key: "pip1", label: "PIP #1", state: pipState(pip1, first) });
+  if (pip !== undefined || live.some((entry) => entry.result === "failed")) {
+    nodes.push({ key: "pip1", label: "PIP", state: pipState(pip, pipEval) });
   }
 
   nodes.push({
@@ -64,9 +63,19 @@ export function deriveRailNodes(facts: WorkflowFacts, stage: WorkflowStage): Rai
             : "upcoming",
   });
 
-  if (pip2 !== undefined || second?.result === "failed") {
-    nodes.push({ key: "pip2", label: "PIP #2", state: pipState(pip2, second) });
-  }
+  nodes.push({
+    key: "third",
+    label: "3rd Evaluation",
+    state: third
+      ? "done"
+      : failed
+        ? "terminated"
+        : stage === "third_evaluation"
+          ? "active"
+          : stage === "closed"
+            ? "terminated"
+            : "upcoming",
+  });
 
   nodes.push({
     key: "recommendation",
@@ -95,6 +104,14 @@ export function deriveRailNodes(facts: WorkflowFacts, stage: WorkflowStage): Rai
             ? "terminated"
             : "upcoming",
   });
+
+  if (flagged || facts.terminatedAt !== null) {
+    nodes.push({
+      key: "termination_review",
+      label: "Termination review",
+      state: facts.terminatedAt !== null ? "done" : "active",
+    });
+  }
 
   return nodes;
 }

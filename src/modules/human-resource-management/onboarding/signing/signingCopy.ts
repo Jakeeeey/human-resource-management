@@ -28,7 +28,7 @@ export function humanizeValidityReason(
     });
     return `Missing your signature in ${names.join(", ")}`;
   }
-  return "This document is not ready to sign yet";
+  return "Draw your signature anywhere to enable signing";
 }
 
 const MACHINE_CODE_PREFIX = /^[A-Z][A-Z0-9_]{2,}:\s*/;
@@ -42,13 +42,11 @@ export function isCompletionPending(
   envelopeStatus: string,
   applicantStatus: string | null | undefined
 ): boolean {
-  return envelopeStatus === "complete" && applicantStatus !== "hired";
+  return envelopeStatus === "complete" && applicantStatus !== "signing_complete";
 }
 
 export function completionNeedsAttention(
   completion: SigningCompletion | null
 ): boolean {
-  return (
-    completion?.kind === "blocked" || completion?.kind === "failed"
-  );
+  return completion?.kind === "blocked";
 }

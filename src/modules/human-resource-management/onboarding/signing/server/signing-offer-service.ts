@@ -74,6 +74,10 @@ export interface SignJobOfferResult {
   completion: SigningCompletion;
 }
 
+export interface SaveJobOfferResult {
+  offer: JobOffer;
+}
+
 /**
  * Accept an offer: persist `status="signed"` + `signature_file` + `strokes` +
  * `signed_pdf_file` + `signed_at`, then run the todo-12 rollup recompute (the
@@ -182,4 +186,49 @@ export async function signJobOffer(
     applicantStatus,
     completion: rollup.completion,
   };
+}
+
+export async function saveJobOfferSignature(
+  rawInput: unknown,
+  actorId?: number | null
+): Promise<SaveJobOfferResult> {
+  const validation = SignJobOfferInputSchema.safeParse(rawInput);
+  if (!validation.success) {
+    throw new Error(
+      `${SIGNING_OFFER_ERROR_CODES.invalidInput}: ${validation.error.issues
+        .map((issue) => `${issue.path.join(".") || "input"}: ${issue.message}`)
+        .join("; ")}`
+    );
+  }
+  const { offerId, signatureFile, strokes, signedPdfFile } = validation.data;
+  const existing = await readJobOfferById(offerId);
+  if (!existing) {
+    throw new Error(
+      `${SIGNING_OFFER_ERROR_CODES.offerNotFound}: job_offer ${offerId} does not exist`
+    );
+  }
+  if (existing.status === "declined") {
+    throw new Error(
+      `${SIGNING_OFFER_ERROR_CODES.offerClosed}: job_offer ${offerId} is declined and cannot be signed`
+    );
+  }
+  if (existing.status === "signed") {
+    return { offer: existing };
+  }
+  const now = nowUTC();
+  const offer = await patchRow(
+    "job_offer",
+    offerId,
+    stampUpdate(
+      {
+        signature_file: signatureFile,
+        strokes,
+        signed_pdf_file: signedPdfFile,
+        updated_at: now,
+      },
+      actorId ?? null
+    ),
+    JobOfferSchema
+  );
+  return { offer };
 }

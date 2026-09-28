@@ -12,6 +12,7 @@ import {
 } from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
 import {
   SIGNING_OFFER_ERROR_CODES,
+  saveJobOfferSignature,
   signJobOffer,
 } from "@/modules/human-resource-management/onboarding/signing/server/signing-offer-service";
 import { JobOfferSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
@@ -82,6 +83,7 @@ const JobOfferSignSchema = z
     signature_file: z.string().min(1).nullable().default(null),
     strokes: z.string().min(1).nullable().default(null),
     signed_pdf_file: z.string().min(1).nullable().default(null),
+    finalize: z.boolean().default(true),
   })
   .strict();
 
@@ -110,6 +112,15 @@ export async function PATCH(
     }
 
     try {
+      if (validation.data.finalize === false) {
+        const saved = await saveJobOfferSignature({
+          offerId,
+          signatureFile: validation.data.signature_file,
+          strokes: validation.data.strokes,
+          signedPdfFile: validation.data.signed_pdf_file,
+        }, actorId);
+        return NextResponse.json({ success: true, data: saved });
+      }
       const result = await signJobOffer({
         offerId,
         signatureFile: validation.data.signature_file,

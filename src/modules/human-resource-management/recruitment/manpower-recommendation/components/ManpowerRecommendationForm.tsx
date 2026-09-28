@@ -18,7 +18,7 @@ import { ApplicantCombobox } from "./ApplicantCombobox";
 const ManpowerRecommendationFormSchema = z.object({
     manpower_request_id: z.number({ error: "Please select a manpower request" }),
     applicant_id: z.number({ error: "Please select an applicant" }),
-    recommendation_notes: z.string().nullable().optional(),
+    recommendation_notes: z.string().trim().min(1, { error: "Recommendation notes is required" }),
 });
 
 type ManpowerRecommendationFormValues = z.infer<typeof ManpowerRecommendationFormSchema>;
@@ -64,7 +64,7 @@ export function ManpowerRecommendationForm() {
             const payload = {
                 manpower_request_id: values.manpower_request_id,
                 applicant_id: values.applicant_id,
-                recommendation_notes: values.recommendation_notes || null,
+                recommendation_notes: values.recommendation_notes.trim(),
             };
             const success = await submitRecommendation(payload as ManpowerRecommendationCreateInput);
             if (success) {
@@ -134,10 +134,10 @@ export function ManpowerRecommendationForm() {
                                 name="recommendation_notes"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Recommendation Notes</FormLabel>
+                                        <FormLabel className="text-xs font-bold uppercase text-muted-foreground">Recommendation Notes <span className="text-destructive">*</span></FormLabel>
                                         <FormControl>
                                             <Textarea
-                                                placeholder="Why is this applicant a strong fit? (optional)"
+                                                placeholder="Why is this applicant a strong fit?"
                                                 className="min-h-[100px] resize-none bg-muted/30 focus:bg-background transition-colors"
                                                 rows={4}
                                                 {...field}
