@@ -19,8 +19,6 @@ export const FORM_SECTIONS = [
     { id: "section-certification", label: "Certify" },
 ] as const;
 
-// Viewport-top distance at which a section counts as "current": the sticky
-// nav height (~44px) plus the `scroll-mt-28` anchor offset (112px) with slack.
 const ACTIVE_TOP_OFFSET = 140;
 
 export function ApplicationFormNav() {
@@ -29,8 +27,6 @@ export function ApplicationFormNav() {
     const navRef = useRef<HTMLElement | null>(null);
     const pillRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
 
-    // Reveal an edge fade only when there is actually content clipped off it,
-    // so the hint is truthful at both ends of the scroll range.
     const syncEdges = useCallback(() => {
         const nav = navRef.current;
         if (!nav) return;
@@ -43,13 +39,26 @@ export function ApplicationFormNav() {
 
     useEffect(() => {
         let frame = 0;
+        let scroller: Element | Window = window;
+        const resolveScroller = (from: Element | null): Element | Window => {
+            let el = from ? from.parentElement : null;
+            while (el) {
+                if (el === document.body || el === document.documentElement) break;
+                const overflowY = getComputedStyle(el).overflowY;
+                if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight) return el;
+                el = el.parentElement;
+            }
+            return window;
+        };
         const updateActive = () => {
             frame = 0;
+            const isWindow = scroller === window;
+            const base = isWindow ? 0 : (scroller as Element).getBoundingClientRect().top;
             let current: string = FORM_SECTIONS[0].id;
             for (const section of FORM_SECTIONS) {
                 const el = document.getElementById(section.id);
                 if (!el) continue;
-                if (el.getBoundingClientRect().top <= ACTIVE_TOP_OFFSET) current = section.id;
+                if (el.getBoundingClientRect().top <= base + ACTIVE_TOP_OFFSET) current = section.id;
                 else break;
             }
             setActiveId(current);
@@ -58,20 +67,32 @@ export function ApplicationFormNav() {
             if (frame) return;
             frame = window.requestAnimationFrame(updateActive);
         };
+        const attachScroll = () => {
+            const next = resolveScroller(navRef.current);
+            if (next !== scroller) {
+                scroller.removeEventListener("scroll", onScroll);
+                scroller = next;
+                scroller.addEventListener("scroll", onScroll, { passive: true });
+            }
+        };
+        const onResize = () => {
+            attachScroll();
+            onScroll();
+        };
+        scroller = resolveScroller(navRef.current);
         updateActive();
         syncEdges();
-        window.addEventListener("scroll", onScroll, { passive: true });
-        window.addEventListener("resize", onScroll);
+        scroller.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onResize);
         window.addEventListener("resize", syncEdges);
         return () => {
             if (frame) window.cancelAnimationFrame(frame);
-            window.removeEventListener("scroll", onScroll);
-            window.removeEventListener("resize", onScroll);
+            scroller.removeEventListener("scroll", onScroll);
+            window.removeEventListener("resize", onResize);
             window.removeEventListener("resize", syncEdges);
         };
     }, [syncEdges]);
 
-    // Keep the current pill revealed without nudging the page vertically.
     useEffect(() => {
         const nav = navRef.current;
         const pill = pillRefs.current[activeId];
