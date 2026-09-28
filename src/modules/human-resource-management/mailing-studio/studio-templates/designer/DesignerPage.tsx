@@ -9,7 +9,6 @@ import { useStore } from "zustand";
 import {
     ArrowLeft,
     Box,
-    ChevronDown,
     Eye,
     HelpCircle,
     Layers,
@@ -46,7 +45,6 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-import { DeviceSwitch, STUDIO_DEVICE_WIDTHS, type StudioDevice } from "./components/DeviceSwitch";
 import { HelpPanel } from "./components/HelpPanel";
 import { LayersPanel } from "./components/LayersPanel";
 import { MsCombobox } from "./components/MsCombobox";
@@ -68,7 +66,7 @@ import { renderTemplate } from "../utils/template-render";
  * `HRM documentation/DESIGN-mailing-studio.md` (tokens, geometry, states,
  * motion, responsive intent — the contract lives with the subsystem docs,
  * not inside the repo).
- * Template identity is route-driven (?key=, P1-14); device width + zoom are
+ * Template identity is route-driven (?key=, P1-14); zoom is
  * designer state (N5/P1-10); the send dialog mounts its portal content only
  * while open so no closed overlay can outlive it (N1).
  */
@@ -225,8 +223,6 @@ function StudioTopBar({
     onSave,
     saveStatus,
     dirty,
-    device,
-    onDeviceChange,
     propsOpen,
     onToggleProps,
 }: {
@@ -244,8 +240,6 @@ function StudioTopBar({
     readonly onSave: () => void;
     readonly saveStatus: DesignAutosaveStatus;
     readonly dirty: boolean;
-    readonly device: StudioDevice;
-    readonly onDeviceChange: (next: StudioDevice) => void;
     readonly propsOpen: boolean;
     readonly onToggleProps: () => void;
 }) {
@@ -277,10 +271,6 @@ function StudioTopBar({
                 >
                     {saveChipCopy(saveStatus, dirty)}
                 </span>
-            </div>
-
-            <div className="hidden shrink-0 items-center sm:flex">
-                <DeviceSwitch device={device} onChange={onDeviceChange} />
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -439,8 +429,6 @@ function SettingsPanel({
     onTemplateKeyChange,
     subject,
     onSubjectChange,
-    device,
-    onDeviceChange,
     exportNotes,
 }: {
     readonly templateName: string;
@@ -449,8 +437,6 @@ function SettingsPanel({
     readonly onTemplateKeyChange: (next: string) => void;
     readonly subject: string;
     readonly onSubjectChange: (next: string) => void;
-    readonly device: StudioDevice;
-    readonly onDeviceChange: (next: StudioDevice) => void;
     readonly exportNotes: string | null;
 }) {
     const zoom = useCanvasDoc((state) => state.viewport.zoom);
@@ -518,14 +504,6 @@ function SettingsPanel({
                     <h3 className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                         Canvas
                     </h3>
-                    <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-muted-foreground" id="settings-device-label">
-                            Device
-                        </span>
-                        <div aria-labelledby="settings-device-label">
-                            <DeviceSwitch device={device} onChange={onDeviceChange} />
-                        </div>
-                    </div>
                     <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-muted-foreground" id="settings-zoom-label">
                             Zoom
@@ -736,7 +714,6 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
     const { templateKey, requestedKey, keyRewritten } = useTemplateKey(propTemplateKey);
     const router = useRouter();
     const [panel, setPanel] = useState<PanelId>("elements");
-    const [device, setDevice] = useState<StudioDevice>("desktop");
     const [propsOpen, setPropsOpen] = useState(false);
     const [templateName, setTemplateName] = useState<string>(DEFAULT_DESIGN_META.templateName);
     const [subject, setSubject] = useState<string>(DEFAULT_DESIGN_META.subject);
@@ -750,7 +727,6 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
     const [previewEventKey, setPreviewEventKey] = useState<string | null>(null);
     const [previewCompiledAt, setPreviewCompiledAt] = useState<number | null>(null);
     const [previewDirtyDoc, setPreviewDirtyDoc] = useState(false);
-    const [previewNoticesOpen, setPreviewNoticesOpen] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [previewError, setPreviewError] = useState<string | null>(null);
     const [variableCatalog, setVariableCatalog] = useState<readonly MsCatalogRow[]>([]);
@@ -771,7 +747,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
     const missingKeyToastedRef = useRef<string | null>(null);
     const { canUndo, canRedo } = useHistoryCounts();
 
-    const width = STUDIO_DEVICE_WIDTHS[device];
+    const width = 600;
 
     const effectiveKey = templateKeyDraft ?? templateKey;
 
@@ -1046,7 +1022,6 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
         setPreviewHtml(null);
         setPreviewWarnings([]);
         setPreviewSampleKey(null);
-        setPreviewNoticesOpen(false);
         setPreviewCompiledAt(null);
         try {
             let rows: MsCatalogRow[] = [];
@@ -1094,7 +1069,6 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
         setPreviewLoading(false);
         setPreviewCatalog([]);
         setPreviewCompiledAt(null);
-        setPreviewNoticesOpen(false);
         previewDesignJsonRef.current = null;
         const saved = savedSelectionRef.current;
         if (saved.length > 0) useCanvasDoc.getState().selectNodes(saved);
@@ -1196,13 +1170,14 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                         Preview — receiver view
                     </span>
                     {previewCatalog.length > 0 ? (
-                        <div className="flex w-40 shrink-0 items-center gap-1.5 sm:w-48">
+                        <div className="flex shrink-0 items-center gap-1.5">
                             <Label
                                 className="hidden shrink-0 text-[11px] font-medium text-muted-foreground lg:inline"
                                 htmlFor="preview-sample-event"
                             >
                                 Sample data:
                             </Label>
+                            <div className="w-36 min-w-0 max-w-[220px] sm:w-40">
                             <MsCombobox
                                 ariaLabel="Preview sample data from event"
                                 disabled={previewLoading}
@@ -1216,36 +1191,8 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                                     handlePreviewSampleChange(next === "" ? null : next)
                                 }
                             />
+                            </div>
                         </div>
-                    ) : null}
-                    {previewSampleKey ? (
-                        <span
-                            className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex"
-                            data-testid="preview-sample"
-                            title={`Resolved against ${previewSampleKey}`}
-                        >
-                            Sample: {previewSampleKey}
-                        </span>
-                    ) : null}
-                    {previewWarnings.length > 0 ? (
-                        <button
-                            aria-expanded={previewNoticesOpen}
-                            aria-label={`${previewWarnings.length} export notices, activate to ${previewNoticesOpen ? "hide" : "show"}`}
-                            className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors duration-150 hover:text-foreground"
-                            data-testid="preview-warnings"
-                            type="button"
-                            onClick={() => setPreviewNoticesOpen((open) => !open)}
-                        >
-                            {previewWarnings.length} export notice
-                            {previewWarnings.length === 1 ? "" : "s"}
-                            <ChevronDown
-                                aria-hidden="true"
-                                className={cn(
-                                    "size-3 transition-transform duration-150",
-                                    previewNoticesOpen ? "rotate-180" : undefined,
-                                )}
-                            />
-                        </button>
                     ) : null}
                     <Button
                         aria-label="Exit preview"
@@ -1278,7 +1225,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                         <span>No sample event — tokens shown raw.</span>
                     ) : null}
                 </div>
-                {previewNoticesOpen && previewWarnings.length > 0 ? (
+                {previewWarnings.length > 0 ? (
                     <div className="max-h-40 shrink-0 overflow-y-auto border-b bg-card px-3 py-2">
                         <ul className="flex flex-col gap-1" data-testid="preview-notices">
                             {previewWarnings.map((warning) =>
@@ -1307,7 +1254,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                         </ul>
                     </div>
                 ) : null}
-                {unknownTokens.length > 0 && !previewNoticesOpen ? (
+                {unknownTokens.length > 0 ? (
                     <div
                         className="shrink-0 border-b bg-card px-3 py-1.5 text-[11px] text-muted-foreground"
                         data-testid="preview-unresolved"
@@ -1374,14 +1321,12 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                 backBusy={backBusy}
                 canRedo={canRedo}
                 canUndo={canUndo}
-                device={device}
                 dirty={dirty}
                 name={templateName}
                 propsOpen={propsOpen}
                 saveStatus={status}
                 sending={sending}
                 onBack={() => void handleBack()}
-                onDeviceChange={setDevice}
                 onNameChange={setTemplateName}
                 onPreview={() => void handlePreview()}
                 onRedo={() => useCanvasDoc.getState().redo()}
@@ -1499,19 +1444,17 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                 {panel === "layers" ? <LayersPanel /> : null}
                 {panel === "settings" ? (
                     <SettingsPanel
-                        device={device}
                         exportNotes={exportNotes}
                         subject={subject}
                         templateKey={effectiveKey}
                         templateName={templateName}
-                        onDeviceChange={setDevice}
                         onSubjectChange={setSubject}
                         onTemplateKeyChange={setTemplateKeyDraft}
                         onTemplateNameChange={setTemplateName}
                     />
                 ) : null}
                 {panel === "help" ? <HelpPanel /> : null}
-                <StageCanvas device={device} width={width} onEmptyAdd={() => setPanel("elements")} />
+                <StageCanvas width={width} onEmptyAdd={() => setPanel("elements")} />
                 <PropertyPanel
                     catalog={variableCatalog}
                     variableEventKey={variableEventKey}

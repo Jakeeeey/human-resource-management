@@ -9,11 +9,9 @@ import { MousePointerClick } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { clampZoom, useCanvasDoc } from "../hooks/useCanvasDoc";
-import { buildMobileViewModel, mobileNodeBadges, type MobileViewModel } from "../services/mobile-reflow";
 import type { CanvasNode } from "../types/canvas-doc.schema";
 import CanvasNodeView from "./CanvasNodeView";
 import { type CanvasBadge, nodeBadges } from "./canvas-badges";
-import type { StudioDevice } from "./DeviceSwitch";
 
 const CanvasMoveable = dynamic(() => import("./CanvasMoveable"), { ssr: false });
 
@@ -101,24 +99,11 @@ function EmptyCanvasCta({ onBrowse }: { readonly onBrowse: () => void }) {
     );
 }
 
-/**
- * Live freeform canvas stage (T8): absolutely-positioned `.canvas-block` divs
- * driven by useCanvasDoc, background-deselect, Moveable gestures on the first
- * selected node (click-select handled by Selecto), Selecto marquee, keyboard
- * Delete / arrows / Escape / Ctrl+A / Ctrl+C+V+D / Ctrl+Z / Ctrl+Y, Ctrl+wheel
- * zoom. History stays inside the store.
- * Artboard-first sizing: the stage keeps its device width and the workspace
- * scrolls on both axes, so blocks never crush below the artboard contract.
- * `width` is the device artboard width (Desktop 600 / Mobile 375); the pill
- * above the stage always shows this live width.
- */
 export function StageCanvas({
     width = 600,
-    device = "desktop",
     onEmptyAdd,
 }: {
     readonly width?: number;
-    readonly device?: StudioDevice;
     readonly onEmptyAdd?: () => void;
 }) {
     const nodes = useCanvasDoc((state) => state.nodes);
@@ -131,19 +116,13 @@ export function StageCanvas({
     const scrollRef = useRef<HTMLDivElement | null>(null);
 
     const nodeList = useMemo(() => Object.values(nodes), [nodes]);
-    const isMobile = device === "mobile";
-    const mobileModel: MobileViewModel | null = useMemo(() => {
-        if (!isMobile) return null;
-        return buildMobileViewModel({ nodes, rootIds });
-    }, [isMobile, nodes, rootIds]);
     const badgesById = useMemo(() => {
-        if (mobileModel) return mobileNodeBadges(mobileModel);
         const map: Record<string, CanvasBadge[]> = {};
         for (const node of nodeList) {
             map[node.id] = nodeBadges(node, nodeList, width);
         }
         return map;
-    }, [nodeList, width, mobileModel]);
+    }, [nodeList, width]);
 
     const firstSelected = selection[0] ?? null;
 
@@ -178,10 +157,6 @@ export function StageCanvas({
                     element.tagName === "SELECT" ||
                     element.isContentEditable)
             ) {
-                return;
-            }
-
-            if (isMobile && event.key !== "Escape") {
                 return;
             }
 
@@ -264,7 +239,7 @@ export function StageCanvas({
 
         window.addEventListener("keydown", onKeyDown);
         return () => window.removeEventListener("keydown", onKeyDown);
-    }, [isMobile]);
+    }, []);
 
     return (
         <div
@@ -284,7 +259,7 @@ export function StageCanvas({
                 <div
                     className="relative shrink-0 rounded-xl border bg-card shadow-xl dark:shadow-black/50"
                     data-stage="canvas"
-                    style={{ width, minWidth: width, maxWidth: width, minHeight: mobileModel ? Math.max(mobileModel.totalHeight, 1) : 2000, zoom }}
+                    style={{ width, minWidth: width, maxWidth: width, minHeight: 2000, zoom }}
                     onPointerDown={(event) => {
                         if (event.target === event.currentTarget && !event.shiftKey) {
                             selectNodes([]);
@@ -294,21 +269,6 @@ export function StageCanvas({
                 >
                     {rootIds.length === 0 ? (
                         <EmptyCanvasCta onBrowse={() => onEmptyAdd?.()} />
-                    ) : mobileModel ? (
-                        mobileModel.order.map((id) => {
-                            const node = nodes[id];
-                            if (!node) return null;
-                            return (
-                                <CanvasNodeView
-                                    badgesById={badgesById}
-                                    geom={mobileModel.geometries[id]}
-                                    geomById={mobileModel.geometries}
-                                    key={id}
-                                    node={node}
-                                    nodes={nodes}
-                                />
-                            );
-                        })
                     ) : (
                         rootIds.map((id) => {
                             const node = nodes[id];
@@ -323,7 +283,7 @@ export function StageCanvas({
                             );
                         })
                     )}
-                    <CanvasMoveable enabled={!isMobile} stageEl={stageEl} targetId={firstSelected} width={width} />
+                    <CanvasMoveable stageEl={stageEl} targetId={firstSelected} width={width} />
                 </div>
             </div>
         </div>

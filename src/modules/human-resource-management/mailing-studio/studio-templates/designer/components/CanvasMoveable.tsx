@@ -14,7 +14,6 @@ interface CanvasMoveableProps {
     readonly stageEl: HTMLDivElement | null;
     readonly targetId: string | null;
     readonly width: number;
-    readonly enabled?: boolean;
 }
 
 interface ResizeCommit {
@@ -107,7 +106,7 @@ function applyRowSnap(
  * Moveable + Selecto wrappers for the live canvas (v0.56 cheat-sheet wiring).
  * - P0-1: Moveable owns the DOM mid-resize (imperative style writes); the store
  *   commits once in onResizeEnd. Chrome re-measures via updateRect() after
- *   every store-driven geometry change (numeric edit, undo/redo, device).
+ *   every store-driven geometry change (numeric edit, undo/redo).
  * - P0-4 (follow-up): group drag initiates from ANY selected node. A multi
  *   selection renders a group (`targets`) Moveable whose control box IS the
  *   union bounding box — the effective hitbox — so mousedown-drag on any
@@ -117,7 +116,7 @@ function applyRowSnap(
  * - Selecto marquee multi-selects `.canvas-block` targets; shift unions.
  * Loaded client-only via dynamic(..., { ssr: false }) from StageCanvas.
  */
-export default function CanvasMoveable({ stageEl, targetId, width, enabled = true }: CanvasMoveableProps) {
+export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMoveableProps) {
     const beginGesture = useCanvasDoc((state) => state.beginGesture);
     const endGesture = useCanvasDoc((state) => state.endGesture);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
@@ -161,7 +160,7 @@ export default function CanvasMoveable({ stageEl, targetId, width, enabled = tru
         return () => cancelAnimationFrame(frame);
     }, [targetId, targetX, targetY, targetW, targetH, targetRotation, width, selectionKey, isGroup]);
 
-    if (!stageEl || !enabled) return null;
+    if (!stageEl) return null;
 
     return (
         <>

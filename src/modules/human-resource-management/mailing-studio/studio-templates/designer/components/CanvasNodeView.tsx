@@ -15,8 +15,6 @@ interface CanvasNodeViewProps {
     readonly node: CanvasNode;
     readonly nodes: Readonly<Record<string, CanvasNode>>;
     readonly badgesById: Readonly<Record<string, readonly CanvasBadge[]>>;
-    readonly geom?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
-    readonly geomById?: Readonly<Record<string, { readonly x: number; readonly y: number; readonly w: number; readonly h: number }>>;
 }
 
 /** Live canvas rendering of block style props — resolves through the shared
@@ -219,13 +217,12 @@ export function SnapGuidesOverlay({ xLines, yLines, mates, rowLabel }: SnapGuide
  * and the live state badges (ROTATED / OVERLAP / CLIPPED) counter-rotated so
  * they stay readable.
  */
-export default function CanvasNodeView({ node, nodes, badgesById, geom, geomById }: CanvasNodeViewProps) {
+export default function CanvasNodeView({ node, nodes, badgesById }: CanvasNodeViewProps) {
     const selected = useCanvasDoc((state) => state.selection.includes(node.id));
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
     const badges = badgesById[node.id] ?? [];
     const children = Object.values(nodes).filter((child) => child.parentId === node.id);
     const label = layerLabel(node);
-    const placed = geom ?? node;
 
     return (
         <div
@@ -239,10 +236,10 @@ export default function CanvasNodeView({ node, nodes, badgesById, geom, geomById
             data-id={node.id}
             role="button"
             style={{
-                left: placed.x,
-                top: placed.y,
-                width: placed.w,
-                height: placed.h,
+                left: node.x,
+                top: node.y,
+                width: node.w,
+                height: node.h,
                 transform: `rotate(${node.rotation}deg)`,
                 zIndex: node.z,
             }}
@@ -274,8 +271,6 @@ export default function CanvasNodeView({ node, nodes, badgesById, geom, geomById
             {children.map((child) => (
                 <CanvasNodeView
                     badgesById={badgesById}
-                    geom={geomById?.[child.id]}
-                    geomById={geomById}
                     key={child.id}
                     node={child}
                     nodes={nodes}
