@@ -7,7 +7,6 @@ import { AlignCenter, AlignLeft, AlignRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
@@ -16,8 +15,8 @@ import { extractTemplateTokens } from "../../utils/template-render";
 import { extractPayloadKeys, parseJsonDocument } from "../../utils/ms-variables";
 import type { MsCatalogRow } from "../../types/ms-catalog.schema";
 import { MsCombobox } from "./MsCombobox";
+import { MsRichTextField } from "./MsRichTextField";
 import {
-    CANVAS_TEXT_MAX,
     defaultBlockProps,
     type BlockAlign,
     type CanvasNode,
@@ -342,25 +341,11 @@ function AlignField({ node }: { readonly node: CanvasNode }) {
     );
 }
 
-function TextContentField({ node }: { readonly node: CanvasNode }) {    const id = useId();
-    const updateProps = useCanvasDoc((state) => state.updateProps);
-    const beginGesture = useCanvasDoc((state) => state.beginGesture);
-    const endGesture = useCanvasDoc((state) => state.endGesture);
-
+function TextContentField({ node }: { readonly node: CanvasNode }) {
     return (
         <div className="col-span-2 space-y-1.5">
-            <Label className="text-xs font-medium text-muted-foreground" htmlFor={id}>
-                Text
-            </Label>
-            <Textarea
-                className="min-h-[72px] text-xs leading-relaxed"
-                id={id}
-                maxLength={CANVAS_TEXT_MAX}
-                value={typeof node.props.text === "string" ? node.props.text : ""}
-                onBlur={endGesture}
-                onChange={(event) => updateProps(node.id, { text: event.target.value })}
-                onFocus={beginGesture}
-            />
+            <span className="text-xs font-medium text-muted-foreground">Text</span>
+            <MsRichTextField node={node} />
         </div>
     );
 }

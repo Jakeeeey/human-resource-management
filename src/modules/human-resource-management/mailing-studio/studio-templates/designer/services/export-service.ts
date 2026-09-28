@@ -26,6 +26,7 @@ import {
     rootsOf,
     verticalGap,
 } from "./export-layout";
+import { sanitizeMsInlineHtml } from "../utils/ms-inline-html-sanitize";
 
 export interface ExportResult {
     mjml: string;
@@ -190,7 +191,7 @@ function columnStyleAttrs(node: CanvasNode, leadingGap = 0): string {
 function contentOf(doc: CanvasDoc, node: CanvasNode): string {
     switch (node.type) {
         case "text":
-            return `<mj-text${textStyleAttrs(node)}>${escapeText(stringProp(node, "text"))}</mj-text>`;
+            return `<mj-text${textStyleAttrs(node)}>${sanitizeMsInlineHtml(stringProp(node, "text"))}</mj-text>`;
         case "image": {
             const width = numberPxProp(node, "width");
             const height = numberPxProp(node, "height");

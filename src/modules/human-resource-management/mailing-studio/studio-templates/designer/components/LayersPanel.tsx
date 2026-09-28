@@ -23,7 +23,7 @@ const TYPE_ICON: Record<CanvasNodeType, typeof Type> = {
 export function layerLabel(node: CanvasNode): string {
     const text = node.props.text;
     if (typeof text === "string" && text.trim().length > 0) {
-        return text.trim().slice(0, 28);
+        return text.replace(/<[^>]*>/g, "").trim().slice(0, 28) || "Text";
     }
     if (node.type === "image" && typeof node.props.alt === "string" && node.props.alt.trim()) {
         return node.props.alt.trim().slice(0, 28);

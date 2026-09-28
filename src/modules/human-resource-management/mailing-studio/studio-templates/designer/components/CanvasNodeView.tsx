@@ -6,6 +6,7 @@ import {
     resolveStyleValue,
     type CanvasNode,
 } from "../types/canvas-doc.schema";
+import { sanitizeMsInlineHtml } from "../utils/ms-inline-html-sanitize";
 import { cn } from "@/lib/utils";
 import type { CSSProperties } from "react";
 import type { CanvasBadge } from "./canvas-badges";
@@ -56,15 +57,27 @@ function blockStyle(node: CanvasNode): CSSProperties {
 
 function NodeBody({ node }: { readonly node: CanvasNode }) {
     switch (node.type) {
-        case "text":
+        case "text": {
+            const stored = typeof node.props.text === "string" ? node.props.text : "";
+            const html = sanitizeMsInlineHtml(stored);
+            if (html === "") {
+                return (
+                    <p
+                        className="h-full w-full overflow-hidden p-1.5 text-sm leading-relaxed text-foreground"
+                        style={blockStyle(node)}
+                    >
+                        Text
+                    </p>
+                );
+            }
             return (
                 <p
                     className="h-full w-full overflow-hidden p-1.5 text-sm leading-relaxed text-foreground"
                     style={blockStyle(node)}
-                >
-                    {typeof node.props.text === "string" ? node.props.text : "Text"}
-                </p>
+                    dangerouslySetInnerHTML={{ __html: html }}
+                />
             );
+        }
         case "button":
             return (
                 <span
