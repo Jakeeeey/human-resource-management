@@ -5,6 +5,16 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { Bold, Braces, Italic, Link2, RemoveFormatting, Underline, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
@@ -59,26 +69,26 @@ const TOOLBAR_ITEMS: ReadonlyArray<{ command: MsInlineFormat; label: string; Ico
     { command: "clear", label: "Clear formatting", Icon: RemoveFormatting },
 ];
 
-interface MsVariablePopoverProps {
+interface MsVariableDialogProps {
+    readonly open: boolean;
+    readonly onOpenChange: (open: boolean) => void;
     readonly catalog: readonly MsCatalogRow[];
     readonly variableEventKey: string;
     readonly onVariableEventChange: (value: string) => void;
-    readonly onCaptureCaret: () => void;
-    readonly onRestoreCaret: () => void;
     readonly onInsertToken: (name: string) => boolean;
 }
 
-function MsVariablePopover({
+function MsVariableDialog({
+    open,
+    onOpenChange,
     catalog,
     variableEventKey,
     onVariableEventChange,
-    onCaptureCaret,
-    onRestoreCaret,
     onInsertToken,
-}: MsVariablePopoverProps) {
-    const [open, setOpen] = useState(false);
-    const wrapRef = useRef<HTMLDivElement | null>(null);
-    const selectedRow = catalog.find((row) => row.event_key === variableEventKey) ?? null;
+}: MsVariableDialogProps) {
+    const [draftEvent, setDraftEvent] = useState(variableEventKey);
+    const [draftVariable, setDraftVariable] = useState("");
+    const selectedRow = catalog.find((row) => row.event_key === draftEvent) ?? null;
     const variableNames = selectedRow
         ? extractPayloadKeys(selectedRow.payload_schema, selectedRow.payload_example)
         : [];
@@ -90,90 +100,105 @@ function MsVariablePopover({
         value: name,
         label: `{{${name}}}`,
     }));
-    const variableDisabled = variableEventKey === "" || variableNames.length === 0;
-
-    const handleEventChange = (next: string): void => {
-        onVariableEventChange(next);
-        onRestoreCaret();
-    };
-
-    const handleVariableChange = (next: string): void => {
-        if (onInsertToken(next)) setOpen(false);
-    };
 
     useEffect(() => {
         if (!open) return;
-        const onPointerDown = (event: MouseEvent): void => {
-            const target = event.target;
-            if (target instanceof HTMLElement && target.closest('[data-slot="popover-content"]')) return;
-            const wrap = wrapRef.current;
-            if (wrap && target instanceof Node && !wrap.contains(target)) {
-                setOpen(false);
-            }
-        };
-        const onKeyDown = (event: KeyboardEvent): void => {
-            if (event.key === "Escape") setOpen(false);
-        };
-        document.addEventListener("mousedown", onPointerDown);
-        document.addEventListener("keydown", onKeyDown);
-        return () => {
-            document.removeEventListener("mousedown", onPointerDown);
-            document.removeEventListener("keydown", onKeyDown);
-        };
+        const frame = requestAnimationFrame(() => {
+            document.getElementById("ms-variable-event")?.focus();
+        });
+        return () => cancelAnimationFrame(frame);
     }, [open ]);
 
+    const handleEventChange = (value: string): void => {
+        setDraftEvent(value);
+        setDraftVariable("");
+        onVariableEventChange(value);
+    };
+
+    const handleInsert = (): void => {
+        if (draftVariable === "") return;
+        onInsertToken(draftVariable);
+        onOpenChange(false);
+    };
+
     return (
-        <div className="relative" ref={wrapRef}>
+        <>
             <Button
-                aria-expanded={open}
                 aria-label="Insert variable"
                 size="icon-sm"
                 variant="ghost"
-                onClick={() => setOpen((next) => !next)}
-                onMouseDown={(event) => {
-                    event.preventDefault();
-                    onCaptureCaret();
-                }}
+                onClick={() => onOpenChange(true)}
+                onMouseDown={(event) => event.preventDefault()}
             >
                 <Braces />
             </Button>
-            {open ? (
-                <div className="absolute left-0 top-full z-50 mt-1 flex max-h-80 w-80 min-w-56 max-w-[min(24rem,calc(100vw-2rem))] flex-col gap-2 overflow-hidden rounded-md border bg-popover p-2 shadow-md">
-                    <div onMouseDown={onCaptureCaret}>
-                        <MsCombobox
-                            ariaLabel="Variable event"
-                            emptyText="No events found."
-                            options={eventOptions}
-                            placeholder="Select event…"
-                            searchPlaceholder="Search events…"
-                            value={variableEventKey}
-                            onValueChange={handleEventChange}
-                        />
+            <Dialog open={open} onOpenChange={onOpenChange}>
+                <DialogContent className="w-[95vw] sm:max-w-[440px]">
+                    <DialogHeader>
+                        <DialogTitle>Insert variable</DialogTitle>
+                        <DialogDescription>
+                            Choose an event, then pick a variable to insert at the caret.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs font-medium text-muted-foreground" htmlFor="ms-variable-event">
+                                Event
+                            </Label>
+                            <MsCombobox
+                                ariaLabel="Variable event"
+                                emptyText="No events found."
+                                id="ms-variable-event"
+                                options={eventOptions}
+                                placeholder="Select event…"
+                                searchPlaceholder="Search events…"
+                                value={draftEvent}
+                                onValueChange={handleEventChange}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs font-medium text-muted-foreground" htmlFor="ms-variable-pick">
+                                Variable
+                            </Label>
+                            <MsCombobox
+                                ariaLabel="Variable name"
+                                disabled={draftEvent === ""}
+                                emptyText="No variables found."
+                                id="ms-variable-pick"
+                                options={variableOptions}
+                                placeholder="Select variable…"
+                                searchPlaceholder="Search variables…"
+                                value={draftVariable}
+                                onValueChange={setDraftVariable}
+                            />
+                            {catalog.length === 0 ? (
+                                <p className="text-[11px] leading-snug text-muted-foreground">
+                                    No events registered yet.
+                                </p>
+                            ) : draftEvent === "" ? (
+                                <p className="text-[11px] leading-snug text-muted-foreground">
+                                    Pick an event to see its variables.
+                                </p>
+                            ) : variableNames.length === 0 ? (
+                                <p className="text-[11px] leading-snug text-muted-foreground">
+                                    This event has no variables registered yet.
+                                </p>
+                            ) : null}
+                        </div>
                     </div>
-                    <div onMouseDown={onCaptureCaret}>
-                        <MsCombobox
-                            ariaLabel="Insert variable"
-                            disabled={variableDisabled}
-                            emptyText="No variables found."
-                            options={variableOptions}
-                            placeholder="Insert variable…"
-                            searchPlaceholder="Search variables…"
-                            value=""
-                            onValueChange={handleVariableChange}
-                        />
-                    </div>
-                    {variableEventKey === "" ? (
-                        <p className="px-1 text-[11px] leading-snug text-muted-foreground">
-                            Pick an event to see its variables.
-                        </p>
-                    ) : variableNames.length === 0 ? (
-                        <p className="px-1 text-[11px] leading-snug text-muted-foreground">
-                            This event has no variables registered yet.
-                        </p>
-                    ) : null}
-                </div>
-            ) : null}
-        </div>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                            <Button size="sm" type="button" variant="outline">
+                                Cancel
+                            </Button>
+                        </DialogClose>
+                        <Button disabled={draftVariable === ""} size="sm" type="button" onClick={handleInsert}>
+                            Insert
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 
@@ -182,16 +207,16 @@ export function MsInlineToolbar({
     catalog,
     variableEventKey,
     onVariableEventChange,
-    onCaptureCaret,
-    onRestoreCaret,
+    pickerOpen,
+    onPickerOpenChange,
     onInsertToken,
 }: {
     readonly onFormat: (command: MsInlineFormat) => void;
     readonly catalog?: readonly MsCatalogRow[];
     readonly variableEventKey?: string;
     readonly onVariableEventChange?: (value: string) => void;
-    readonly onCaptureCaret?: () => void;
-    readonly onRestoreCaret?: () => void;
+    readonly pickerOpen?: boolean;
+    readonly onPickerOpenChange?: (open: boolean) => void;
     readonly onInsertToken?: (name: string) => boolean;
 }) {
     return (
@@ -213,13 +238,13 @@ export function MsInlineToolbar({
                     <Icon />
                 </Button>
             ))}
-            {catalog && variableEventKey !== undefined && onVariableEventChange && onCaptureCaret && onRestoreCaret && onInsertToken ? (
-                <MsVariablePopover
+            {catalog && variableEventKey !== undefined && onVariableEventChange && pickerOpen !== undefined && onPickerOpenChange && onInsertToken ? (
+                <MsVariableDialog
                     catalog={catalog}
+                    open={pickerOpen}
                     variableEventKey={variableEventKey}
-                    onCaptureCaret={onCaptureCaret}
-                    onRestoreCaret={onRestoreCaret}
                     onInsertToken={onInsertToken}
+                    onOpenChange={onPickerOpenChange}
                     onVariableEventChange={onVariableEventChange}
                 />
             ) : null}
@@ -247,6 +272,9 @@ export const MsInlineEditor = forwardRef<MsInlineEditorHandle, MsInlineEditorPro
     ) {
         const editableRef = useRef<HTMLDivElement | null>(null);
         const savedRangeRef = useRef<Range | null>(null);
+        const pickerOpenRef = useRef(false);
+        const [pickerOpen, setPickerOpen] = useState(false);
+        const [pickerSession, setPickerSession] = useState(0);
         const committedRef = useRef(sanitizeMsInlineHtml(initialHtml));
         const seedRef = useRef({ html: initialHtml, focus: autoFocus ?? false });
 
@@ -294,16 +322,44 @@ export const MsInlineEditor = forwardRef<MsInlineEditorHandle, MsInlineEditorPro
             savedRangeRef.current = range.cloneRange();
         };
 
-        const restoreCaret = (): void => {
+        const refocusEditor = (): void => {
             const element = editableRef.current;
-            const selection = window.getSelection();
-            if (!element || !selection) return;
-            element.focus();
-            const saved = savedRangeRef.current;
-            if (saved && element.contains(saved.commonAncestorContainer)) {
-                selection.removeAllRanges();
-                selection.addRange(saved);
+            if (!element) return;
+            try {
+                element.focus();
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const current = selection.getRangeAt(0);
+                    if (element.contains(current.commonAncestorContainer)) return;
+                }
+                const saved = savedRangeRef.current;
+                if (selection && saved && element.contains(saved.commonAncestorContainer)) {
+                    selection.removeAllRanges();
+                    selection.addRange(saved);
+                    return;
+                }
+                placeCaretAtEnd(element);
+            } catch {
+                try {
+                    element.focus();
+                    placeCaretAtEnd(element);
+                } catch {
+                    return;
+                }
             }
+        };
+
+        const handlePickerOpenChange = (next: boolean): void => {
+            if (next) {
+                captureCaret();
+                pickerOpenRef.current = true;
+                setPickerSession((session) => session + 1);
+                setPickerOpen(true);
+                return;
+            }
+            pickerOpenRef.current = false;
+            setPickerOpen(false);
+            refocusEditor();
         };
 
         const insertToken = (name: string): boolean => {
@@ -365,12 +421,13 @@ export const MsInlineEditor = forwardRef<MsInlineEditorHandle, MsInlineEditorPro
                 >
                     <MsInlineToolbar
                         catalog={catalog}
+                        key={pickerSession}
                         variableEventKey={variableEventKey}
-                        onCaptureCaret={captureCaret}
-                        onRestoreCaret={restoreCaret}
                         onFormat={runFormat}
                         onInsertToken={insertToken}
+                        onPickerOpenChange={handlePickerOpenChange}
                         onVariableEventChange={onVariableEventChange}
+                        pickerOpen={pickerOpen}
                     />
                 </div>
                 <div
@@ -386,6 +443,7 @@ export const MsInlineEditor = forwardRef<MsInlineEditorHandle, MsInlineEditorPro
                     role="textbox"
                     spellCheck={false}
                     onBlur={() => {
+                        if (pickerOpenRef.current) return;
                         commitNow();
                         onEndGesture();
                         onRequestClose?.();
@@ -415,6 +473,7 @@ export const MsInlineEditor = forwardRef<MsInlineEditorHandle, MsInlineEditorPro
                             }
                         }
                         if (event.key === "Escape") {
+                            if (pickerOpenRef.current) return;
                             event.preventDefault();
                             commitNow();
                             onEndGesture();
