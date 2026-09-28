@@ -75,12 +75,12 @@ export function SigningSurface({
   const router = useRouter();
   const redirectedRef = useRef(false);
 
-  const redirectOnHired = useCallback(
+  const redirectOnSigningComplete = useCallback(
     (kind: string) => {
-      if (kind === "hired" && !redirectedRef.current) {
+      if (kind === "signing_complete" && !redirectedRef.current) {
         redirectedRef.current = true;
         toast.success(
-          "Completion finished — employee record is ready. Opening the onboarding hub…"
+          "Signing complete — the applicant is ready for the next onboarding step. Opening the onboarding hub…"
         );
         window.setTimeout(() => {
           router.push("/hrm/onboarding");
@@ -123,10 +123,18 @@ export function SigningSurface({
       setEnvelopeState(result.envelope);
       setPaperworks(result.paperworks);
       setCompletion(result.completion);
-      redirectOnHired(result.completion.kind);
+      redirectOnSigningComplete(result.completion.kind);
       onChanged?.();
     },
-    [onChanged, redirectOnHired, setCompletion]
+    [onChanged, redirectOnSigningComplete, setCompletion]
+  );
+
+  const handleOfferSaved = useCallback(
+    (offer: JobOffer) => {
+      setOffer(offer);
+      onChanged?.();
+    },
+    [onChanged]
   );
 
   const handleItemSigned = useCallback(
@@ -137,10 +145,10 @@ export function SigningSurface({
       setEnvelopeState(result.envelope);
       setPaperworks(result.paperworks);
       setCompletion(result.completion);
-      redirectOnHired(result.completion.kind);
+      redirectOnSigningComplete(result.completion.kind);
       onChanged?.();
     },
-    [onChanged, redirectOnHired, setCompletion]
+    [onChanged, redirectOnSigningComplete, setCompletion]
   );
 
   const handleOfferChanged = useCallback(async () => {
@@ -178,8 +186,8 @@ export function SigningSurface({
         retryItem.pdf_file
       );
       handleItemSigned(result);
-      if (result.completion.kind === "hired") {
-        redirectOnHired(result.completion.kind);
+      if (result.completion.kind === "signing_complete") {
+        redirectOnSigningComplete(result.completion.kind);
       } else {
         toast.warning("Completion is still blocked — see the notice above");
       }
@@ -194,7 +202,7 @@ export function SigningSurface({
     retrying,
     signPaperworkItem,
     handleItemSigned,
-    redirectOnHired,
+    redirectOnSigningComplete,
     reloadSet,
   ]);
 
@@ -253,6 +261,7 @@ export function SigningSurface({
       <SigningOfferSection
         offer={offer}
         onAccepted={handleOfferAccepted}
+        onOfferSaved={handleOfferSaved}
         onOfferChanged={() => void handleOfferChanged()}
       />
 

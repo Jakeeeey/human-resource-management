@@ -12,7 +12,7 @@ import {
   listExistingFileRefs,
   listFiledRecords,
   listTemplateTitles,
-  readApplicantStatus,
+  readEmployeeUserId,
 } from "./signingFilingIo";
 
 // signing-filing-service.ts — the DEFERRED post-hire filing service (todo 17).
@@ -95,12 +95,12 @@ function zeroResult(
   };
 }
 
-/** Hard guard against pre-hire filing: only a `hired` applicant is fileable. */
-async function assertApplicantHired(applicantId: number): Promise<void> {
-  const status = await readApplicantStatus(applicantId);
-  if (status !== "hired") {
+/** Hard guard against pre-hire filing: only an existing employee is fileable. */
+async function assertEmployeeExists(userId: number): Promise<void> {
+  const employeeId = await readEmployeeUserId(userId);
+  if (employeeId === null) {
     throw new Error(
-      `${SIGNED_PDF_FILING_ERROR_CODES.applicantNotHired}: applicant ${applicantId} is "${status ?? "absent"}", not "hired" — filing is deferred until the employee exists`
+      `${SIGNED_PDF_FILING_ERROR_CODES.applicantNotHired}: employee user_id ${userId} does not exist — filing is deferred until the employee exists`
     );
   }
 }
@@ -114,7 +114,7 @@ async function doFileSignedPaperwork(
   applicantId: number,
   userId: number
 ): Promise<FileSignedPaperworkResult> {
-  await assertApplicantHired(applicantId);
+  await assertEmployeeExists(userId);
 
   const envelope = await findSigningEnvelopeByApplicant(applicantId);
   if (!envelope) return zeroResult(applicantId, userId, null);
@@ -215,14 +215,15 @@ async function doFileSignedPaperwork(
 const fileInFlight = new Map<number, Promise<FileSignedPaperworkResult>>();
 
 /**
- * Files every staged signed PDF of one hired applicant to its employee.
- * Call ONLY from the post-hire orchestrator step (a `hired` guard inside
- * refuses every other status, so a pre-hire call can never file).
+ * Files every staged signed PDF of one applicant to its employee.
+ * Call ONLY from the post-hire orchestrator step (an employee-existence
+ * guard inside refuses a missing employee, so a pre-hire call can never
+ * file).
  * @param rawInput - `{ applicantId, userId }` (strict).
  * @returns Counts + the resolved intake `listId` (`null` when nothing is
  * staged yet).
  * @throws Error with `SIGNED_PDF_FILING_ERROR_CODES` on invalid input, a
- * non-hired applicant, a signed item without a staged PDF, a staged UUID
+ * missing employee, a signed item without a staged PDF, a staged UUID
  * whose file no longer exists, or a write that is not visible on read-back.
  */
 export function fileSignedPaperwork(

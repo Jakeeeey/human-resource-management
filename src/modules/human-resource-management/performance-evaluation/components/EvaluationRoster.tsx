@@ -147,6 +147,7 @@ export function EvaluationRoster({ scope }: { scope: EvaluationScope }) {
   const router = useRouter();
   const pathname = usePathname();
   const copy = SCOPE_COPY[scope];
+  const showDepartmentFilter = scope === "hr";
 
   const selectedUserId = useMemo(() => {
     const raw = searchParams.get("selected");
@@ -174,7 +175,11 @@ export function EvaluationRoster({ scope }: { scope: EvaluationScope }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return sorted.filter((row) => {
-      if (department !== "all" && row.department_name !== department) {
+      if (
+        showDepartmentFilter &&
+        department !== "all" &&
+        row.department_name !== department
+      ) {
         return false;
       }
       if (
@@ -185,7 +190,7 @@ export function EvaluationRoster({ scope }: { scope: EvaluationScope }) {
       }
       return true;
     });
-  }, [sorted, query, department]);
+  }, [sorted, query, department, showDepartmentFilter]);
 
   const activeRow = useMemo(
     () => sorted.find((row) => row.user_id === selectedUserId) ?? null,
@@ -206,7 +211,9 @@ export function EvaluationRoster({ scope }: { scope: EvaluationScope }) {
   );
 
   const filtersActive =
-    query.trim() !== "" || department !== "all" || showRegular;
+    query.trim() !== "" ||
+    (showDepartmentFilter && department !== "all") ||
+    showRegular;
 
   const clearFilters = useCallback(() => {
     setQuery("");
@@ -282,16 +289,20 @@ export function EvaluationRoster({ scope }: { scope: EvaluationScope }) {
 
       <EvaluationRosterFilterBar
         query={query}
-        department={department}
-        departmentOptions={departmentOptions}
+        {...(showDepartmentFilter
+          ? {
+              department,
+              departmentOptions,
+              onDepartmentChange: (value: string) => {
+                setDepartment(value);
+                setPage(1);
+              },
+            }
+          : {})}
         showRegular={showRegular}
         filtersActive={filtersActive}
         onQueryChange={(value) => {
           setQuery(value);
-          setPage(1);
-        }}
-        onDepartmentChange={(value) => {
-          setDepartment(value);
           setPage(1);
         }}
         onShowRegularChange={(value) => {

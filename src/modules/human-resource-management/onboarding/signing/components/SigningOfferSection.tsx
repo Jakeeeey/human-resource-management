@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import type { PaperworkTemplate } from "../../paperwork/types/paperwork-template.schema";
 import { isPaperworkValid } from "../../paperwork/paperworkValidity";
 import type { InkCanvasHandle } from "../InkCanvas";
+import { humanizeValidityReason } from "../signingCopy";
 import type { SignOfferResult } from "../providers/signingEnvelopeProvider";
 import {
   parseInk,
@@ -49,6 +50,7 @@ import { useSigningOfferSign } from "./useSigningOfferSign";
 interface SigningOfferSectionProps {
   offer: JobOffer | null;
   onAccepted: (result: SignOfferResult) => void;
+  onOfferSaved?: (offer: JobOffer) => void;
   onOfferChanged?: () => void;
 }
 
@@ -75,9 +77,15 @@ function seedInkPages(
 export function SigningOfferSection({
   offer,
   onAccepted,
+  onOfferSaved,
   onOfferChanged,
 }: SigningOfferSectionProps) {
-  const pdf = useSigningOfferPdf(offer?.pdf_file ?? null);
+  const offerSigned = offer?.status === "signed";
+  const downloadFileId =
+    offer && offerSigned && offer.signed_pdf_file
+      ? offer.signed_pdf_file
+      : (offer?.pdf_file ?? null);
+  const pdf = useSigningOfferPdf(downloadFileId);
   const [inkPages, setInkPages] = useState<Record<number, SigningStroke[]>>(
     () => seedInkPages(offer?.strokes)
   );
@@ -87,7 +95,6 @@ export function SigningOfferSection({
   const [activePage, setActivePage] = useState(1);
   const [pageDraft, setPageDraft] = useState("1");
 
-  const offerSigned = offer?.status === "signed";
   const offerPdfMissing = offer === null || offer.pdf_file === null;
   const canUploadOfferPdf = offer !== null && offer.pdf_file === null;
 
@@ -215,11 +222,14 @@ export function SigningOfferSection({
     offerId: offer?.id ?? null,
     locked: offerSigned,
     verdictValid: verdict.valid,
-    validityMessage: verdict.reason ?? "This offer is not ready to sign yet",
+    validityMessage: humanizeValidityReason([], verdict),
     pdfDoc: pdf.pdfDoc,
     pages: pdf.pages,
     mergedInk: ink,
     onSigned: onAccepted,
+    onSaved: (result) => {
+      onOfferSaved?.(result.offer);
+    },
   });
 
   const commitJump = () => {
@@ -307,9 +317,9 @@ export function SigningOfferSection({
           <Badge variant={offerSigned ? "default" : "outline"}>
             {offer ? offer.status : "missing"}
           </Badge>
-          {offer?.pdf_file && (
+          {downloadFileId && (
             <a
-              href={`/api/hrm/employee-admin/employee-master-list/assets/${offer.pdf_file}?filename=${encodeURIComponent("Job Offer.pdf")}`}
+              href={`/api/hrm/employee-admin/employee-master-list/assets/${downloadFileId}?filename=${encodeURIComponent("Job Offer.pdf")}`}
               download="Job Offer.pdf"
               target="_blank"
               rel="noopener noreferrer"
@@ -392,7 +402,7 @@ export function SigningOfferSection({
         <p className="px-3 pb-3 text-xs text-muted-foreground sm:px-4">
           {offerPdfMissing
             ? offer === null
-              ? "The offer document has not been uploaded yet — signing is disabled."
+              ? "No job offer yet — create it in the Job Offer module. Signing stays disabled until the offer exists."
               : "No offer PDF on file — upload the offer document to enable signing."
             : `${pdf.pdfError ?? "The offer PDF could not be loaded"} — signing is disabled.`}
         </p>
@@ -402,16 +412,40 @@ export function SigningOfferSection({
         <div className="flex flex-col gap-2 border-t border-border px-3 py-3 sm:flex-row sm:justify-end sm:px-4">
           <Button
             type="button"
-            onClick={() => void sign.handleSign()}
-            disabled={sign.signing || !verdict.valid || pdf.pdfDoc === null}
+            variant="outline"
+            onClick={() => void sign.handleSave()}
+            disabled={
+              sign.signing ||
+              sign.saving ||
+              !verdict.valid ||
+              pdf.pdfDoc === null
+            }
             className="min-h-8 w-full sm:w-auto"
             title={
               verdict.valid
-                ? "Sign and file the offer — this accepts it"
+                ? "Save the signature progress without finalizing"
                 : (verdict.reason ?? "Draw your signature on the offer first")
             }
           >
-            {sign.signing ? "Signing…" : "Sign & file offer"}
+            {sign.saving ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void sign.handleSign()}
+            disabled={
+              sign.signing ||
+              sign.saving ||
+              !verdict.valid ||
+              pdf.pdfDoc === null
+            }
+            className="min-h-8 w-full sm:w-auto"
+            title={
+              verdict.valid
+                ? "Sign and finalize the offer — this accepts it"
+                : (verdict.reason ?? "Draw your signature on the offer first")
+            }
+          >
+            {sign.signing ? "Signing…" : "Sign and Finalize"}
           </Button>
         </div>
       )}

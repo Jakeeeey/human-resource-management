@@ -1,20 +1,38 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Textarea } from "@/components/ui/textarea";
 
 import { useEvaluationWorkspace } from "../hooks/useEvaluationWorkspace";
-import type { EvaluationScope } from "../providers/evaluationClient";
+import {
+  EvaluationClientError,
+  regularize,
+  terminateEmployment,
+  type EvaluationScope,
+  type TerminationSeparationType,
+} from "../providers/evaluationClient";
 import type { WorkspaceBundle } from "../types/performance-evaluation.schema";
 import { formatHiredDate } from "../utils/probationClock";
 import {
+  countFailures,
   deriveNextAction,
   deriveProbationStatus,
   deriveStage,
@@ -36,10 +54,146 @@ function stageScopePath(scope: EvaluationScope): string {
     : "/hrm/department-evaluation";
 }
 
-function ClosedStageCard({ bundle }: { bundle: WorkspaceBundle }) {
+const TERMINATION_SEPARATION_OPTIONS: { value: TerminationSeparationType; label: string }[] = [
+  { value: "failed_probation", label: "Failed probation" },
+  { value: "laid_off", label: "Laid off" },
+  { value: "resigned", label: "Resigned" },
+];
+
+function terminationErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof EvaluationClientError) return err.message;
+  return fallback;
+}
+
+function TerminationReviewSection({
+  scope,
+  userId,
+  bundle,
+  onRefresh,
+}: {
+  scope: EvaluationScope;
+  userId: number;
+  bundle: WorkspaceBundle;
+  onRefresh: () => void;
+}) {
+  const [separationType, setSeparationType] = useState<TerminationSeparationType>("failed_probation");
+  const [reason, setReason] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [overriding, setOverriding] = useState(false);
+  const facts = buildWorkflowFacts(bundle);
+  const failures = countFailures(facts);
+  const isHr = scope === "hr";
+
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      const trimmed = reason.trim();
+      await terminateEmployment(userId, {
+        separation_type: separationType,
+        termination_reason: trimmed === "" ? null : trimmed,
+      });
+      toast.success("Termination confirmed");
+      onRefresh();
+    } catch (err) {
+      toast.error(terminationErrorMessage(err, "Failed to confirm the termination."));
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const handleOverride = async () => {
+    setOverriding(true);
+    try {
+      await regularize(userId);
+      toast.success("Employee regularized");
+      onRefresh();
+    } catch (err) {
+      toast.error(terminationErrorMessage(err, "Failed to regularize this employee."));
+    } finally {
+      setOverriding(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          Termination review
+          <StatusBadge tone="warning">Subject to termination</StatusBadge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          {failures} failures on record (failed evaluations plus failed PIPs). HR must confirm
+          the separation and choose its type, or override by regularizing instead.
+        </p>
+        {isHr ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="termination-separation-type">Separation type</Label>
+              <Select
+                value={separationType}
+                onValueChange={(value) => setSeparationType(value as TerminationSeparationType)}
+              >
+                <SelectTrigger id="termination-separation-type" className="w-full sm:w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TERMINATION_SEPARATION_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="termination-reason">Reason</Label>
+              <Textarea
+                id="termination-reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                placeholder="Grounds for the decision"
+                rows={3}
+              />
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                disabled={confirming || overriding}
+                onClick={() => void handleConfirm()}
+              >
+                {confirming ? "Saving…" : "Confirm termination"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                disabled={confirming || overriding}
+                onClick={() => void handleOverride()}
+              >
+                {overriding ? "Saving…" : "Override — regularize instead"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Awaiting HR — only HR can confirm the termination or override it.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+function ClosedStageCard({ bundle, derivedRegular }: { bundle: WorkspaceBundle; derivedRegular: boolean }) {
   const regular =
-    bundle.tracking?.regularized_at !== null &&
-    bundle.tracking?.regularized_at !== undefined;
+    derivedRegular ||
+    (bundle.tracking?.regularized_at !== null &&
+      bundle.tracking?.regularized_at !== undefined);
   return (
     <Card>
       <CardContent className="space-y-2 pt-6">
@@ -226,7 +380,17 @@ export function EvaluationStageView({
               readOnly={actionOwnedByOther}
               backHref={workspaceHref}
             />
-          ) : stage === "pip_1" || stage === "pip_2" ? (
+          ) : stage === "third_evaluation" ? (
+            <KpiSheetForm
+              scope={scope}
+              userId={userId}
+              evalType="third"
+              bundle={bundle}
+              onSaved={handleSaved}
+              readOnly={actionOwnedByOther}
+              backHref={workspaceHref}
+            />
+          ) : stage === "pip_1" ? (
             <PipForm
               scope={scope}
               userId={userId}
@@ -234,6 +398,15 @@ export function EvaluationStageView({
               onSaved={handleSaved}
               readOnly={pipFormReadOnly}
               backHref={workspaceHref}
+            />
+          ) : stage === "termination_review" ? (
+            <TerminationReviewSection
+              scope={scope}
+              userId={userId}
+              bundle={bundle}
+              onRefresh={() => {
+                void refresh();
+              }}
             />
           ) : stage === "recommendation" || stage === "regularization" ? (
             <RecommendationSection
@@ -245,7 +418,7 @@ export function EvaluationStageView({
               }}
             />
           ) : (
-            <ClosedStageCard bundle={bundle} />
+            <ClosedStageCard bundle={bundle} derivedRegular={status === "regular"} />
           )}
         </div>
       )}

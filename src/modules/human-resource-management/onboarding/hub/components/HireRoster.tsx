@@ -23,6 +23,7 @@ import {
 } from "../rosterData";
 import type { HireRosterRow } from "../types/hire-roster.schema";
 import { HireRosterFilterBar } from "./HireRosterFilterBar";
+import { HireGatePendingSection } from "./HireGatePendingSection";
 import { HireRosterPanel } from "./HireRosterPanel";
 import { HireRosterTable } from "./HireRosterTable";
 
@@ -116,23 +117,27 @@ export function HireRoster() {
 
   if (rows.length === 0) {
     return (
-      <Empty className="rounded-2xl border border-dashed">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <Users className="h-6 w-6" aria-hidden="true" />
-          </EmptyMedia>
-          <EmptyTitle>No hires in onboarding yet</EmptyTitle>
-          <EmptyDescription>
-            Hires appear here as soon as their onboarding tasks are created
-            after commitment.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+      <div className="grid gap-3">
+        <HireGatePendingSection />
+        <Empty className="rounded-2xl border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Users className="h-6 w-6" aria-hidden="true" />
+            </EmptyMedia>
+            <EmptyTitle>No hires in onboarding yet</EmptyTitle>
+            <EmptyDescription>
+              Hires appear here as soon as their onboarding tasks are created
+              after commitment.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </div>
     );
   }
 
   return (
     <div className="grid gap-3">
+      <HireGatePendingSection />
       <HireRosterFilterBar
         filters={filters}
         phaseOptions={phaseOptions}

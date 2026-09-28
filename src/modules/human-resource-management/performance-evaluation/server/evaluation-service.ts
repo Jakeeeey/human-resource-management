@@ -38,9 +38,12 @@ import type {
 import type { EvaluationCapability } from "./evaluationCapability";
 import { computeDueDates, isDateOverdue } from "../utils/probationClock";
 import {
+  countFailures,
   deriveNextAction,
   deriveProbationStatus,
   deriveStage,
+  isSubjectToTermination,
+  type EvalType,
   type WorkflowFacts,
 } from "../utils/workflow";
 
@@ -74,9 +77,20 @@ const PROBATION_STATUS_RANK: Record<string, number> = {
   probationary: 0,
   pip_open: 1,
   recommendation_issued: 2,
-  regular: 3,
-  terminated: 4,
+  subject_to_termination: 3,
+  regular: 4,
+  terminated: 5,
 };
+
+export const SEPARATION_TYPES = [
+  "failed_probation",
+  "laid_off",
+  "resigned",
+] as const;
+
+export type SeparationType = (typeof SEPARATION_TYPES)[number];
+
+export { countFailures, isSubjectToTermination };
 
 function parseRowList<T>(
   schema: z.ZodType<T>,
@@ -148,7 +162,7 @@ function toWorkflowFacts(
   allEvaluations: readonly EmployeeEvaluation[],
   pips: readonly EmployeePip[]
 ): WorkflowFacts {
-  const evalTypeById = new Map<number, "first" | "second">();
+  const evalTypeById = new Map<number, EvalType>();
   for (const evaluation of allEvaluations) {
     evalTypeById.set(evaluation.id, evaluation.eval_type);
   }
@@ -360,8 +374,8 @@ export async function listEvaluationRoster(
       continue;
     }
     const stage = deriveStage(facts);
-    const thirdMonthDue = dueDates?.third ?? null;
-    const fifthMonthDue = dueDates?.fifth ?? null;
+    const day30Due = dueDates?.day30 ?? null;
+    const day60Due = dueDates?.day60 ?? null;
     const candidate = {
       user_id: employee.user_id,
       full_name: toFullName(employee),
@@ -372,15 +386,16 @@ export async function listEvaluationRoster(
           : (departmentNames.get(departmentId) ?? null),
       position: normalizeText(employee.user_position),
       date_hired: dateHired,
-      third_month_due: thirdMonthDue,
-      fifth_month_due: fifthMonthDue,
+      day_30_due: day30Due,
+      day_60_due: day60Due,
+      day_90_due: dueDates?.day90 ?? null,
       sixth_month_due: dueDates?.sixth ?? null,
       probation_status: probationStatus,
       stage,
       next_action: deriveNextAction(facts),
       is_overdue:
-        (stage === "first_evaluation" && isDateOverdue(thirdMonthDue)) ||
-        (stage === "second_evaluation" && isDateOverdue(fifthMonthDue)),
+        (stage === "first_evaluation" && isDateOverdue(day30Due)) ||
+        (stage === "second_evaluation" && isDateOverdue(day60Due)),
     };
     const parsed = RosterRowSchema.safeParse(candidate);
     if (!parsed.success) {
@@ -817,6 +832,22 @@ export async function assertNoExistingPip(
       409,
       PIP_ERROR_CODES.alreadyExists,
       "A PIP already exists for this evaluation"
+    );
+  }
+}
+
+export async function assertNoExistingPipForUser(
+  userId: number
+): Promise<void> {
+  const body: unknown = await dFetch(
+    `/items/employee_pip?filter[user_id][_eq]=${userId}&fields=id&limit=1`
+  );
+  const rows = unwrapData<unknown>(body);
+  if (Array.isArray(rows) && rows.length > 0) {
+    throw pipGate(
+      409,
+      PIP_ERROR_CODES.alreadyExists,
+      "Only one PIP is allowed per employee for the whole probation"
     );
   }
 }

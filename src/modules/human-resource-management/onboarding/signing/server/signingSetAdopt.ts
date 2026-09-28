@@ -7,7 +7,6 @@ import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   findJobOfferByApplicant,
   findPaperworksByApplicant,
-  insertJobOffer,
   insertPaperworkItemsBatch,
   insertPaperworks,
   listPaperworkItems,
@@ -95,13 +94,6 @@ export async function repairExistingSet(input: {
       ...(actorId != null ? { actorId } : {}),
     });
   }
-  if (!jobOffer) {
-    jobOffer = await insertJobOffer({
-      applicantId,
-      now,
-      ...(actorId != null ? { actorId } : {}),
-    });
-  }
   if (paperworks.signing_envelope_id !== envelope.id) {
     paperworks = await patchPaperworksEnvelopeLink({
       paperworksId: paperworks.id,
@@ -110,7 +102,7 @@ export async function repairExistingSet(input: {
       ...(actorId != null ? { actorId } : {}),
     });
   }
-  if (jobOffer.signing_envelope_id !== envelope.id) {
+  if (jobOffer && jobOffer.signing_envelope_id !== envelope.id) {
     jobOffer = await patchJobOfferEnvelopeLink({
       jobOfferId: jobOffer.id,
       envelopeId: envelope.id,
@@ -119,12 +111,12 @@ export async function repairExistingSet(input: {
     });
   }
   if (
-    envelope.joboffer_id !== jobOffer.id ||
+    (jobOffer && envelope.joboffer_id !== jobOffer.id) ||
     envelope.paperworks_id !== paperworks.id
   ) {
     envelope = await patchSigningEnvelopeLinks({
       envelopeId: envelope.id,
-      jobOfferId: jobOffer.id,
+      jobOfferId: jobOffer ? jobOffer.id : (envelope.joboffer_id ?? null),
       paperworksId: paperworks.id,
       now,
       ...(actorId != null ? { actorId } : {}),

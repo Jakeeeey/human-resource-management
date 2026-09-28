@@ -17,23 +17,26 @@ import { statusToneBadgeClass } from "./StatusPill";
 
 const STAGE_LABELS: Record<string, string> = {
   first_evaluation: "1st evaluation",
-  pip_1: "PIP #1",
+  pip_1: "PIP",
   second_evaluation: "2nd evaluation",
-  pip_2: "PIP #2",
+  third_evaluation: "3rd evaluation",
   recommendation: "Recommendation",
   regularization: "Regularization",
+  termination_review: "Termination review",
   closed: "Closed",
 };
 
 const DUE_ROWS: readonly { key: DueKey; label: string }[] = [
-  { key: "third", label: "3rd-month due" },
-  { key: "fifth", label: "5th-month due" },
+  { key: "day30", label: "30-day due" },
+  { key: "day60", label: "60-day due" },
+  { key: "day90", label: "90-day due" },
   { key: "sixth", label: "6th-month due" },
 ];
 
 function deadlineValue(row: RosterRow, key: DueKey): string | null {
-  if (key === "third") return row.third_month_due;
-  if (key === "fifth") return row.fifth_month_due;
+  if (key === "day30") return row.day_30_due;
+  if (key === "day60") return row.day_60_due;
+  if (key === "day90") return row.day_90_due;
   return row.sixth_month_due;
 }
 

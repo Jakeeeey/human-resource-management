@@ -10,6 +10,7 @@ import type { SigningPdfDocument } from "./pdfDocument";
 import { SIGNING_PAGE_W } from "./TemplatePageView";
 import {
   useSigningEnvelopeFetch,
+  type SaveOfferResult,
   type SignJobOfferPayload,
   type SignOfferResult,
 } from "../providers/signingEnvelopeProvider";
@@ -32,11 +33,14 @@ interface SigningOfferSignInput {
   pages: number[];
   mergedInk: SigningInk;
   onSigned: (result: SignOfferResult) => void;
+  onSaved: (result: SaveOfferResult) => void;
 }
 
 export interface SigningOfferSignModel {
   signing: boolean;
+  saving: boolean;
   handleSign: () => Promise<void>;
+  handleSave: () => Promise<void>;
 }
 
 export function useSigningOfferSign({
@@ -49,12 +53,33 @@ export function useSigningOfferSign({
   pages,
   mergedInk,
   onSigned,
+  onSaved,
 }: SigningOfferSignInput): SigningOfferSignModel {
-  const { signJobOffer } = useSigningEnvelopeFetch();
+  const { signJobOffer, saveJobOffer } = useSigningEnvelopeFetch();
   const [signing, setSigning] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const renderPayload = useCallback(async (): Promise<SignJobOfferPayload> => {
+    if (pdfDoc === null) {
+      throw new Error("Wait for the offer PDF to finish loading");
+    }
+    const bytes = await renderSignedItemPdf({
+      doc: pdfDoc,
+      pages,
+      targetWidth: SIGNING_PAGE_W,
+      ink: mergedInk,
+    });
+    const filename = buildFilingFilename(
+      `applicant-${applicantId}-offer`,
+      1
+    );
+    const fileId = await uploadFiledPdf(bytes, filename);
+    return { strokes: serializeInk(mergedInk), signed_pdf_file: fileId };
+  }, [applicantId, mergedInk, pages, pdfDoc]);
 
   const handleSign = useCallback(async () => {
-    if (applicantId === null || offerId === null || locked || signing) return;
+    if (applicantId === null || offerId === null || locked || signing || saving)
+      return;
     if (!verdictValid) {
       toast.error(validityMessage);
       return;
@@ -66,24 +91,10 @@ export function useSigningOfferSign({
     setSigning(true);
     let payload: SignJobOfferPayload | null = null;
     try {
-      const bytes = await renderSignedItemPdf({
-        doc: pdfDoc,
-        pages,
-        targetWidth: SIGNING_PAGE_W,
-        ink: mergedInk,
-      });
-      const filename = buildFilingFilename(
-        `applicant-${applicantId}-offer`,
-        1
-      );
-      const fileId = await uploadFiledPdf(bytes, filename);
-      payload = { strokes: serializeInk(mergedInk), signed_pdf_file: fileId };
+      payload = await renderPayload();
       const result = await signJobOffer(offerId, payload);
       onSigned(result);
-      if (
-        result.completion.kind === "blocked" ||
-        result.completion.kind === "failed"
-      ) {
+      if (result.completion.kind === "blocked") {
         toast.warning("Job offer signed — completion needs attention");
       } else {
         toast.success("Job offer signed and filed");
@@ -107,14 +118,60 @@ export function useSigningOfferSign({
     offerId,
     locked,
     signing,
+    saving,
     verdictValid,
     validityMessage,
     pdfDoc,
-    pages,
-    mergedInk,
+    renderPayload,
     signJobOffer,
     onSigned,
   ]);
 
-  return { signing, handleSign };
+  const handleSave = useCallback(async () => {
+    if (applicantId === null || offerId === null || locked || signing || saving)
+      return;
+    if (!verdictValid) {
+      toast.error(validityMessage);
+      return;
+    }
+    if (pdfDoc === null) {
+      toast.error("Wait for the offer PDF to finish loading");
+      return;
+    }
+    setSaving(true);
+    let payload: SignJobOfferPayload | null = null;
+    try {
+      payload = await renderPayload();
+      const result = await saveJobOffer(offerId, payload);
+      onSaved(result);
+      toast.success("Offer progress saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Saving failed");
+      if (payload !== null) {
+        try {
+          const reconciled = await saveJobOffer(offerId, payload);
+          onSaved(reconciled);
+          toast.success("Offer progress saved");
+        } catch {
+          // Reconcile is best-effort — the mutation error was already toasted.
+        }
+      }
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    applicantId,
+    offerId,
+    locked,
+    signing,
+    saving,
+    verdictValid,
+    validityMessage,
+    pdfDoc,
+    renderPayload,
+    saveJobOffer,
+    onSaved,
+  ]);
+
+  return { signing, saving, handleSign, handleSave };
 }

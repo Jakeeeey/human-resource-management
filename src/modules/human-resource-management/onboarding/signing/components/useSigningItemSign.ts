@@ -89,10 +89,7 @@ export function useSigningItemSign({
         fileId
       );
       onSigned(result);
-      if (
-        result.completion.kind === "blocked" ||
-        result.completion.kind === "failed"
-      ) {
+      if (result.completion.kind === "blocked") {
         toast.warning(`${template.title} signed — completion needs attention`);
       } else {
         toast.success(`${template.title} signed and filed`);

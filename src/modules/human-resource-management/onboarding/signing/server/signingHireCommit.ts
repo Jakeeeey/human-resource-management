@@ -1,4 +1,3 @@
-import { runHireOrchestrator } from "@/modules/human-resource-management/onboarding/hire/server/hire-orchestrator";
 import {
   readHireApplicant,
   readHireApplicationByApplicant,
@@ -101,7 +100,7 @@ export async function fireHiredIfComplete(
   // orchestrator — a retry must never be blocked by data that changed after
   // the hire was committed.
   const currentStatus = await getApplicantStatus(input.applicantId);
-  if (currentStatus !== "hired") {
+  if (currentStatus !== "signing_complete") {
     const missing = await readMissingHirePrerequisite(input.applicantId);
     if (missing !== null) {
       return {
@@ -113,32 +112,18 @@ export async function fireHiredIfComplete(
 
   const applicant = await setApplicantStatus({
     applicantId: input.applicantId,
-    status: "hired",
+    status: "signing_complete",
     ...(input.actorId != null ? { actorId: input.actorId } : {}),
   });
-  if (applicant.status !== "hired") {
+  if (applicant.status !== "signing_complete") {
     return {
       applicantStatus: applicant.status,
       completion: { kind: "incomplete" },
     };
   }
 
-  try {
-    const outcome = await runHireOrchestrator({
-      applicantId: input.applicantId,
-      ...(input.actorId != null ? { actorId: input.actorId } : {}),
-    });
-    return {
-      applicantStatus: applicant.status,
-      completion: { kind: "hired", userCreated: outcome.userCreated },
-    };
-  } catch (error) {
-    return {
-      applicantStatus: applicant.status,
-      completion: {
-        kind: "failed",
-        reason: error instanceof Error ? error.message : String(error),
-      },
-    };
-  }
+  return {
+    applicantStatus: applicant.status,
+    completion: { kind: "signing_complete" },
+  };
 }

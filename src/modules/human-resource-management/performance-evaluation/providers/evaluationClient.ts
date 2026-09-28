@@ -249,6 +249,25 @@ export async function regularize(userId: number): Promise<EvaluationTracking> {
   );
 }
 
+export const TERMINATION_SEPARATION_TYPES = [
+  "failed_probation",
+  "laid_off",
+  "resigned",
+] as const;
+
+export type TerminationSeparationType = (typeof TERMINATION_SEPARATION_TYPES)[number];
+
+export async function terminateEmployment(
+  userId: number,
+  input: { separation_type: TerminationSeparationType; termination_reason?: string | null },
+): Promise<EvaluationTracking> {
+  return requestParsed(
+    `${HR_BASE}/tracking/${userId}/terminate`,
+    EvaluationTrackingSchema,
+    jsonInit("POST", input),
+  );
+}
+
 export async function getMyPips(): Promise<EmployeePip[]> {
   return requestParsed(`${PIP_ACK_BASE}/my-pips`, z.array(EmployeePipSchema));
 }

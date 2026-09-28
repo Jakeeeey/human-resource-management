@@ -10,7 +10,7 @@ import { fileSignedPaperwork } from "../../signing/server/signing-filing-service
 // staged signed PDF (`paperwork_item.pdf_file`, uploaded pre-hire through the
 // existing `?type=employee_file` path) into `employee_file_records` keyed to
 // `context.userId` + the signed-documents intake list. The service refuses a
-// non-hired applicant, so the pre-hire state is untouched by construction;
+// missing employee, so the pre-hire state is untouched by construction;
 // `userId` IS the correlation to the employee (no DB FK / column is added).
 // Idempotent per the seam contract: a retried orchestration files ZERO
 // duplicates.

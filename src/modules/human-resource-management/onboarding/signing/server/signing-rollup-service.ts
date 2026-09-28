@@ -11,6 +11,7 @@ import type { ApplicantStatus } from "@/modules/human-resource-management/shared
 import { fireHiredIfComplete } from "./signingHireCommit";
 import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
+  findJobOfferByApplicant,
   findSigningEnvelopeByApplicant,
   listPaperworkItems,
 } from "./signingSetRows";
@@ -227,16 +228,18 @@ export async function recomputeSigningRollups(
     );
   }
   const { paperworks_id: paperworksId, joboffer_id: jobOfferId } = envelope;
-  if (paperworksId === null || jobOfferId === null) {
+  if (paperworksId === null) {
     throw new Error(
-      `${SIGNING_ROLLUP_ERROR_CODES.envelopeStructureInvalid}: signing_envelope ${envelopeId} is missing its paperworks/offer link`
+      `${SIGNING_ROLLUP_ERROR_CODES.envelopeStructureInvalid}: signing_envelope ${envelopeId} is missing its paperworks link`
     );
   }
 
   const [paperworks, items, jobOffer] = await Promise.all([
     readPaperworksById(paperworksId),
     listPaperworkItems(paperworksId),
-    readJobOfferById(jobOfferId),
+    jobOfferId !== null
+      ? readJobOfferById(jobOfferId)
+      : findJobOfferByApplicant(envelope.applicant_id),
   ]);
   if (!paperworks) {
     throw new Error(
@@ -245,7 +248,7 @@ export async function recomputeSigningRollups(
   }
   if (!jobOffer) {
     throw new Error(
-      `${SIGNING_ROLLUP_ERROR_CODES.readFailed}: job_offer ${jobOfferId} of envelope ${envelopeId} is not readable`
+      `${SIGNING_ROLLUP_ERROR_CODES.readFailed}: job_offer ${jobOfferId ?? `for applicant ${envelope.applicant_id}`} of envelope ${envelopeId} is not readable`
     );
   }
 

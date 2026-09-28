@@ -5,7 +5,7 @@ export const ManpowerRecommendationSchema = z.object({
   manpower_request_id: z.number(),
   applicant_id: z.number(),
   status: z.enum(['Recommended', 'Approved', 'Hired', 'Rejected', 'Withdrawn']).default('Recommended'),
-  recommendation_notes: z.string().nullable().optional(),
+  recommendation_notes: z.string().trim().min(1, { error: "Recommendation notes is required" }),
   recommended_by: z.number().nullable().optional(),
   recommended_at: z.string().nullable().optional(),
   decision_by: z.number().nullable().optional(),
