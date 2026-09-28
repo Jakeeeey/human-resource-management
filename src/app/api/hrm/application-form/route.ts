@@ -3,6 +3,8 @@ import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import type { SubmitApplicationPayload } from "@/modules/human-resource-management/application-form/types";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { submissionError } from "@/modules/human-resource-management/application-form/lib/submissionRules";
 
 export const runtime = "nodejs";
 
@@ -64,6 +66,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const invalid = submissionError(body);
+        if (invalid) {
+            return NextResponse.json({ error: invalid }, { status: 400 });
+        }
+
         const token = req.cookies.get(COOKIE_NAME)?.value;
         const payload = token ? decodeJwtPayload(token) : null;
         const createdBy = payload?.sub ? Number(payload.sub) || null : null;
@@ -79,6 +86,8 @@ export async function POST(req: NextRequest) {
                 full_name: fullName,
                 position_applied_for: position,
                 created_by: createdBy,
+                created_at: nowUTC(),
+                updated_at: nowUTC(),
             }),
         });
         const applicantErr = firstError(createdApplicant);
@@ -93,7 +102,7 @@ export async function POST(req: NextRequest) {
         // The row starts at the DB default `draft`; the SINGLE status writer advances
         // it to `submitted` (creation IS the submission moment).
         try {
-            await setApplicantStatus({ applicantId, status: "submitted" });
+            await setApplicantStatus({ applicantId, status: "submitted", ...(createdBy != null ? { actorId: createdBy } : {}) });
         } catch (err: unknown) {
             console.error(
                 "[application-form] failed to set applicant status:",
@@ -102,7 +111,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Failed to submit application." }, { status: 502 });
         }
 
-        const nowIso = new Date().toISOString();
+        const nowIso = nowUTC();
         const createdApplication = await dFetch(`/items/application`, {
             method: "POST",
             body: JSON.stringify({
@@ -148,6 +157,8 @@ export async function POST(req: NextRequest) {
 
                 source: "hrm-assisted",
                 submitted_at: nowIso,
+                created_at: nowIso,
+                updated_at: nowIso,
                 created_by: createdBy,
             }),
         });

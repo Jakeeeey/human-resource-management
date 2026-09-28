@@ -22,8 +22,10 @@ export type HireApplicantRow = z.infer<typeof HireApplicantRowSchema>;
 
 /**
  * `application` fields the orchestrator reads. The application is the ONLY
- * source of the hiree's personal data (applicant is decoupled) and the ONLY
- * place the email for the idempotent user lookup comes from.
+ * source of the hiree's personal data (applicant is decoupled); its email is
+ * the preferred identity for the idempotent user lookup, with the
+ * applicant-scoped synthetic as fallback when absent — so a missing email
+ * never blocks the hire.
  */
 export const HireApplicationRowSchema = z.looseObject({
   id: z.number().int().positive(),
@@ -62,6 +64,8 @@ export const HireOrchestrationInputSchema = z
      * cookie; direct server-side invocations may pass a token explicitly.
      */
     authToken: z.string().min(1).optional(),
+    /** Optional acting user id, threaded into post-hire step contexts. */
+    actorId: z.number().int().positive().nullable().optional(),
   })
   .strict();
 
@@ -76,7 +80,6 @@ export const HIRE_ORCHESTRATOR_ERROR_CODES = {
   applicantNotFound: "HIRE_APPLICANT_NOT_FOUND",
   applicantNotHired: "HIRE_APPLICANT_NOT_HIRED",
   applicationNotFound: "HIRE_APPLICATION_NOT_FOUND",
-  emailMissing: "HIRE_EMAIL_MISSING",
   positionMissing: "HIRE_POSITION_MISSING",
   companyMissing: "HIRE_COMPANY_MISSING",
   userCreateFailed: "HIRE_USER_CREATE_FAILED",
@@ -96,7 +99,10 @@ export interface HireCompletionContext {
   userId: number;
   /** True when THIS orchestration run created the Spring user; false = reused. */
   userCreated: boolean;
+  /** Hire identity: the real personal email, or the synthetic fallback. */
   email: string;
+  /** Acting user id for audit stamps on rows steps create/patch (null = stamp nothing). */
+  actorId: number | null;
 }
 
 /** Outcome a post-hire step reports. `ok:false` fails the whole run. */
@@ -123,6 +129,7 @@ export interface HireOrchestrationResult {
   applicationId: number;
   userId: number;
   userCreated: boolean;
+  /** Hire identity: the real personal email, or the synthetic fallback. */
   email: string;
   steps: HireCompletionStepResult[];
 }

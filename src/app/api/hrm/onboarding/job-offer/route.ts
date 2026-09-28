@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
-  getPhilippineTime,
   mapWriteFailure,
   readSigningSession,
   serverError,
@@ -14,6 +13,7 @@ import {
   JobOfferListQuerySchema,
 } from "@/modules/human-resource-management/onboarding/signing/types/signing-api.schema";
 import { JobOfferSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
+import { actorIdFromJwt, stampCreate, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,7 +77,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!readSigningSession(req)) return unauthorized();
+    const session = readSigningSession(req);
+    if (!session) return unauthorized();
+    const actorId = actorIdFromJwt(session);
 
     const body: unknown = await req.json().catch(() => null);
     const validation = JobOfferCreateSchema.safeParse(body);
@@ -85,14 +87,14 @@ export async function POST(req: NextRequest) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const created = (await dFetch("/items/job_offer", {
       method: "POST",
-      body: JSON.stringify({
+      body: JSON.stringify(stampCreate({
         ...validation.data,
         created_at: now,
         updated_at: now,
-      }),
+      }, actorId)),
     })) as { data?: unknown; errors?: unknown };
 
     if (created?.errors || !created?.data) {

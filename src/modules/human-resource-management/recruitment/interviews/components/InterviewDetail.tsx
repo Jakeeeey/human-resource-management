@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { FileText, Loader2 } from "lucide-react";
-import { formatDateLong } from "@/lib/utils";
+import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
 
 type InterviewVerdict = "Pending" | "Passed" | "Failed";
 
@@ -222,7 +222,7 @@ export function InterviewDetail() {
                                             </div>
                                             <div>
                                                 <span className="text-xs font-bold uppercase text-muted-foreground block mb-1">Date</span>
-                                                <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50">{(() => { const raw = interview.interviewed_at ?? interview.created_at; return raw ? formatDateLong(new Date(raw)) : "-"; })()}</div>
+                                                <div className="font-medium text-foreground p-2 bg-muted/30 rounded-md border border-border/50">{(() => { const raw = interview.interviewed_at ?? interview.created_at; return raw ? formatPHT(raw) : "-"; })()}</div>
                                             </div>
                                         </div>
                                         <div>

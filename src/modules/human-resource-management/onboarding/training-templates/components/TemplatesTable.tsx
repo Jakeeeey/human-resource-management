@@ -242,6 +242,7 @@ export function TemplatesTable({
         rangeEnd={controls.rangeEnd}
         onPageChange={controls.setPage}
         onPageSizeChange={controls.setPageSize}
+        alwaysShowControls
       />
     </div>
   );

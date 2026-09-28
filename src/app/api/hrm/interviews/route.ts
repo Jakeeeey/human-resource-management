@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 import { getApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
+function decodeJwtPayload(token: string): JwtPayload | null {
     try {
         if (!token) return null;
         const parts = token.split(".");
@@ -132,11 +134,12 @@ export async function POST(req: NextRequest) {
         if (!userId) {
             return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
         }
+        const actorId = actorIdFromJwt(payload);
 
         const body = await req.json();
 
         body.interviewed_by = userId;
-        body.interviewed_at = nowPH();
+        body.interviewed_at = nowUTC();
 
         const validated = InterviewSchema.parse(body);
 
@@ -178,7 +181,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "VALIDATION_FAILED", message: "At least one criterion score is required to submit interview grading." }, { status: 400 });
         }
 
-        const created = await interviewService.createInterviewFlow({ ...validated, items });
+        const created = await interviewService.createInterviewFlow({ ...validated, items }, actorId);
         const autoApproved =
             created.stage === "Final" && created.verdict === "Passed"
                 ? await maybeAutoApproveRecommendation(created.recommendation_id)

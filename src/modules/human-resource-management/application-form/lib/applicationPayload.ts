@@ -43,34 +43,43 @@ function toStringOrNull(s: string): string | null {
 }
 
 function isFamilyMemberFilled(m: FamilyMemberFields): boolean {
-    return Boolean(m.name.trim() || m.occupation.trim() || m.company.trim() || m.age.trim() || m.education.trim());
+    return Boolean(
+        m.name.trim() ||
+            m.date_of_birth.trim() ||
+            m.is_deceased ||
+            m.occupation.trim() ||
+            m.company.trim() ||
+            m.education.trim() ||
+            m.contact_number.trim() ||
+            m.address.trim()
+    );
+}
+
+function toFamilyRow(relation: SubmitFamilyMember["relation"], m: FamilyMemberFields): SubmitFamilyMember {
+    return {
+        relation,
+        name: m.name.trim(),
+        date_of_birth: toStringOrNull(m.date_of_birth),
+        is_deceased: m.is_deceased,
+        age: null,
+        occupation: m.is_deceased ? null : toStringOrNull(m.occupation),
+        company: m.is_deceased ? null : toStringOrNull(m.company),
+        education: toStringOrNull(m.education),
+        contact_number: toStringOrNull(m.contact_number),
+        address: toStringOrNull(m.address),
+    };
 }
 
 function buildFamilyMembers(values: ApplicationFormValues): SubmitFamilyMember[] {
     const rows: SubmitFamilyMember[] = [];
     (["father", "mother", "spouse"] as const).forEach((key) => {
-        if (key === "spouse" && values.civil_status === "Single") return;
         const m = values[key];
         if (!isFamilyMemberFilled(m)) return;
-        rows.push({
-            relation: key === "father" ? "Father" : key === "mother" ? "Mother" : "Spouse",
-            name: m.name.trim(),
-            age: toNumberOrNull(m.age),
-            occupation: toStringOrNull(m.occupation),
-            company: toStringOrNull(m.company),
-            education: toStringOrNull(m.education),
-        });
+        rows.push(toFamilyRow(key === "father" ? "Father" : key === "mother" ? "Mother" : "Spouse", m));
     });
     values.family_dependents.forEach((d) => {
         if (!d.relation || !d.name.trim()) return;
-        rows.push({
-            relation: d.relation,
-            name: d.name.trim(),
-            age: toNumberOrNull(d.age),
-            occupation: toStringOrNull(d.occupation),
-            company: toStringOrNull(d.company),
-            education: toStringOrNull(d.education),
-        });
+        rows.push(toFamilyRow(d.relation, { ...d, is_deceased: false }));
     });
     return rows;
 }
@@ -122,13 +131,14 @@ function buildWorkExperience(values: ApplicationFormValues): SubmitWorkExperienc
             address: toStringOrNull(r.address),
             job_title: toStringOrNull(r.job_title),
             date_from: toStringOrNull(r.date_from),
-            date_to: toStringOrNull(r.date_to),
+            date_to: r.currently_employed ? null : toStringOrNull(r.date_to),
+            currently_employed: r.currently_employed,
             salary_rate_start: toNumberOrNull(r.salary_rate_start),
-            salary_rate_end: toNumberOrNull(r.salary_rate_end),
+            salary_rate_end: r.currently_employed ? null : toNumberOrNull(r.salary_rate_end),
             supervisor_name: toStringOrNull(r.supervisor_name),
             supervisor_contact: toStringOrNull(r.supervisor_contact),
             responsibilities: toStringOrNull(r.responsibilities),
-            reason_for_leaving: toStringOrNull(r.reason_for_leaving),
+            reason_for_leaving: r.currently_employed ? null : toStringOrNull(r.reason_for_leaving),
         }));
 }
 

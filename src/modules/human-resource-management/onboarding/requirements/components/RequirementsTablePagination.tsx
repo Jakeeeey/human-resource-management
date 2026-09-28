@@ -56,6 +56,7 @@ interface RequirementsTablePaginationProps {
   rangeEnd: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  alwaysShowControls?: boolean;
 }
 
 /**
@@ -72,9 +73,11 @@ export function RequirementsTablePagination({
   rangeEnd,
   onPageChange,
   onPageSizeChange,
+  alwaysShowControls = false,
 }: RequirementsTablePaginationProps) {
   const onFirstPage = page <= 1;
   const onLastPage = page >= totalPages;
+  const showControls = alwaysShowControls || totalPages > 1;
 
   return (
     <div className="flex flex-col gap-3 border-t border-border/50 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -89,7 +92,7 @@ export function RequirementsTablePagination({
       {/* Single-page lists show the quiet count only — no inert pager chrome. */}
       <div
         className={
-          totalPages > 1
+          showControls
             ? "flex flex-col gap-3 sm:flex-row sm:items-center"
             : "hidden"
         }

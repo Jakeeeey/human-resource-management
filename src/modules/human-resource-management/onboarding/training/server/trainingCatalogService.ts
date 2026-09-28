@@ -28,9 +28,9 @@ import {
   createTemplateRows,
   listTemplateRows,
   patchTemplateRow,
-  phTimeNow,
   type TemplateWriteRow,
 } from "../../tasks/server/onboardingTaskIo";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { OnboardingOwnerRole } from "../../types/onboarding-task.schema";
 
 // trainingCatalogService.ts — the training-template DOMAIN layer over
@@ -38,13 +38,13 @@ import type { OnboardingOwnerRole } from "../../types/onboarding-task.schema";
 // CRUD with read-back verification, and the derivation of one
 // `onboarding_task_template` row per training item.
 //
-// Department auto-selection (the ONE precedence rule): a hire's department id
-// picks the active template whose EFFECTIVE department set contains it (the
-// junction rows, falling back to the legacy `department_id` when empty); when
-// there is none (or the hire has no department) the active GLOBAL template
-// (empty effective set) applies. `resolveApplicableTrainingItems` is the single
-// resolver; the materialize filter and the derived-template sync both go
-// through it.
+// Department auto-selection (UNION rule): a hire gets EVERY active template
+// that applies — each template whose EFFECTIVE department set contains the
+// hire's department id (the junction rows, falling back to the legacy
+// `department_id` when empty), PLUS every active GLOBAL template (empty
+// effective set = "all departments"). A hire with no department matches
+// globals only. `resolveApplicableTrainingItems` is the single resolver; the
+// materialize filter and the derived-template sync both go through it.
 //
 // `syncTrainingDerivedTemplates` mirrors `orientationTopicTemplateSync`:
 // create-missing derived rows, then PATCH `is_active` on existing derived rows
@@ -199,38 +199,41 @@ export async function listTrainingItems(
 }
 
 /**
- * The training that applies to a hire in `departmentId`: the active template
- * whose EFFECTIVE department set contains that id when the hire has a
- * department and such a template exists, otherwise the active GLOBAL template
- * (empty effective set).
- * @returns The chosen template (or null) and its ACTIVE items by `sort_order`.
+ * Every training that applies to a hire in `departmentId`: ALL active
+ * templates whose EFFECTIVE department set contains that id, PLUS all active
+ * GLOBAL templates (empty effective set = "all departments"). A null
+ * department matches globals only.
+ * @returns The applicable templates (id order) and their ACTIVE items —
+ *   template by template in id order, `sort_order` within each template.
  */
 export async function resolveApplicableTrainingItems(
   departmentId: number | null
-): Promise<{ template: TrainingTemplate | null; items: TrainingItem[] }> {
-  const [templates, junctions] = await Promise.all([
+): Promise<{ templates: TrainingTemplate[]; items: TrainingItem[] }> {
+  const [templates, junctions, allItems] = await Promise.all([
     listTrainingTemplateRows(),
     listTrainingTemplateDepartmentRows(),
+    listAllTrainingItemRows(),
   ]);
   const junctionByTemplate = groupDepartmentIds(junctions);
-  const departmentTemplate =
-    departmentId === null
-      ? undefined
-      : templates.find((template) =>
-          effectiveDepartmentIds(template, junctionByTemplate).includes(
-            departmentId
-          )
-        );
-  const template =
-    departmentTemplate ??
-    templates.find(
-      (candidate) =>
-        effectiveDepartmentIds(candidate, junctionByTemplate).length === 0
-    ) ??
-    null;
-  if (!template) return { template: null, items: [] };
-  const items = await listTrainingItemRows(template.id);
-  return { template, items };
+  const applicable = templates.filter((template) => {
+    const effective = effectiveDepartmentIds(template, junctionByTemplate);
+    if (effective.length === 0) return true;
+    return departmentId !== null && effective.includes(departmentId);
+  });
+  const applicableIds = new Set(applicable.map((template) => template.id));
+  const position = new Map<number, number>(
+    applicable.map((template, index) => [template.id, index])
+  );
+  const items = allItems
+    .filter((item) => applicableIds.has(item.template_id))
+    .sort(
+      (a, b) =>
+        (position.get(a.template_id) ?? 0) -
+          (position.get(b.template_id) ?? 0) ||
+        a.sort_order - b.sort_order ||
+        a.id - b.id
+    );
+  return { templates: applicable, items };
 }
 
 /**
@@ -303,7 +306,7 @@ export async function createTrainingTemplate(
   }
 
   const departmentIds = [...new Set(parsed.data.department_ids ?? [])];
-  const now = phTimeNow();
+  const now = nowUTC();
   const row: TrainingTemplateWriteRow = {
     code: parsed.data.code,
     title: parsed.data.title,
@@ -361,8 +364,8 @@ export async function updateTrainingTemplate(input: {
   const { department_ids: departmentIds, ...rest } = parsed.data;
   const patch: Record<string, unknown> = {
     ...rest,
-    updated_at: phTimeNow(),
-    updated_by: actorId,
+    updated_at: nowUTC(),
+    ...(actorId != null ? { updated_by: actorId } : {}),
   };
   if (departmentIds !== undefined) {
     patch.department_id = [...new Set(departmentIds)][0] ?? null;
@@ -384,7 +387,7 @@ export async function updateTrainingTemplate(input: {
 
 /**
  * Soft-deletes one template (`is_active=false`). Read-back verified through
- * `updateTrainingTemplate`, which owns the `phTimeNow()` audit stamps.
+ * `updateTrainingTemplate`, which owns the `nowUTC()` audit stamps.
  * @throws Coded `templateNotFound` / `writeNotVisible` / IO failures.
  */
 export function deactivateTrainingTemplate(input: {
@@ -444,7 +447,7 @@ export async function createTrainingItem(
     );
   }
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const row: TrainingItemWriteRow = {
     template_id: templateId,
     code: parsed.data.code,
@@ -497,8 +500,8 @@ export async function updateTrainingItem(input: {
 
   const updated = await patchTrainingItemRow(input.id, {
     ...parsed.data,
-    updated_at: phTimeNow(),
-    updated_by: actorId,
+    updated_at: nowUTC(),
+    ...(actorId != null ? { updated_by: actorId } : {}),
   });
   const verified = await readItemById(updated.id);
   if (!verified) {
@@ -512,7 +515,7 @@ export async function updateTrainingItem(input: {
 
 /**
  * Soft-deletes one item (`is_active=false`). Read-back verified through
- * `updateTrainingItem`, which owns the `phTimeNow()` audit stamps.
+ * `updateTrainingItem`, which owns the `nowUTC()` audit stamps.
  * @throws Coded `itemNotFound` / `writeNotVisible` / IO failures.
  */
 export function deactivateTrainingItem(input: {
@@ -552,7 +555,7 @@ export async function syncTrainingDerivedTemplates(
     });
   }
 
-  const now = phTimeNow();
+  const now = nowUTC();
   const desired = items
     .filter((item) => templateActive.has(item.template_id))
     .map((item) => ({
@@ -591,7 +594,7 @@ export async function syncTrainingDerivedTemplates(
     await patchTemplateRow(existing.id, {
       is_active: row.isActive,
       updated_at: now,
-      updated_by: actorId,
+      ...(actorId != null ? { updated_by: actorId } : {}),
     });
     updated += 1;
   }

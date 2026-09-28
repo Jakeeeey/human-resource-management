@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, Pencil } from "lucide-react";
 
@@ -24,6 +24,7 @@ import {
 
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import type { MailTemplateRow } from "../providers/mailTemplateService";
+import { MailingTablePagination } from "./MailingTablePagination";
 
 /**
  * Template list with dedicated-page create/edit navigation.
@@ -32,6 +33,8 @@ import type { MailTemplateRow } from "../providers/mailTemplateService";
 export function MailTemplateList() {
     const router = useRouter();
     const { templates, loading, error, refresh } = useMailTemplates();
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     useEffect(() => {
         const handler = () => {
@@ -65,6 +68,13 @@ export function MailTemplateList() {
         );
     }
 
+    const filteredCount = templates.length;
+    const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const rangeStart = filteredCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
+    const rangeEnd = Math.min(safePage * pageSize, filteredCount);
+    const pagedTemplates = templates.slice((safePage - 1) * pageSize, safePage * pageSize);
+
     return (
         <div className="grid gap-3">
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
@@ -86,7 +96,7 @@ export function MailTemplateList() {
                                 </TableCell>
                             </TableRow>
                         )}
-                        {templates.map((row) => (
+                        {pagedTemplates.map((row) => (
                             <TableRow key={String(row.id)}>
                                 <TableCell className="max-w-40 truncate" title={row.template_key}>
                                     {row.template_key}
@@ -131,6 +141,19 @@ export function MailTemplateList() {
                     </TableBody>
                 </Table>
                 </div>
+                <MailingTablePagination
+                    page={safePage}
+                    pageSize={pageSize}
+                    totalPages={totalPages}
+                    filteredCount={filteredCount}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setPage(1);
+                    }}
+                />
             </div>
         </div>
     );

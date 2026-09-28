@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { interviewService, nowPH, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
+import { interviewService, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
+function decodeJwtPayload(token: string): JwtPayload | null {
     try {
         if (!token) return null;
         const parts = token.split(".");
@@ -59,6 +61,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const raw = payload?.id || payload?.user_id || payload?.sub;
         const userId = typeof raw === "string" ? parseInt(raw, 10) : raw;
         if (!userId) return NextResponse.json({ error: "AUTH_DENIED" }, { status: 401 });
+        const actorId = actorIdFromJwt(payload);
 
         const body = await req.json();
 
@@ -87,10 +90,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 template_id,
                 verdict,
                 interviewed_by: typeof userId === "number" ? userId : null,
-                interviewed_at: typeof body.interviewed_at === "string" && body.interviewed_at ? body.interviewed_at : nowPH(),
+                interviewed_at: typeof body.interviewed_at === "string" && body.interviewed_at ? body.interviewed_at : nowUTC(),
                 notes: typeof body.notes === "string" && body.notes ? body.notes : null,
                 items: body.items,
-            });
+            }, actorId);
             const autoApproved =
                 data.stage === "Final" && data.verdict === "Passed"
                     ? await maybeAutoApproveRecommendation(data.recommendation_id)
@@ -106,6 +109,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 stage: data.stage,
                 applicationId: data.application_id,
                 verdict: data.verdict,
+                ...(actorId != null ? { actorId } : {}),
             });
             // Mail hook (mailing-module todo 11): stage-routed graded event, never awaited.
             void dispatchMail(data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
@@ -124,10 +128,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
         // The client sends only { verdict, notes, interviewed_by } — it has no
         // userId in scope. NEVER trust client-supplied updated_by; always
-        // overwrite server-side. updated_at is stamped by the service via nowPH().
         const validated = InterviewSchema.omit({ id: true }).partial().parse(body);
 
-        const data = await interviewService.updateInterview(id, validated);
+        const data = await interviewService.updateInterview(id, validated, actorId);
         const autoApproved =
             data.stage === "Final" && data.verdict === "Passed" && existing?.verdict !== "Passed"
                 ? await maybeAutoApproveRecommendation(data.recommendation_id)
@@ -144,6 +147,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 stage: data.stage,
                 applicationId: data.application_id,
                 verdict: data.verdict,
+                ...(actorId != null ? { actorId } : {}),
             });
             // Mail hook (mailing-module todo 11): real verdict transitions only, never awaited.
             void dispatchMail(data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {

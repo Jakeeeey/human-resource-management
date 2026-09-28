@@ -13,6 +13,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Eraser,
   FileText,
   Upload,
 } from "lucide-react";
@@ -230,6 +231,70 @@ export function SigningOfferSection({
     setPageDraft(String(next));
   };
 
+  const renderPageNav = () => (
+    <div className="flex flex-nowrap items-center justify-center gap-1.5">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setActivePage(1)}
+        disabled={activePage <= 1}
+        aria-label="First page"
+        className="min-h-8 min-w-8 px-0"
+      >
+        <ChevronsLeft className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setActivePage((p) => Math.max(1, p - 1))}
+        disabled={activePage <= 1}
+        aria-label="Previous page"
+        className="min-h-8 min-w-8 px-0"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <Input
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={numPages}
+        value={pageDraft}
+        onChange={(e) => setPageDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitJump();
+          }
+          if (e.key === "Escape") setPageDraft(String(activePage));
+        }}
+        onBlur={commitJump}
+        aria-label="Page number"
+        className="h-8 w-14 px-1 text-center"
+      />
+      <span className="text-xs text-muted-foreground">/ {numPages}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setActivePage((p) => Math.min(numPages, p + 1))}
+        disabled={activePage >= numPages}
+        aria-label="Next page"
+        className="min-h-8 min-w-8 px-0"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setActivePage(numPages)}
+        disabled={activePage >= numPages}
+        aria-label="Last page"
+        className="min-h-8 min-w-8 px-0"
+      >
+        <ChevronsRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   return (
     <section className="bg-card overflow-hidden rounded-2xl border border-border/50 shadow-sm">
       <div className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
@@ -283,67 +348,7 @@ export function SigningOfferSection({
 
       {offerTemplate && pdf.pdfError === null ? (
         <div className="space-y-4 px-3 pb-3 sm:px-4">
-          <div className="flex flex-nowrap items-center justify-center gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActivePage(1)}
-              disabled={activePage <= 1}
-              aria-label="First page"
-              className="min-h-8 min-w-8 px-0"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActivePage((p) => Math.max(1, p - 1))}
-              disabled={activePage <= 1}
-              aria-label="Previous page"
-              className="min-h-8 min-w-8 px-0"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={numPages}
-              value={pageDraft}
-              onChange={(e) => setPageDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  commitJump();
-                }
-                if (e.key === "Escape") setPageDraft(String(activePage));
-              }}
-              onBlur={commitJump}
-              aria-label="Page number"
-              className="h-8 w-14 px-1 text-center"
-            />
-            <span className="text-xs text-muted-foreground">/ {numPages}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActivePage((p) => Math.min(numPages, p + 1))}
-              disabled={activePage >= numPages}
-              aria-label="Next page"
-              className="min-h-8 min-w-8 px-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActivePage(numPages)}
-              disabled={activePage >= numPages}
-              aria-label="Last page"
-              className="min-h-8 min-w-8 px-0"
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
+          {renderPageNav()}
 
           <div className="space-y-2">
             <TemplatePageView
@@ -370,16 +375,18 @@ export function SigningOfferSection({
             {!offerSigned && (
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => handleClearPage(activePage)}
-                className="min-h-8"
+                className="min-h-8 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 aria-label={`Clear ink on page ${activePage}`}
               >
+                <Eraser className="h-3.5 w-3.5" />
                 Clear page {activePage}
               </Button>
             )}
           </div>
+          {renderPageNav()}
         </div>
       ) : (
         <p className="px-3 pb-3 text-xs text-muted-foreground sm:px-4">

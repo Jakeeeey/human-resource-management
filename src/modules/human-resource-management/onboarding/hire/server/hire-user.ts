@@ -7,17 +7,21 @@ import {
 } from "@/modules/human-resource-management/shared/services/spring-user-service";
 
 import { HIRE_ORCHESTRATOR_ERROR_CODES } from "../types/hire.schema";
-import { buildLoginEmail } from "./hire-email";
+import { buildLoginEmail, isSyntheticHireIdentity } from "./hire-email";
 
 // hire-user.ts — idempotent Spring employee resolution for the post-hire
 // orchestrator (todo 16).
 //
 // IDENTITY MODEL (task contract):
-//   - The hire's IDENTITY is the applicant's PERSONAL email, held in
-//     `user.personal_email` for new rows and still in `user.user_email` for
-//     legacy rows (the personal address used to be the login). ONE `_or`
-//     lookup matches either, so retries reuse the same user and two different
-//     people who share a generated name never share an account.
+//   - The hire's IDENTITY is the applicant's PERSONAL email when the
+//     application carries one, else the deterministic applicant-scoped
+//     synthetic (`applicant-<id>@no-email.invalid`). It is held in
+//     `user.personal_email` for new rows ONLY when real — the synthetic is
+//     a dedup key, never persisted, never mailed to — and still in
+//     `user.user_email` for legacy rows (the personal address used to be
+//     the login). ONE `_or` lookup matches either, so retries reuse the
+//     same user and two different people who share a generated name never
+//     share an account.
 //   - The account's login address is a GENERATED company address
 //     (`first_last@companydomain`) and is NEVER used to key idempotency.
 //   - IN-PROCESS MUTEX: concurrent orchestrations for the same identity
@@ -211,7 +215,7 @@ async function createOrReuseUser(
         `${HIRE_ORCHESTRATOR_ERROR_CODES.userVerifyFailed}: created user ${outcome.userId} is not visible by email ${allocation.email} (found: [${rows.map((row) => row.user_id).join(",")}])`
       );
     }
-    if (createdRow.personal_email === null) {
+    if (createdRow.personal_email === null && !isSyntheticHireIdentity(identity)) {
       await persistPersonalEmail(outcome.userId, personalEmail);
     }
     return { userId: outcome.userId, created: true };

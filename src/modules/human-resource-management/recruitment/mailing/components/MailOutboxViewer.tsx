@@ -27,6 +27,7 @@ import { useMailOutbox } from "../hooks/useMailOutbox";
 import type { MailOutboxRow } from "../providers/mailOutboxService";
 import { listSendNowApplicants } from "../providers/mailSendNowService";
 import { renderMailTemplate } from "../utils/mailRenderer";
+import { MailingTablePagination } from "./MailingTablePagination";
 
 const SNAPSHOT_UNAVAILABLE_NOTE =
     "Template may have changed since send — snapshot unavailable for rows written before snapshots existed";
@@ -123,6 +124,8 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
     const [selected, setSelected] = useState<MailOutboxRow | null>(null);
     const [dialogRow, setDialogRow] = useState<MailOutboxRow | null>(null);
     const [previewOpen, setPreviewOpen] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [applicantNames, setApplicantNames] = useState<Map<string, string>>(new Map());
     const isLarge = useIsLargeScreen();
 
@@ -194,6 +197,17 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
     // current filter falls back to the first row.
     const activeRow = selected !== null && filtered.includes(selected) ? selected : (filtered[0] ?? null);
 
+    useEffect(() => {
+        setPage(1);
+    }, [status, templateFilter, query]);
+
+    const filteredCount = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const rangeStart = filteredCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
+    const rangeEnd = Math.min(safePage * pageSize, filteredCount);
+    const pagedFiltered = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+
     const handleSelect = (row: MailOutboxRow) => {
         setSelected(row);
         setPreviewOpen(true);
@@ -250,7 +264,7 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {filtered.map((row, index) => {
+                            {pagedFiltered.map((row, index) => {
                                 const isActive = activeRow === row;
                                 const linked = linkedFor(row);
                                 const recipientName = recipientNameFor(row);
@@ -297,6 +311,19 @@ export function MailOutboxViewer({ status, templateFilter, query, templates }: M
                         </TableBody>
                     </Table>
                     </div>
+                    <MailingTablePagination
+                        page={safePage}
+                        pageSize={pageSize}
+                        totalPages={totalPages}
+                        filteredCount={filteredCount}
+                        rangeStart={rangeStart}
+                        rangeEnd={rangeEnd}
+                        onPageChange={setPage}
+                        onPageSizeChange={(size) => {
+                            setPageSize(size);
+                            setPage(1);
+                        }}
+                    />
                 </div>
                 {previewOpen && (
                 <div className="hidden lg:block">

@@ -62,7 +62,7 @@ const EMPTY_DESK_FILTERS: DeskFilters = {
   attentionOnly: false,
 };
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
 const ENVELOPE_STATUS_OPTIONS = [
   { value: "all", label: "All statuses" },
@@ -198,15 +198,41 @@ function DeskFilterBar({
 function DeskPager({
   page,
   totalPages,
+  pageSize,
   onChange,
+  onPageSizeChange,
 }: {
   page: number;
   totalPages: number;
+  pageSize: number;
   onChange: (next: number) => void;
+  onPageSizeChange: (size: number) => void;
 }) {
-  if (totalPages <= 1) return null;
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Rows per page</span>
+        <Select
+          value={String(pageSize)}
+          onValueChange={(value) => onPageSizeChange(Number(value))}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-[90px]"
+            aria-label="Rows per page"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <SelectItem key={size} value={String(size)}>
+                {size}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex items-center gap-1">
       <Button
         type="button"
         variant="outline"
@@ -258,6 +284,7 @@ function DeskPager({
       >
         <ChevronsRight className="h-4 w-4" aria-hidden="true" />
       </Button>
+      </div>
     </div>
   );
 }
@@ -277,6 +304,7 @@ function DeskBody() {
   const [error, setError] = useState<Error | null>(null);
   const [filters, setFilters] = useState<DeskFilters>(EMPTY_DESK_FILTERS);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const templateById = useMemo(() => {
     const map = new Map<number, PaperworkTemplate>();
@@ -343,15 +371,15 @@ function DeskBody() {
       });
   }, [allRows, filters]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleRows = filteredRows.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
+    (safePage - 1) * pageSize,
+    safePage * pageSize
   );
   const rangeStart =
-    filteredRows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(safePage * PAGE_SIZE, filteredRows.length);
+    filteredRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(safePage * pageSize, filteredRows.length);
   const hasActiveFilters =
     filters.query !== "" ||
     filters.envelopeStatus !== "all" ||
@@ -524,7 +552,12 @@ function DeskBody() {
           <DeskPager
             page={safePage}
             totalPages={totalPages}
+            pageSize={pageSize}
             onChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
           />
         </div>
       </section>

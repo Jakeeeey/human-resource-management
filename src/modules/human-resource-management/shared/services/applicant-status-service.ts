@@ -6,6 +6,7 @@ import {
   type ApplicantStatus,
 } from "@/modules/human-resource-management/onboarding/types/applicant-status";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // applicant-status-service.ts — the SINGLE writer of `applicant.status`
 // (todo 2 of onboarding-hub-replan). Every module that advances or closes an
@@ -62,11 +63,12 @@ export const APPLICANT_STATUS_ERROR_CODES = {
   writeFailed: "APPLICANT_STATUS_WRITE_FAILED",
 } as const;
 
-/** `setApplicantStatus` input: applicant row id + target status + optional one-time stamp. */
+/** `setApplicantStatus` input: applicant row id + target status + optional one-time stamp + optional actor. */
 export const SetApplicantStatusParamsSchema = z.object({
   applicantId: z.number().int().positive(),
   status: ApplicantStatusSchema,
   manpowerRequestId: z.number().int().positive().optional(),
+  actorId: z.number().int().positive().optional(),
 });
 
 export type SetApplicantStatusParams = z.infer<typeof SetApplicantStatusParamsSchema>;
@@ -123,15 +125,19 @@ async function readApplicantRow(applicantId: number): Promise<ApplicantStatusRow
 async function patchApplicantStatus(
   applicantId: number,
   status: ApplicantStatus,
-  manpowerRequestId?: number
+  manpowerRequestId?: number,
+  actorId?: number
 ): Promise<ApplicantStatusRow> {
+  const payload = {
+    ...(manpowerRequestId === undefined
+      ? { status }
+      : { status, manpower_request_id: manpowerRequestId }),
+    ...(actorId != null ? { updated_by: actorId } : {}),
+    updated_at: nowUTC(),
+  };
   const body: unknown = await dFetch(`/items/${DIRECTUS_COLLECTION}/${applicantId}`, {
     method: "PATCH",
-    body: JSON.stringify(
-      manpowerRequestId === undefined
-        ? { status }
-        : { status, manpower_request_id: manpowerRequestId }
-    ),
+    body: JSON.stringify(payload),
   });
   const errorMessage = directusErrorMessage(body);
   if (errorMessage) {
@@ -170,9 +176,11 @@ export function canTransition(from: ApplicantStatus, to: ApplicantStatus): boole
  * provenance and is never cleared. Re-calling with the CURRENT status is an
  * idempotent no-op (safe for retries/resume — no PATCH is issued), unless a
  * differing `manpowerRequestId` is supplied, in which case only the stamp is
- * PATCHed.
- * @param params - `{ applicantId, status, manpowerRequestId? }` (applicant row
- * id + target status + optional one-time `manpower_request_id` stamp).
+ * PATCHed. The optional `actorId` stamps `updated_by` on the PATCH (null/absent
+ * writes nothing extra).
+ * @param params - `{ applicantId, status, manpowerRequestId?, actorId? }` (applicant row
+ * id + target status + optional one-time `manpower_request_id` stamp + optional
+ * acting user id for `updated_by`).
  * @returns The Directus read-back row (`{ id, status, manpower_request_id, ... }`).
  * @throws Error with a code from `APPLICANT_STATUS_ERROR_CODES` on invalid
  * input, unreadable/unparseable current status, disallowed transition, or
@@ -189,14 +197,14 @@ export async function setApplicantStatus(
     throw new Error(`${APPLICANT_STATUS_ERROR_CODES.invalidInput}: ${issues}`);
   }
 
-  const { applicantId, status, manpowerRequestId } = validation.data;
+  const { applicantId, status, manpowerRequestId, actorId } = validation.data;
   const current = await readApplicantRow(applicantId);
 
   if (current.status === status) {
     if (manpowerRequestId === undefined || manpowerRequestId === current.manpower_request_id) {
       return current;
     }
-    return patchApplicantStatus(applicantId, status, manpowerRequestId);
+    return patchApplicantStatus(applicantId, status, manpowerRequestId, actorId);
   }
 
   if (!canTransition(current.status, status)) {
@@ -205,7 +213,7 @@ export async function setApplicantStatus(
     );
   }
 
-  return patchApplicantStatus(applicantId, status, manpowerRequestId);
+  return patchApplicantStatus(applicantId, status, manpowerRequestId, actorId);
 }
 
 /**

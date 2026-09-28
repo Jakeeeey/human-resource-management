@@ -10,7 +10,7 @@ export default function ApplyQuizPage() {
             <Suspense
                 fallback={<div className="p-6 text-sm text-muted-foreground">Loading quiz...</div>}
             >
-                <QuizTakingModule returnHref="/apply/done" />
+                <QuizTakingModule returnHref="/hrm/apply/done" />
             </Suspense>
         </main>
     );

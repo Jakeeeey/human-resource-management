@@ -19,8 +19,8 @@ import {
   assertAssignmentOwner,
   normalizeTrainingAssignment,
   resolveEngineApplicant,
-  getPhilippineTime,
 } from "@/modules/human-resource-management/onboarding/training/trainingTaking";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   abandonedInProgress,
   buildCompletionScalars,
@@ -202,7 +202,7 @@ export async function POST(
       return NextResponse.json({ success: false, message: next.error }, { status: 409 });
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const updated = (await dFetch(`/items/training_assignments/${assignmentId}`, {
       method: "PATCH",
       body: JSON.stringify({

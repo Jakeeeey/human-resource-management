@@ -11,7 +11,8 @@ import type {
   Paperworks,
   SigningEnvelope,
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { SIGNING_SET_ERROR_CODES, getPhilippineTime } from "./signingSetIo";
+import { SIGNING_SET_ERROR_CODES } from "./signingSetIo";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   findSigningEnvelopeByApplicant,
   insertJobOffer,
@@ -110,12 +111,15 @@ export function canSigningSetFireHired(input: {
  * create a second set; terminal applicants (closed instances) are read-only.
  * @param rawInput - `{ applicantId, companyId? }` (company narrows the
  * required set through the paperwork-template company junction).
+ * @param actorId - Optional acting user id, stamped as `created_by` /
+ * `updated_by` on the rows this call inserts or patches.
  * @returns The (created or adopted) signing set with its required template ids.
  * @throws Error with `SIGNING_SET_ERROR_CODES` on invalid input, unreadable
  * applicant/envelope, a non-creatable applicant state, or a Directus failure.
  */
 export async function ensureSigningSetForFinalApproved(
-  rawInput: unknown
+  rawInput: unknown,
+  actorId?: number
 ): Promise<SigningSetResult> {
   const validation = EnsureSigningSetInputSchema.safeParse(rawInput);
   if (!validation.success) {
@@ -138,6 +142,7 @@ export async function ensureSigningSetForFinalApproved(
       envelope: existing,
       companyId: companyId ?? null,
       status,
+      actorId,
     });
   }
 
@@ -147,7 +152,7 @@ export async function ensureSigningSetForFinalApproved(
     );
   }
 
-  const now = getPhilippineTime();
+  const now = nowUTC();
   const required = await resolveRequiredSigningTemplates(companyId);
   if (required.length === 0) {
     console.warn(
@@ -161,31 +166,40 @@ export async function ensureSigningSetForFinalApproved(
     applicantId,
     requiredCount: required.length,
     now,
+    ...(actorId != null ? { actorId } : {}),
   });
-  let jobOffer = await insertJobOffer({ applicantId, now });
+  let jobOffer = await insertJobOffer({
+    applicantId,
+    now,
+    ...(actorId != null ? { actorId } : {}),
+  });
   const envelope = await insertSigningEnvelope({
     applicantId,
     jobOfferId: jobOffer.id,
     paperworksId: paperworks.id,
     now,
+    ...(actorId != null ? { actorId } : {}),
   });
   paperworks = await patchPaperworksEnvelopeLink({
     paperworksId: paperworks.id,
     envelopeId: envelope.id,
     now,
+    ...(actorId != null ? { actorId } : {}),
   });
   jobOffer = await patchJobOfferEnvelopeLink({
     jobOfferId: jobOffer.id,
     envelopeId: envelope.id,
     now,
+    ...(actorId != null ? { actorId } : {}),
   });
   const items = await insertPaperworkItemsBatch({
     paperworksId: paperworks.id,
     templateIds: required.map((template) => template.id),
     now,
+    ...(actorId != null ? { actorId } : {}),
   });
 
-  await advanceFinalApprovedToForSigning(applicantId, status);
+  await advanceFinalApprovedToForSigning(applicantId, status, actorId);
   return {
     applicantId,
     created: true,

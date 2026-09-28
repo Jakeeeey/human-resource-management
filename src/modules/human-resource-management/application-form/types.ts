@@ -72,18 +72,26 @@ export const CERTIFICATION_AGREEMENT_LINE =
 
 export interface FamilyMemberFields {
     name: string;
-    age: string;
+    date_of_birth: string;
+    is_deceased: boolean;
     occupation: string;
     company: string;
     education: string;
+    contact_number: string;
+    address: string;
+    age: string;
 }
 
 export const EMPTY_FAMILY_MEMBER: FamilyMemberFields = {
     name: "",
-    age: "",
+    date_of_birth: "",
+    is_deceased: false,
     occupation: "",
     company: "",
     education: "",
+    contact_number: "",
+    address: "",
+    age: "",
 };
 
 export interface FamilyDependentRow extends FamilyMemberFields {
@@ -148,6 +156,7 @@ export interface WorkExperienceRow {
     job_title: string;
     date_from: string;
     date_to: string;
+    currently_employed: boolean;
     salary_rate_start: string;
     salary_rate_end: string;
     supervisor_name: string;
@@ -162,6 +171,7 @@ export const EMPTY_WORK_EXPERIENCE: WorkExperienceRow = {
     job_title: "",
     date_from: "",
     date_to: "",
+    currently_employed: false,
     salary_rate_start: "",
     salary_rate_end: "",
     supervisor_name: "",
@@ -326,10 +336,14 @@ export const DEFAULT_APPLICATION_FORM: ApplicationFormValues = {
 export interface SubmitFamilyMember {
     relation: "Father" | "Mother" | "Spouse" | DependentRelation;
     name: string;
+    date_of_birth: string | null;
+    is_deceased: boolean;
     age: number | null;
     occupation: string | null;
     company: string | null;
     education: string | null;
+    contact_number: string | null;
+    address: string | null;
 }
 
 export interface SubmitCompanyRelative {
@@ -363,6 +377,7 @@ export interface SubmitWorkExperience {
     job_title: string | null;
     date_from: string | null;
     date_to: string | null;
+    currently_employed: boolean;
     salary_rate_start: number | null;
     salary_rate_end: number | null;
     supervisor_name: string | null;

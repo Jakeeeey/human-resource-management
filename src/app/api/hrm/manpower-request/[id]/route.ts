@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { manpowerRequestService } from "@/modules/human-resource-management/manpower-request/services/manpowerRequest.service";
 import { ManpowerRequestSchema } from "@/modules/human-resource-management/manpower-request/types";
+import { actorIdFromJwt, nowUTC, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
+import type { JwtPayload } from "@/lib/auth-utils";
 
 const COOKIE_NAME = "vos_access_token";
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
+function decodeJwtPayload(token: string): JwtPayload | null {
     try {
         if (!token) return null;
         const parts = token.split(".");
@@ -44,15 +46,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const cookieStore = await cookies();
         const token = cookieStore.get(COOKIE_NAME)?.value;
         const payload = token ? decodeJwtPayload(token) : null;
-        const userId = payload?.id || payload?.user_id || payload?.sub;
+        const actorId = actorIdFromJwt(payload);
+
+        const existing = await manpowerRequestService.fetchById(id);
+        if (!existing) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+        if ((existing.status ?? "Draft") !== "Draft") {
+            return NextResponse.json({ error: "Only Draft requests can be edited." }, { status: 409 });
+        }
 
         const body = await req.json();
 
-        if (userId) {
-            body.updated_by = typeof userId === "string" ? parseInt(userId) : userId;
-        }
-
-        const validated = ManpowerRequestSchema.partial().parse(body);
+        const EditableSchema = ManpowerRequestSchema.omit({
+            id: true,
+            request_no: true,
+            requesting_department_id: true,
+            requested_by: true,
+            created_by: true,
+            created_at: true,
+            recommending_approval: true,
+            noted_by: true,
+            approved_by: true,
+            status: true,
+        }).partial();
+        const validated = EditableSchema.parse(stampUpdate({ ...body, updated_at: nowUTC() }, actorId));
         const data = await manpowerRequestService.update(id, validated);
         return NextResponse.json(data);
     } catch (e: unknown) {

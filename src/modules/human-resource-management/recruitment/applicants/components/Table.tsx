@@ -18,6 +18,13 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Inbox, SearchX } from "lucide-react";
 import { createColumns, getApplicantStatusColor } from "./columns";
@@ -70,7 +77,6 @@ export function ApplicantsTable({ onSelect }: ApplicantsTableProps) {
     const rows = table.getRowModel().rows;
     const total = applicants.length;
     const hasActiveFilters = filters.search.trim() !== "" || filters.status !== null;
-    const pageCount = table.getPageCount();
     const { pageIndex, pageSize } = table.getState().pagination;
     const showingFrom = total === 0 ? 0 : pageIndex * pageSize + 1;
     const showingTo = Math.min(total, pageIndex * pageSize + rows.length);
@@ -204,8 +210,33 @@ export function ApplicantsTable({ onSelect }: ApplicantsTableProps) {
                 )}
             </div>
 
-            {pageCount > 1 && (
-                <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-4">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Rows per page</span>
+                    <Select
+                        value={String(pageSize)}
+                        onValueChange={(value) => {
+                            table.setPageSize(Number(value));
+                            table.setPageIndex(0);
+                        }}
+                    >
+                        <SelectTrigger
+                            size="sm"
+                            className="w-[90px]"
+                            aria-label="Rows per page"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {[10, 25, 50, 100].map((size) => (
+                                <SelectItem key={size} value={String(size)}>
+                                    {size}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="flex items-center gap-2">
                     <Button
                         variant="outline"
                         size="sm"
@@ -223,7 +254,7 @@ export function ApplicantsTable({ onSelect }: ApplicantsTableProps) {
                         Next
                     </Button>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

@@ -1,4 +1,5 @@
 import type { ManpowerRequest } from "../types";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 const getHeaders = () => {
     return {
@@ -68,9 +69,11 @@ export const manpowerApprovalService = {
     async updateStatus(id: number, status: 'Approved' | 'Rejected', userId?: number): Promise<boolean> {
         try {
             const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/items/manpower_request/${id}`;
-            const bodyData: Record<string, string | number> = { status };
-            const now = new Date().toISOString();
-            
+            const now = nowUTC();
+            const bodyData: Record<string, string | number> = { status, updated_at: now };
+
+            if (userId) bodyData.updated_by = userId;
+
             if (status === 'Approved') {
                 if (userId) bodyData.approved_by = userId;
                 bodyData.approved_at = now;

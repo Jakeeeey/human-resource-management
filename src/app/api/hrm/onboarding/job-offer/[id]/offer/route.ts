@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import {
-  getPhilippineTime,
   isAbsentItemError,
   mapWriteFailure,
   notFound,
@@ -13,6 +12,7 @@ import {
 } from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
 import { JobOfferUpdateSchema } from "@/modules/human-resource-management/onboarding/signing/types/signing-api.schema";
 import { JobOfferSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
+import { actorIdFromJwt, stampUpdate, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +27,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!readSigningSession(req)) return unauthorized();
+    const session = readSigningSession(req);
+    if (!session) return unauthorized();
+    const actorId = actorIdFromJwt(session);
 
     const { id } = await params;
     const offerId = Number(id);
@@ -44,10 +46,10 @@ export async function PATCH(
       return validationFailed(validation.error.flatten().fieldErrors);
     }
 
-    const now = getPhilippineTime();
+    const now = nowUTC();
     const updated = (await dFetch(`/items/job_offer/${offerId}`, {
       method: "PATCH",
-      body: JSON.stringify({ ...validation.data, updated_at: now }),
+      body: JSON.stringify(stampUpdate({ ...validation.data, updated_at: now }, actorId)),
     })) as { data?: unknown; errors?: unknown };
 
     if (updated?.errors || !updated?.data) {

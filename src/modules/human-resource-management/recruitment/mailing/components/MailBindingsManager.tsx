@@ -22,8 +22,12 @@ import { useMailBindings } from "../hooks/useMailBindings";
 import { useMailTemplates } from "../hooks/useMailTemplates";
 import type { MailBindingRow } from "../providers/mailBindingService";
 import { MailCombobox } from "./MailCombobox";
+import { MailingTablePagination } from "./MailingTablePagination";
 
-const EVENT_KEY_OPTIONS = mailEventKeySchema.options.map((key) => ({ value: key, label: key }));
+const MANUAL_ONLY_EVENT_KEYS: readonly MailEventKey[] = ["final_interview.invited"];
+const EVENT_KEY_OPTIONS = mailEventKeySchema.options
+    .filter((key) => !MANUAL_ONLY_EVENT_KEYS.includes(key))
+    .map((key) => ({ value: key, label: key }));
 const CONDITION_OPTIONS = mailSendConditionSchema.options.map((key) => ({ value: key, label: key }));
 
 interface MailBindingsManagerProps {
@@ -33,7 +37,7 @@ interface MailBindingsManagerProps {
 }
 
 /**
- * Bindings manager: 3-key select + condition select + enabled toggle +
+ * Bindings manager: event-key select (auto events only) + condition select + enabled toggle +
  * unhook. Never defaults to an enabled final_interview.invited binding.
  * @param onSendNow - Optional Send-now hook point (todo 12).
  * @returns The bindings table + create form.
@@ -55,6 +59,8 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
     const [templateId, setTemplateId] = useState("");
     const [sendCondition, setSendCondition] = useState<MailSendCondition>("always");
     const [isEnabled, setIsEnabled] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     const templateOptions = useMemo(
         () =>
@@ -124,6 +130,13 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
         );
     }
 
+    const filteredCount = bindings.length;
+    const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const rangeStart = filteredCount === 0 ? 0 : (safePage - 1) * pageSize + 1;
+    const rangeEnd = Math.min(safePage * pageSize, filteredCount);
+    const pagedBindings = bindings.slice((safePage - 1) * pageSize, safePage * pageSize);
+
     return (
         <div className="grid gap-4">
             <div className="grid gap-4 rounded-2xl border border-border/50 bg-card p-5 shadow-sm sm:p-6">
@@ -188,7 +201,7 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {bindings.map((row) => (
+                            {pagedBindings.map((row) => (
                                 <TableRow key={String(row.id)}>
                                     <TableCell className="max-w-56 truncate" title={row.event_key}>
                                         {row.event_key}
@@ -233,6 +246,19 @@ export function MailBindingsManager({ onSendNow }: MailBindingsManagerProps) {
                         </TableBody>
                     </Table>
                 </div>
+                <MailingTablePagination
+                    page={safePage}
+                    pageSize={pageSize}
+                    totalPages={totalPages}
+                    filteredCount={filteredCount}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setPage(1);
+                    }}
+                />
             </div>
         </div>
     );

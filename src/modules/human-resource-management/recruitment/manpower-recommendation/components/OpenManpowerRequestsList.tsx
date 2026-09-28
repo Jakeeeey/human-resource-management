@@ -7,7 +7,9 @@ import { RequestStatusPill } from "./RequestStatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ManpowerRecommendationPagination } from "./ManpowerRecommendationPagination";
 
 import { Eye, FileText } from "lucide-react";
 
@@ -43,6 +45,9 @@ export function OpenManpowerRequestsList() {
     const { recommendations, applicants, openRequests, divisions, isLoading, error, setSelectedRequest, setIsDetailOpen } = context;
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
+    const [showClosed, setShowClosed] = useState(false);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     if (error) {
         return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
@@ -68,15 +73,24 @@ export function OpenManpowerRequestsList() {
 
     const query = search.trim().toLowerCase();
     const views = openRequests.map(toView).filter(({ request, displayStatus }) => {
+        if (!showClosed && displayStatus === "Closed") return false;
         if (query && !`${request.request_no} ${request.position}`.toLowerCase().includes(query)) return false;
         if (statusFilter !== "All" && displayStatus !== statusFilter) return false;
         return true;
     });
 
-    const filtersActive = query !== "" || statusFilter !== "All";
+    const totalPages = Math.max(1, Math.ceil(views.length / pageSize));
+    const safePage = Math.min(page, totalPages);
+    const rangeStart = views.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+    const rangeEnd = Math.min(safePage * pageSize, views.length);
+    const pagedViews = views.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+    const filtersActive = query !== "" || statusFilter !== "All" || showClosed;
     const clearFilters = () => {
         setSearch("");
         setStatusFilter("All");
+        setShowClosed(false);
+        setPage(1);
     };
     const statusFilterLabel = statusFilter === "Approved" ? "open" : statusFilter.toLowerCase();
     const emptyMessage = (): string => {
@@ -106,10 +120,10 @@ export function OpenManpowerRequestsList() {
                     <Input
                         placeholder="Search request no or position..."
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                         className="w-full sm:w-64"
                     />
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }}>
                         <SelectTrigger className="w-full sm:w-36 truncate" aria-label="Filter by status">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -117,9 +131,16 @@ export function OpenManpowerRequestsList() {
                             <SelectItem value="All">All statuses</SelectItem>
                             <SelectItem value="Approved">Open</SelectItem>
                             <SelectItem value="Full">Full</SelectItem>
-                            <SelectItem value="Closed">Closed</SelectItem>
                         </SelectContent>
                     </Select>
+                    <div className="flex items-center gap-2">
+                        <Switch
+                            id="show-closed"
+                            checked={showClosed}
+                            onCheckedChange={(checked) => { setShowClosed(checked); setPage(1); }}
+                        />
+                        <label htmlFor="show-closed" className="text-sm text-muted-foreground cursor-pointer">Show closed</label>
+                    </div>
                 </div>
             </div>
             <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
@@ -154,7 +175,7 @@ export function OpenManpowerRequestsList() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {views.map(({ request, division, recommended, approved, displayStatus }) => (
+                                    {pagedViews.map(({ request, division, recommended, approved, displayStatus }) => (
                                         <TableRow key={request.id} className="hover:bg-muted/40 transition-colors border-border/50 group">
                                             <TableCell className="pl-6 h-16">
                                                 <div className="font-bold text-foreground group-hover:text-primary transition-colors">
@@ -191,7 +212,7 @@ export function OpenManpowerRequestsList() {
                         </div>
                         {/* Mobile: stacked cards keep Status + Details (the only path to detail/recommend) reachable */}
                         <div className="sm:hidden divide-y divide-border/50">
-                            {views.map(({ request, division, recommended, approved, displayStatus }) => (
+                            {pagedViews.map(({ request, division, recommended, approved, displayStatus }) => (
                                 <div key={request.id} className="space-y-3 p-4">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
@@ -214,6 +235,16 @@ export function OpenManpowerRequestsList() {
                         </div>
                     </>
                 )}
+                <ManpowerRecommendationPagination
+                    page={safePage}
+                    pageSize={pageSize}
+                    totalPages={totalPages}
+                    filteredCount={views.length}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+                />
             </div>
         </div>
     );

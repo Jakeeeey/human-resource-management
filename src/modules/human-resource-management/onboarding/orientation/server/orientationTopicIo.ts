@@ -7,6 +7,7 @@ import {
   type OrientationTrack,
 } from "../types/orientation.schema";
 import { syncDerivedTemplateActive } from "./orientationTopicTemplateSync";
+import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 // `orientationTopicCode` (the ONLY topic↔template formula) and
 // `syncDerivedTemplateActive` are re-exported so the store keeps one surface.
@@ -35,10 +36,6 @@ export const ORIENTATION_TOPIC_ERROR_CODES = {
 } as const;
 
 /** PH wall-time, MySQL-compatible `YYYY-MM-DD HH:mm:ss` (conventions §6). */
-export function phTimeNow(): string {
-  return new Date().toLocaleString("sv-SE", { timeZone: "Asia/Manila" });
-}
-
 function fail(code: string, detail: string): never {
   throw new Error(`${code}: ${detail}`);
 }
@@ -243,8 +240,8 @@ export async function softDeleteTopicRow(
 ): Promise<OrientationTopicRow> {
   const row = await patchTopicRow(id, {
     is_active: 0,
-    updated_at: phTimeNow(),
-    updated_by: actorId,
+    updated_at: nowUTC(),
+    ...(actorId != null ? { updated_by: actorId } : {}),
   });
   await syncDerivedTemplateActive(
     { code: row.code, is_active: false },
@@ -263,14 +260,14 @@ export async function reorderTopics(
   entries: readonly TopicOrderEntry[],
   actorId: number | null
 ): Promise<OrientationTopicRow[]> {
-  const now = phTimeNow();
+  const now = nowUTC();
   const updated: OrientationTopicRow[] = [];
   for (const entry of entries) {
     updated.push(
       await patchTopicRow(entry.id, {
         sort_order: entry.sort_order,
         updated_at: now,
-        updated_by: actorId,
+        ...(actorId != null ? { updated_by: actorId } : {}),
       })
     );
   }

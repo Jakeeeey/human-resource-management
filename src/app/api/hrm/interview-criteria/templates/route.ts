@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { cookies } from "next/headers";
+import { actorIdFromJwt, nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const LIMIT = 1000;
@@ -76,7 +79,7 @@ async function clearOtherDefaultsForStage(stage: string, exceptId: number) {
         others.map((t) =>
             dFetch(`/items/interview_criteria_template/${t.id}`, {
                 method: "PATCH",
-                body: JSON.stringify({ is_default_for_stage: false }),
+                body: JSON.stringify({ is_default_for_stage: false, updated_at: nowUTC() }),
             })
         )
     );
@@ -157,15 +160,22 @@ export async function POST(req: NextRequest) {
         [key: string]: unknown;
     };
 
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const payload = token ? decodeJwtPayload(token) : null;
+    const actorId = actorIdFromJwt(payload);
+
     const validationError = validateCriteria(String(templateData.stage ?? ""), criteria || []);
     if (validationError) {
         return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
     try {
+        const now = nowUTC();
         const created = await dFetch(`/items/interview_criteria_template`, {
             method: "POST",
-            body: JSON.stringify(templateData),
+            body: JSON.stringify(
+                stampCreate({ ...templateData, created_at: now, updated_at: now }, actorId)
+            ),
         });
 
         const templateId = created?.data?.id;
@@ -195,6 +205,10 @@ export async function PATCH(req: NextRequest) {
         [key: string]: unknown;
     };
 
+    const token = (await cookies()).get(COOKIE_NAME)?.value;
+    const payload = token ? decodeJwtPayload(token) : null;
+    const actorId = actorIdFromJwt(payload);
+
     try {
         if (Array.isArray(criteria)) {
             let effectiveStage = rest.stage;
@@ -212,7 +226,9 @@ export async function PATCH(req: NextRequest) {
 
         await dFetch(`/items/interview_criteria_template/${id}`, {
             method: "PATCH",
-            body: JSON.stringify(rest),
+            body: JSON.stringify(
+                stampUpdate({ ...rest, updated_at: nowUTC() }, actorId)
+            ),
         });
 
         if (Array.isArray(criteria)) {
