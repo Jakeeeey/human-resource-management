@@ -61,6 +61,20 @@ function numberPxProp(node: CanvasNode, key: string): string | undefined {
     return typeof value === "number" && Number.isFinite(value) ? `${value}px` : undefined;
 }
 
+function msAssetIdFromSrc(value: string): string | null {
+    const match =
+        /\/assets\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/.exec(
+            value,
+        );
+    const id = match?.[1];
+    return typeof id === "string" && id.length > 0 ? id : null;
+}
+
+function msMailImageSrc(value: string): string {
+    const id = msAssetIdFromSrc(value);
+    return id === null ? value : `cid:${id}`;
+}
+
 // Fidelity-contract style readers — every key resolves props → theme
 // default (shared `resolveStyleValue`), so export emits exactly what the
 // canvas renders, including for pre-style docs with no style keys.
@@ -186,7 +200,7 @@ function contentOf(doc: CanvasDoc, node: CanvasNode): string {
             const border = styleBorderProp(node);
             const radius = stylePxProp(node, "radius");
             return (
-                `<mj-image src="${escapeAttr(stringProp(node, "src"))}"` +
+                `<mj-image src="${escapeAttr(msMailImageSrc(stringProp(node, "src")))}"` +
                 ` alt="${escapeAttr(stringProp(node, "alt"))}"` +
                 (width ? ` width="${width}"` : "") +
                 (height ? ` height="${height}"` : "") +
@@ -274,12 +288,14 @@ export async function compileCanvasDoc(
         }
     }
 
-    // (e) http:// image src loads on canvas but risks mixed-content blocking
-    // in external inboxes — warn, don't block (schema already gates schemes).
     for (const node of displayOrder) {
         if (node.type !== "image") continue;
         const src = node.props.src;
-        if (typeof src === "string" && src.toLowerCase().startsWith("http://")) {
+        if (
+            typeof src === "string" &&
+            src.toLowerCase().startsWith("http://") &&
+            msAssetIdFromSrc(src) === null
+        ) {
             warnings.push(`http-image:${node.id} non-https src may block in external inboxes`);
         }
     }

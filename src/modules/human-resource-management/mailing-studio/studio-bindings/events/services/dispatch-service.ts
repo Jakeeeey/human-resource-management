@@ -1,4 +1,6 @@
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { compileCanvasDoc } from "@/modules/human-resource-management/mailing-studio/studio-templates/designer/services/export-service";
+import type { CanvasDoc } from "@/modules/human-resource-management/mailing-studio/studio-templates/designer/types/canvas-doc.schema";
 import {
     getMsMailConfigStatus,
     getMsMailTransport,
@@ -9,6 +11,12 @@ import { resolveRecipient } from "../utils/recipient";
 import { renderTemplate } from "../utils/template-render";
 import { msAssertMailableHtml, msHasForbiddenMailHtml } from "../utils/ms-html-scrub";
 import { mailHtmlToText } from "../utils/ms-mail-text";
+import {
+    MS_INLINE_IMAGE_WARN_BYTES,
+    fetchMsAssetBytes,
+    msAssetFilename,
+    msCidRefsInHtml,
+} from "./ms-asset-fetch";
 
 export interface DispatchInput {
     payload?: Record<string, unknown>;
@@ -40,11 +48,39 @@ interface BindingRow {
     is_enabled: boolean;
 }
 
-interface TemplateRow {
+export interface TemplateRow {
     id: string | number;
     subject: string;
     body_html: string;
+    design_json: string | null;
     is_active: boolean;
+}
+
+export interface ResolvedTemplateBody {
+    html: string;
+    warnings: string[];
+}
+
+export async function resolveTemplateBodyHtml(template: TemplateRow): Promise<ResolvedTemplateBody> {
+    const raw = template.design_json;
+    if (typeof raw !== "string" || raw.trim() === "") {
+        return {
+            html: template.body_html,
+            warnings: [`design-recompile-failed:${String(template.id)}`],
+        };
+    }
+    try {
+        const doc: unknown = JSON.parse(raw);
+        const result = await compileCanvasDoc(doc as CanvasDoc, {
+            subject: template.subject,
+        });
+        return { html: result.html, warnings: result.warnings };
+    } catch {
+        return {
+            html: template.body_html,
+            warnings: [`design-recompile-failed:${String(template.id)}`],
+        };
+    }
 }
 
 const sendTimestamps: number[] = [];
@@ -118,7 +154,7 @@ export async function fetchActiveTemplate(templateId: string | number): Promise<
     try {
         const res = (await dFetch(
             `/items/ms_templates/${encodeURIComponent(String(templateId))}` +
-                "?fields=id,subject,body_html,is_active"
+                "?fields=id,subject,body_html,design_json,is_active"
         )) as { data?: Record<string, unknown> };
         if (!isRecord(res?.data)) return null;
         const row = res.data;
@@ -128,6 +164,7 @@ export async function fetchActiveTemplate(templateId: string | number): Promise<
             id: (row.id as string | number) ?? templateId,
             subject: row.subject,
             body_html: row.body_html,
+            design_json: typeof row.design_json === "string" ? row.design_json : null,
             is_active: true,
         };
     } catch (error) {
@@ -262,9 +299,14 @@ export async function dispatchMail(
             };
         }
 
+        const resolvedBody = await resolveTemplateBodyHtml(template);
         const renderedSubject = renderTemplate(template.subject, { payload });
-        const renderedBody = renderTemplate(template.body_html, { payload });
-        const warnings = [...renderedSubject.warnings, ...renderedBody.warnings];
+        const renderedBody = renderTemplate(resolvedBody.html, { payload });
+        const warnings = [
+            ...resolvedBody.warnings,
+            ...renderedSubject.warnings,
+            ...renderedBody.warnings,
+        ];
         const finalSubject = renderedSubject.html;
         const finalBody = renderedBody.html;
 
@@ -324,6 +366,34 @@ export async function dispatchMail(
         }
 
         let sendError: string | null = null;
+        const inlineCids = msCidRefsInHtml(finalBody);
+        const inlineAttachments: {
+            cid: string;
+            filename: string;
+            content: Buffer;
+            contentType: string;
+        }[] = [];
+        let inlineBytesTotal = 0;
+        for (const assetId of inlineCids) {
+            try {
+                const asset = await fetchMsAssetBytes(assetId);
+                inlineAttachments.push({
+                    cid: assetId,
+                    filename: msAssetFilename(assetId, asset.contentType),
+                    content: asset.bytes,
+                    contentType: asset.contentType,
+                });
+                inlineBytesTotal += asset.size;
+            } catch (error) {
+                msLogRedacted("[dispatch-service] inline image fetch failed:", error);
+                warnings.push(`inline-image:${assetId} unavailable, sent without attachment`);
+            }
+        }
+        if (inlineBytesTotal > MS_INLINE_IMAGE_WARN_BYTES) {
+            warnings.push(
+                `inline-images:oversize total ${inlineBytesTotal} bytes exceeds ${MS_INLINE_IMAGE_WARN_BYTES} budget`
+            );
+        }
         try {
             const { transporter } = await getMsMailTransport();
             const fromName = (process.env.MAIL_FROM_NAME ?? "").trim();
@@ -334,6 +404,7 @@ export async function dispatchMail(
                 subject: finalSubject,
                 text: textBody,
                 html: finalBody,
+                attachments: inlineAttachments,
             });
         } catch (error) {
             msLogRedacted("[dispatch-service] send failed:", error);

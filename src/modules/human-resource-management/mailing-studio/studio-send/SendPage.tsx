@@ -23,7 +23,9 @@ import { useMsCatalog } from "./hooks/useMsCatalog";
 import { useMsSend } from "./hooks/useMsSend";
 import { useMsTemplates } from "./hooks/useMsTemplates";
 import { msGet } from "./providers/msApi";
+import { previewDesign } from "./providers/designService";
 import { renderTemplate } from "./utils/template-render";
+import { msCidHtmlToPreviewHtml } from "./utils/ms-preview-images";
 import { parseJsonDocument } from "./utils/ms-variables";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -183,6 +185,32 @@ export function SendPage() {
         );
     }, [templates.data, templateId]);
 
+    const designJsonText = selectedTemplate?.design_json ?? null;
+    const subjectText = selectedTemplate?.subject ?? "";
+    const [compiled, setCompiled] = useState<{ source: string | null; html: string | null }>({
+        source: null,
+        html: null,
+    });
+
+    useEffect(() => {
+        let live = true;
+        if (typeof designJsonText !== "string" || designJsonText.trim() === "") return;
+        const source = designJsonText;
+        previewDesign(source, subjectText !== "" ? subjectText : undefined)
+            .then((result) => {
+                if (live) setCompiled({ source, html: result.html });
+            })
+            .catch(() => {
+                if (live) setCompiled({ source, html: null });
+            });
+        return () => {
+            live = false;
+        };
+    }, [designJsonText, subjectText]);
+
+    const compiledBody = compiled.source === designJsonText ? compiled.html : null;
+    const bodySource = compiledBody ?? selectedTemplate?.body_html ?? "";
+
     const templateVariables = useMemo(() => {
         const raw = selectedTemplate?.variables;
         if (!Array.isArray(raw)) return [];
@@ -236,8 +264,12 @@ export function SendPage() {
     }, [selectedTemplate, previewPayload]);
 
     const renderedBody = useMemo(() => {
-        return renderTemplate(selectedTemplate?.body_html ?? "", { payload: previewPayload });
-    }, [selectedTemplate, previewPayload]);
+        return renderTemplate(bodySource, { payload: previewPayload });
+    }, [bodySource, previewPayload]);
+
+    const previewBodyHtml = useMemo(() => {
+        return msCidHtmlToPreviewHtml(renderedBody.html, designJsonText);
+    }, [renderedBody, designJsonText]);
 
     const previewWarnings = useMemo(() => {
         return [...new Set([...renderedSubject.warnings, ...renderedBody.warnings])];
@@ -274,7 +306,7 @@ export function SendPage() {
             return;
         }
         const rendered = renderTemplate(selectedTemplate?.subject ?? "", { payload: sendPayload });
-        const renderedBodyNow = renderTemplate(selectedTemplate?.body_html ?? "", { payload: sendPayload });
+        const renderedBodyNow = renderTemplate(bodySource, { payload: sendPayload });
         const subject = rendered.html;
         const bodyHtml = renderedBodyNow.html;
         await sendManual({
@@ -462,7 +494,7 @@ export function SendPage() {
                                 <div className="overflow-hidden rounded-lg border">
                                     <iframe
                                         sandbox=""
-                                        srcDoc={renderedBody.html}
+                                        srcDoc={previewBodyHtml}
                                         style={{ border: 0, display: "block", height: 420, width: "100%" }}
                                         title="Rendered email body"
                                     />

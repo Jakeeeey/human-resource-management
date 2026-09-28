@@ -4,9 +4,16 @@ import { z } from "zod";
 import {
     fetchActiveTemplate,
     getPhilippineTime,
+    resolveTemplateBodyHtml,
     takeRateSlot,
     writeOutboxRow,
 } from "@/modules/human-resource-management/mailing-studio/studio-bindings/events/services/dispatch-service";
+import {
+    MS_INLINE_IMAGE_WARN_BYTES,
+    fetchMsAssetBytes,
+    msAssetFilename,
+    msCidRefsInHtml,
+} from "@/modules/human-resource-management/mailing-studio/studio-bindings/events/services/ms-asset-fetch";
 import {
     getMsMailConfigStatus,
     getMsMailTransport,
@@ -136,12 +143,16 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // Send-only overrides (never persisted): override ?? template value.
-        // Canvas HTML is final — no {{var}} renderer — so the strings go
-        // through the server scrub re-assert as-is.
         const finalSubject = subject ?? template.subject;
-        const finalBody = body_html ?? template.body_html;
         const warnings = ["manual-send"];
+        let finalBody: string;
+        if (body_html !== undefined) {
+            finalBody = body_html;
+        } else {
+            const resolved = await resolveTemplateBodyHtml(template);
+            finalBody = resolved.html;
+            warnings.push(...resolved.warnings);
+        }
 
         const forbiddenReason = msAssertMailableHtml(finalBody);
         if (msHasForbiddenMailHtml(finalBody) || forbiddenReason) {
@@ -219,6 +230,34 @@ export async function POST(req: NextRequest) {
         }
 
         let sendError: string | null = null;
+        const inlineCids = msCidRefsInHtml(finalBody);
+        const inlineAttachments: {
+            cid: string;
+            filename: string;
+            content: Buffer;
+            contentType: string;
+        }[] = [];
+        let inlineBytesTotal = 0;
+        for (const assetId of inlineCids) {
+            try {
+                const asset = await fetchMsAssetBytes(assetId);
+                inlineAttachments.push({
+                    cid: assetId,
+                    filename: msAssetFilename(assetId, asset.contentType),
+                    content: asset.bytes,
+                    contentType: asset.contentType,
+                });
+                inlineBytesTotal += asset.size;
+            } catch (error) {
+                msLogRedacted("[mailing-studio-manual-send] inline image fetch failed:", error);
+                warnings.push(`inline-image:${assetId} unavailable, sent without attachment`);
+            }
+        }
+        if (inlineBytesTotal > MS_INLINE_IMAGE_WARN_BYTES) {
+            warnings.push(
+                `inline-images:oversize total ${inlineBytesTotal} bytes exceeds ${MS_INLINE_IMAGE_WARN_BYTES} budget`
+            );
+        }
         try {
             const { transporter } = await getMsMailTransport();
             const fromName = (process.env.MAIL_FROM_NAME ?? "").trim();
@@ -229,6 +268,7 @@ export async function POST(req: NextRequest) {
                 subject: finalSubject,
                 text: textBody,
                 html: finalBody,
+                attachments: inlineAttachments,
             });
         } catch (error) {
             msLogRedacted("[mailing-studio-manual-send] send failed:", error);

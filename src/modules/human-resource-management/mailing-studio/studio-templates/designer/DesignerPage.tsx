@@ -55,6 +55,7 @@ import { useDesignAutosave, type DesignAutosaveStatus } from "./hooks/useDesignA
 import { getDesign, previewDesign, sendCompiledTest } from "../providers/designService";
 import { fetchMsCatalog } from "./providers/msCatalog";
 import { canvasDocSchema, defaultBlockProps, type CanvasNode, type CanvasNodeType } from "./types/canvas-doc.schema";
+import { msCidHtmlToPreviewHtml } from "./utils/ms-preview-images";
 import { type MsCatalogRow } from "../types/ms-catalog.schema";
 import { MS_TEMPLATE_KEY_HINT, MS_TEMPLATE_KEY_PATTERN } from "../utils/ms-template-key";
 import { extractPayloadExample } from "../utils/ms-variables";
@@ -981,7 +982,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
             try {
                 const result = await previewDesign(designJson, subject, eventKey);
                 if (result.sampleKey) {
-                    setPreviewHtml(result.html);
+                    setPreviewHtml(msCidHtmlToPreviewHtml(result.html, designJson));
                     setPreviewWarnings(result.warnings);
                     setPreviewSampleKey(result.sampleKey);
                 } else {
@@ -990,7 +991,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                             ? rows.find((row) => row.event_key === eventKey)
                             : undefined) ?? null;
                     const applied = applyPreviewSample(result.html, result.warnings, pick);
-                    setPreviewHtml(applied.html);
+                    setPreviewHtml(msCidHtmlToPreviewHtml(applied.html, designJson));
                     setPreviewWarnings(applied.warnings);
                     setPreviewSampleKey(applied.sampleKey);
                 }
