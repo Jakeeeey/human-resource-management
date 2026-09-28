@@ -214,8 +214,6 @@ function contentOf(doc: CanvasDoc, node: CanvasNode): string {
             );
         }
         case "button": {
-            // P0-2: editor/chips write props.text (PropertyPanel Label → updateProps
-            // { text }); fall back to props.label for legacy docs.
             const label = stringProp(node, "text") || stringProp(node, "label");
             const href = stringProp(node, "href");
             return (

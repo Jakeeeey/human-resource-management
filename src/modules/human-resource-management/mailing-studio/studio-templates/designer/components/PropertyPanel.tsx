@@ -11,25 +11,12 @@ import { cn } from "@/lib/utils";
 
 import { useCanvasDoc } from "../hooks/useCanvasDoc";
 import { MS_IMAGE_UPLOAD_TYPES, uploadImage } from "../../providers/designService";
-import { extractTemplateTokens } from "../../utils/template-render";
-import { extractPayloadKeys, parseJsonDocument } from "../../utils/ms-variables";
-import type { MsCatalogRow } from "../../types/ms-catalog.schema";
-import { MsCombobox } from "./MsCombobox";
-import { MsRichTextField } from "./MsRichTextField";
 import {
     defaultBlockProps,
     type BlockAlign,
     type CanvasNode,
 } from "../types/canvas-doc.schema";
 import { layerLabel } from "./LayersPanel";
-
-/**
- * Live properties panel (T8c): edits the first selected node through the store.
- * Content fields go through updateProps; geometry through move/resize/rotateNode.
- * Every field wraps focus→blur in beginGesture/endGesture so a typing session
- * coalesces to ONE history entry. Image src is validated to the canvas-doc
- * https-only rule before it is committed (cid:/data:/http:/.svg stay inline errors).
- */
 
 function Section({
     title,
@@ -341,201 +328,11 @@ function AlignField({ node }: { readonly node: CanvasNode }) {
     );
 }
 
-function TextContentField({ node }: { readonly node: CanvasNode }) {
-    return (
-        <div className="col-span-2 space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Text</span>
-            <MsRichTextField node={node} />
-        </div>
-    );
-}
-
-function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function variableTypeLabel(name: string, schema: unknown): string {
-    const doc = parseJsonDocument(schema);
-    if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return name;
-    const properties = (doc as Record<string, unknown>)["properties"];
-    if (typeof properties !== "object" || properties === null || Array.isArray(properties))
-        return name;
-    const entry = (properties as Record<string, unknown>)[name];
-    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return name;
-    const type = (entry as Record<string, unknown>)["type"];
-    return typeof type === "string" && type.length > 0 ? `${name} · ${type}` : name;
-}
-
-interface VariablesSectionProps {
-    readonly node: CanvasNode;
-    readonly catalog?: readonly MsCatalogRow[];
-    readonly variableEventKey?: string;
-    readonly onVariableEventChange?: (value: string) => void;
-}
-
-function VariablesSection({
-    node,
-    catalog = [],
-    variableEventKey = "",
-    onVariableEventChange,
-}: VariablesSectionProps) {
-    const eventId = useId();
-    const variableId = useId();
-    const updateProps = useCanvasDoc((state) => state.updateProps);
-    const [variableName, setVariableName] = useState("");
-    const [prevEventKey, setPrevEventKey] = useState(variableEventKey);
-    const [prevNodeId, setPrevNodeId] = useState(node.id);
-    if (prevEventKey !== variableEventKey) {
-        setPrevEventKey(variableEventKey);
-        setVariableName("");
-    }
-    if (prevNodeId !== node.id) {
-        setPrevNodeId(node.id);
-        setVariableName("");
-    }
-
-    const text = typeof node.props.text === "string" ? node.props.text : "";
-    const tokens = extractTemplateTokens(text);
-    const selectedRow = catalog.find((row) => row.event_key === variableEventKey) ?? null;
-    const variableNames = selectedRow
-        ? extractPayloadKeys(selectedRow.payload_schema, selectedRow.payload_example)
-        : [];
-    const eventOptions = catalog.map((row) => ({
-        value: row.event_key,
-        label: row.label ? `${row.event_key} — ${row.label}` : row.event_key,
-    }));
-    const variableOptions = variableNames.map((name) => ({
-        value: name,
-        label: selectedRow ? variableTypeLabel(name, selectedRow.payload_schema) : name,
-    }));
-
-    const insertToken = (key: string): void => {
-        const separator =
-            text.length === 0 || text.endsWith(" ") || text.endsWith("\n") ? "" : " ";
-        updateProps(node.id, { text: `${text}${separator}{{${key}}}` });
-    };
-
-    const handleAdd = (): void => {
-        if (variableName === "") return;
-        insertToken(variableName);
-        setVariableName("");
-    };
-
-    const removeToken = (key: string): void => {
-        const pattern = new RegExp(
-            `\\{\\{\\s*(payload\\.)?${escapeRegExp(key)}\\s*\\}\\}`,
-            "g",
-        );
-        updateProps(node.id, { text: text.replace(pattern, "") });
-    };
-
-    return (
-        <div className="col-span-2 flex flex-col gap-2.5">
-            <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium text-muted-foreground" htmlFor={eventId}>
-                    Event
-                </Label>
-                <MsCombobox
-                    ariaLabel="Variable event"
-                    emptyText="No events found."
-                    id={eventId}
-                    options={eventOptions}
-                    placeholder="Select event…"
-                    searchPlaceholder="Search events…"
-                    value={variableEventKey}
-                    onValueChange={(next) => onVariableEventChange?.(next)}
-                />
-            </div>
-            <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium text-muted-foreground" htmlFor={variableId}>
-                    Variable
-                </Label>
-                {variableEventKey === "" ? (
-                    <>
-                        <MsCombobox
-                            ariaLabel="Variable name"
-                            disabled
-                            emptyText="No variables found."
-                            id={variableId}
-                            options={[]}
-                            placeholder="Select variable…"
-                            value=""
-                            onValueChange={setVariableName}
-                        />
-                        <p className="text-[11px] leading-snug text-muted-foreground">
-                            Pick an event to see its variables.
-                        </p>
-                    </>
-                ) : variableNames.length === 0 ? (
-                    <p className="text-[11px] leading-snug text-muted-foreground">
-                        This event has no variables registered yet.
-                    </p>
-                ) : (
-                    <>
-                        <MsCombobox
-                            ariaLabel="Variable name"
-                            emptyText="No variables found."
-                            id={variableId}
-                            options={variableOptions}
-                            placeholder="Select variable…"
-                            searchPlaceholder="Search variables…"
-                            value={variableName}
-                            onValueChange={setVariableName}
-                        />
-                        <Button
-                            aria-label="Add variable to block"
-                            disabled={variableName === ""}
-                            size="sm"
-                            type="button"
-                            onClick={handleAdd}
-                        >
-                            Add
-                        </Button>
-                    </>
-                )}
-            </div>
-            {tokens.length > 0 ? (
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                        In this block
-                    </span>
-                    <div className="flex flex-wrap gap-1" data-testid="block-tokens">
-                        {tokens.map((token) => (
-                            <span
-                                className="flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-                                key={token}
-                            >
-                                {`{{${token}}}`}
-                                <button
-                                    aria-label={`Remove variable ${token}`}
-                                    className="font-sans text-xs leading-none transition-colors duration-150 hover:text-primary"
-                                    type="button"
-                                    onClick={() => removeToken(token)}
-                                >
-                                    ×
-                                </button>
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            ) : null}
-        </div>
-    );
-}
-
 interface PropertyPanelProps {
     readonly sheet?: boolean;
-    readonly catalog?: readonly MsCatalogRow[];
-    readonly variableEventKey?: string;
-    readonly onVariableEventChange?: (value: string) => void;
 }
 
-export function PropertyPanel({
-    sheet = false,
-    catalog = [],
-    variableEventKey = "",
-    onVariableEventChange,
-}: PropertyPanelProps) {
+export function PropertyPanel({ sheet = false }: PropertyPanelProps) {
     const nodes = useCanvasDoc((state) => state.nodes);
     const selection = useCanvasDoc((state) => state.selection);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
@@ -614,12 +411,6 @@ export function PropertyPanel({
             </nav>
 
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
-                {node.type === "text" ? (
-                    <Section title="Content">
-                        <TextContentField node={node} />
-                    </Section>
-                ) : null}
-
                 {node.type === "button" ? (
                     <Section title="Content">
                         <StringField
@@ -631,17 +422,6 @@ export function PropertyPanel({
                             label="Href"
                             value={typeof node.props.href === "string" ? node.props.href : ""}
                             onCommit={(next) => updateProps(node.id, { href: next })}
-                        />
-                    </Section>
-                ) : null}
-
-                {node.type === "text" || node.type === "button" ? (
-                    <Section title="Variables">
-                        <VariablesSection
-                            catalog={catalog}
-                            node={node}
-                            variableEventKey={variableEventKey}
-                            onVariableEventChange={onVariableEventChange}
                         />
                     </Section>
                 ) : null}

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 
 import { clampZoom, useCanvasDoc } from "../hooks/useCanvasDoc";
 import type { CanvasNode } from "../types/canvas-doc.schema";
+import type { MsCatalogRow } from "../../types/ms-catalog.schema";
 import CanvasNodeView from "./CanvasNodeView";
 import { type CanvasBadge, nodeBadges } from "./canvas-badges";
 
@@ -102,14 +103,21 @@ function EmptyCanvasCta({ onBrowse }: { readonly onBrowse: () => void }) {
 export function StageCanvas({
     width = 600,
     onEmptyAdd,
+    catalog = [],
+    variableEventKey = "",
+    onVariableEventChange,
 }: {
     readonly width?: number;
     readonly onEmptyAdd?: () => void;
+    readonly catalog?: readonly MsCatalogRow[];
+    readonly variableEventKey?: string;
+    readonly onVariableEventChange?: (value: string) => void;
 }) {
     const nodes = useCanvasDoc((state) => state.nodes);
     const rootIds = useCanvasDoc((state) => state.rootIds);
     const selection = useCanvasDoc((state) => state.selection);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
+    const editingId = useCanvasDoc((state) => state.editingId);
     const zoom = useCanvasDoc((state) => state.viewport.zoom);
 
     const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);
@@ -261,6 +269,12 @@ export function StageCanvas({
                     data-stage="canvas"
                     style={{ width, minWidth: width, maxWidth: width, minHeight: 2000, zoom }}
                     onPointerDown={(event) => {
+                        if (editingId !== null) {
+                            const store = useCanvasDoc.getState();
+                            store.endGesture();
+                            store.setEditingId(null);
+                            return;
+                        }
                         if (event.target === event.currentTarget && !event.shiftKey) {
                             selectNodes([]);
                         }
@@ -276,14 +290,17 @@ export function StageCanvas({
                             return (
                                 <CanvasNodeView
                                     badgesById={badgesById}
+                                    catalog={catalog}
                                     key={id}
                                     node={node}
                                     nodes={nodes}
+                                    variableEventKey={variableEventKey}
+                                    onVariableEventChange={onVariableEventChange}
                                 />
                             );
                         })
                     )}
-                    <CanvasMoveable stageEl={stageEl} targetId={firstSelected} width={width} />
+                    <CanvasMoveable stageEl={stageEl} targetId={firstSelected} width={width} editing={editingId !== null} />
                 </div>
             </div>
         </div>

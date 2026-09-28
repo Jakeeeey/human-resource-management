@@ -14,6 +14,7 @@ interface CanvasMoveableProps {
     readonly stageEl: HTMLDivElement | null;
     readonly targetId: string | null;
     readonly width: number;
+    readonly editing: boolean;
 }
 
 interface ResizeCommit {
@@ -116,7 +117,7 @@ function applyRowSnap(
  * - Selecto marquee multi-selects `.canvas-block` targets; shift unions.
  * Loaded client-only via dynamic(..., { ssr: false }) from StageCanvas.
  */
-export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMoveableProps) {
+export default function CanvasMoveable({ stageEl, targetId, width, editing }: CanvasMoveableProps) {
     const beginGesture = useCanvasDoc((state) => state.beginGesture);
     const endGesture = useCanvasDoc((state) => state.endGesture);
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
@@ -204,6 +205,7 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                     // selecto evaluates before emit/isTrusted branching.
                     const target = event.inputEvent?.target as HTMLElement | null | undefined;
                     if (!target) return true;
+                    if (target.closest("[data-ms-editing]")) return false;
                     if (target.closest("[class*='moveable-']")) return false;
                     const block = target.closest<HTMLElement>(".canvas-block");
                     // Union-bbox hitbox: a press on ANY selected block belongs
@@ -216,10 +218,10 @@ export default function CanvasMoveable({ stageEl, targetId, width }: CanvasMovea
                 }}
                 ref={selectoRef}
                 selectableTargets={[".canvas-block"]}
-                selectByClick
+                selectByClick={!editing}
                 toggleContinueSelect={["shift"]}
             />
-            {isGroup ? (
+            {editing ? null : isGroup ? (
                 <Moveable
                     bounds={{ left: 0, top: 0, right: width, bottom: 2000 }}
                     container={stageEl}

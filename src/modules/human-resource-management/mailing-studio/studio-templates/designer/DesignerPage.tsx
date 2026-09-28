@@ -1455,12 +1455,14 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                     />
                 ) : null}
                 {panel === "help" ? <HelpPanel /> : null}
-                <StageCanvas width={width} onEmptyAdd={() => setPanel("elements")} />
-                <PropertyPanel
+                <StageCanvas
                     catalog={variableCatalog}
                     variableEventKey={variableEventKey}
+                    width={width}
+                    onEmptyAdd={() => setPanel("elements")}
                     onVariableEventChange={handleVariableEventChange}
                 />
+                <PropertyPanel />
                 {propsOpen ? (
                     <div className="fixed inset-0 z-40 2xl:hidden">
                         <button
@@ -1470,12 +1472,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                             onClick={() => setPropsOpen(false)}
                         />
                         <div className="absolute bottom-0 right-0 top-0 flex max-h-[100dvh] w-[280px] flex-col overflow-hidden border-l bg-card shadow-xl">
-                            <PropertyPanel
-                                catalog={variableCatalog}
-                                sheet
-                                variableEventKey={variableEventKey}
-                                onVariableEventChange={handleVariableEventChange}
-                            />
+                            <PropertyPanel sheet />
                         </div>
                     </div>
                 ) : null}

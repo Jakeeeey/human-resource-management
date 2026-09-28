@@ -25,8 +25,8 @@ export interface CanvasDocState {
     selection: string[];
     hover: string | null;
     viewport: CanvasViewport;
-    /** Canvas snap-to-sibling guides (P1-13). UI pref — never enters history. */
     snapEnabled: boolean;
+    editingId: string | null;
     version: number;
     gestureActive: boolean;
     gesturePre: CanvasHistory | null;
@@ -41,6 +41,7 @@ export interface CanvasDocState {
     reorderNode: (id: string, direction: "up" | "down") => void;
     selectNodes: (ids: string[]) => void;
     setHover: (id: string | null) => void;
+    setEditingId: (id: string | null) => void;
     setViewport: (patch: Partial<CanvasViewport>) => void;
     setSnapEnabled: (enabled: boolean) => void;
     beginGesture: () => void;
@@ -101,6 +102,7 @@ export function createCanvasDocStore() {
                     hover: null,
                     viewport: { zoom: 1, panX: 0, panY: 0 },
                     snapEnabled: true,
+                    editingId: null,
                     version: 0,
                     gestureActive: false,
                     gesturePre: null,
@@ -244,6 +246,10 @@ export function createCanvasDocStore() {
 
                     setHover: (id) => {
                         set({ hover: id });
+                    },
+
+                    setEditingId: (id) => {
+                        set({ editingId: id });
                     },
 
                     setViewport: (patch) => {

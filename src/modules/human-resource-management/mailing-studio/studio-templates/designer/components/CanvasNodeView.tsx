@@ -8,14 +8,25 @@ import {
 } from "../types/canvas-doc.schema";
 import { sanitizeMsInlineHtml } from "../utils/ms-inline-html-sanitize";
 import { cn } from "@/lib/utils";
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 import type { CanvasBadge } from "./canvas-badges";
 import { layerLabel } from "./LayersPanel";
+import { MsInlineEditor, type MsInlineEditorHandle } from "./MsInlineEditor";
+import type { MsCatalogRow } from "../../types/ms-catalog.schema";
 
 interface CanvasNodeViewProps {
     readonly node: CanvasNode;
     readonly nodes: Readonly<Record<string, CanvasNode>>;
     readonly badgesById: Readonly<Record<string, readonly CanvasBadge[]>>;
+    readonly catalog?: readonly MsCatalogRow[];
+    readonly variableEventKey?: string;
+    readonly onVariableEventChange?: (value: string) => void;
+}
+
+interface CanvasVariableProps {
+    readonly catalog?: readonly MsCatalogRow[];
+    readonly variableEventKey?: string;
+    readonly onVariableEventChange?: (value: string) => void;
 }
 
 /** Live canvas rendering of block style props — resolves through the shared
@@ -55,29 +66,88 @@ function blockStyle(node: CanvasNode): CSSProperties {
     return style;
 }
 
-function NodeBody({ node }: { readonly node: CanvasNode }) {
-    switch (node.type) {
-        case "text": {
-            const stored = typeof node.props.text === "string" ? node.props.text : "";
-            const html = sanitizeMsInlineHtml(stored);
-            if (html === "") {
-                return (
-                    <p
-                        className="h-full w-full overflow-hidden p-1.5 text-sm leading-relaxed text-foreground"
-                        style={blockStyle(node)}
-                    >
-                        Text
-                    </p>
-                );
-            }
+function TextBody({ node, catalog, variableEventKey, onVariableEventChange }: { readonly node: CanvasNode } & CanvasVariableProps) {
+    const editingId = useCanvasDoc((state) => state.editingId);
+    const setEditingId = useCanvasDoc((state) => state.setEditingId);
+    const updateProps = useCanvasDoc((state) => state.updateProps);
+    const beginGesture = useCanvasDoc((state) => state.beginGesture);
+    const endGesture = useCanvasDoc((state) => state.endGesture);
+    const editorRef = useRef<MsInlineEditorHandle | null>(null);
+    const stored = typeof node.props.text === "string" ? node.props.text : "";
+
+    if (editingId !== node.id) {
+        const html = sanitizeMsInlineHtml(stored);
+        const enterEdit = (): void => {
+            const store = useCanvasDoc.getState();
+            store.endGesture();
+            store.setEditingId(node.id);
+        };
+        if (html === "") {
             return (
                 <p
                     className="h-full w-full overflow-hidden p-1.5 text-sm leading-relaxed text-foreground"
                     style={blockStyle(node)}
-                    dangerouslySetInnerHTML={{ __html: html }}
-                />
+                    onDoubleClick={enterEdit}
+                >
+                    Text
+                </p>
             );
         }
+        return (
+            <p
+                className="h-full w-full overflow-hidden p-1.5 text-sm leading-relaxed text-foreground"
+                style={blockStyle(node)}
+                dangerouslySetInnerHTML={{ __html: html }}
+                onDoubleClick={enterEdit}
+            />
+        );
+    }
+
+    const flipBelow = node.y < 44;
+    const shiftLeft = Math.max(-node.x, Math.min(0, 600 - node.x - 260));
+    return (
+        <div
+            className="relative h-full w-full"
+            data-ms-editing=""
+            style={blockStyle(node)}
+            onClick={(event) => event.stopPropagation()}
+            onDoubleClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+        >
+            <MsInlineEditor
+                autoFocus
+                catalog={catalog}
+                flipBelow={flipBelow}
+                initialHtml={stored}
+                key={node.id}
+                nodeId={node.id}
+                ref={editorRef}
+                shiftLeft={shiftLeft}
+                variableEventKey={variableEventKey}
+                onBeginGesture={beginGesture}
+                onCommit={(clean) => {
+                    const current = useCanvasDoc.getState().nodes[node.id]?.props.text;
+                    if (clean !== current) updateProps(node.id, { text: clean });
+                }}
+                onEndGesture={endGesture}
+                onRequestClose={() => setEditingId(null)}
+                onVariableEventChange={onVariableEventChange}
+            />
+        </div>
+    );
+}
+
+function NodeBody({ node, catalog, variableEventKey, onVariableEventChange }: { readonly node: CanvasNode } & CanvasVariableProps) {
+    switch (node.type) {
+        case "text":
+            return (
+                <TextBody
+                    catalog={catalog}
+                    node={node}
+                    variableEventKey={variableEventKey}
+                    onVariableEventChange={onVariableEventChange}
+                />
+            );
         case "button":
             return (
                 <span
@@ -230,7 +300,7 @@ export function SnapGuidesOverlay({ xLines, yLines, mates, rowLabel }: SnapGuide
  * and the live state badges (ROTATED / OVERLAP / CLIPPED) counter-rotated so
  * they stay readable.
  */
-export default function CanvasNodeView({ node, nodes, badgesById }: CanvasNodeViewProps) {
+export default function CanvasNodeView({ node, nodes, badgesById, catalog, variableEventKey, onVariableEventChange }: CanvasNodeViewProps) {
     const selected = useCanvasDoc((state) => state.selection.includes(node.id));
     const selectNodes = useCanvasDoc((state) => state.selectNodes);
     const badges = badgesById[node.id] ?? [];
@@ -280,13 +350,21 @@ export default function CanvasNodeView({ node, nodes, badgesById }: CanvasNodeVi
                     ))}
                 </div>
             ) : null}
-            <NodeBody node={node} />
+            <NodeBody
+                catalog={catalog}
+                node={node}
+                variableEventKey={variableEventKey}
+                onVariableEventChange={onVariableEventChange}
+            />
             {children.map((child) => (
                 <CanvasNodeView
                     badgesById={badgesById}
+                    catalog={catalog}
                     key={child.id}
                     node={child}
                     nodes={nodes}
+                    variableEventKey={variableEventKey}
+                    onVariableEventChange={onVariableEventChange}
                 />
             ))}
         </div>
