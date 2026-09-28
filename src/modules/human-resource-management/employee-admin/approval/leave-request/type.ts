@@ -14,6 +14,10 @@ export interface LeaveRequest {
   approver_id: number | null;
   approved_at: string | null;
   filed_at: string;
+  override_attatchment_uuid?: string | null;
+  current_approval_level?: number;
+  emp_attatchment_uuid?: string | null;
+  is_paid?: number | boolean;
 }
 
 export interface LeaveRequestWithUser extends LeaveRequest {

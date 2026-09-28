@@ -65,9 +65,16 @@ export function ViewDetailsModal({ isOpen, onClose, data }: ViewDetailsModalProp
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Status</p>
-                <Badge variant="secondary" className="capitalize">
-                  {data.status}
-                </Badge>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <Badge variant="secondary" className="capitalize">
+                    {data.status}
+                  </Badge>
+                  {(Number(data.is_paid) === 1 || data.is_paid === true) && (
+                    <Badge className="bg-green-600 hover:bg-green-700 text-white font-semibold">
+                      PAID LEAVE
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Days</p>

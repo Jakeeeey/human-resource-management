@@ -179,7 +179,14 @@ export function LeaveTable({ data, onApprove, onReject, isLoading = false }: Lea
                   </TableCell>
                   <TableCell className="capitalize">{request.leave_type}</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{request.status}</Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge variant="secondary">{request.status}</Badge>
+                      {(Number(request.is_paid) === 1 || request.is_paid === true) && (
+                        <Badge className="bg-green-600 hover:bg-green-700 text-white font-semibold">
+                          PAID LEAVE
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
