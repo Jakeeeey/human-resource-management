@@ -8,28 +8,21 @@ import {
     Send,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { MsCombobox } from "./components/MsCombobox";
 import { MsPager } from "./components/MsPager";
-import { useMsCatalog } from "./hooks/useMsCatalog";
 import { useMsOutbox } from "./hooks/useMsOutbox";
 import { useMsOutboxRow } from "./hooks/useMsOutboxRow";
+import { useMsTemplates } from "./hooks/useMsTemplates";
 import type { MsOutboxRow } from "./types/ms-outbox-row";
+import { msOutboxPreviewHtml } from "./utils/ms-preview-images";
 
-const STATUS_FILTERS = [
-    { value: "all", label: "All" },
+const STATUS_OPTIONS = [
+    { value: "", label: "All statuses" },
     { value: "queued", label: "Queued" },
     { value: "sent", label: "Sent" },
     { value: "failed", label: "Failed" },
@@ -37,16 +30,7 @@ const STATUS_FILTERS = [
     { value: "dry_run", label: "Dry run" },
 ] as const;
 
-type StatusFilter = (typeof STATUS_FILTERS)[number]["value"];
-
-type OutboxSort = "-id" | "id" | "status" | "-status";
-
-const SORT_OPTIONS: readonly { readonly value: OutboxSort; readonly label: string }[] = [
-    { value: "-id", label: "Newest first" },
-    { value: "id", label: "Oldest first" },
-    { value: "status", label: "Status A–Z" },
-    { value: "-status", label: "Status Z–A" },
-];
+type StatusFilter = (typeof STATUS_OPTIONS)[number]["value"];
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -65,60 +49,84 @@ function humaniseOutboxError(message: string): string {
     return "Something went wrong — please try again.";
 }
 
-function statusTone(status: unknown): string {
-    if (status === "sent") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
-    if (status === "failed") return "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400";
-    if (status === "queued") return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400";
-    if (status === "dry_run") return "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400";
-    return "border-border bg-muted text-muted-foreground";
+function outcomeTone(status: unknown): string {
+    if (status === "sent") return "badge-success";
+    if (status === "failed") return "badge-destructive";
+    if (status === "queued") return "badge-info";
+    if (status === "dry_run") return "badge-warning";
+    return "badge-neutral";
 }
 
-function statusDisplay(status: unknown): string {
-    if (status === "dry_run") return "Dry run";
-    return String(status ?? "unknown");
+function outcomeLabel(status: unknown): string {
+    const raw = typeof status === "string" && status.trim() !== "" ? status : "unknown";
+    const spaced = raw.replace(/_/g, " ");
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-function recipientLabel(row: MsOutboxRow): string {
+function recipientEmail(row: MsOutboxRow): string {
     const value = typeof row.to_email === "string" ? row.to_email.trim() : "";
     return value === "" ? "No recipient" : value;
 }
 
-function formatMsDateTime(value: unknown): string {
-    if (typeof value !== "string" || value.trim().length === 0) return "—";
+function friendlyDate(value: unknown): string {
+    if (typeof value !== "string" || value.length === 0) return "—";
     const parsed = new Date(value.includes("T") ? value : value.replace(" ", "T"));
     if (Number.isNaN(parsed.getTime())) return String(value);
-    return new Intl.DateTimeFormat("en-GB", {
-        day: "numeric",
+    return parsed.toLocaleDateString("en-US", {
         month: "short",
+        day: "numeric",
         year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-    }).format(parsed);
+    });
 }
 
-function rowSubject(row: MsOutboxRow): string {
+interface LinkedTemplate {
+    readonly name: string;
+    readonly subject: string;
+}
+
+function resolveSubject(row: MsOutboxRow, linked: LinkedTemplate | null): string {
     if (typeof row.rendered_subject === "string" && row.rendered_subject.trim().length > 0) {
         return row.rendered_subject;
     }
-    if (typeof row.event_key === "string" && row.event_key.trim().length > 0) {
-        return row.event_key;
+    if (linked !== null && linked.subject.trim().length > 0) {
+        return linked.subject;
+    }
+    if (linked !== null && linked.name.trim().length > 0) {
+        return linked.name;
     }
     return "—";
 }
 
+function rowId(row: MsOutboxRow): string | number | null {
+    return typeof row.id === "string" || typeof row.id === "number" ? row.id : null;
+}
+
+function OutboxStatusPill({ status }: { readonly status: unknown }) {
+    return (
+        <span
+            className={cn(
+                "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-colors duration-150",
+                outcomeTone(status),
+            )}
+        >
+            {outcomeLabel(status)}
+        </span>
+    );
+}
+
 function OutboxRowCard({
     row,
+    subject,
     selected,
     onSelect,
 }: {
     readonly row: MsOutboxRow;
+    readonly subject: string;
     readonly selected: boolean;
     readonly onSelect: () => void;
 }) {
-    const recipient = recipientLabel(row);
-    const subject = rowSubject(row);
-    const sentDisplay = formatMsDateTime(row.sent_at);
+    const email = recipientEmail(row);
+    const sentDisplay = friendlyDate(row.sent_at);
     const sentTitle = typeof row.sent_at === "string" && row.sent_at ? row.sent_at : sentDisplay;
     return (
         <li data-testid="outbox-row">
@@ -131,11 +139,9 @@ function OutboxRowCard({
                     selected ? "border-primary/60" : undefined,
                 )}
             >
-                <Badge className={statusTone(row.status)} variant="outline">
-                    {statusDisplay(row.status)}
-                </Badge>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium" title={recipient}>
-                    {recipient}
+                <OutboxStatusPill status={row.status} />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium" title={email}>
+                    {email}
                 </span>
                 <span className="min-w-0 basis-full truncate text-xs text-muted-foreground sm:basis-auto sm:max-w-56" title={subject}>
                     {subject}
@@ -148,14 +154,69 @@ function OutboxRowCard({
     );
 }
 
+function OutboxDetailPane({
+    row,
+    linked,
+}: {
+    readonly row: MsOutboxRow;
+    readonly linked: LinkedTemplate | null;
+}) {
+    const status = String(row.status ?? "unknown");
+    const isQueued = status === "queued";
+    const isFailed = status === "failed";
+    const sentDisplay = friendlyDate(row.sent_at);
+    const sentTitle = typeof row.sent_at === "string" && row.sent_at ? row.sent_at : undefined;
+    const title = resolveSubject(row, linked);
+    return (
+        <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-2 overflow-x-clip [overflow-wrap:break-word]">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <OutboxStatusPill status={row.status} />
+                <span className="text-xs text-muted-foreground tabular-nums" title={sentTitle}>
+                    {sentDisplay}
+                </span>
+            </div>
+            {isQueued ? (
+                <p className="shrink-0 text-xs text-muted-foreground" role="status">
+                    Awaiting delivery — no sent timestamp until the send lands.
+                </p>
+            ) : null}
+            {isFailed ? (
+                <p className="shrink-0 rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive" role="status">
+                    Not delivered — last rendered snapshot below.
+                </p>
+            ) : null}
+            {row.error ? (
+                <p className="shrink-0 break-words text-xs text-destructive">{humaniseOutboxError(row.error)}</p>
+            ) : null}
+            <div className="flex min-h-0 w-full max-w-full flex-1 flex-col gap-3 rounded-xl border border-border/50 bg-muted/50 p-3 sm:p-4">
+                <p className="shrink-0 truncate text-lg font-bold" title={title}>
+                    {title}
+                </p>
+                <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-border bg-card p-4 text-sm leading-relaxed text-card-foreground shadow-sm">
+                    {row.rendered_body_html ? (
+                        <iframe
+                            sandbox=""
+                            srcDoc={msOutboxPreviewHtml(row.rendered_body_html)}
+                            style={{ border: 0, display: "block", height: "100%", minHeight: 420, width: "100%" }}
+                            title="Rendered email body"
+                        />
+                    ) : (
+                        <p className="text-sm text-muted-foreground">No body recorded.</p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function OutboxPage() {
-    const [filter, setFilter] = useState<StatusFilter>("all");
-    const [eventKey, setEventKey] = useState("");
+    const [status, setStatus] = useState<StatusFilter>("");
     const [searchInput, setSearchInput] = useState("");
     const [search, setSearch] = useState("");
-    const [sort, setSort] = useState<OutboxSort>("-id");
     const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(10);
     const [selectedId, setSelectedId] = useState<string | number | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(true);
     const [retrying, setRetrying] = useState(false);
     const [detailRetrying, setDetailRetrying] = useState(false);
 
@@ -169,27 +230,44 @@ export function OutboxPage() {
     }, [searchInput]);
 
     const { data, isLoading, error, refetch } = useMsOutbox({
-        ...(filter === "all" ? {} : { status: filter }),
-        ...(eventKey ? { eventKey } : {}),
+        ...(status !== "" ? { status } : {}),
         ...(search ? { search } : {}),
-        sort,
+        sort: "-id",
         page,
+        limit,
     });
-    const detail = useMsOutboxRow(selectedId);
-    const catalog = useMsCatalog();
+    const templates = useMsTemplates();
 
-    const eventOptions = useMemo(() => {
-        return (catalog.data ?? [])
-            .map((row) => ({ value: row.event_key, label: `${row.event_key} — ${row.label}` }))
-            .sort((a, b) => a.value.localeCompare(b.value));
-    }, [catalog.data]);
+    const templateById = useMemo(() => {
+        const map = new Map<string, LinkedTemplate>();
+        for (const entry of templates.data ?? []) {
+            map.set(String(entry.id), { name: entry.name, subject: entry.subject });
+        }
+        return map;
+    }, [templates.data]);
+
+    const linkedFor = (row: MsOutboxRow): LinkedTemplate | null => {
+        if (row.template_id === null || row.template_id === undefined) return null;
+        return templateById.get(String(row.template_id)) ?? null;
+    };
 
     const total = data?.total ?? 0;
-    const limit = data?.limit ?? 10;
-    const rows = data?.rows ?? [];
-    const totalPages = Math.max(1, Math.ceil(total / limit));
-    const rangeStart = total === 0 ? 0 : (page - 1) * limit + 1;
-    const rangeEnd = (page - 1) * limit + rows.length;
+    const serverLimit = data?.limit ?? limit;
+    const rows = useMemo(() => data?.rows ?? [], [data]);
+    const totalPages = Math.max(1, Math.ceil(total / serverLimit));
+
+    const activeId = useMemo(() => {
+        if (selectedId !== null && rows.some((row) => rowId(row) === selectedId)) {
+            return selectedId;
+        }
+        const first = rows.find((row) => rowId(row) !== null);
+        return first ? rowId(first) : null;
+    }, [selectedId, rows]);
+
+    const detail = useMsOutboxRow(activeId);
+
+    const rangeStart = total === 0 || rows.length === 0 ? 0 : (page - 1) * serverLimit + 1;
+    const rangeEnd = rows.length === 0 ? 0 : (page - 1) * serverLimit + rows.length;
 
     const resetToFirstPage = (): void => {
         setPage(1);
@@ -197,9 +275,13 @@ export function OutboxPage() {
     };
 
     const selectRow = (row: MsOutboxRow): void => {
-        setSelectedId(
-            typeof row.id === "string" || typeof row.id === "number" ? row.id : null,
-        );
+        setSelectedId(rowId(row));
+        setPreviewOpen(true);
+    };
+
+    const closePreview = (): void => {
+        setPreviewOpen(false);
+        setSelectedId(null);
     };
 
     const handleRetry = async (): Promise<void> => {
@@ -220,12 +302,7 @@ export function OutboxPage() {
         }
     };
 
-    const filtersActive = filter !== "all" || eventKey !== "" || search !== "";
-    const countLabel = isLoading && !data
-        ? "Loading…"
-        : total === 0
-          ? "No entries"
-          : `Showing ${rangeStart}–${rangeEnd} of ${total}`;
+    const filtersActive = status !== "" || search !== "";
 
     return (
         <section aria-label="Outbox" className="flex min-h-0 flex-1 flex-col gap-4">
@@ -239,127 +316,73 @@ export function OutboxPage() {
                         <p className="text-sm text-muted-foreground">The record of everything the studio has sent and queued.</p>
                     </div>
                 </div>
-            </header>
-
-            <div className="flex flex-wrap items-center gap-2">
-                <Input
-                    aria-label="Search outbox by recipient, event, or key"
-                    className="h-8 w-full text-xs sm:max-w-xs"
-                    placeholder="Search recipient, event, or key…"
-                    value={searchInput}
-                    onChange={(event) => setSearchInput(event.target.value)}
-                />
-                <div className="w-52 max-w-full">
-                    <MsCombobox
-                        ariaLabel="Filter by event key"
-                        disabled={catalog.isLoading}
-                        emptyText="No event keys."
-                        id="outbox-event-filter"
-                        options={eventOptions}
-                        placeholder={catalog.isLoading ? "Loading events…" : "All events"}
-                        searchPlaceholder="Search events…"
-                        value={eventKey}
-                        onValueChange={(next) => {
-                            setEventKey(next);
-                            resetToFirstPage();
-                        }}
-                    />
-                </div>
-                <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Status filter">
-                    {STATUS_FILTERS.map((status) => (
-                        <button
-                            aria-pressed={filter === status.value}
-                            className={cn(
-                                "min-h-11 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-150 md:min-h-0",
-                                filter === status.value
-                                    ? "bg-primary text-primary-foreground"
-                                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                            )}
-                            data-testid={`outbox-filter-${status.value}`}
-                            key={status.value}
-                            type="button"
+                <div className="flex flex-wrap items-center gap-2">
+                    {filtersActive ? (
+                        <Button
+                            aria-label="Clear outbox filters"
+                            className="min-h-11 md:min-h-0"
+                            size="sm"
+                            variant="ghost"
                             onClick={() => {
-                                setFilter(status.value);
+                                setStatus("");
+                                setSearchInput("");
+                                setSearch("");
                                 resetToFirstPage();
                             }}
                         >
-                            {status.label}
-                        </button>
-                    ))}
+                            Clear
+                        </Button>
+                    ) : null}
+                    <Button
+                        aria-label="Refresh outbox"
+                        className="min-h-11 md:min-h-0"
+                        disabled={isLoading}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void refetch()}
+                    >
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                        Refresh
+                    </Button>
                 </div>
-                <Select
-                    value={sort}
+            </header>
+
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_220px]">
+                <Input
+                    aria-label="Search recipient or subject"
+                    className="h-8 text-xs"
+                    placeholder="Recipient or subject"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                />
+                <MsCombobox
+                    ariaLabel="Filter by status"
+                    emptyText="No statuses."
+                    id="outbox-status-filter"
                     onValueChange={(next) => {
-                        setSort(next as OutboxSort);
+                        setStatus(next as StatusFilter);
                         resetToFirstPage();
                     }}
-                >
-                    <SelectTrigger aria-label="Sort outbox" className="h-8 max-w-[220px] text-xs" size="sm">
-                        <SelectValue placeholder="Sort" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                        {SORT_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                {filtersActive ? (
-                    <Button
-                        aria-label="Clear outbox filters"
-                        className="min-h-11 md:min-h-0"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                            setFilter("all");
-                            setEventKey("");
-                            setSearchInput("");
-                            setSearch("");
-                            resetToFirstPage();
-                        }}
-                    >
-                        Clear
-                    </Button>
-                ) : null}
-                <Button
-                    aria-label="Refresh outbox"
-                    className="min-h-11 md:min-h-0"
-                    disabled={isLoading}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void refetch()}
-                >
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    Refresh
-                </Button>
-                <span
-                    className="ms-auto rounded-full border bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
-                    data-testid="outbox-count"
-                >
-                    {countLabel}
-                </span>
+                    options={STATUS_OPTIONS}
+                    placeholder="All statuses"
+                    searchPlaceholder="Search statuses…"
+                    value={status}
+                />
             </div>
 
-            {catalog.error ? (
+            {templates.error ? (
                 <p className="text-[11px] leading-snug text-muted-foreground" role="status">
-                    Event list failed to load — event filtering is unavailable.
+                    Template list failed to load — subject fallback is unavailable.
                 </p>
             ) : null}
 
             {isLoading && !data ? (
                 <div className="flex flex-col gap-2" data-testid="outbox-loading" role="status" aria-label="Loading outbox">
-                    {[0, 1].map((index) => (
-                        <div className="flex flex-col gap-2 rounded-lg border bg-card p-3" key={index}>
-                            <div className="flex items-start gap-3">
-                                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                                    <Skeleton className="h-4 w-1/3" />
-                                    <Skeleton className="h-3 w-2/3" />
-                                </div>
-                                <Skeleton className="h-5 w-14 rounded-full" />
-                                <Skeleton className="h-8 w-8 rounded-md" />
-                            </div>
-                            <Skeleton className="h-3 w-1/2" />
+                    {[0, 1, 2].map((index) => (
+                        <div className="flex items-center gap-2 rounded-lg border bg-card p-3" key={index}>
+                            <Skeleton className="h-5 w-16 rounded-full" />
+                            <Skeleton className="h-4 flex-1" />
+                            <Skeleton className="h-4 w-24" />
                         </div>
                     ))}
                     <span className="sr-only">Loading outbox…</span>
@@ -393,194 +416,83 @@ export function OutboxPage() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                         {filtersActive
-                            ? "Try another status or event, clear the search, or send a test from the Send tab."
-                            : "Send a test from the Send tab to record the first entry."}
+                            ? "Try another status or clear the search."
+                            : "Send a test from Send to record the first entry."}
                     </p>
                 </div>
             ) : null}
 
             {rows.length > 0 ? (
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
+                <div className={previewOpen ? "grid items-stretch gap-3 lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]" : "grid gap-3"}>
                     <div className="overflow-hidden rounded-lg border bg-card">
-                        <ul aria-label="Outbox rows" className="flex max-h-[560px] flex-col gap-2 overflow-y-auto p-3" data-testid="outbox-list">
-                            {rows.map((row) => (
-                                <OutboxRowCard
-                                    key={String(row.id ?? row.idempotency_key)}
-                                    row={row}
-                                    selected={selectedId === row.id}
-                                    onSelect={() => selectRow(row)}
-                                />
-                            ))}
-                        </ul>
-                    </div>
-
-                    <div className="hidden lg:block">
-                        <div
-                            className="flex h-[560px] min-h-0 flex-col gap-3 overflow-y-auto rounded-lg border bg-card p-4"
-                            data-testid="outbox-detail"
-                        >
-                            {selectedId === null ? (
-                                <p className="min-h-0 flex-1 text-sm text-muted-foreground">Select a row to preview.</p>
-                            ) : detail.isLoading ? (
-                                <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Loading entry…
-                                </p>
-                            ) : detail.error ? (
-                                <div className="flex flex-col gap-2" role="alert">
-                                    <p className="text-sm text-destructive">{humaniseOutboxError(detail.error)}</p>
-                                    <Button className="mt-1 min-h-11 self-start md:min-h-0" disabled={detailRetrying} size="sm" variant="outline" onClick={() => void handleDetailRetry()}>
-                                        {detailRetrying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                        Retry
-                                    </Button>
-                                </div>
-                            ) : detail.data ? (
-                                <OutboxDetailPane row={detail.data} />
-                            ) : null}
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-            <MsPager page={page} totalPages={totalPages} onPage={(next) => {
-                setPage(next);
-                setSelectedId(null);
-            }} />
-        </section>
-    );
-}
-
-function OutboxDetailPane({ row }: { readonly row: MsOutboxRow }) {
-    const status = String(row.status ?? "unknown");
-    const isSent = status === "sent";
-    const isQueued = status === "queued";
-    const isFailed = status === "failed";
-    const recipient = recipientLabel(row);
-    const eventKey = typeof row.event_key === "string" ? row.event_key : String(row.event_key ?? "");
-    const sentLabel = isSent ? formatMsDateTime(row.sent_at) : "—";
-    const sentTitle =
-        isSent && typeof row.sent_at === "string" && row.sent_at ? row.sent_at : undefined;
-    const nextAttemptLabel =
-        typeof row.next_attempt_at === "string" && row.next_attempt_at
-            ? formatMsDateTime(row.next_attempt_at)
-            : "—";
-    const errorLabel = isQueued ? "Last attempt — retrying" : "Last attempt";
-    const hasSnapshot = Boolean(row.rendered_subject ?? row.rendered_body_html);
-    const subject = typeof row.rendered_subject === "string" ? row.rendered_subject : "";
-
-    return (
-        <>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Badge className={statusTone(row.status)} variant="outline">
-                    {statusDisplay(row.status)}
-                </Badge>
-                <span className="min-w-0 max-w-60 flex-1 truncate font-mono text-xs text-muted-foreground" title={eventKey}>
-                    {eventKey}
-                </span>
-            </div>
-            {isQueued ? (
-                <p className="text-xs text-muted-foreground" role="status">
-                    Awaiting delivery — no sent timestamp until the send lands.
-                </p>
-            ) : null}
-            {isFailed && hasSnapshot ? (
-                <p className="rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive" role="status">
-                    Not delivered — last rendered snapshot below.
-                </p>
-            ) : null}
-            <dl className="flex min-w-0 flex-col gap-2 text-sm">
-                <div>
-                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Id
-                    </dt>
-                    <dd className="truncate font-mono" title={String(row.id ?? "—")}>{String(row.id ?? "—")}</dd>
-                </div>
-                <div>
-                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Idempotency key
-                    </dt>
-                    <dd className="break-all font-mono" title={String(row.idempotency_key ?? "—")}>{String(row.idempotency_key ?? "—")}</dd>
-                </div>
-                <div>
-                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Template
-                    </dt>
-                    <dd className="truncate font-mono" title={String(row.template_id ?? "—")}>{String(row.template_id ?? "—")}</dd>
-                </div>
-                <div>
-                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Recipient
-                    </dt>
-                    <dd className="truncate font-mono" title={recipient}>{recipient}</dd>
-                </div>
-                <div>
-                    <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                        Sent at
-                    </dt>
-                    <dd className="tabular-nums" title={sentTitle}>
-                        {sentLabel}
-                    </dd>
-                </div>
-                {typeof row.attempts === "number" ? (
-                    <div>
-                        <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                            Attempts
-                        </dt>
-                        <dd className="tabular-nums">{row.attempts}</dd>
-                    </div>
-                ) : null}
-                {isQueued || row.next_attempt_at ? (
-                    <div>
-                        <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                            Next attempt
-                        </dt>
-                        <dd className="tabular-nums" title={row.next_attempt_at ?? undefined}>
-                            {nextAttemptLabel}
-                        </dd>
-                    </div>
-                ) : null}
-                {row.warnings.length > 0 ? (
-                    <div>
-                        <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                            Warnings
-                        </dt>
-                        <dd>
-                            <ul className="flex flex-col gap-1">
-                                {row.warnings.map((warning) => (
-                                    <li className="break-words text-xs" key={warning}>
-                                        {warning}
-                                    </li>
+                        {rows.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center gap-3 py-16">
+                                <p className="text-sm text-muted-foreground">No rows match these filters.</p>
+                            </div>
+                        ) : (
+                            <ul aria-label="Outbox rows" className="flex max-h-[560px] flex-col gap-2 overflow-y-auto p-3" data-testid="outbox-list">
+                                {rows.map((row) => (
+                                    <OutboxRowCard
+                                        key={String(row.id ?? row.idempotency_key)}
+                                        row={row}
+                                        subject={resolveSubject(row, linkedFor(row))}
+                                        selected={activeId !== null && rowId(row) === activeId}
+                                        onSelect={() => selectRow(row)}
+                                    />
                                 ))}
                             </ul>
-                        </dd>
+                        )}
+                        <MsPager
+                            page={page}
+                            pageSize={serverLimit}
+                            totalPages={totalPages}
+                            total={total}
+                            rangeStart={rangeStart}
+                            rangeEnd={rangeEnd}
+                            onPage={(next) => {
+                                setPage(next);
+                                setSelectedId(null);
+                            }}
+                            onPageSize={(size) => {
+                                setLimit(size);
+                                setPage(1);
+                                setSelectedId(null);
+                            }}
+                        />
                     </div>
-                ) : null}
-                {row.error ? (
-                    <div>
-                        <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                            {errorLabel}
-                        </dt>
-                        <dd className="break-words text-xs">{humaniseOutboxError(row.error)}</dd>
-                    </div>
-                ) : null}
-                {subject.trim().length > 0 ? (
-                    <div>
-                        <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                            Rendered subject
-                        </dt>
-                        <dd className="truncate" title={subject}>{subject}</dd>
-                    </div>
-                ) : null}
-            </dl>
-            {row.rendered_body_html ? (
-                <div className="overflow-hidden rounded-lg border">
-                    <iframe
-                        sandbox=""
-                        srcDoc={row.rendered_body_html}
-                        style={{ border: 0, display: "block", height: 420, width: "100%" }}
-                        title="Rendered email body"
-                    />
+
+                    {previewOpen ? (
+                        <div className="hidden min-h-0 lg:flex lg:flex-col">
+                            <div
+                                className="flex h-full min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-lg border bg-card p-4"
+                                data-testid="outbox-detail"
+                            >
+                                {activeId === null ? (
+                                    <p className="min-h-0 flex-1 text-sm text-muted-foreground">Select a row to preview.</p>
+                                ) : detail.isLoading ? (
+                                    <p className="flex min-h-0 flex-1 items-start gap-2 text-sm text-muted-foreground" role="status">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Loading entry…
+                                    </p>
+                                ) : detail.error ? (
+                                    <div className="flex min-h-0 flex-1 flex-col items-start gap-2" role="alert">
+                                        <p className="text-sm text-destructive">{humaniseOutboxError(detail.error)}</p>
+                                        <Button className="mt-1 min-h-11 md:min-h-0" disabled={detailRetrying} size="sm" variant="outline" onClick={() => void handleDetailRetry()}>
+                                            {detailRetrying ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                            Retry
+                                        </Button>
+                                    </div>
+                                ) : detail.data ? (
+                                    <OutboxDetailPane row={detail.data} linked={linkedFor(detail.data)} />
+                                ) : null}
+                                <Button variant="outline" size="sm" className="mt-auto w-full shrink-0" onClick={closePreview}>
+                                    Close preview
+                                </Button>
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
-        </>
+        </section>
     );
 }
