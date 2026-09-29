@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
 import { mailOutboxStatusSchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-outbox.schema";
-import { toOutboxRow } from "@/modules/human-resource-management/recruitment/mailing/utils/mailMask";
+import { toMaskedOutboxRow } from "@/modules/human-resource-management/recruitment/mailing/utils/mailMask";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,9 +11,10 @@ export const dynamic = "force-dynamic";
 // GET /api/hrm/mailing/outbox?status=<queued|sent|failed|skipped|dry_run>
 //
 // Status-only outbox viewer (D17 — no resend endpoint exists on this path).
-// LOGIN-GATED (user order 2026-09-08 — `to_email` now leaves this server
-// UNMASKED): same cookie session gate as company-logos (401 AUTH_DENIED
-// without a valid user). `warnings`/`error` echoes pass through verbatim.
+// LOGIN-GATED (same cookie session gate as company-logos: 401 AUTH_DENIED
+// without a valid user) AND masked at the edge via utils/mailMask
+// (toMaskedOutboxRow): full addresses never leave the server, including
+// `warnings`/`error` echoes (scrubbed for email-like substrings).
 // No Zod body validation: GET has no body; the `status` query value is
 // validated against `mailOutboxStatusSchema` and an unknown value answers
 // 400 (never 500, never an ambiguous empty 200).
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            data: rows.map(toOutboxRow),
+            data: rows.map(toMaskedOutboxRow),
         });
     } catch (error) {
         console.error("[mailing-outbox] list error:", error);
