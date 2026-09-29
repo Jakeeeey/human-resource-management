@@ -48,13 +48,21 @@ import { useMsPagination } from "./hooks/useMsPagination";
 import { useMsTemplates } from "./hooks/useMsTemplates";
 import { createMsBinding, type MsBindingPatch, type MsBindingRow } from "./providers/msBindings";
 import type { MsCatalogRow } from "./catalog/ms-catalog.schema";
+import { BindingConditionsEditor } from "./components/BindingConditionsEditor";
 import { MsCombobox } from "./components/MsCombobox";
 import { MsConfirmDialog } from "./components/MsConfirmDialog";
 import { MsPager } from "./components/MsPager";
 import {
+    extractConditionFields,
+    parseConditions,
+    type Condition,
+} from "./events/utils/routing-conditions";
+import { summariseConditions } from "./utils/ms-condition-labels";
+import {
     classifyTokens,
     extractPayloadKeys,
     normaliseVariablesList,
+    parseJsonDocument,
 } from "./utils/ms-variables";
 
 type BindingFilter = "all" | "attention" | "disabled";
@@ -62,6 +70,14 @@ type BindingFilter = "all" | "attention" | "disabled";
 type BindingSort = "event" | "template";
 
 type BindingDialogMode = "create" | "edit";
+
+type BindingDraft = {
+    readonly eventKeyId: string;
+    readonly templateId: string;
+    readonly enabled: boolean;
+    readonly priority: number | null;
+    readonly conditions: Condition[];
+};
 
 const FILTERS: readonly { readonly value: BindingFilter; readonly label: string }[] = [
     { value: "all", label: "All" },
@@ -110,6 +126,7 @@ function MsBindingDialog({
     catalogError,
     templatesLoading,
     submitting,
+    catalogById,
     onSubmit,
 }: {
     readonly open: boolean;
@@ -122,15 +139,20 @@ function MsBindingDialog({
     readonly catalogError: string | null;
     readonly templatesLoading: boolean;
     readonly submitting: boolean;
-    readonly onSubmit: (draft: { eventKeyId: string; templateId: string; enabled: boolean }) => Promise<string | null>;
+    readonly catalogById: ReadonlyMap<string, MsCatalogRow>;
+    readonly onSubmit: (draft: BindingDraft) => Promise<string | null>;
 }) {
     const initialEvent = binding ? String(binding.event_key_id) : (eventOptions[0]?.value ?? "");
     const initialTemplate = binding ? String(binding.template_id) : "";
     const initialEnabled = binding ? isEnabled(binding.is_enabled) : true;
+    const initialPriority = binding && binding.priority !== null ? String(binding.priority) : "";
+    const initialConditions = parseConditions(binding?.conditions) ?? [];
 
     const [eventDraft, setEventDraft] = useState(initialEvent);
     const [templateDraft, setTemplateDraft] = useState(initialTemplate);
     const [enabledDraft, setEnabledDraft] = useState(initialEnabled);
+    const [priorityDraft, setPriorityDraft] = useState(initialPriority);
+    const [conditionsDraft, setConditionsDraft] = useState<Condition[]>(initialConditions);
     const [localError, setLocalError] = useState<string | null>(null);
 
     const title = mode === "create" ? "Hook binding" : "Edit binding";
@@ -141,6 +163,14 @@ function MsBindingDialog({
     const submitLabel = mode === "create" ? "Hook binding" : "Save fields";
     const eventId = binding ? `binding-event-${String(binding.id)}` : "binding-event";
     const templateId = binding ? `binding-template-${String(binding.id)}` : "binding-template";
+    const priorityId = binding ? `binding-priority-${String(binding.id)}` : "binding-priority";
+
+    const trimmedPriority = priorityDraft.trim();
+    const numericPriority = trimmedPriority === "" ? null : Number(trimmedPriority);
+    const submitPriority = numericPriority === null || Number.isNaN(numericPriority) ? null : numericPriority;
+
+    const selectedCatalog = catalogById.get(eventDraft);
+    const payloadSchema = selectedCatalog?.payload_schema ?? null;
 
     const handleSubmit = (event: React.FormEvent): void => {
         event.preventDefault();
@@ -153,7 +183,13 @@ function MsBindingDialog({
             return;
         }
         setLocalError(null);
-        void onSubmit({ eventKeyId: eventDraft, templateId: templateDraft.trim(), enabled: enabledDraft }).then(
+        void onSubmit({
+            eventKeyId: eventDraft,
+            templateId: templateDraft.trim(),
+            enabled: enabledDraft,
+            priority: submitPriority,
+            conditions: conditionsDraft,
+        }).then(
             (failure) => {
                 if (failure !== null) setLocalError(humaniseBindingError(failure, eventDraft));
             },
@@ -162,12 +198,12 @@ function MsBindingDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] w-[95vw] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-[500px]">
+            <DialogContent className="grid max-h-[85vh] w-[95vw] grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl p-0 sm:max-w-[500px]">
                 <DialogHeader className="px-6 pt-6">
                     <DialogTitle className="line-clamp-1">{title}</DialogTitle>
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
-                <form data-testid="bindings-form" onSubmit={handleSubmit}>
+                <form className="flex min-h-0 flex-col" data-testid="bindings-form" onSubmit={handleSubmit}>
                     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4">
                         <div className="flex flex-col gap-2">
                             <Label className="text-xs font-medium text-muted-foreground" htmlFor={eventId}>
@@ -208,6 +244,32 @@ function MsBindingDialog({
                                 onValueChange={setTemplateDraft}
                             />
                         </div>
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-xs font-medium text-muted-foreground" htmlFor={priorityId}>
+                                Priority
+                            </Label>
+                            <Input
+                                className="h-8 text-xs"
+                                id={priorityId}
+                                inputMode="numeric"
+                                min={0}
+                                placeholder="Leave empty to check last"
+                                type="number"
+                                value={priorityDraft}
+                                onChange={(event) => setPriorityDraft(event.target.value)}
+                            />
+                            <p className="text-[11px] leading-snug text-muted-foreground">
+                                Lower numbers are checked first; leave empty to be checked last.
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <span className="text-xs font-medium text-muted-foreground">Conditions</span>
+                            <BindingConditionsEditor
+                                conditions={conditionsDraft}
+                                payloadSchema={payloadSchema}
+                                onChange={setConditionsDraft}
+                            />
+                        </div>
                         <div className="flex items-center gap-2">
                             <Switch
                                 aria-label="Binding enabled"
@@ -224,7 +286,7 @@ function MsBindingDialog({
                             </p>
                         ) : null}
                     </div>
-                    <DialogFooter className="border-t bg-muted/20 px-6 py-4">
+                    <DialogFooter className="shrink-0 border-t bg-muted/20 px-6 py-4">
                         <DialogClose asChild>
                             <Button className="min-h-11 md:min-h-0" size="sm" type="button" variant="outline">
                                 Cancel
@@ -246,6 +308,7 @@ function BindingRowCard({
     eventKeyText,
     unmapped,
     unresolvable,
+    staleConditions,
     templateName,
     onToggle,
     onRemove,
@@ -256,6 +319,7 @@ function BindingRowCard({
     readonly eventKeyText: string;
     readonly unmapped: readonly string[];
     readonly unresolvable: string | null;
+    readonly staleConditions: readonly string[];
     readonly templateName: string;
     readonly onToggle: () => void;
     readonly onRemove: () => void;
@@ -263,6 +327,15 @@ function BindingRowCard({
     readonly busy: boolean;
 }) {
     const enabled = isEnabled(row.is_enabled);
+    const displayTemplate = templateName.trim() === "" ? "Unnamed template" : templateName;
+    const parsedConditions = parseConditions(row.conditions);
+    const fullSummary = summariseConditions(row.conditions as Condition[] | null);
+    const firstCondition = parsedConditions?.[0];
+    const shortSummary =
+        parsedConditions !== null && parsedConditions.length > 1 && firstCondition !== undefined
+            ? `${summariseConditions([firstCondition])} +${parsedConditions.length - 1} more`
+            : fullSummary;
+    const priorityText = row.priority === null ? "Priority last" : `Priority ${row.priority}`;
 
     return (
         <li
@@ -270,16 +343,35 @@ function BindingRowCard({
             data-testid="binding-row"
         >
             <div className="flex items-start gap-3">
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate font-mono text-sm font-medium" title={eventKeyText}>
-                        {eventKeyText}
-                    </span>
-                    <span
-                        className="truncate font-mono text-xs text-muted-foreground"
-                        title={templateName}
-                    >
-                        {templateName}
-                    </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <span
+                            className="min-w-0 flex-1 truncate text-sm font-medium"
+                            title={displayTemplate}
+                        >
+                            {displayTemplate}
+                        </span>
+                        <span
+                            className="shrink-0 rounded-full border bg-muted px-1.5 py-px text-[10px] tabular-nums text-muted-foreground"
+                            title="Lower numbers are checked first; empty means last"
+                        >
+                            {priorityText}
+                        </span>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                        <span
+                            className="max-w-[50%] shrink-0 truncate rounded border bg-muted px-1.5 py-px font-mono text-[11px] text-muted-foreground"
+                            title={eventKeyText}
+                        >
+                            {eventKeyText}
+                        </span>
+                        <span
+                            className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                            title={fullSummary}
+                        >
+                            {shortSummary}
+                        </span>
+                    </div>
                 </div>
                 <Badge
                     className={
@@ -348,6 +440,20 @@ function BindingRowCard({
                         {unmapped.length === 1 ? " this key" : " these keys"} but the event does
                         not provide {unmapped.length === 1 ? "it" : "them"}. Fix the token or
                         the event schema; nothing is auto-repaired.
+                    </span>
+                </div>
+            ) : null}
+            {staleConditions.length > 0 ? (
+                <div
+                    className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
+                    data-testid="binding-conditions-drift"
+                    role="alert"
+                >
+                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                        Stale conditions: {staleConditions.join(", ")} — this rule checks
+                        {staleConditions.length === 1 ? " a field" : " fields"} the event no longer
+                        sends. Update the conditions or the rule will never match.
                     </span>
                 </div>
             ) : null}
@@ -442,31 +548,42 @@ export function BindingsPage() {
         return (data ?? []).map((row) => {
             const catalogRow = catalogById.get(String(row.event_key_id));
             if (!catalogRow) {
-                return { row, unmapped: [] as string[], unresolvable: "This binding points at an event that is not in the catalog." as string | null };
+                return { row, unmapped: [] as string[], unresolvable: "This binding points at an event that is not in the catalog." as string | null, staleConditions: [] as string[] };
             }
             const ref = String(row.template_id);
             const variables = templateVariables.byId.get(ref) ?? templateVariables.byKey.get(ref);
             if (!variables) {
-                return { row, unmapped: [] as string[], unresolvable: "This binding points at a template that is not loaded — variables unknown." as string | null };
+                return { row, unmapped: [] as string[], unresolvable: "This binding points at a template that is not loaded — variables unknown." as string | null, staleConditions: [] as string[] };
             }
             const provided = extractPayloadKeys(catalogRow.payload_schema, catalogRow.payload_example);
+            const parsed = parseConditions(row.conditions);
+            const schemaFields = new Set(
+                extractConditionFields(parseJsonDocument(catalogRow.payload_schema)).map((field) => field.name),
+            );
+            const staleConditions =
+                parsed === null
+                    ? []
+                    : Array.from(new Set(parsed.map((condition) => condition.field))).filter(
+                        (field) => !schemaFields.has(field),
+                    );
             return {
                 row,
                 unmapped: classifyTokens(variables, provided).unmapped,
                 unresolvable: null as string | null,
+                staleConditions,
             };
         });
     }, [data, catalogById, templateVariables]);
 
     const attentionCount = useMemo(() => {
-        return analysed.filter((item) => item.unmapped.length > 0 || item.unresolvable !== null).length;
+        return analysed.filter((item) => item.unmapped.length > 0 || item.unresolvable !== null || item.staleConditions.length > 0).length;
     }, [analysed]);
 
     const filtered = useMemo(() => {
         const query = search.trim().toLowerCase();
         const rows = analysed.filter((item) => {
             if (filter === "disabled" && isEnabled(item.row.is_enabled)) return false;
-            if (filter === "attention" && item.unmapped.length === 0 && item.unresolvable === null) {
+            if (filter === "attention" && item.unmapped.length === 0 && item.unresolvable === null && item.staleConditions.length === 0) {
                 return false;
             }
             if (!query) return true;
@@ -492,13 +609,15 @@ export function BindingsPage() {
     const { page, totalPages, pageItems, setPage, resetPage } = useMsPagination(filtered.length);
     const visible = pageItems(filtered);
 
-    const handleCreateSubmit = async (draft: { eventKeyId: string; templateId: string; enabled: boolean }): Promise<string | null> => {
+    const handleCreateSubmit = async (draft: BindingDraft): Promise<string | null> => {
         setCreating(true);
         try {
             await createMsBinding({
                 event_key_id: draft.eventKeyId,
                 template_id: draft.templateId,
                 is_enabled: draft.enabled,
+                priority: draft.priority,
+                conditions: draft.conditions,
             });
             await refetch();
             setCreateOpen(false);
@@ -511,7 +630,7 @@ export function BindingsPage() {
         }
     };
 
-    const handleEditSubmit = async (draft: { eventKeyId: string; templateId: string; enabled: boolean }): Promise<string | null> => {
+    const handleEditSubmit = async (draft: BindingDraft): Promise<string | null> => {
         if (!editingRow) return "No binding is selected for editing — close and try again.";
         const patch: MsBindingPatch = {};
         if (draft.eventKeyId !== String(editingRow.event_key_id)) patch.event_key_id = draft.eventKeyId;
@@ -519,6 +638,11 @@ export function BindingsPage() {
             patch.template_id = draft.templateId;
         }
         if (draft.enabled !== isEnabled(editingRow.is_enabled)) patch.is_enabled = draft.enabled;
+        if (draft.priority !== editingRow.priority) patch.priority = draft.priority;
+        const savedConditions = parseConditions(editingRow.conditions) ?? [];
+        if (JSON.stringify(draft.conditions) !== JSON.stringify(savedConditions)) {
+            patch.conditions = draft.conditions;
+        }
         if (Object.keys(patch).length === 0) {
             setEditingRow(null);
             return null;
@@ -728,6 +852,7 @@ export function BindingsPage() {
                             eventKeyText={resolveBindingKey(item.row.event_key_id)}
                             key={String(item.row.id)}
                             row={item.row}
+                            staleConditions={item.staleConditions}
                             templateName={resolveTemplateName(item.row.template_id)}
                             unmapped={item.unmapped}
                             unresolvable={item.unresolvable}
@@ -742,6 +867,7 @@ export function BindingsPage() {
             {createOpen ? (
                 <MsBindingDialog
                     binding={null}
+                    catalogById={catalogById}
                     catalogError={catalog.error}
                     catalogLoading={catalog.isLoading}
                     eventOptions={eventOptions}
@@ -757,6 +883,7 @@ export function BindingsPage() {
             {editingRow ? (
                 <MsBindingDialog
                     binding={editingRow}
+                    catalogById={catalogById}
                     catalogError={catalog.error}
                     catalogLoading={catalog.isLoading}
                     eventOptions={eventOptions}

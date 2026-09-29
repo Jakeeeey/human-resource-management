@@ -9,6 +9,11 @@ import {
 } from "./mail-transport";
 import { resolveRecipient } from "../utils/recipient";
 import { renderTemplate } from "../utils/template-render";
+import {
+    evaluateRouting,
+    sortEnabledBindings,
+} from "../utils/routing-conditions";
+import type { RoutableBinding } from "../utils/routing-conditions";
 import { msAssertMailableHtml, msHasForbiddenMailHtml } from "../utils/ms-html-scrub";
 import { mailHtmlToText } from "../utils/ms-mail-text";
 import {
@@ -41,11 +46,8 @@ export interface DispatchOutcome {
     rendered_body_html: string | null;
 }
 
-interface BindingRow {
-    id: string | number;
+interface BindingRow extends RoutableBinding {
     event_key_id: string | number;
-    template_id: string | number;
-    is_enabled: boolean;
 }
 
 export interface TemplateRow {
@@ -137,17 +139,11 @@ async function listEnabledBindings(eventKey: string): Promise<BindingRow[]> {
             event_key_id: (raw.event_key_id as string | number) ?? "",
             template_id: (raw.template_id as string | number) ?? "",
             is_enabled: toBool(raw.is_enabled),
+            conditions: raw.conditions ?? null,
+            priority: raw.priority ?? null,
         });
     }
-    rows.sort((a, b) => {
-        const left = Number(a.id);
-        const right = Number(b.id);
-        if (Number.isFinite(left) && Number.isFinite(right) && left !== right) {
-            return left - right;
-        }
-        return String(a.id).localeCompare(String(b.id));
-    });
-    return rows.filter((row) => row.is_enabled);
+    return sortEnabledBindings(rows) as BindingRow[];
 }
 
 export async function fetchActiveTemplate(templateId: string | number): Promise<TemplateRow | null> {
@@ -240,7 +236,7 @@ export async function dispatchMail(
             msLogRedacted("[dispatch-service] binding lookup failed:", error);
             return { ok: false, reason: "binding-lookup-failed" };
         }
-        const binding = bindings.length > 0 ? bindings[0] : undefined;
+        const { binding } = evaluateRouting(bindings, payload);
         if (!binding) {
             msLogRedacted("[dispatch-service] no enabled binding for event:", {
                 event_key: eventKey,

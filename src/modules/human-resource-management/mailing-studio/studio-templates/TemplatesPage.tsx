@@ -1,11 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { LayoutTemplate, Loader2, RefreshCw, SearchX } from "lucide-react";
+import { LayoutTemplate, Loader2, MoreVertical, RefreshCw, SearchX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,9 +24,13 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 
+import { MsConfirmDialog } from "./components/MsConfirmDialog";
 import { MsPager } from "./components/MsPager";
 import { useMsPagination } from "./hooks/useMsPagination";
 import { useMsTemplates } from "./hooks/useMsTemplates";
+import { fetchMsTemplate } from "./providers/msTemplates";
+import { saveDesign, type DesignRow } from "./providers/designService";
+import { msPatch } from "./providers/msApi";
 
 type TemplateSort = "name" | "key" | "updated";
 
@@ -27,6 +39,8 @@ const SORT_OPTIONS: readonly { readonly value: TemplateSort; readonly label: str
     { value: "key", label: "Key A–Z" },
     { value: "updated", label: "Recently updated" },
 ];
+
+const DUPLICATE_ATTEMPTS = 20;
 
 function isActive(value: unknown): boolean {
     return value === true || value === 1 || value === "1" || value === "true";
@@ -48,11 +62,19 @@ function statusTone(value: unknown): string {
     return "border-border bg-muted text-muted-foreground";
 }
 
+function rowKey(row: DesignRow): string {
+    return String(row.id ?? row.template_key);
+}
+
 export function TemplatesPage() {
+    const router = useRouter();
     const { data, isLoading, error, refetch } = useMsTemplates();
     const [search, setSearch] = useState("");
     const [sort, setSort] = useState<TemplateSort>("name");
     const [retrying, setRetrying] = useState(false);
+    const [busyKey, setBusyKey] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [retireTarget, setRetireTarget] = useState<DesignRow | null>(null);
 
     const filtered = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -82,6 +104,85 @@ export function TemplatesPage() {
             await refetch();
         } finally {
             setRetrying(false);
+        }
+    };
+
+    const handleEdit = (row: DesignRow): void => {
+        router.push(`/hrm/mailing-studio/studio-templates/${encodeURIComponent(row.template_key)}/design`);
+    };
+
+    const handleDuplicate = async (row: DesignRow): Promise<void> => {
+        const key = rowKey(row);
+        setBusyKey(key);
+        setActionError(null);
+        try {
+            let designJson = row.design_json ?? null;
+            if (!designJson) {
+                const full = await fetchMsTemplate(row.id ?? row.template_key);
+                designJson = full?.design_json ?? null;
+            }
+            if (!designJson) {
+                setActionError(`Could not duplicate “${row.template_name}” — the saved design is empty.`);
+                return;
+            }
+            const taken = new Set((data ?? []).map((item) => item.template_key));
+            const base = row.template_key;
+            for (let attempt = 0; attempt < DUPLICATE_ATTEMPTS; attempt += 1) {
+                const candidate = attempt === 0 ? `${base}-copy` : `${base}-copy-${attempt + 1}`;
+                if (taken.has(candidate)) continue;
+                try {
+                    await saveDesign({
+                        template_key: candidate,
+                        template_name: `${row.template_name} (copy)`,
+                        subject: row.subject,
+                        design_json: designJson,
+                        is_active: isActive(row.is_active),
+                    });
+                    await refetch();
+                    return;
+                } catch (cause) {
+                    const message = cause instanceof Error ? cause.message : String(cause);
+                    if (message.includes("already in use")) {
+                        taken.add(candidate);
+                        continue;
+                    }
+                    setActionError(message === "" ? "Could not duplicate the template — please try again." : message);
+                    return;
+                }
+            }
+            setActionError(`Could not duplicate “${row.template_name}” — every copy key is taken. Rename the template and try again.`);
+        } finally {
+            setBusyKey(null);
+        }
+    };
+
+    const handleRestore = async (row: DesignRow): Promise<void> => {
+        const key = rowKey(row);
+        setBusyKey(key);
+        setActionError(null);
+        try {
+            await msPatch(`/studio-templates/${encodeURIComponent(key)}`, { is_active: true });
+            await refetch();
+        } catch (cause) {
+            setActionError(cause instanceof Error ? cause.message : String(cause));
+        } finally {
+            setBusyKey(null);
+        }
+    };
+
+    const handleRetireConfirm = async (): Promise<void> => {
+        if (!retireTarget) return;
+        const key = rowKey(retireTarget);
+        setBusyKey(key);
+        try {
+            await msPatch(`/studio-templates/${encodeURIComponent(key)}`, { is_active: false });
+            setRetireTarget(null);
+            await refetch();
+        } catch (cause) {
+            setActionError(cause instanceof Error ? cause.message : String(cause));
+            setRetireTarget(null);
+        } finally {
+            setBusyKey(null);
         }
     };
 
@@ -184,6 +285,16 @@ export function TemplatesPage() {
                 </div>
             ) : null}
 
+            {actionError ? (
+                <div
+                    className="rounded-lg border border-destructive/40 bg-card p-4"
+                    data-testid="templates-action-error"
+                    role="alert"
+                >
+                    <p className="text-sm text-destructive">{humaniseTemplatesError(actionError)}</p>
+                </div>
+            ) : null}
+
             {!isLoading && !error && data && data.length === 0 ? (
                 <div
                     className="flex flex-col items-center gap-2 rounded-lg border bg-card px-4 py-16 text-center"
@@ -211,11 +322,18 @@ export function TemplatesPage() {
             {visible.length > 0 ? (
                 <ul className="flex flex-col gap-2" data-testid="templates-list">
                     {visible.map((row) => {
+                        const key = rowKey(row);
+                        const busy = busyKey === key;
+                        const active = isActive(row.is_active);
                         return (
-                            <li data-testid="template-row" key={String(row.id ?? row.template_key)}>
+                            <li
+                                className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors duration-150 hover:border-primary/40"
+                                data-testid="template-row"
+                                key={key}
+                            >
                                 <Link
                                     aria-label={`Open in designer: ${row.template_name}`}
-                                    className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 transition-colors duration-150 hover:border-primary/40"
+                                    className="flex min-w-0 flex-1 flex-wrap items-center gap-3"
                                     href={`/hrm/mailing-studio/studio-templates/${encodeURIComponent(row.template_key)}/design`}
                                 >
                                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -230,15 +348,62 @@ export function TemplatesPage() {
                                         </span>
                                     </div>
                                     <Badge className={statusTone(row.is_active)} variant="outline">
-                                        {isActive(row.is_active) ? "Active" : "Retired"}
+                                        {active ? "Active" : "Retired"}
                                     </Badge>
                                 </Link>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            aria-label={`Actions for template ${row.template_name}`}
+                                            className="h-8 w-8 shrink-0"
+                                            disabled={busy}
+                                            size="icon"
+                                            variant="ghost"
+                                        >
+                                            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-[180px]">
+                                        <DropdownMenuItem disabled={busy} onSelect={() => handleEdit(row)}>
+                                            Edit in designer
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem disabled={busy} onSelect={() => void handleDuplicate(row)}>
+                                            Duplicate
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        {active ? (
+                                            <DropdownMenuItem
+                                                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                disabled={busy}
+                                                onSelect={() => setRetireTarget(row)}
+                                            >
+                                                Retire
+                                            </DropdownMenuItem>
+                                        ) : (
+                                            <DropdownMenuItem disabled={busy} onSelect={() => void handleRestore(row)}>
+                                                Restore
+                                            </DropdownMenuItem>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </li>
                         );
                     })}
                 </ul>
             ) : null}
             <MsPager page={page} totalPages={totalPages} onPage={setPage} />
+            <MsConfirmDialog
+                busy={busyKey !== null}
+                busyLabel="Retiring…"
+                confirmLabel="Retire template"
+                description="This retires the template: it stops being used for sending but stays in the list as Retired, so existing bindings keep their reference. Nothing is deleted."
+                open={retireTarget !== null}
+                title={retireTarget ? `Retire “${retireTarget.template_name}”?` : "Retire this template?"}
+                onConfirm={() => void handleRetireConfirm()}
+                onOpenChange={(open) => {
+                    if (!open) setRetireTarget(null);
+                }}
+            />
         </section>
     );
 }

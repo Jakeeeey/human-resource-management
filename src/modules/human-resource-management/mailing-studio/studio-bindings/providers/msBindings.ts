@@ -1,3 +1,4 @@
+import type { Condition } from "../events/utils/routing-conditions";
 import { msDelete, msGet, msPatch, msPost } from "./msApi";
 
 export interface MsBindingRow {
@@ -5,18 +6,24 @@ export interface MsBindingRow {
     event_key_id: string | number;
     template_id: string | number;
     is_enabled: boolean | number | string;
+    conditions: unknown | null;
+    priority: number | null;
 }
 
 export interface MsBindingCreate {
     event_key_id: string | number;
     template_id: string | number;
     is_enabled: boolean;
+    conditions?: Condition[] | null;
+    priority?: number | null;
 }
 
 export interface MsBindingPatch {
     event_key_id?: string | number;
     template_id?: string | number;
     is_enabled?: boolean;
+    conditions?: Condition[] | null;
+    priority?: number | null;
 }
 
 export async function fetchMsBindings(filters?: {
