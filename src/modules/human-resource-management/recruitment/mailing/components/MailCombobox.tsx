@@ -29,6 +29,8 @@ export interface MailComboboxProps {
     value?: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
+    searchPlaceholder?: string;
+    triggerId?: string;
     disabled?: boolean;
     className?: string;
 }
@@ -48,6 +50,8 @@ export function MailCombobox({
     value,
     onValueChange,
     placeholder = "Select option...",
+    searchPlaceholder,
+    triggerId,
     disabled = false,
     className,
 }: MailComboboxProps) {
@@ -57,14 +61,21 @@ export function MailCombobox({
         return options.find((opt) => opt.value === value)?.label;
     }, [options, value]);
 
+    const searchText = React.useMemo(() => {
+        if (searchPlaceholder) return searchPlaceholder;
+        if (placeholder.trim().toLowerCase().startsWith("search")) return placeholder;
+        return `Search ${placeholder.toLowerCase()}`;
+    }, [placeholder, searchPlaceholder]);
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
+                    id={triggerId}
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className={cn("w-full min-w-0 max-w-full justify-between", !value && "text-muted-foreground", className)}
+                    className={cn("h-8 w-full min-w-0 max-w-full justify-between text-xs", !value && "text-muted-foreground", className)}
                     disabled={disabled}
                 >
                     <span className="min-w-0 flex-1 truncate text-left" title={selectedLabel ?? undefined}>
@@ -78,7 +89,7 @@ export function MailCombobox({
                 align="start"
             >
                 <Command>
-                    <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+                    <CommandInput placeholder={searchText} />
                     <CommandList className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain">
                         <CommandEmpty>No results found.</CommandEmpty>
                         <CommandGroup>

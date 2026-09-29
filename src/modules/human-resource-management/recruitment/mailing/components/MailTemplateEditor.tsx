@@ -123,6 +123,31 @@ function tokensToChipSpans(html: string): string {
     });
 }
 
+const NESTED_CHIP_SPAN_PATTERN = /<span[^>]*\bql-var-chip\b[^>]*>([\s\S]*?)<\/span>([\s\S]*?)<\/span>/g;
+const FLAT_CHIP_SPAN_PATTERN = /<span[^>]*\bql-var-chip\b[^>]*>([^<]*)<\/span>/g;
+
+function chipMatchToToken(match: string): string {
+    const name = /data-var="(\w+)"/.exec(match)?.[1];
+    return name ? `{{${name}}}` : match;
+}
+
+/**
+ * Normalizes editor display HTML back to the stored {{token}} form for
+ * dirty comparison. Quill re-serializes chip spans with a nested
+ * contenteditable label span on load, so the raw state string differs from
+ * the stored row even with zero edits — both sides must pass through here.
+ * @param html - Editor display HTML (chip spans) or stored HTML (tokens).
+ * @returns The HTML with every chip span restored to its {{token}}.
+ */
+export function mailEditorHtmlToStoredTokens(html: string): string {
+    if (typeof html !== "string" || html.indexOf("ql-var-chip") === -1) return html;
+    return html
+        .replace(NESTED_CHIP_SPAN_PATTERN, (match) =>
+            match.indexOf("contenteditable") === -1 ? match : chipMatchToToken(match),
+        )
+        .replace(FLAT_CHIP_SPAN_PATTERN, chipMatchToToken);
+}
+
 interface MailTemplateEditorProps {
     value: string;
     onChange: (value: string) => void;
@@ -250,7 +275,7 @@ export const MailTemplateEditor = forwardRef<MailTemplateEditorHandle, MailTempl
                 onChange={onChange}
                 placeholder={placeholder ?? "Compose the email body… click a chip below to insert {{variables}}."}
                 formats={MAIL_FORMATS}
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card leading-relaxed focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background [&_.ql-container]:min-h-0 [&_.ql-container]:min-h-40 [&_.ql-container]:flex-1 [&_.ql-container]:border-0! [&_.ql-container]:bg-card [&_.ql-editor]:min-h-40 [&_.ql-editor]:overflow-y-auto [&_.ql-editor]:p-5! [&_.ql-editor]:text-sm [&_.ql-editor]:leading-relaxed! [&_.ql-editor]:text-foreground [&_.ql-editor.ql-blank::before]:text-muted-foreground! [&_.ql-editor.ql-blank::before]:not-italic! [&_.ql-toolbar]:border-x-0! [&_.ql-toolbar]:border-t-0! [&_.ql-toolbar]:border-b! [&_.ql-toolbar]:border-b-border! [&_.ql-toolbar]:bg-muted/40 [&_button]:text-muted-foreground [&_button:hover]:text-foreground! [&_.ql-toolbar_.ql-picker-label]:text-muted-foreground [&_.ql-toolbar_.ql-stroke]:stroke-muted-foreground! [&_.ql-toolbar_.ql-fill]:fill-muted-foreground! [&_.ql-var-chip]:inline-block [&_.ql-var-chip]:cursor-default [&_.ql-var-chip]:rounded-md [&_.ql-var-chip]:border [&_.ql-var-chip]:border-primary/50 [&_.ql-var-chip]:bg-primary/15 [&_.ql-var-chip]:px-2 [&_.ql-var-chip]:py-0.5 [&_.ql-var-chip]:text-xs [&_.ql-var-chip]:font-bold [&_.ql-var-chip]:text-primary"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card leading-relaxed focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background [&_.ql-container]:min-h-0 [&_.ql-container]:min-h-40 [&_.ql-container]:flex-1 [&_.ql-container]:border-0! [&_.ql-container]:bg-card [&_.ql-editor]:min-h-40 [&_.ql-editor]:overflow-y-auto [&_.ql-editor]:p-5! [&_.ql-editor]:text-sm [&_.ql-editor]:leading-relaxed! [&_.ql-editor]:text-foreground [&_.ql-editor.ql-blank::before]:text-muted-foreground! [&_.ql-editor.ql-blank::before]:not-italic! [&_.ql-toolbar]:border-x-0! [&_.ql-toolbar]:border-t-0! [&_.ql-toolbar]:border-b! [&_.ql-toolbar]:border-b-border! [&_.ql-toolbar]:bg-muted/40 [&_button]:text-muted-foreground [&_button:hover]:text-foreground! [&_.ql-toolbar_.ql-active]:text-primary! [&_.ql-toolbar_.ql-active_.ql-stroke]:stroke-primary! [&_.ql-toolbar_.ql-active_.ql-fill]:fill-primary! [&_.ql-toolbar_.ql-picker-label]:text-muted-foreground [&_.ql-toolbar_.ql-stroke]:stroke-muted-foreground! [&_.ql-toolbar_.ql-fill]:fill-muted-foreground! [&_.ql-var-chip]:inline-block [&_.ql-var-chip]:cursor-default [&_.ql-var-chip]:rounded-md [&_.ql-var-chip]:border [&_.ql-var-chip]:border-primary/50 [&_.ql-var-chip]:bg-primary/15 [&_.ql-var-chip]:px-2 [&_.ql-var-chip]:py-0.5 [&_.ql-var-chip]:text-xs [&_.ql-var-chip]:font-bold [&_.ql-var-chip]:text-primary"
             modules={chipsOn ? { toolbar: MAIL_TOOLBAR, "var-chip": true } : { toolbar: MAIL_TOOLBAR }}
         />
     );

@@ -22,6 +22,7 @@ import {
     type SendNowApplicant,
 } from "../providers/mailSendNowService";
 import { MailCombobox } from "./MailCombobox";
+import { sendFailureCopy } from "./MailManualSend";
 
 interface MailSendNowDialogProps {
     // Invite binding the dialog was opened from (null = closed). The event
@@ -112,7 +113,7 @@ export function MailSendNowDialog({ binding, onClose }: MailSendNowDialogProps) 
                 toast.success("Invite sent (logged to outbox).");
                 onClose();
             } else {
-                toast.error(`Not sent (${result.data?.reason ?? "unknown"}).`);
+                toast.error(sendFailureCopy("failed", result.data?.reason));
             }
         } finally {
             setSending(false);
@@ -131,11 +132,12 @@ export function MailSendNowDialog({ binding, onClose }: MailSendNowDialogProps) 
                         <Skeleton className="h-9 w-full" />
                     </div>
                 ) : loadError ? (
-                    <div className="grid gap-3">
-                        <p className="text-sm text-destructive">{loadError}</p>
+                    <div className="rounded-lg border border-destructive/40 bg-card p-4" role="alert">
+                        <p className="text-sm text-muted-foreground">{loadError}</p>
                         <Button
                             variant="outline"
-                            className="w-full sm:w-auto"
+                            size="sm"
+                            className="mt-2 w-full sm:w-auto"
                             onClick={() => {
                                 setLoading(true);
                                 setLoadError(null);
@@ -155,7 +157,7 @@ export function MailSendNowDialog({ binding, onClose }: MailSendNowDialogProps) 
                 ) : (
                     <div className="grid gap-3">
                         <div className="grid gap-1.5">
-                            <Label>Applicant</Label>
+                            <Label className="text-xs font-medium text-muted-foreground">Applicant</Label>
                             <MailCombobox
                                 options={options}
                                 value={pickedId}
@@ -170,7 +172,7 @@ export function MailSendNowDialog({ binding, onClose }: MailSendNowDialogProps) 
                             </p>
                         )}
                         <div className="grid gap-1.5">
-                            <Label htmlFor="mail-sendnow-email">Recipient email (optional)</Label>
+                            <Label htmlFor="mail-sendnow-email" className="text-xs font-medium text-muted-foreground">Recipient email (optional)</Label>
                             <Input
                                 id="mail-sendnow-email"
                                 type="email"
@@ -178,7 +180,7 @@ export function MailSendNowDialog({ binding, onClose }: MailSendNowDialogProps) 
                                 onChange={(e) => setToEmail(e.target.value)}
                                 placeholder="Blank = application record email"
                                 disabled={sending}
-                                className="truncate"
+                                className="h-8 truncate text-xs"
                             />
                             <p className="text-xs text-muted-foreground">
                                 {emailError ?? "One click sends exactly one invite to this address."}
@@ -187,10 +189,11 @@ export function MailSendNowDialog({ binding, onClose }: MailSendNowDialogProps) 
                     </div>
                 )}
                 <DialogFooter className="flex-col gap-2 sm:flex-row">
-                    <Button variant="outline" className="w-full sm:w-auto" disabled={sending} onClick={onClose}>
+                    <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={sending} onClick={onClose}>
                         Cancel
                     </Button>
                     <Button
+                        size="sm"
                         className="w-full sm:w-auto"
                         disabled={loading || sending || !picked || emailError !== null}
                         onClick={() => void handleSend()}
