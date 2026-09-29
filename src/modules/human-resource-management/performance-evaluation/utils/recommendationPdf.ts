@@ -232,9 +232,25 @@ export function buildRecommendationLetterPdf(
 
     doc.setFont("times", "bold");
     doc.text(blank(input.signatoryName).toUpperCase(), PAGE_MARGIN, y);
+    const recommenderNameY = y;
     y += 14;
     doc.setFont("times", "normal");
     doc.text(blank(input.signatoryTitle), PAGE_MARGIN, y);
+    const signRuleWidth = 200;
+    const signRuleOffset = 36;
+    const signRightX = pageWidth - PAGE_MARGIN - signRuleWidth;
+    doc.setFont("times", "bold");
+    doc.setFontSize(BODY_SIZE);
+    doc.text("APPROVED BY:", signRightX, recommenderNameY);
+    const lowerSignY = y + 50;
+    doc.text("NOTED BY:", PAGE_MARGIN, lowerSignY);
+    doc.text("APPROVED BY:", signRightX, lowerSignY);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.75);
+    doc.line(signRightX, recommenderNameY + signRuleOffset, signRightX + signRuleWidth, recommenderNameY + signRuleOffset);
+    doc.line(PAGE_MARGIN, lowerSignY + signRuleOffset, PAGE_MARGIN + signRuleWidth, lowerSignY + signRuleOffset);
+    doc.line(signRightX, lowerSignY + signRuleOffset, signRightX + signRuleWidth, lowerSignY + signRuleOffset);
+    y = lowerSignY + signRuleOffset;
 
     return doc.output("blob");
 }
