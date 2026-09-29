@@ -114,6 +114,58 @@ async function readUserRowsByUserEmail(
   }));
 }
 
+const UserLinkRowSchema = z.object({
+  user_id: z.number().int().positive(),
+  applicant_id: z.number().int().nullable().optional(),
+  company_id: z.number().int().nullable().optional(),
+});
+
+const UserLinkListSchema = z.object({
+  data: z.array(UserLinkRowSchema),
+});
+
+export async function persistHireUserLinks(input: {
+  userId: number;
+  applicantId: number;
+  companyId: number | null;
+}): Promise<void> {
+  const body: unknown = await dFetch(
+    `/items/user?filter[user_id][_eq]=${input.userId}&fields=user_id,applicant_id,company_id&limit=1`
+  );
+  const parsed = UserLinkListSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: user link read-back failed for user ${input.userId} (${JSON.stringify(body).slice(0, 300)})`
+    );
+  }
+  const row = parsed.data.data[0];
+  if (!row) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.userVerifyFailed}: user ${input.userId} is not visible for link persistence`
+    );
+  }
+  const patch: { applicant_id?: number; company_id?: number } = {};
+  if (row.applicant_id == null) {
+    patch.applicant_id = input.applicantId;
+  }
+  if (row.company_id == null && input.companyId !== null) {
+    patch.company_id = input.companyId;
+  }
+  if (Object.keys(patch).length === 0) return;
+  const patchBody: unknown = await dFetch(`/items/user/${input.userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+  const patchParsed = z
+    .object({ data: z.object({ user_id: z.number().int().positive() }) })
+    .safeParse(patchBody);
+  if (!patchParsed.success || patchParsed.data.data.user_id !== input.userId) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.userVerifyFailed}: user links for user ${input.userId} could not be persisted`
+    );
+  }
+}
+
 async function persistPersonalEmail(
   userId: number,
   personalEmail: string

@@ -208,6 +208,9 @@ export function PipPlanForm(props: {
     if (!currentPip && !failedEvaluation) {
       return "There is no failed evaluation to attach this PIP to.";
     }
+    if (detailedConcerns.trim() === "") {
+      return "Remarks is required.";
+    }
     for (const row of planRows) {
       if (row.area.trim() === "" || row.action.trim() === "") {
         return "Every action-plan row needs an area for improvement and an action plan.";
@@ -258,7 +261,7 @@ export function PipPlanForm(props: {
           pip_end_date: endDate === "" ? null : endDate,
           immediate_superior_id:
             trimmedSuperior === "" ? null : Number(trimmedSuperior),
-          detailed_concerns: trimmedConcerns === "" ? null : trimmedConcerns,
+          detailed_concerns: trimmedConcerns,
           action_plan: actionPlan,
         };
         await updatePip(currentPip.id, input);
@@ -273,7 +276,7 @@ export function PipPlanForm(props: {
           pip_end_date: endDate === "" ? null : endDate,
           immediate_superior_id:
             trimmedSuperior === "" ? null : Number(trimmedSuperior),
-          detailed_concerns: trimmedConcerns === "" ? null : trimmedConcerns,
+          detailed_concerns: trimmedConcerns,
           action_plan: actionPlan,
         };
         await createPip(input);
@@ -355,17 +358,19 @@ export function PipPlanForm(props: {
 
         <Separator />
 
-        <section aria-label="Detailed concerns" className="space-y-2">
+        <section aria-label="Remarks" className="space-y-2">
           <Label htmlFor="pip-detailed-concerns">
-            Detailed Areas for Improvement/Concern
+            Remarks <span className="text-destructive" aria-hidden="true">*</span>
           </Label>
           <Textarea
             id="pip-detailed-concerns"
             value={detailedConcerns}
             disabled={isReadOnly || saving}
             onChange={(event) => setDetailedConcerns(event.target.value)}
-            placeholder="Describe the observed concerns and the expected standard"
+            placeholder="Describe the observed performance and the expected standard"
             rows={4}
+            maxLength={4000}
+            aria-required="true"
           />
           <p className="text-xs text-muted-foreground">
             Printed on the PIP as the narrative behind the listed areas.

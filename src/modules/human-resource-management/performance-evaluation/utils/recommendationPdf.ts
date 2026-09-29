@@ -39,6 +39,28 @@ function formatLongDate(input: string): string {
 
 const blank = (v: string) => (v.trim() ? v : "________________");
 
+export interface RecommendationCompanyAddress {
+    company_address: string | null;
+    company_brgy: string | null;
+    company_city: string | null;
+    company_province: string | null;
+    company_zipCode: string | null;
+}
+
+export function formatRecommendationCompanyAddress(
+    parts: RecommendationCompanyAddress
+): string {
+    return [
+        parts.company_address,
+        parts.company_brgy,
+        parts.company_city,
+        parts.company_province,
+        parts.company_zipCode,
+    ]
+        .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+        .join(", ");
+}
+
 function departmentDisplay(value: string): string {
     const name = value.trim();
     if (!name) return "________________";
@@ -210,9 +232,25 @@ export function buildRecommendationLetterPdf(
 
     doc.setFont("times", "bold");
     doc.text(blank(input.signatoryName).toUpperCase(), PAGE_MARGIN, y);
+    const recommenderNameY = y;
     y += 14;
     doc.setFont("times", "normal");
     doc.text(blank(input.signatoryTitle), PAGE_MARGIN, y);
+    const signRuleWidth = 200;
+    const signRuleOffset = 56;
+    const signRightX = pageWidth - PAGE_MARGIN - signRuleWidth;
+    doc.setFont("times", "bold");
+    doc.setFontSize(BODY_SIZE);
+    doc.text("APPROVED BY:", signRightX, recommenderNameY);
+    const lowerSignY = y + 70;
+    doc.text("NOTED BY:", PAGE_MARGIN, lowerSignY);
+    doc.text("APPROVED BY:", signRightX, lowerSignY);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.75);
+    doc.line(signRightX, recommenderNameY + signRuleOffset, signRightX + signRuleWidth, recommenderNameY + signRuleOffset);
+    doc.line(PAGE_MARGIN, lowerSignY + signRuleOffset, PAGE_MARGIN + signRuleWidth, lowerSignY + signRuleOffset);
+    doc.line(signRightX, lowerSignY + signRuleOffset, signRightX + signRuleWidth, lowerSignY + signRuleOffset);
+    y = lowerSignY + signRuleOffset;
 
     return doc.output("blob");
 }

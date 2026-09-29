@@ -155,6 +155,24 @@ const HireOfferCompanyRowSchema = z.object({
   company_id: z.number().int().positive().nullable(),
 });
 
+export async function readHireOfferCompanyId(
+  applicantId: number
+): Promise<number | null> {
+  const offerBody: unknown = await dFetch(
+    `/items/job_offer?filter[applicant_id][_eq]=${applicantId}&fields=company_id&limit=1`
+  );
+  const offerError = directusErrorMessage(offerBody);
+  if (offerError) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: job offer for applicant ${applicantId} could not be read (${offerError})`
+    );
+  }
+  const offerRows = z
+    .array(HireOfferCompanyRowSchema)
+    .safeParse(unwrapData(offerBody));
+  return offerRows.success ? (offerRows.data[0]?.company_id ?? null) : null;
+}
+
 /**
  * Resolves the login email domain for a hire from the offer's company:
  * the applicant's `job_offer.company_id` -> `company_list.company_email` ->
@@ -169,21 +187,7 @@ const HireOfferCompanyRowSchema = z.object({
 export async function readHireCompanyDomain(
   applicantId: number
 ): Promise<string> {
-  const offerBody: unknown = await dFetch(
-    `/items/job_offer?filter[applicant_id][_eq]=${applicantId}&fields=company_id&limit=1`
-  );
-  const offerError = directusErrorMessage(offerBody);
-  if (offerError) {
-    throw new Error(
-      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: job offer for applicant ${applicantId} could not be read (${offerError})`
-    );
-  }
-  const offerRows = z
-    .array(HireOfferCompanyRowSchema)
-    .safeParse(unwrapData(offerBody));
-  const companyId = offerRows.success
-    ? (offerRows.data[0]?.company_id ?? null)
-    : null;
+  const companyId = await readHireOfferCompanyId(applicantId);
   if (companyId === null) {
     throw new Error(
       `${HIRE_ORCHESTRATOR_ERROR_CODES.companyMissing}: applicant ${applicantId} has no job offer company to derive the login domain from`

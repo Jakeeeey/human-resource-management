@@ -10,6 +10,7 @@ import {
   readHireApplicant,
   readHireApplicationByApplicant,
   readHireCompanyDomain,
+  readHireOfferCompanyId,
   readHireRecruitmentProfile,
   resolveHireIdentity,
   resolveHirePosition,
@@ -17,7 +18,7 @@ import {
 import { logHireActivity, placeholderApplicantEmail } from "./hire-log";
 import { buildLoginEmail, buildLoginLocalPart } from "./hire-email";
 import { listHireCompletionSteps } from "./hire-steps";
-import { resolveHireUser } from "./hire-user";
+import { resolveHireUser, persistHireUserLinks } from "./hire-user";
 
 // hire-orchestrator.ts — THE single post-hire completion orchestrator (todo 16).
 //
@@ -175,6 +176,19 @@ export async function runHireOrchestrator(
       authToken,
     });
     resolvedUserId = resolved.userId;
+
+    try {
+      const offerCompanyId = await readHireOfferCompanyId(applicantId).catch(
+        () => null
+      );
+      await persistHireUserLinks({
+        userId: resolved.userId,
+        applicantId,
+        companyId: offerCompanyId,
+      });
+    } catch (error) {
+      console.error("[hire-orchestrator] user link skipped:", toMessage(error));
+    }
 
     const steps = await runHireSteps(
       {
