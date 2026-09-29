@@ -21,6 +21,7 @@ import {
   Layers,
   Settings2,
   Clock,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRoleManagement } from "./hooks/useRoleManagement";
@@ -31,6 +32,7 @@ import {
   SupervisorTab,
   SalesmanTab,
   ExpenseReviewCommitteeTab,
+  ExpenseApproverTab,
 } from "./components/index";
 import { TimeAndAttendanceCommitteeTab } from "./components/TimeAndAttendanceCommitteeTab";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,7 @@ export default function RoleManagementModule() {
     executives,
     reviewCommittee,
     expenseReviewCommittee,
+    expenseApprovers,
     divisionHeads,
     supervisors,
     salesmanAssignments,
@@ -59,6 +62,8 @@ export default function RoleManagementModule() {
     createReviewCommittee,
     deleteExpenseReviewCommittee,
     createExpenseReviewCommittee,
+    deleteExpenseApprover,
+    createExpenseApprover,
     deleteDivisionHead,
     createDivisionHead,
     deleteSupervisor,
@@ -162,7 +167,7 @@ export default function RoleManagementModule() {
                     className="p-0 bg-transparent data-[state=active]:bg-transparent shadow-none border-none group text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
                   >
                     <div className="flex flex-col items-center gap-1 w-max">
-                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-primary transition-colors whitespace-nowrap">
+                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-white transition-colors whitespace-nowrap">
                         <item.icon className="h-4 w-4 opacity-50 group-data-[state=active]:opacity-100" />
                         <span className="font-bold text-sm tracking-tight whitespace-nowrap">{item.label}</span>
                       </div>
@@ -194,6 +199,7 @@ export default function RoleManagementModule() {
                 {[
                   { value: "review-committee", label: "Target Review", icon: ShieldCheck },
                   { value: "expense-review-committee", label: "Expense Review", icon: CircleDollarSign },
+                  { value: "expense-approvers", label: "Expense Approvers", icon: Wallet },
                   { value: "ta-committee", label: "TA Committee", icon: Clock },
                 ].map((item) => (
                   <TabsTrigger
@@ -202,7 +208,7 @@ export default function RoleManagementModule() {
                     className="p-0 bg-transparent data-[state=active]:bg-transparent shadow-none border-none group text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
                   >
                     <div className="flex flex-col items-center gap-1 w-max">
-                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-violet-600 transition-colors whitespace-nowrap">
+                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-white transition-colors whitespace-nowrap">
                         <item.icon className="h-4 w-4 opacity-50 group-data-[state=active]:opacity-100" />
                         <span className="font-bold text-sm tracking-tight whitespace-nowrap">{item.label}</span>
                       </div>
@@ -230,6 +236,17 @@ export default function RoleManagementModule() {
                 divisions={divisions}
                 onDelete={deleteExpenseReviewCommittee}
                 onCreate={createExpenseReviewCommittee}
+                divisionNameSetting={divisionNameSetting}
+              />
+            </TabsContent>
+            <TabsContent value="expense-approvers" className="mt-0 outline-none">
+              <ExpenseApproverTab
+                data={expenseApprovers}
+                isLoading={isLoading}
+                users={users}
+                divisions={divisions}
+                onDelete={deleteExpenseApprover}
+                onCreate={createExpenseApprover}
                 divisionNameSetting={divisionNameSetting}
               />
             </TabsContent>
