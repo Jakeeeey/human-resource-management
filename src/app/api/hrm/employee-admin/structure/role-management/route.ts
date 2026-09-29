@@ -35,6 +35,7 @@ async function proxy(req: NextRequest) {
     case "salesmen": upstreamPath = "/items/salesman"; break;
     case "review-committees": upstreamPath = "/items/review_committee?fields=*.*,approver_id.*"; break;
     case "expense-review-committees": upstreamPath = "/items/expense_review_committee?fields=*.*,approver_id.*,division_id.*"; break;
+    case "expense-approvers": upstreamPath = "/items/expense_approvers?fields=*.*,approver_id.*,division_id.*&filter[is_deleted][_eq]=0"; break;
     case "settings": upstreamPath = "/items/general_setting?filter[setting_key][_eq]=division_name"; break;
     default:
       // Fallback for cases like /executives/123
@@ -52,6 +53,7 @@ async function proxy(req: NextRequest) {
       }
       else if (segment.startsWith("review-committees/")) upstreamPath = `/items/review_committee/${segment.split("/")[1]}`;
       else if (segment.startsWith("expense-review-committees/")) upstreamPath = `/items/expense_review_committee/${segment.split("/")[1]}`;
+      else if (segment.startsWith("expense-approvers/")) upstreamPath = `/items/expense_approvers/${segment.split("/")[1]}`;
   }
 
   if (!upstreamPath) {
