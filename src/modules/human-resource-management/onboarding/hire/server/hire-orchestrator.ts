@@ -18,6 +18,7 @@ import {
 import { logHireActivity, placeholderApplicantEmail } from "./hire-log";
 import { buildLoginEmail, buildLoginLocalPart } from "./hire-email";
 import { listHireCompletionSteps } from "./hire-steps";
+import { isHireStepSkipped } from "./hire-skip-steps";
 import { resolveHireUser, persistHireUserLinks } from "./hire-user";
 
 // hire-orchestrator.ts — THE single post-hire completion orchestrator (todo 16).
@@ -51,7 +52,7 @@ async function runHireSteps(
 ): Promise<HireCompletionStepResult[]> {
   const results: HireCompletionStepResult[] = [];
   for (const step of listHireCompletionSteps()) {
-    if (skipSteps.includes(step.name || "post-hire-step")) continue;
+    if (isHireStepSkipped(step, skipSteps)) continue;
     try {
       results.push(await step(context));
     } catch (error) {

@@ -15,6 +15,7 @@ import { notFound } from "next/navigation";
 
 import { OnboardingWorkspace } from "@/modules/human-resource-management/onboarding/hub";
 import { resolveOnboardingOperator } from "@/modules/human-resource-management/onboarding/hub/operatorIdentity";
+import { getHireGateState } from "@/modules/human-resource-management/onboarding/hire/server/hire-gate-service";
 import { listOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
 
 export const runtime = "nodejs";
@@ -98,12 +99,21 @@ export default async function OnboardingWorkspacePage({
 
   const { userId: rawUserId } = await params;
   const userId = Number.parseInt(rawUserId, 10);
-  // A malformed id is not a hire; a valid id with no materialized task set is
-  // not in onboarding. Both are 404s (never a half-rendered workspace).
   if (!Number.isInteger(userId) || userId <= 0) notFound();
 
   const tasks = await listOnboardingTasks({ userId });
-  if (tasks.length === 0) notFound();
+  if (tasks.length === 0) {
+    let earlyOnboarding = false;
+    try {
+      const gate = await getHireGateState({ userId });
+      earlyOnboarding =
+        gate.userId === userId &&
+        (gate.applicantStatus === "signing_complete" || gate.applicantStatus === "for_training");
+    } catch {
+      earlyOnboarding = false;
+    }
+    if (!earlyOnboarding) notFound();
+  }
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

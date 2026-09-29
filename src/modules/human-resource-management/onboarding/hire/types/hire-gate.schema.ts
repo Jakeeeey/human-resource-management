@@ -66,9 +66,18 @@ export const HireGatePendingItemSchema = z.object({
   name: z.string(),
   status: ApplicantStatusSchema,
   position: z.string().nullable(),
+  userId: z.number().int().positive().nullable(),
 });
 
 export type HireGatePendingItem = z.infer<typeof HireGatePendingItemSchema>;
+
+export const HireGateProvisionBodySchema = z
+  .object({
+    applicant_id: z.number().int().positive(),
+  })
+  .strict();
+
+export type HireGateProvisionBody = z.infer<typeof HireGateProvisionBodySchema>;
 
 export const HireGateResponseSchema = z.object({
   success: z.boolean(),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardCheck, RefreshCw } from "lucide-react";
 
@@ -22,6 +22,9 @@ import {
 } from "@/modules/human-resource-management/onboarding/verification";
 
 import { useHireWorkspace } from "../hooks/useHireWorkspace";
+import { HireGateResponseSchema } from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
+import type { HireGateState } from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
+import { PreEmploymentTrainingSection } from "@/modules/human-resource-management/onboarding/pre-employment-training/components/PreEmploymentTrainingSection";
 import { phaseLabel, ROSTER_STATUS_LABELS, rosterStatusTone } from "../rosterData";
 import type { WorkspaceOperator } from "../taskInbox";
 import { TrainingTab } from "./TrainingTab";
@@ -56,6 +59,7 @@ export function OnboardingWorkspace({
     useHireWorkspace(userId);
   const [active, setActive] = useState<string>("overview");
   const [refreshTick, setRefreshTick] = useState(0);
+  const [gate, setGate] = useState<HireGateState | null>(null);
   const operator: WorkspaceOperator = {
     userId: operatorUserId,
     role: operatorRole,
@@ -72,6 +76,32 @@ export function OnboardingWorkspace({
   };
 
   const title = row?.name ?? "Unnamed employee";
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadGate() {
+      try {
+        const res = await fetch(
+          `/api/hrm/onboarding/hire-gate?user_id=${userId}`,
+          { cache: "no-store" }
+        );
+        const body: unknown = await res.json().catch(() => null);
+        const parsed = HireGateResponseSchema.safeParse(body);
+        if (cancelled) return;
+        setGate(
+          res.ok && parsed.success && parsed.data.success
+            ? (parsed.data.data?.gate ?? null)
+            : null
+        );
+      } catch {
+        if (!cancelled) setGate(null);
+      }
+    }
+    void loadGate();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   return (
     <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
@@ -170,14 +200,31 @@ export function OnboardingWorkspace({
         </TabsContent>
 
         <TabsContent value="training" className="m-0">
-          <TrainingTab
-            key={`training-${userId}`}
-            userId={userId}
-            groups={phaseGroups}
-            loading={loading}
-            error={error}
-            onRefresh={() => void refresh()}
-          />
+          <div className="space-y-8">
+            <TrainingTab
+              key={`training-${userId}`}
+              groups={phaseGroups}
+              loading={loading}
+              error={error}
+              onRefresh={() => void refresh()}
+            />
+            {gate?.applicantId != null ? (
+              <PreEmploymentTrainingSection
+                key={`pre-employment-training-${userId}`}
+                applicantId={gate.applicantId}
+                userId={userId}
+                applicantStatus={gate.applicantStatus}
+                prefill={{
+                  applicantName: row?.name,
+                  position: row?.position ?? undefined,
+                }}
+                trainingGroups={phaseGroups}
+                trainingLoading={loading}
+                trainingError={error}
+                onTrainingRefresh={() => void refresh()}
+              />
+            ) : null}
+          </div>
         </TabsContent>
 
         <TabsContent value="equipment" className="m-0">

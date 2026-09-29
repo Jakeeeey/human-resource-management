@@ -94,6 +94,24 @@ function unwrapList(body: unknown): unknown[] | null {
 export async function resolveHireUserIdByApplicant(
   applicantId: number
 ): Promise<number | null> {
+  const linkBody: unknown = await dFetch(
+    `/items/user?filter[applicant_id][_eq]=${applicantId}&fields=user_id&sort=user_id&limit=1`
+  );
+  if (directusErrorMessage(linkBody)) {
+    fail(
+      HIRE_GATE_ERROR_CODES.readFailed,
+      `user lookup for applicant ${applicantId} failed`
+    );
+  }
+  const linkParsed = UserIdRowSchema.safeParse(linkBody);
+  if (!linkParsed.success) {
+    fail(
+      HIRE_GATE_ERROR_CODES.readFailed,
+      `user lookup for applicant ${applicantId} answered an unreadable body`
+    );
+  }
+  const linked = linkParsed.data.data[0]?.user_id ?? null;
+  if (linked !== null) return linked;
   const application = await readHireApplicationByApplicant(applicantId);
   const email =
     typeof application?.email === "string" &&
@@ -237,11 +255,18 @@ export async function listPendingHireGates(): Promise<HireGatePendingItem[]> {
   for (const raw of rows) {
     const parsed = PendingApplicantRowSchema.safeParse(raw);
     if (!parsed.success || parsed.data.status !== "signing_complete") continue;
+    let userId: number | null = null;
+    try {
+      userId = await resolveHireUserIdByApplicant(parsed.data.id);
+    } catch {
+      userId = null;
+    }
     pending.push({
       applicantId: parsed.data.id,
       name: parsed.data.full_name?.trim() || `Applicant #${parsed.data.id}`,
       status: "signing_complete",
       position: parsed.data.position_applied_for?.trim() || null,
+      userId,
     });
   }
   return pending;
@@ -460,8 +485,13 @@ export async function runHireGateChoice(
     return getHireGateState({ applicantId: input.applicantId });
   }
 
-  let userId = await resolveHireUserIdByApplicant(input.applicantId);
-  if (userId === null) {
+  const preexistingUserId = await resolveHireUserIdByApplicant(
+    input.applicantId
+  );
+  let userId: number;
+  if (preexistingUserId !== null) {
+    userId = preexistingUserId;
+  } else {
     const orchestrated = await runHireOrchestrator({
       applicantId: input.applicantId,
       ...(actorId !== null ? { actorId } : {}),
@@ -469,7 +499,6 @@ export async function runHireGateChoice(
       skipSteps: [ONBOARDING_TASK_MATERIALIZE_STEP_NAME],
     });
     userId = orchestrated.userId;
-    await materializeNonTrainingTasks(userId, actorId);
     await logHireActivity({
       userId,
       userName: `Applicant #${input.applicantId}`,
@@ -478,6 +507,7 @@ export async function runHireGateChoice(
       reason: `hire-gate training: applicant=${input.applicantId} user_id=${userId}`,
     });
   }
+  await materializeNonTrainingTasks(userId, actorId);
   await setApplicantStatus({
     applicantId: input.applicantId,
     status: "for_training",
