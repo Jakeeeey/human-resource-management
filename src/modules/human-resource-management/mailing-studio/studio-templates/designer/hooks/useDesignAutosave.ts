@@ -18,6 +18,7 @@ export interface UseDesignAutosaveOptions {
     templateKey: string;
     templateName: string;
     subject: string;
+    isActive: boolean;
 }
 
 export interface DesignSaveResult {
@@ -74,7 +75,7 @@ export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignA
                 template_name: options.templateName,
                 subject: options.subject,
                 design_json: snapshotDesignJson(),
-                is_active: true,
+                is_active: options.isActive,
             };
             const saveId = options.templateId;
             if (saveId !== undefined && saveId !== null && String(saveId).trim() !== "") {
@@ -110,7 +111,8 @@ export function useDesignAutosave(options: UseDesignAutosaveOptions): UseDesignA
     const metaDirty =
         savedMeta.templateKey !== options.templateKey ||
         savedMeta.templateName !== options.templateName ||
-        savedMeta.subject !== options.subject;
+        savedMeta.subject !== options.subject ||
+        savedMeta.isActive !== options.isActive;
 
     return { status, error, message, dirty: dirty || metaDirty, save };
 }

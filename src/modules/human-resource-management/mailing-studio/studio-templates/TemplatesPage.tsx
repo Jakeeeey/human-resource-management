@@ -34,6 +34,14 @@ import { msPatch } from "./providers/msApi";
 
 type TemplateSort = "name" | "key" | "updated";
 
+type TemplateStatusFilter = "all" | "active" | "retired";
+
+const STATUS_OPTIONS: readonly { readonly value: TemplateStatusFilter; readonly label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "active", label: "Active" },
+    { value: "retired", label: "Retired" },
+];
+
 const SORT_OPTIONS: readonly { readonly value: TemplateSort; readonly label: string }[] = [
     { value: "name", label: "Name A–Z" },
     { value: "key", label: "Key A–Z" },
@@ -68,7 +76,8 @@ function rowKey(row: DesignRow): string {
 
 export function TemplatesPage() {
     const router = useRouter();
-    const { data, isLoading, error, refetch } = useMsTemplates();
+    const [status, setStatus] = useState<TemplateStatusFilter>("all");
+    const { data, isLoading, error, refetch } = useMsTemplates(status === "all" ? undefined : status === "active");
     const [search, setSearch] = useState("");
     const [sort, setSort] = useState<TemplateSort>("name");
     const [retrying, setRetrying] = useState(false);
@@ -215,6 +224,24 @@ export function TemplatesPage() {
                     }}
                 />
                 <Select
+                    value={status}
+                    onValueChange={(next) => {
+                        setStatus(next as TemplateStatusFilter);
+                        resetPage();
+                    }}
+                >
+                    <SelectTrigger aria-label="Filter templates by status" className="h-8 max-w-[220px] text-xs" size="sm">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                        {STATUS_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select
                     value={sort}
                     onValueChange={(next) => {
                         setSort(next as TemplateSort);
@@ -295,7 +322,7 @@ export function TemplatesPage() {
                 </div>
             ) : null}
 
-            {!isLoading && !error && data && data.length === 0 ? (
+            {!isLoading && !error && data && data.length === 0 && search.trim() === "" && status === "all" ? (
                 <div
                     className="flex flex-col items-center gap-2 rounded-lg border bg-card px-4 py-16 text-center"
                     data-testid="templates-empty"
@@ -308,7 +335,31 @@ export function TemplatesPage() {
                 </div>
             ) : null}
 
-            {!isLoading && !error && data && data.length > 0 && filtered.length === 0 ? (
+            {!isLoading && !error && data && data.length === 0 && search.trim() === "" && status === "active" ? (
+                <div
+                    className="flex flex-col items-center gap-2 rounded-lg border bg-card px-4 py-16 text-center"
+                    data-testid="templates-empty"
+                >
+                    <LayoutTemplate aria-hidden="true" className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No active templates.</p>
+                    <Button className="min-h-11 md:min-h-0" size="sm" asChild>
+                        <Link href="/hrm/mailing-studio/studio-templates/new">Create a template</Link>
+                    </Button>
+                </div>
+            ) : null}
+
+            {!isLoading && !error && data && data.length === 0 && search.trim() === "" && status === "retired" ? (
+                <div
+                    className="flex flex-col items-center gap-2 rounded-lg border bg-card px-4 py-16 text-center"
+                    data-testid="templates-empty"
+                >
+                    <LayoutTemplate aria-hidden="true" className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No retired templates.</p>
+                    <p className="text-xs text-muted-foreground">Retired templates stay in the list so existing bindings keep their reference.</p>
+                </div>
+            ) : null}
+
+            {!isLoading && !error && data && ((data.length > 0 && filtered.length === 0) || (data.length === 0 && search.trim() !== "")) ? (
                 <div
                     className="flex flex-col items-center gap-2 rounded-lg border bg-card px-4 py-16 text-center"
                     data-testid="templates-no-match"
