@@ -48,6 +48,8 @@ export const APPLICANT_STATUS_LABELS: Record<ApplicantStatus, string> = {
     final_approved: "Final Approved",
     for_signing: "For Signing",
     incomplete: "Incomplete",
+    signing_complete: "Signing Complete",
+    for_training: "For Training",
     hired: "Hired",
     rejected: "Rejected",
     withdrawn: "Withdrawn",

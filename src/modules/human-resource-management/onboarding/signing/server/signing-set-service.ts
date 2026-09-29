@@ -15,11 +15,9 @@ import { SIGNING_SET_ERROR_CODES } from "./signingSetIo";
 import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import {
   findSigningEnvelopeByApplicant,
-  insertJobOffer,
   insertPaperworkItemsBatch,
   insertPaperworks,
   insertSigningEnvelope,
-  patchJobOfferEnvelopeLink,
   patchPaperworksEnvelopeLink,
   resolveRequiredSigningTemplates,
 } from "./signingSetRows";
@@ -34,8 +32,7 @@ import {
 // On the `final_approved` transition this service idempotently materializes
 // the applicant-scoped signing set:
 //   paperworks (pending, required_count = required template set)
-//   -> job_offer (sent, offered_at = PH now)
-//   -> signing_envelope (pending, links both)
+//   -> signing_envelope (pending, links the batch)
 //   -> one pending paperwork_item per required template
 // then advances `applicant.status` through the SINGLE writer
 // `setApplicantStatus` (`final_approved` -> `for_signing`).
@@ -168,26 +165,16 @@ export async function ensureSigningSetForFinalApproved(
     now,
     ...(actorId != null ? { actorId } : {}),
   });
-  let jobOffer = await insertJobOffer({
-    applicantId,
-    now,
-    ...(actorId != null ? { actorId } : {}),
-  });
+  const jobOffer = null;
   const envelope = await insertSigningEnvelope({
     applicantId,
-    jobOfferId: jobOffer.id,
+    jobOfferId: null,
     paperworksId: paperworks.id,
     now,
     ...(actorId != null ? { actorId } : {}),
   });
   paperworks = await patchPaperworksEnvelopeLink({
     paperworksId: paperworks.id,
-    envelopeId: envelope.id,
-    now,
-    ...(actorId != null ? { actorId } : {}),
-  });
-  jobOffer = await patchJobOfferEnvelopeLink({
-    jobOfferId: jobOffer.id,
     envelopeId: envelope.id,
     now,
     ...(actorId != null ? { actorId } : {}),

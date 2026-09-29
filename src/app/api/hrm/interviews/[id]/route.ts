@@ -84,6 +84,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 return NextResponse.json({ error: "VALIDATION_FAILED", message: "A scoring template and application are required to submit interview grading." }, { status: 400 });
             }
             const verdict = body.verdict === "Passed" || body.verdict === "Failed" ? body.verdict : "Pending";
+            if (typeof body.notes !== "string" || !body.notes.trim()) {
+                return NextResponse.json({ error: "VALIDATION_FAILED", message: "Remarks is required." }, { status: 400 });
+            }
             const data = await interviewService.gradeScheduledInterview(id, {
                 stage,
                 application_id: body.application_id,
@@ -91,7 +94,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 verdict,
                 interviewed_by: typeof userId === "number" ? userId : null,
                 interviewed_at: typeof body.interviewed_at === "string" && body.interviewed_at ? body.interviewed_at : nowUTC(),
-                notes: typeof body.notes === "string" && body.notes ? body.notes : null,
+                notes: body.notes.trim(),
                 items: body.items,
             }, actorId);
             const autoApproved =

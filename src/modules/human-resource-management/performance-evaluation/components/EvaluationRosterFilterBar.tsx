@@ -20,15 +20,22 @@ export function EvaluationRosterFilterBar({
   onClear,
 }: {
   query: string;
-  department: string;
-  departmentOptions: readonly string[];
+  department?: string;
+  departmentOptions?: readonly string[];
   showRegular: boolean;
   filtersActive: boolean;
   onQueryChange: (value: string) => void;
-  onDepartmentChange: (value: string) => void;
+  onDepartmentChange?: (value: string) => void;
   onShowRegularChange: (value: boolean) => void;
   onClear: () => void;
 }) {
+  const showDepartment =
+    department !== undefined &&
+    departmentOptions !== undefined &&
+    onDepartmentChange !== undefined;
+  const departmentValue = department ?? "all";
+  const departmentList = departmentOptions ?? [];
+  const handleDepartmentChange = onDepartmentChange ?? (() => {});
   return (
     <div
       role="toolbar"
@@ -50,13 +57,15 @@ export function EvaluationRosterFilterBar({
         />
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center lg:shrink-0">
-        <DepartmentCombobox
-          id="evaluation-roster-department"
-          options={departmentOptions}
-          value={department}
-          onValueChange={onDepartmentChange}
-          placeholder="All departments"
-        />
+        {showDepartment ? (
+          <DepartmentCombobox
+            id="evaluation-roster-department"
+            options={departmentList}
+            value={departmentValue}
+            onValueChange={handleDepartmentChange}
+            placeholder="All departments"
+          />
+        ) : null}
         <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-background px-3">
           <Switch
             id="evaluation-roster-show-regular"

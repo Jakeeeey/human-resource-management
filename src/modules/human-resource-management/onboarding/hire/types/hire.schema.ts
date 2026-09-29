@@ -66,6 +66,20 @@ export const HireOrchestrationInputSchema = z
     authToken: z.string().min(1).optional(),
     /** Optional acting user id, threaded into post-hire step contexts. */
     actorId: z.number().int().positive().nullable().optional(),
+    /**
+     * Explicit status allow-list for THIS call only. Defaults to `["hired"]`
+     * so existing callers keep the refuse-any-non-hired guard; the
+     * onboarding-hub hire gate passes `["signing_complete", "for_training"]`
+     * to create the account before the applicant reaches `hired`.
+     */
+    allowedStatuses: z.array(ApplicantStatusSchema).min(1).optional(),
+    /**
+     * Registered post-hire step names to skip for THIS run only. Defaults to
+     * `[]` so existing callers run every step; the hire gate skips the
+     * task-materialize step on the for-training path to replace the UNION
+     * auto-assignment with the HR-chosen template.
+     */
+    skipSteps: z.array(z.string().min(1)).optional(),
   })
   .strict();
 

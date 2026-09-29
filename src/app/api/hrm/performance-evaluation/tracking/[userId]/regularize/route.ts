@@ -17,12 +17,19 @@ import {
   assertCapability,
   resolveEvaluationCapability,
 } from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
+import { getEvaluationWorkspace } from "@/modules/human-resource-management/performance-evaluation/server/evaluation-service";
 import { EvaluationTrackingSchema } from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation.schema";
 import {
   actorIdFromJwt,
   nowPH,
+  stampCreate,
   stampUpdate,
 } from "@/modules/human-resource-management/performance-evaluation/utils/audit";
+import { hasCompletedProbation } from "@/modules/human-resource-management/performance-evaluation/utils/probationClock";
+import {
+  type EvalType,
+  type WorkflowFacts,
+} from "@/modules/human-resource-management/performance-evaluation/utils/workflow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,53 +52,101 @@ export async function POST(
       return validationFailed({ user_id: ["Must be a positive integer"] });
     }
 
-    const body: unknown = await dFetch(
-      `/items/employee_evaluation_tracking?filter[user_id][_eq]=${userId}&limit=1`
-    );
-    const rows = unwrapData<unknown>(body);
-    const tracked = EvaluationTrackingSchema.safeParse(
-      Array.isArray(rows) ? rows[0] : undefined
-    );
-    if (!tracked.success || tracked.data.recommendation_issued_at === null) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Issue the recommendation letter first.",
-        },
-        { status: 400 }
-      );
+    const workspace = await getEvaluationWorkspace(userId);
+    const evalTypeById = new Map<number, EvalType>();
+    for (const evaluation of workspace.evaluations) {
+      evalTypeById.set(evaluation.id, evaluation.eval_type);
     }
-    if (tracked.data.regularized_at !== null) {
+    const facts: WorkflowFacts = {
+      dateHired: workspace.employee.date_hired,
+      regularizedAt: workspace.tracking?.regularized_at ?? null,
+      terminatedAt: workspace.tracking?.terminated_at ?? null,
+      recommendationIssuedAt:
+        workspace.tracking?.recommendation_issued_at ?? null,
+      evaluations: workspace.evaluations.map((evaluation) => ({
+        evalType: evaluation.eval_type,
+        result: evaluation.result,
+        voidedAt: evaluation.voided_at,
+      })),
+      pips: workspace.pips.map((pip) => ({
+        evaluationId: pip.evaluation_id,
+        evalType: evalTypeById.get(pip.evaluation_id) ?? "first",
+        status: pip.status,
+        acknowledgedAt: pip.employee_acknowledged_at,
+      })),
+    };
+    if (facts.regularizedAt !== null) {
       return NextResponse.json(
         { success: false, message: "The employee is already regularized." },
         { status: 409 }
       );
     }
+    if (facts.terminatedAt !== null) {
+      return NextResponse.json(
+        { success: false, message: "The employee is already separated." },
+        { status: 409 }
+      );
+    }
+    const viaRecommendation = facts.recommendationIssuedAt !== null;
+    const viaSixMonthCutoff = hasCompletedProbation(facts.dateHired);
+    if (!viaRecommendation && !viaSixMonthCutoff) {
+      const openPip = facts.pips.some((pip) => pip.status === "open");
+      if (openPip) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Close the open PIP before regularizing this employee.",
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const now = nowPH();
-    const patched = (await dFetch(
-      `/items/employee_evaluation_tracking/${tracked.data.id}`,
-      {
-        method: "PATCH",
+    if (workspace.tracking) {
+      const patched = (await dFetch(
+        `/items/employee_evaluation_tracking/${workspace.tracking.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(
+            stampUpdate(
+              {
+                regularized_at: now,
+                regularized_by: actorId,
+                updated_at: now,
+              },
+              actorId
+            )
+          ),
+        }
+      )) as { data?: unknown; errors?: unknown };
+      if (patched?.errors || !patched?.data) return mapWriteFailure(patched);
+    } else {
+      const created = (await dFetch("/items/employee_evaluation_tracking", {
+        method: "POST",
         body: JSON.stringify(
-          stampUpdate(
+          stampCreate(
             {
+              user_id: userId,
+              date_hired_snapshot: workspace.employee.date_hired,
               regularized_at: now,
               regularized_by: actorId,
+              created_at: now,
               updated_at: now,
             },
             actorId
           )
         ),
-      }
-    )) as { data?: unknown; errors?: unknown };
-    if (patched?.errors || !patched?.data) return mapWriteFailure(patched);
+      })) as { data?: unknown; errors?: unknown };
+      if (created?.errors || !created?.data) return mapWriteFailure(created);
+    }
 
     const readBack: unknown = await dFetch(
-      `/items/employee_evaluation_tracking/${tracked.data.id}`
+      `/items/employee_evaluation_tracking?filter[user_id][_eq]=${userId}&limit=1`
     );
+    const rows = unwrapData<unknown>(readBack);
     const parsed = EvaluationTrackingSchema.safeParse(
-      unwrapData<unknown>(readBack)
+      Array.isArray(rows) ? rows[0] : undefined
     );
     if (!parsed.success) return serverError();
     return ok(parsed.data);

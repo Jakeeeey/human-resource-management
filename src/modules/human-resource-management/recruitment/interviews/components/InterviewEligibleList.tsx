@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, Pencil } from "lucide-react";
@@ -26,7 +27,7 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, 
  *
  * Search filters through the hook joined-text lists (filteredInitial /
  * filteredFinal); the verdict dropdown filters the active tab by verdict
- * (All, Pending, Passed, Failed). Applicant names arrive as full_name per row from
+ * (Pending, Passed, Failed) when selected. Applicant names arrive as full_name per row from
  * the T4 envelope applicant lookup, with `Applicant #id` fallback only
  * when the name is truly missing.
  */
@@ -44,7 +45,8 @@ export function InterviewEligibleList() {
         handleView,
         latestPerApplication,
     } = useInterview();
-    const [verdictFilter, setVerdictFilter] = useState<"All" | "Pending" | "Passed" | "Failed">("All");
+    const [verdictFilter, setVerdictFilter] = useState<"Pending" | "Passed" | "Failed" | undefined>(undefined);
+    const [showCompleted, setShowCompleted] = useState(false);
     const [pageInitial, setPageInitial] = useState(1);
     const [pageFinal, setPageFinal] = useState(1);
     const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -53,10 +55,32 @@ export function InterviewEligibleList() {
         return <div className="p-4 text-red-500 bg-red-50 rounded-lg">Error: {error}</div>;
     }
 
+    const baseInitial = showCompleted
+        ? filteredInitial
+        : filteredInitial.filter(
+              (row) =>
+                  !interviews.some(
+                      (interview) =>
+                          interview.application_id === row.id &&
+                          interview.stage === "Initial" &&
+                          interview.score_sheet_id != null,
+                  ),
+          );
+    const baseFinal = showCompleted
+        ? filteredFinal
+        : filteredFinal.filter(
+              (row) =>
+                  !interviews.some(
+                      (interview) =>
+                          interview.stage === "Final" &&
+                          interview.recommendation_id === row.id &&
+                          interview.score_sheet_id != null,
+                  ),
+          );
     const visibleInitial =
-        verdictFilter === "All" ? filteredInitial : filteredInitial.filter((row) => row.latestInitialVerdict === verdictFilter);
+        verdictFilter === undefined ? baseInitial : baseInitial.filter((row) => row.latestInitialVerdict === verdictFilter);
     const visibleFinal =
-        verdictFilter === "All" ? filteredFinal : filteredFinal.filter((row) => row.latestFinalVerdict === verdictFilter);
+        verdictFilter === undefined ? baseFinal : baseFinal.filter((row) => row.latestFinalVerdict === verdictFilter);
 
     const initialPage = paginate(visibleInitial, pageInitial, pageSize);
     const finalPage = paginate(visibleFinal, pageFinal, pageSize);
@@ -69,11 +93,11 @@ export function InterviewEligibleList() {
         setPageFinal(1);
     };
 
-    const filtersActive = searchQuery.trim() !== "" || verdictFilter !== "All";
+    const filtersActive = searchQuery.trim() !== "" || verdictFilter !== undefined;
 
     const clearFilters = () => {
         setSearchQuery("");
-        setVerdictFilter("All");
+        setVerdictFilter(undefined);
         setPageInitial(1);
         setPageFinal(1);
     };
@@ -87,9 +111,10 @@ export function InterviewEligibleList() {
      */
     const emptyMessage = (noun: string, fallback: string): string => {
         const query = searchQuery.trim();
-        if (query && verdictFilter !== "All") return `No ${noun} match “${query}” with a ${verdictFilter} verdict.`;
+        if (query && verdictFilter !== undefined) return `No ${noun} match “${query}” with a ${verdictFilter} verdict.`;
         if (query) return `No ${noun} match “${query}”.`;
-        if (verdictFilter !== "All") return `No ${noun} with a ${verdictFilter} verdict.`;
+        if (verdictFilter !== undefined) return `No ${noun} with a ${verdictFilter} verdict.`;
+        if (!showCompleted) return `No ungraded ${noun}; turn on Show completed to reveal graded rows.`;
         return fallback;
     };
 
@@ -133,7 +158,7 @@ export function InterviewEligibleList() {
                 value={stageTab}
                 onValueChange={(value) => {
                     setStageTab(value as "Initial" | "Final");
-                    setVerdictFilter("All");
+                    setVerdictFilter(undefined);
                     setPageInitial(1);
                     setPageFinal(1);
                 }}
@@ -143,13 +168,13 @@ export function InterviewEligibleList() {
                         <TabsTrigger value="Initial" className="flex-1 sm:flex-none text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">
                             Initial
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
-                                {filteredInitial.length}
+                                {visibleInitial.length}
                             </span>
                         </TabsTrigger>
                         <TabsTrigger value="Final" className="flex-1 sm:flex-none text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">
                             Final
                             <span className="ml-2 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 px-2.5 py-0.5 text-xs font-bold">
-                                {filteredFinal.length}
+                                {visibleFinal.length}
                             </span>
                         </TabsTrigger>
                     </TabsList>
@@ -167,21 +192,35 @@ export function InterviewEligibleList() {
                         <Select
                             value={verdictFilter}
                             onValueChange={(value) => {
-                                setVerdictFilter(value as "All" | "Pending" | "Passed" | "Failed");
+                                setVerdictFilter(value as "Pending" | "Passed" | "Failed");
                                 setPageInitial(1);
                                 setPageFinal(1);
                             }}
                         >
                             <SelectTrigger className="w-full sm:w-40" aria-label="Filter by verdict">
-                                <SelectValue placeholder="All verdicts" />
+                                <SelectValue placeholder="Filter by verdict" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="All">All verdicts</SelectItem>
                                 <SelectItem value="Pending">Pending</SelectItem>
                                 <SelectItem value="Passed">Passed</SelectItem>
                                 <SelectItem value="Failed">Failed</SelectItem>
                             </SelectContent>
                         </Select>
+                        <div className="flex items-center gap-2">
+                            <Switch
+                                id="show-completed"
+                                checked={showCompleted}
+                                onCheckedChange={(checked) => {
+                                    setShowCompleted(checked);
+                                    setPageInitial(1);
+                                    setPageFinal(1);
+                                }}
+                                aria-label="Show completed"
+                            />
+                            <label htmlFor="show-completed" className="text-sm font-medium">
+                                Show completed
+                            </label>
+                        </div>
                     </div>
                 </div>
             </Tabs>

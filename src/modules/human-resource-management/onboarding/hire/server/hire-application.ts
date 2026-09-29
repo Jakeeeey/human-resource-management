@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { getApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import {
   HIRE_ORCHESTRATOR_ERROR_CODES,
   HireApplicantRowSchema,
@@ -154,6 +155,24 @@ const HireOfferCompanyRowSchema = z.object({
   company_id: z.number().int().positive().nullable(),
 });
 
+export async function readHireOfferCompanyId(
+  applicantId: number
+): Promise<number | null> {
+  const offerBody: unknown = await dFetch(
+    `/items/job_offer?filter[applicant_id][_eq]=${applicantId}&fields=company_id&limit=1`
+  );
+  const offerError = directusErrorMessage(offerBody);
+  if (offerError) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: job offer for applicant ${applicantId} could not be read (${offerError})`
+    );
+  }
+  const offerRows = z
+    .array(HireOfferCompanyRowSchema)
+    .safeParse(unwrapData(offerBody));
+  return offerRows.success ? (offerRows.data[0]?.company_id ?? null) : null;
+}
+
 /**
  * Resolves the login email domain for a hire from the offer's company:
  * the applicant's `job_offer.company_id` -> `company_list.company_email` ->
@@ -168,21 +187,7 @@ const HireOfferCompanyRowSchema = z.object({
 export async function readHireCompanyDomain(
   applicantId: number
 ): Promise<string> {
-  const offerBody: unknown = await dFetch(
-    `/items/job_offer?filter[applicant_id][_eq]=${applicantId}&fields=company_id&limit=1`
-  );
-  const offerError = directusErrorMessage(offerBody);
-  if (offerError) {
-    throw new Error(
-      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: job offer for applicant ${applicantId} could not be read (${offerError})`
-    );
-  }
-  const offerRows = z
-    .array(HireOfferCompanyRowSchema)
-    .safeParse(unwrapData(offerBody));
-  const companyId = offerRows.success
-    ? (offerRows.data[0]?.company_id ?? null)
-    : null;
+  const companyId = await readHireOfferCompanyId(applicantId);
   if (companyId === null) {
     throw new Error(
       `${HIRE_ORCHESTRATOR_ERROR_CODES.companyMissing}: applicant ${applicantId} has no job offer company to derive the login domain from`
@@ -387,4 +392,87 @@ export function buildSpringUserPayload(
     tinNumber: application.tin ?? undefined,
     pagibigNumber: application.pagibig_no ?? undefined,
   };
+}
+
+const HireUserContactRowSchema = z.object({
+  user_id: z.number().int().positive(),
+  personal_email: z.string().nullable().optional(),
+  user_email: z.string().nullable().optional(),
+  user_fname: z.string().nullable().optional(),
+  user_lname: z.string().nullable().optional(),
+});
+
+const HireApplicationLinkRowSchema = z.object({
+  id: z.number().int().positive(),
+  applicant_id: z.number().int().positive(),
+});
+
+function trimmedLinkValue(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return text.length > 0 ? text : null;
+}
+
+export async function resolveHireApplicantIdByUserId(
+  userId: number
+): Promise<number | null> {
+  const userBody: unknown = await dFetch(
+    `/items/user?filter[user_id][_eq]=${userId}&fields=user_id,personal_email,user_email,user_fname,user_lname&limit=1`
+  );
+  const userError = directusErrorMessage(userBody);
+  if (userError) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: user ${userId} lookup failed (${userError})`
+    );
+  }
+  const userRows = unwrapData(userBody);
+  const user =
+    Array.isArray(userRows) && userRows.length > 0
+      ? HireUserContactRowSchema.safeParse(userRows[0])
+      : null;
+  if (!user?.success) return null;
+
+  const email = trimmedLinkValue(user.data.personal_email);
+  if (email) {
+    const appBody: unknown = await dFetch(
+      `/items/application?filter[email][_eq]=${encodeURIComponent(email)}&fields=id,applicant_id&sort=id&limit=1`
+    );
+    const appError = directusErrorMessage(appBody);
+    if (appError) {
+      throw new Error(
+        `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: application lookup for user ${userId} failed (${appError})`
+      );
+    }
+    const appRows = unwrapData(appBody);
+    const link =
+      Array.isArray(appRows) && appRows.length > 0
+        ? HireApplicationLinkRowSchema.safeParse(appRows[0])
+        : null;
+    return link?.success ? link.data.applicant_id : null;
+  }
+
+  const firstName = trimmedLinkValue(user.data.user_fname);
+  const lastName = trimmedLinkValue(user.data.user_lname);
+  if (!firstName || !lastName) return null;
+  const nameBody: unknown = await dFetch(
+    `/items/application?filter[first_name][_eq]=${encodeURIComponent(firstName)}&filter[last_name][_eq]=${encodeURIComponent(lastName)}&fields=id,applicant_id&sort=id&limit=10`
+  );
+  const nameError = directusErrorMessage(nameBody);
+  if (nameError) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: application lookup for user ${userId} failed (${nameError})`
+    );
+  }
+  const nameRows = unwrapData(nameBody);
+  if (!Array.isArray(nameRows)) return null;
+  const candidates: number[] = [];
+  for (const raw of nameRows) {
+    const link = HireApplicationLinkRowSchema.safeParse(raw);
+    if (!link.success) continue;
+    const status = await getApplicantStatus(link.data.applicant_id).catch(
+      () => null
+    );
+    if (status === "for_training") candidates.push(link.data.applicant_id);
+  }
+  return candidates.length === 1 ? (candidates[0] as number) : null;
 }

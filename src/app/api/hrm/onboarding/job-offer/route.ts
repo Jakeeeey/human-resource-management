@@ -13,7 +13,7 @@ import {
   JobOfferListQuerySchema,
 } from "@/modules/human-resource-management/onboarding/signing/types/signing-api.schema";
 import { JobOfferSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { actorIdFromJwt, stampCreate, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { actorIdFromJwt, stampCreate, stampUpdate, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -116,6 +116,26 @@ export async function POST(req: NextRequest) {
         JSON.stringify(parsed.error.flatten())
       );
       return serverError();
+    }
+    if (validation.data.signing_envelope_id !== null) {
+      const linked = (await dFetch(
+        `/items/signing_envelope/${validation.data.signing_envelope_id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(
+            stampUpdate(
+              { joboffer_id: parsed.data.id, updated_at: now },
+              actorId
+            )
+          ),
+        }
+      )) as { data?: unknown; errors?: unknown };
+      if (linked?.errors || !linked?.data) {
+        console.error(
+          "[onboarding-job-offer] envelope link failed:",
+          JSON.stringify(linked)
+        );
+      }
     }
     return NextResponse.json(
       { success: true, data: parsed.data },

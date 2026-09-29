@@ -1,4 +1,4 @@
-import { addMonths, format } from "date-fns";
+import { addDays, addMonths, format } from "date-fns";
 
 export function addMonthsClamped(date: Date, months: number): Date {
   return addMonths(date, months);
@@ -27,12 +27,13 @@ export function parseLocalDate(value: string | null | undefined): Date | null {
 
 export function computeDueDates(
   dateHired: string | null | undefined
-): { third: string; fifth: string; sixth: string } | null {
+): { day30: string; day60: string; day90: string; sixth: string } | null {
   const hired = parseLocalDate(dateHired);
   if (hired === null) return null;
   return {
-    third: format(addMonthsClamped(hired, 3), "yyyy-MM-dd"),
-    fifth: format(addMonthsClamped(hired, 5), "yyyy-MM-dd"),
+    day30: format(addDays(hired, 30), "yyyy-MM-dd"),
+    day60: format(addDays(hired, 60), "yyyy-MM-dd"),
+    day90: format(addDays(hired, 90), "yyyy-MM-dd"),
     sixth: format(addMonthsClamped(hired, 6), "yyyy-MM-dd"),
   };
 }

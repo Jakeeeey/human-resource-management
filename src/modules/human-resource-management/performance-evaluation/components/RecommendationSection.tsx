@@ -13,6 +13,14 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 import type {
     WorkspaceBundle,
@@ -22,30 +30,21 @@ import {
     getDepartmentSuperiors,
     issueRecommendation,
     regularize,
+    setEmployeeCompany,
     type EvaluationScope,
 } from "../providers/evaluationClient";
 import { deriveNextAction, deriveStage } from "../utils/workflow";
 import { todayPH } from "../utils/probationClock";
-import { buildRecommendationLetterPdf } from "../utils/recommendationPdf";
+import {
+    buildRecommendationLetterPdf,
+    formatRecommendationCompanyAddress,
+} from "../utils/recommendationPdf";
 import { buildWorkflowFacts, workflowStageLabel } from "./OverviewSection";
 import { RecommendationLetterPreviewModal } from "./RecommendationLetterPreviewModal";
 
-interface CompanyLogo {
+interface CompanyOption {
     id: number;
     company_name: string;
-    logo_data_url: string | null;
-    is_default: boolean;
-}
-
-interface PdfCompanyRecord {
-    company_name: unknown;
-    company_address: unknown;
-    company_brgy: unknown;
-    company_city: unknown;
-    company_province: unknown;
-    company_zipCode: unknown;
-    company_contact: unknown;
-    company_email: unknown;
 }
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -109,6 +108,121 @@ function StepMarker({ state, step }: { state: "done" | "active" | "upcoming"; st
     );
 }
 
+function EmployeeCompanyPicker({
+    userId,
+    onRefresh,
+}: {
+    userId: number;
+    onRefresh: () => void;
+}) {
+    const [options, setOptions] = useState<CompanyOption[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [selected, setSelected] = useState("");
+    const [saving, setSaving] = useState(false);
+
+    const loadOptions = async () => {
+        setLoading(true);
+        setLoadFailed(false);
+        try {
+            const res = await fetch("/api/hrm/company-logos", { cache: "no-store" });
+            if (!res.ok) {
+                setLoadFailed(true);
+                return;
+            }
+            const json = await res.json().catch(() => null);
+            if (!Array.isArray(json?.data)) {
+                setLoadFailed(true);
+                return;
+            }
+            const rows: CompanyOption[] = [];
+            for (const entry of json.data as unknown[]) {
+                if (typeof entry !== "object" || entry === null) continue;
+                const record = entry as { id?: unknown; company_name?: unknown };
+                const id = Number(record.id);
+                const name = typeof record.company_name === "string" ? record.company_name : "";
+                if (!Number.isInteger(id) || id <= 0 || name.trim() === "") continue;
+                rows.push({ id, company_name: name });
+            }
+            setOptions(rows);
+        } catch {
+            setLoadFailed(true);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void loadOptions();
+    }, []);
+
+    const handleSave = async () => {
+        const companyId = Number(selected);
+        if (!Number.isInteger(companyId) || companyId <= 0 || saving) return;
+        setSaving(true);
+        try {
+            await setEmployeeCompany(userId, companyId);
+            toast.success("Company set");
+            onRefresh();
+        } catch (err) {
+            toast.error(errorMessage(err, "Failed to set the company."));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base">Set employee company</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                    No company is on record for this employee. Pick the company so the
+                    recommendation letter uses the right letterhead.
+                </p>
+                <div className="space-y-2">
+                    <Label htmlFor="employee-company-select">Company</Label>
+                    <Select value={selected} onValueChange={setSelected} disabled={loading || saving}>
+                        <SelectTrigger id="employee-company-select" className="w-full sm:w-80">
+                            <SelectValue
+                                placeholder={loading ? "Loading companies…" : "Select a company"}
+                            />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {options.map((option) => (
+                                <SelectItem key={option.id} value={String(option.id)}>
+                                    {option.company_name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                {loadFailed ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-muted-foreground">Failed to load companies.</p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void loadOptions()}
+                            disabled={loading || saving}
+                        >
+                            Retry
+                        </Button>
+                    </div>
+                ) : null}
+                <Button
+                    onClick={() => void handleSave()}
+                    disabled={selected.trim() === "" || loading || saving}
+                    className="w-full sm:w-auto"
+                >
+                    {saving ? "Saving…" : "Set company"}
+                </Button>
+            </CardContent>
+        </Card>
+    );
+}
+
 export function RecommendationSection({
     scope,
     userId,
@@ -120,76 +234,12 @@ export function RecommendationSection({
     bundle: WorkspaceBundle;
     onRefresh: () => void;
 }) {
-    const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
-    const [companyName, setCompanyName] = useState("");
-    const [headerAddress, setHeaderAddress] = useState("");
-    const [headerContact, setHeaderContact] = useState("");
-    const [headerEmail, setHeaderEmail] = useState("");
     const [signatoryName, setSignatoryName] = useState("");
     const [signatoryTitle, setSignatoryTitle] = useState("");
     const [issuing, setIssuing] = useState(false);
     const [regularizing, setRegularizing] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [previewOpen, setPreviewOpen] = useState(false);
-
-    useEffect(() => {
-        let cancelled = false;
-        void (async () => {
-            try {
-                const res = await fetch("/api/hrm/company-logos");
-                if (!res.ok) return;
-                const json = await res.json().catch(() => null);
-                if (cancelled || !Array.isArray(json?.data)) return;
-                const rows = json.data as CompanyLogo[];
-                const preferred = rows.find((row) => row.is_default) ?? rows[0];
-                if (!preferred) return;
-                setLogoDataUrl(preferred.logo_data_url);
-                setCompanyName((previous) => (previous.trim() ? previous : preferred.company_name));
-            } catch {
-                if (!cancelled) setLogoDataUrl(null);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-        void (async () => {
-            try {
-                const res = await fetch("/api/pdf/company");
-                if (!res.ok) return;
-                const json = await res.json().catch(() => null);
-                if (cancelled || !Array.isArray(json?.data)) return;
-                const rows = json.data as PdfCompanyRecord[];
-                const record = rows[0] ?? null;
-                if (!record) return;
-                const text = (value: unknown): string =>
-                    typeof value === "string" ? value : "";
-                const address = [
-                    text(record.company_address),
-                    text(record.company_brgy),
-                    text(record.company_city),
-                    text(record.company_province),
-                    text(record.company_zipCode),
-                ]
-                    .filter((part) => part.trim() !== "")
-                    .join(", ");
-                const name = text(record.company_name);
-                if (cancelled) return;
-                if (name.trim()) setCompanyName(name);
-                setHeaderAddress(address);
-                setHeaderContact(text(record.company_contact));
-                setHeaderEmail(text(record.company_email));
-            } catch {
-                return;
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -219,6 +269,13 @@ export function RecommendationSection({
         bundle.tracking?.regularized_at !== undefined;
 
     const isHr = scope === "hr";
+    const company = bundle.company;
+    const companyName = company?.company_name ?? "";
+    const headerAddress = company ? formatRecommendationCompanyAddress(company) : "";
+    const headerContact = company?.company_contact ?? "";
+    const headerEmail = company?.company_email ?? "";
+    const logoDataUrl = company?.logo_data_url ?? null;
+    const needsCompany = bundle.employee.company_id === null || bundle.employee.company_id === undefined;
     const readyToRecommend = nextAction?.key === "recommendation";
     const canIssue = isHr && readyToRecommend && !recommendationIssued && !issuing;
     const canRegularize = isHr && recommendationIssued && !alreadyRegular && !regularizing;
@@ -296,6 +353,9 @@ export function RecommendationSection({
 
     return (
         <div className="space-y-4">
+            {isHr && needsCompany ? (
+                <EmployeeCompanyPicker userId={userId} onRefresh={onRefresh} />
+            ) : null}
             <div className="grid gap-4 md:grid-cols-2">
                 <Card>
                     <CardHeader>

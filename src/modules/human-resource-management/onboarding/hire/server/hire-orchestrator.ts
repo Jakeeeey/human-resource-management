@@ -10,6 +10,7 @@ import {
   readHireApplicant,
   readHireApplicationByApplicant,
   readHireCompanyDomain,
+  readHireOfferCompanyId,
   readHireRecruitmentProfile,
   resolveHireIdentity,
   resolveHirePosition,
@@ -17,7 +18,7 @@ import {
 import { logHireActivity, placeholderApplicantEmail } from "./hire-log";
 import { buildLoginEmail, buildLoginLocalPart } from "./hire-email";
 import { listHireCompletionSteps } from "./hire-steps";
-import { resolveHireUser } from "./hire-user";
+import { resolveHireUser, persistHireUserLinks } from "./hire-user";
 
 // hire-orchestrator.ts — THE single post-hire completion orchestrator (todo 16).
 //
@@ -45,10 +46,12 @@ function toMessage(error: unknown): string {
 }
 
 async function runHireSteps(
-  context: HireCompletionContext
+  context: HireCompletionContext,
+  skipSteps: readonly string[]
 ): Promise<HireCompletionStepResult[]> {
   const results: HireCompletionStepResult[] = [];
   for (const step of listHireCompletionSteps()) {
+    if (skipSteps.includes(step.name || "post-hire-step")) continue;
     try {
       results.push(await step(context));
     } catch (error) {
@@ -95,8 +98,11 @@ export async function runHireOrchestrator(
         .join("; ")}`
     );
   }
-  const { applicantId, authToken, actorId } = validation.data;
+  const { applicantId, authToken, actorId, allowedStatuses, skipSteps } =
+    validation.data;
   const effectiveActorId = actorId ?? null;
+  const effectiveAllowed = allowedStatuses ?? ["hired"];
+  const effectiveSkipped = skipSteps ?? [];
 
   const applicant = await readHireApplicant(applicantId);
   if (!applicant) {
@@ -118,9 +124,9 @@ export async function runHireOrchestrator(
   let userName = applicant.full_name?.trim() ?? `Applicant #${applicantId}`;
 
   try {
-    if (applicant.status !== "hired") {
+    if (!effectiveAllowed.includes(applicant.status)) {
       throw new Error(
-        `${HIRE_ORCHESTRATOR_ERROR_CODES.applicantNotHired}: applicant ${applicantId} is "${applicant.status}", not "hired"`
+        `${HIRE_ORCHESTRATOR_ERROR_CODES.applicantNotHired}: applicant ${applicantId} is "${applicant.status}", not "${effectiveAllowed.join(" | ")}"`
       );
     }
 
@@ -171,14 +177,30 @@ export async function runHireOrchestrator(
     });
     resolvedUserId = resolved.userId;
 
-    const steps = await runHireSteps({
-      applicantId,
-      applicationId: application.id,
-      userId: resolved.userId,
-      userCreated: resolved.created,
-      email,
-      actorId: effectiveActorId,
-    });
+    try {
+      const offerCompanyId = await readHireOfferCompanyId(applicantId).catch(
+        () => null
+      );
+      await persistHireUserLinks({
+        userId: resolved.userId,
+        applicantId,
+        companyId: offerCompanyId,
+      });
+    } catch (error) {
+      console.error("[hire-orchestrator] user link skipped:", toMessage(error));
+    }
+
+    const steps = await runHireSteps(
+      {
+        applicantId,
+        applicationId: application.id,
+        userId: resolved.userId,
+        userCreated: resolved.created,
+        email,
+        actorId: effectiveActorId,
+      },
+      effectiveSkipped
+    );
 
     await logHireActivity({
       userId: resolved.userId,

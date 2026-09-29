@@ -15,6 +15,8 @@ import { materializeOnboardingTasks } from "../../tasks/server/onboarding-task-s
 
 const STEP_NAME = "onboarding-task-materialize";
 
+export const ONBOARDING_TASK_MATERIALIZE_STEP_NAME = STEP_NAME;
+
 export const onboardingTaskMaterializeStep: HireCompletionStep = async (
   context
 ): Promise<HireCompletionStepResult> => {

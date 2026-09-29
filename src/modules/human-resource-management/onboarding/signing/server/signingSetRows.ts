@@ -145,32 +145,10 @@ export async function insertPaperworks(input: {
   );
 }
 
-/** Insert the `job_offer` as `sent` (the offer leaves HR), PH-stamped. */
-export async function insertJobOffer(input: {
-  applicantId: number;
-  now: string;
-  actorId?: number | null;
-}): Promise<JobOffer> {
-  return insertRow(
-    "job_offer",
-    stampCreate(
-      {
-        applicant_id: input.applicantId,
-        status: "sent",
-        offered_at: input.now,
-        created_at: input.now,
-        updated_at: input.now,
-      },
-      input.actorId ?? null
-    ),
-    JobOfferSchema
-  );
-}
-
 /** Insert the `signing_envelope` aggregate (pending) linking offer + batch. */
 export async function insertSigningEnvelope(input: {
   applicantId: number;
-  jobOfferId: number;
+  jobOfferId: number | null;
   paperworksId: number;
   now: string;
   actorId?: number | null;
@@ -261,7 +239,7 @@ export async function patchJobOfferEnvelopeLink(input: {
 /** Repair the aggregate's own offer/batch pointers. */
 export async function patchSigningEnvelopeLinks(input: {
   envelopeId: number;
-  jobOfferId: number;
+  jobOfferId: number | null;
   paperworksId: number;
   now: string;
   actorId?: number | null;
