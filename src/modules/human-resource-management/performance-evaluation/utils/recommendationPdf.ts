@@ -237,12 +237,12 @@ export function buildRecommendationLetterPdf(
     doc.setFont("times", "normal");
     doc.text(blank(input.signatoryTitle), PAGE_MARGIN, y);
     const signRuleWidth = 200;
-    const signRuleOffset = 36;
+    const signRuleOffset = 56;
     const signRightX = pageWidth - PAGE_MARGIN - signRuleWidth;
     doc.setFont("times", "bold");
     doc.setFontSize(BODY_SIZE);
     doc.text("APPROVED BY:", signRightX, recommenderNameY);
-    const lowerSignY = y + 50;
+    const lowerSignY = y + 70;
     doc.text("NOTED BY:", PAGE_MARGIN, lowerSignY);
     doc.text("APPROVED BY:", signRightX, lowerSignY);
     doc.setDrawColor(0);
