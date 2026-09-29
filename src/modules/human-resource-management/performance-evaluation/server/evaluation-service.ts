@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch, DIRECTUS_URL } from "@/modules/human-resource-management/shared/utils/directus";
 
 import {
   EmployeeEvaluationItemSchema,
@@ -8,6 +8,7 @@ import {
   EmployeePipActionPlanSchema,
   EmployeePipAreaSchema,
   EmployeePipSchema,
+  EvaluationCompanySchema,
   EvaluationCriterionSchema,
   EvaluationTrackingSchema,
   RosterRowSchema,
@@ -15,6 +16,7 @@ import {
   type EmployeeEvaluation,
   type EmployeePip,
   type EmployeePipActionPlan,
+  type EvaluationCompany,
   type EvaluationCriterion,
   type EvaluationTracking,
   type RosterRow,
@@ -61,6 +63,7 @@ const RosterEmployeeSchema = z.object({
     .nullish(),
   user_position: z.string().nullish(),
   user_dateOfHire: z.string().nullish(),
+  company_id: z.union([z.number().int(), z.string().regex(/^\d+$/)]).nullish(),
   isDeleted: z.unknown().optional(),
   is_deleted: z.unknown().optional(),
   deleted: z.unknown().optional(),
@@ -148,6 +151,85 @@ function toDepartmentId(
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }
   return value.department_id > 0 ? value.department_id : null;
+}
+
+function toCompanyId(
+  value: RosterEmployee["company_id"]
+): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+const CompanyListRowSchema = z.object({
+  company_id: z.number().int(),
+  company_name: z.string().nullish(),
+  company_address: z.string().nullish(),
+  company_brgy: z.string().nullish(),
+  company_city: z.string().nullish(),
+  company_province: z.string().nullish(),
+  company_zipCode: z.string().nullish(),
+  company_contact: z.string().nullish(),
+  company_email: z.string().nullish(),
+  company_logo: z.string().nullish(),
+});
+
+const COMPANY_FIELDS =
+  "company_id,company_name,company_address,company_brgy,company_city,company_province,company_zipCode,company_contact,company_email,company_logo";
+
+async function fetchCompanyLogoDataUrl(
+  logoFile: string | null | undefined
+): Promise<string | null> {
+  if (typeof logoFile !== "string" || logoFile.trim() === "") return null;
+  const trimmed = logoFile.trim();
+  const assetMatch = trimmed.match(/\/?assets\/([a-f0-9-]+)/i);
+  const bareUuid = /^[a-f0-9-]{36}$/i.test(trimmed) ? trimmed : null;
+  const fileId = assetMatch ? assetMatch[1] : bareUuid;
+  if (!fileId) return null;
+  try {
+    const res = await fetch(`${DIRECTUS_URL}/assets/${fileId}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`,
+      },
+    });
+    if (!res.ok) return null;
+    const mime = res.headers.get("content-type") ?? "image/png";
+    const bytes = Buffer.from(await res.arrayBuffer()).toString("base64");
+    return `data:${mime};base64,${bytes}`;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveEmployeeCompany(
+  companyId: number | null
+): Promise<EvaluationCompany | null> {
+  if (companyId === null) return null;
+  try {
+    const body: unknown = await dFetch(
+      `/items/company_list/${companyId}?fields=${COMPANY_FIELDS}`
+    );
+    const row = unwrapData<unknown>(body);
+    const parsed = CompanyListRowSchema.safeParse(row);
+    if (!parsed.success) return null;
+    const source = parsed.data;
+    const candidate = {
+      company_id: source.company_id,
+      company_name: source.company_name?.trim() ? source.company_name : "",
+      company_address: normalizeText(source.company_address),
+      company_brgy: normalizeText(source.company_brgy),
+      company_city: normalizeText(source.company_city),
+      company_province: normalizeText(source.company_province),
+      company_zipCode: normalizeText(source.company_zipCode),
+      company_contact: normalizeText(source.company_contact),
+      company_email: normalizeText(source.company_email),
+      logo_data_url: await fetchCompanyLogoDataUrl(source.company_logo),
+    };
+    const company = EvaluationCompanySchema.safeParse(candidate);
+    return company.success ? company.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeText(value: string | null | undefined): string | null {
@@ -292,7 +374,7 @@ export async function listEvaluationRoster(
   const [employeeBody, departmentBody, trackingBody, evaluationBody, pipBody] =
     await Promise.all([
       dFetch(
-        "/items/user?fields=user_id,user_fname,user_mname,user_lname,user_department,user_position,user_dateOfHire,isDeleted&limit=-1"
+        "/items/user?fields=user_id,user_fname,user_mname,user_lname,user_department,user_position,user_dateOfHire,company_id,isDeleted&limit=-1"
       ),
       dFetch(
         "/items/department?fields=department_id,department_name&limit=-1"
@@ -414,7 +496,7 @@ async function resolveWorkspaceEmployee(
   tracking: EvaluationTracking | null
 ) {
   const employeeBody: unknown = await dFetch(
-    `/items/user/${userId}?fields=user_id,user_fname,user_mname,user_lname,user_department,user_position,user_dateOfHire`
+    `/items/user/${userId}?fields=user_id,user_fname,user_mname,user_lname,user_department,user_position,user_dateOfHire,company_id`
   );
   const employeeData = unwrapData<unknown>(employeeBody);
   const employeeRow = Array.isArray(employeeData) ? employeeData[0] : employeeData;
@@ -444,6 +526,7 @@ async function resolveWorkspaceEmployee(
     department_id: departmentId,
     department_name: departmentName,
     position: normalizeText(employee.user_position),
+    company_id: toCompanyId(employee.company_id),
     date_hired:
       normalizeText(tracking?.date_hired_snapshot) ??
       normalizeText(employee.user_dateOfHire),
@@ -505,11 +588,13 @@ export async function getEvaluationWorkspace(
           ),
           "employee_pip_action_plan"
         );
+  const employee = await resolveWorkspaceEmployee(
+    userId,
+    trackingRows[0] ?? null
+  );
   const bundle = {
-    employee: await resolveWorkspaceEmployee(
-      userId,
-      trackingRows[0] ?? null
-    ),
+    employee,
+    company: await resolveEmployeeCompany(employee.company_id),
     tracking: trackingRows[0] ?? null,
     evaluations,
     evaluationItems,

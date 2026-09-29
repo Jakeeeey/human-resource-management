@@ -219,7 +219,7 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                         </div>
                                         {entry.evaluator_comments ? (
                                             <div className="space-y-1">
-                                                <dt className="text-muted-foreground">Comments</dt>
+                                                <dt className="text-muted-foreground">Remarks</dt>
                                                 <dd className="text-foreground">{entry.evaluator_comments}</dd>
                                             </div>
                                         ) : null}
@@ -425,7 +425,7 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                             ) : null}
                                             {pip.detailed_concerns ? (
                                                 <div className="space-y-1">
-                                                    <p className="text-muted-foreground">Concerns</p>
+                                                     <p className="text-muted-foreground">Remarks</p>
                                                     <p className="text-foreground">{pip.detailed_concerns}</p>
                                                 </div>
                                             ) : null}

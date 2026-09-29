@@ -269,6 +269,7 @@ export function KpiSheetForm(props: {
     rows.length > 0 &&
     allRated &&
     result != null &&
+    comments.trim() !== "" &&
     weightsValid &&
     !unlinkedRow &&
     !libraryLoading;
@@ -305,6 +306,11 @@ export function KpiSheetForm(props: {
 
   async function handleSave(): Promise<void> {
     if (result == null || !allRated) return;
+    const trimmedComments = comments.trim();
+    if (trimmedComments === "") {
+      setSaveError("Evaluator Remarks is required.");
+      return;
+    }
     const payloadRatings: { criterion_id: number; rating: number }[] = [];
     for (let index = 0; index < rows.length; index += 1) {
       const row = rows[index];
@@ -320,11 +326,10 @@ export function KpiSheetForm(props: {
     setSaving(true);
     setSaveError(null);
     try {
-      const trimmedComments = comments.trim();
       if (existing) {
         const input: UpdateEvaluationInput = {
           result,
-          evaluator_comments: trimmedComments === "" ? null : trimmedComments,
+          evaluator_comments: trimmedComments,
           ratings: payloadRatings,
         };
         await updateEvaluation(existing.id, input);
@@ -334,7 +339,7 @@ export function KpiSheetForm(props: {
           eval_type: evalType,
           evaluation_date: todayIso(),
           result,
-          evaluator_comments: trimmedComments === "" ? null : trimmedComments,
+          evaluator_comments: trimmedComments,
           ratings: payloadRatings,
         };
         await createEvaluation(input);
@@ -379,8 +384,8 @@ export function KpiSheetForm(props: {
             </AlertTitle>
             <AlertDescription>
               {scope === "hr"
-                ? "The department head owns this evaluation step. You can review the scores, band, result, and comments below, but only the department head can submit them."
-                : "HR owns this step. You can review the scores, band, result, and comments below, but only HR can submit them."}
+                ? "The department head owns this evaluation step. You can review the scores, band, result, and remarks below, but only the department head can submit them."
+                : "HR owns this step. You can review the scores, band, result, and remarks below, but only HR can submit them."}
             </AlertDescription>
           </Alert>
         ) : null}
@@ -559,7 +564,7 @@ export function KpiSheetForm(props: {
 
         {libraryEmpty ? null : (
         <div className="space-y-2">
-          <Label htmlFor="kpi-evaluator-comments">Evaluator comments</Label>
+          <Label htmlFor="kpi-evaluator-comments">Evaluator Remarks <span className="text-destructive" aria-hidden="true">*</span></Label>
           <Textarea
             id="kpi-evaluator-comments"
             value={comments}
@@ -567,9 +572,11 @@ export function KpiSheetForm(props: {
             onChange={(event) => setComments(event.target.value)}
             placeholder="Observations, strengths, and concerns supporting the verdict"
             rows={4}
+            maxLength={4000}
+            aria-required="true"
           />
           <p className="text-xs text-muted-foreground">
-            Optional. Saved with the evaluation and shown in the history card.
+            Required. Saved with the evaluation and shown in the history card.
           </p>
         </div>
         )}
