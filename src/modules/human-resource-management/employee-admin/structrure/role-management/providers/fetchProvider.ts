@@ -8,6 +8,7 @@ import {
   Salesman,
   ReviewCommittee,
   ExpenseReviewCommittee,
+  ExpenseApprover,
   TAApprover,
   Department
 } from "../types";
@@ -109,6 +110,19 @@ export async function createExpenseReviewCommittee(data: Partial<ExpenseReviewCo
 
 export async function deleteExpenseReviewCommittee(id: number): Promise<void> {
   await request("DELETE", `${PROXY_BASE}/expense-review-committees/${id}`);
+}
+
+// --- Expense Approvers ---
+export async function listExpenseApprovers(): Promise<ExpenseApprover[]> {
+  return request<ExpenseApprover[]>("GET", `${PROXY_BASE}/expense-approvers`);
+}
+
+export async function createExpenseApprover(data: Partial<ExpenseApprover>): Promise<void> {
+  await request("POST", `${PROXY_BASE}/expense-approvers`, data);
+}
+
+export async function deleteExpenseApprover(id: number): Promise<void> {
+  await request("DELETE", `${PROXY_BASE}/expense-approvers/${id}`);
 }
 
 // --- Division Heads ---
