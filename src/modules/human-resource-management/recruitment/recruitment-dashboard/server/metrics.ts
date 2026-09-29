@@ -8,7 +8,9 @@ import type {
 import type {
     ApplicantRow,
     EvaluationRow,
+    ManpowerRow,
     PipRow,
+    RecommendationRow,
     TrackingRow,
 } from "./rows";
 import {
@@ -17,12 +19,18 @@ import {
 import { dayKey } from "./dates";
 import { buildProbation, countPendingAcknowledgement } from "./probation";
 import { buildPositionBreakdown } from "./cohorts";
+import { deriveRequestEffectiveStatus } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/requestStatus";
+import {
+    isApplicantHired,
+    isApplicantSlotOccupying,
+} from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/applicantPipeline";
 
 export type DashboardInput = {
     readonly applicantTotal: number;
     readonly applicantByStatus: readonly StatusCount[];
     readonly applicants: readonly ApplicantRow[];
-    readonly manpowerByStatus: readonly StatusCount[];
+    readonly manpowerRequests: readonly ManpowerRow[];
+    readonly recommendations: readonly RecommendationRow[];
     readonly tracking: readonly TrackingRow[];
     readonly evaluations: readonly EvaluationRow[];
     readonly pips: readonly PipRow[];
@@ -75,9 +83,29 @@ export function buildDashboard(input: DashboardInput): RecruitmentDashboardData 
     const probation = buildProbation(input.tracking, input.evaluations, input.pips);
     const probationCount = (status: string): number =>
         probation.byStatus.find((row) => row.status === status)?.count ?? 0;
-    const openRequisitions = input.manpowerByStatus
-        .filter((row) => row.status.toLowerCase() === "approved")
-        .reduce((total, row) => total + row.count, 0);
+    const applicantStatusById = new Map<number, string | null | undefined>(
+        input.applicants.map((applicant) => [applicant.id, applicant.status])
+    );
+    let openManpowerRequests = 0;
+    for (const request of input.manpowerRequests) {
+        if ((request.status ?? "") !== "Approved") continue;
+        let slotOccupying = 0;
+        let hired = 0;
+        for (const recommendation of input.recommendations) {
+            if (recommendation.manpower_request_id !== request.id) continue;
+            const status =
+                recommendation.applicant_id == null
+                    ? undefined
+                    : applicantStatusById.get(recommendation.applicant_id);
+            if (isApplicantSlotOccupying(status)) slotOccupying += 1;
+            if (isApplicantHired(status)) hired += 1;
+        }
+        const effective = deriveRequestEffectiveStatus(request.status, request.no_manpower_needed ?? 0, {
+            approved: slotOccupying,
+            hired,
+        });
+        if (effective !== "Closed") openManpowerRequests += 1;
+    }
 
     const applicantTiles: QueueTile[] = APPLICANT_QUEUES.map((spec) => {
         const count = sum(spec.statuses);
@@ -95,11 +123,11 @@ export function buildDashboard(input: DashboardInput): RecruitmentDashboardData 
         ...applicantTiles,
         {
             key: "requisitions",
-            label: "Open requisitions",
-            count: openRequisitions,
-            href: "/hrm/manpower-request",
+            label: "Open manpower requests",
+            count: openManpowerRequests,
+            href: "/hrm/manpower-recommendation",
             tone: "neutral",
-            hint: "Attach applicants to the open role",
+            hint: "Open the approved manpower requests",
             share: null,
         },
         {

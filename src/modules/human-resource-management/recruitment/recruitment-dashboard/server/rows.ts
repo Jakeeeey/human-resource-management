@@ -52,6 +52,7 @@ export type InterviewRow = z.infer<typeof interviewRowSchema>;
 
 export const recommendationRowSchema = z.object({
     applicant_id: intOrNull,
+    manpower_request_id: intOrNull,
     status: strOrNull,
 });
 export type RecommendationRow = z.infer<typeof recommendationRowSchema>;
@@ -73,6 +74,7 @@ export const manpowerRowSchema = z.object({
     position: strOrNull,
     status: strOrNull,
     requesting_department_id: intOrNull,
+    no_manpower_needed: intOrNull,
 });
 export type ManpowerRow = z.infer<typeof manpowerRowSchema>;
 

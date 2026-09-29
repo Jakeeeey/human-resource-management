@@ -156,7 +156,7 @@ export function fetchInterviewRows(): Promise<InterviewRow[]> {
 export function fetchRecommendationRows(): Promise<RecommendationRow[]> {
     return fetchList(
         recommendationRowSchema,
-        listPath("manpower_recommendation", "applicant_id,status", 200)
+        listPath("manpower_recommendation", "applicant_id,manpower_request_id,status", 200)
     );
 }
 
@@ -183,7 +183,7 @@ export function fetchManpowerByStatus(): Promise<StatusCount[]> {
 export function fetchManpowerRows(): Promise<ManpowerRow[]> {
     return fetchList(
         manpowerRowSchema,
-        listPath("manpower_request", "id,position,status,requesting_department_id", 100)
+        listPath("manpower_request", "id,position,status,requesting_department_id,no_manpower_needed", 100)
     );
 }
 
@@ -238,6 +238,18 @@ export function fetchPipRows(): Promise<PipRow[]> {
     return fetchList(
         pipRowSchema,
         listPath("employee_pip", "user_id,status,employee_acknowledged_at", 200)
+    );
+}
+
+export function fetchPipRowsForUser(userId: number): Promise<PipRow[]> {
+    return fetchList(
+        pipRowSchema,
+        listPath(
+            "employee_pip",
+            "user_id,status,employee_acknowledged_at",
+            200,
+            `&filter[user_id][_eq]=${userId}`
+        )
     );
 }
 

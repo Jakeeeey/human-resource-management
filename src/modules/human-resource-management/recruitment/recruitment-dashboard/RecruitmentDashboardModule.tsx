@@ -4,28 +4,50 @@ import React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, LayoutDashboard, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import { useRecruitmentDashboard } from "./hooks/useRecruitmentDashboard";
-import { QueueTiles } from "./components/QueueTiles";
+import { ATTENTION_KEYS, PIPELINE_KEYS, AttentionHighlight, StageList, SummaryStrip } from "./components/QueueTiles";
 import { VolumeChart } from "./components/VolumeChart";
-import { BreakdownCards } from "./components/BreakdownCards";
+import { PositionList } from "./components/BreakdownCards";
+import type { Granularity, RecruitmentDashboardData } from "./types";
 
 function LoadingState() {
     return (
         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-                {[0, 1, 2, 3].map((key) => (
-                    <Skeleton key={key} className="h-28" />
-                ))}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Skeleton className="h-28 rounded-2xl" />
+                <Skeleton className="h-28 rounded-2xl" />
+                <Skeleton className="h-28 rounded-2xl" />
+                <Skeleton className="h-28 rounded-2xl" />
             </div>
-            <Skeleton className="h-72" />
-            <Skeleton className="h-96" />
+            <div className="grid gap-4 lg:grid-cols-3">
+                <Skeleton className="h-80 rounded-2xl lg:col-span-2" />
+                <Skeleton className="h-80 rounded-2xl" />
+            </div>
         </div>
     );
 }
 
+function summaryFigures(data: RecruitmentDashboardData): {
+    readonly active: number;
+    readonly hired: number;
+    readonly attention: number;
+} {
+    const byKey = new Map(data.queues.map((tile) => [tile.key, tile.count]));
+    const active = PIPELINE_KEYS.filter((key) => key !== "hired").reduce(
+        (sum, key) => sum + (byKey.get(key) ?? 0),
+        0
+    );
+    return {
+        active,
+        hired: byKey.get("hired") ?? 0,
+        attention: ATTENTION_KEYS.reduce((sum, key) => sum + (byKey.get(key) ?? 0), 0),
+    };
+}
+
 export default function RecruitmentDashboardModule() {
     const { data, isLoading, isError, errorMessage, reload } = useRecruitmentDashboard();
+    const [granularity, setGranularity] = React.useState<Granularity>("day");
 
     if (isError) {
         return (
@@ -43,46 +65,75 @@ export default function RecruitmentDashboardModule() {
         );
     }
 
+    const figures = data === null ? null : summaryFigures(data);
+
     return (
-        <div className="p-2 sm:p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen space-y-4 sm:space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2 relative z-10">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-primary/10 rounded-2xl shadow-sm border border-primary/20">
-                        <LayoutDashboard className="w-8 h-8 text-primary" />
-                    </div>
+        <div className="min-h-screen rounded-2xl bg-[#f2f2f9] p-3 sm:p-5 md:p-6 dark:bg-background">
+            <div className="mx-auto max-w-[1400px] space-y-4 sm:space-y-5">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-                            Recruitment Dashboard
+                        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+                            Recruitment · Onboarding
+                        </p>
+                        <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+                            Recruitment dashboard
                         </h1>
-                        <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
-                            Live work queues — every tile opens the module where HR acts on it.
+                        <p className="mt-1 text-sm font-normal text-muted-foreground">
+                            Follow every applicant from application to hired.
                         </p>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={reload}
+                            disabled={isLoading}
+                            className="rounded-full bg-white dark:bg-card"
+                        >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Refresh
+                        </Button>
+                    </div>
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={reload}
-                    disabled={isLoading}
-                    className="w-full sm:w-auto"
-                >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Refresh
-                </Button>
+                {isLoading || data === null || figures === null ? (
+                    <LoadingState />
+                ) : (
+                    <React.Fragment>
+                        <SummaryStrip
+                            total={data.totalApplicants}
+                            active={figures.active}
+                            hired={figures.hired}
+                            attention={figures.attention}
+                        />
+                        <div className="grid items-stretch gap-4 lg:grid-cols-3">
+                            <div className="min-w-0 lg:col-span-2">
+                                <VolumeChart
+                                    daily={data.volumeDaily}
+                                    rangeStart={data.volumeStart}
+                                    rangeEnd={data.volumeEnd}
+                                    granularity={granularity}
+                                    onGranularityChange={setGranularity}
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <PositionList rows={data.breakdown.applicantsByPosition} />
+                            </div>
+                        </div>
+                        <div className="grid items-start gap-4 lg:grid-cols-3">
+                            <div className="min-w-0 lg:col-span-2">
+                                <StageList queues={data.queues} />
+                            </div>
+                            <div className="min-w-0">
+                                <AttentionHighlight queues={data.queues} />
+                            </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Updated {new Date(data.generatedAt).toLocaleString()} ·{" "}
+                            {data.bounds.applicantRowsScanned} applicant rows scanned.
+                        </p>
+                    </React.Fragment>
+                )}
             </div>
-            {isLoading || data === null ? (
-                <LoadingState />
-            ) : (
-                <React.Fragment>
-                    <QueueTiles queues={data.queues} />
-                    <VolumeChart
-                        daily={data.volumeDaily}
-                        rangeStart={data.volumeStart}
-                        rangeEnd={data.volumeEnd}
-                    />
-                    <BreakdownCards data={data} />
-                </React.Fragment>
-            )}
         </div>
     );
 }
