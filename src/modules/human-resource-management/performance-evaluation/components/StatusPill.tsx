@@ -4,6 +4,7 @@ export const PROBATION_STATUS_LABELS: Record<string, string> = {
   probationary: "Probationary",
   pip_open: "PIP in progress",
   recommendation_issued: "For regularization",
+  subject_to_termination: "Subject to termination",
   regular: "Regular",
   terminated: "Separated",
 };
@@ -12,6 +13,7 @@ export const PROBATION_STATUS_TONES: Record<string, StatusTone> = {
   probationary: "info",
   pip_open: "warning",
   recommendation_issued: "info",
+  subject_to_termination: "warning",
   regular: "success",
   terminated: "destructive",
 };

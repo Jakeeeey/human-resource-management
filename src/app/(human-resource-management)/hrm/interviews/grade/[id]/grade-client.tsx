@@ -17,11 +17,11 @@ const GradeFormSchema = z.object({
     template_id: z.number({ error: "Please select a scoring template" }),
     verdict: z.enum(["Pending", "Passed", "Failed"], { error: "Please select a verdict" }),
     interview_date: z.string({ error: "Please select an interview date" }).min(1, { error: "Please select an interview date" }),
-    notes: z.string().nullable().optional(),
+    notes: z.string().trim().min(1, { error: "Remarks is required" }),
     scores: z.array(
-        z.number({ error: "Enter a score from 1 to 100" })
-            .min(1, { error: "Score must be between 1 and 100" })
-            .max(100, { error: "Score must be between 1 and 100" })
+        z.number({ error: "Enter a score from 0 to 100" })
+            .min(0, { error: "Enter a score from 0 to 100" })
+            .max(100, { error: "Score must be between 0 and 100" })
             .optional(),
     ),
 });
@@ -308,7 +308,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                     template_id: selectedTemplate.id,
                     verdict: values.verdict,
                     interviewed_at: values.interview_date,
-                    notes: values.notes || null,
+                    notes: values.notes.trim(),
                     items,
                 }),
             });
@@ -600,11 +600,11 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel className="text-xs font-bold uppercase text-muted-foreground">
-                                            Notes
+                                            Remarks <span className="text-destructive">*</span>
                                         </FormLabel>
                                         <FormControl>
                                             <Textarea
-                                                placeholder="Grader notes (optional)"
+                                                placeholder="Remarks"
                                                 className="min-h-[100px] resize-none bg-muted/30 focus:bg-background transition-colors"
                                                 rows={4}
                                                 {...field}

@@ -53,7 +53,8 @@ function formatDay(value: string | null | undefined): string {
 }
 
 function evaluationTriggerLabel(evalType: string, date: string): string {
-    return `${evalType === "first" ? "1st" : "2nd"} evaluation · ${formatDay(date)}`;
+    const ordinal = evalType === "first" ? "1st" : evalType === "second" ? "2nd" : "3rd";
+    return `${ordinal} evaluation · ${formatDay(date)}`;
 }
 
 type OutcomeFilter = "all" | "passed" | "failed" | "open" | "voided";
@@ -229,7 +230,7 @@ export function HistoryPanel({ bundle }: { bundle: WorkspaceBundle }) {
                                             <div className="overflow-x-auto rounded-lg border border-border">
                                                 <table className="data-grid w-full min-w-[640px] border-0">
                                                     <caption className="sr-only">
-                                                        Per-KPI ratings for the {entry.eval_type === "first" ? "1st" : "2nd"} evaluation on {formatDay(entry.evaluation_date)}
+                                                        Per-KPI ratings for the {entry.eval_type === "first" ? "1st" : entry.eval_type === "second" ? "2nd" : "3rd"} evaluation on {formatDay(entry.evaluation_date)}
                                                     </caption>
                                                     <thead>
                                                         <tr>

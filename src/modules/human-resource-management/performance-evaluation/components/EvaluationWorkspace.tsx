@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ClipboardCheck, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,7 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 import { useEvaluationWorkspace } from "../hooks/useEvaluationWorkspace";
-import type { EvaluationScope } from "../providers/evaluationClient";
+import {
+    EvaluationClientError,
+    regularize,
+    type EvaluationScope,
+} from "../providers/evaluationClient";
 import type { WorkspaceBundle } from "../types/performance-evaluation.schema";
 import { computeDueDates, formatHiredDate } from "../utils/probationClock";
 import {
@@ -18,6 +24,7 @@ import {
     deriveProbationStatus,
     deriveStage,
     type NextAction,
+    type WorkflowFacts,
 } from "../utils/workflow";
 import { derivePipPhase } from "../utils/pipGuards";
 import { HistoryPanel } from "./HistoryPanel";
@@ -30,14 +37,24 @@ import {
 } from "./OverviewSection";
 import { StageRail } from "./StageRail";
 
-function dueKeyForAction(key: NextAction["key"]): "third" | "fifth" | "sixth" {
-    if (key === "second_evaluation" || key === "create_pip_2" || key === "close_pip_2") {
-        return "fifth";
+type DueKey = "day30" | "day60" | "day90" | "sixth";
+
+function pipDueKey(facts: WorkflowFacts): DueKey {
+    const openPip = facts.pips.find((pip) => pip.status === "open") ?? facts.pips[0] ?? null;
+    if (openPip?.evalType === "second") return "day60";
+    if (openPip?.evalType === "third") return "day90";
+    return "day30";
+}
+
+function dueKeyForAction(key: NextAction["key"], facts: WorkflowFacts): DueKey | null {
+    if (key === "second_evaluation") return "day60";
+    if (key === "third_evaluation") return "day90";
+    if (key === "recommendation" || key === "regularize") return "sixth";
+    if (key === "confirm_termination") return null;
+    if (key === "create_pip_1" || key === "acknowledge_pip_1" || key === "evaluate_pip_1") {
+        return pipDueKey(facts);
     }
-    if (key === "recommendation" || key === "regularize") {
-        return "sixth";
-    }
-    return "third";
+    return "day30";
 }
 
 function stageHrefForAction(scope: EvaluationScope, userId: number): string {
@@ -51,16 +68,17 @@ function stageCtaLabel(bundle: WorkspaceBundle): string | null {
     const stage = deriveStage(facts);
     if (stage === "first_evaluation") return "Open 1st evaluation form";
     if (stage === "second_evaluation") return "Open 2nd evaluation form";
-    if (stage === "pip_1" || stage === "pip_2") {
-        const pipNumber = stage === "pip_1" ? "1" : "2";
-        if (bundle.pips.length === 0) return `Create PIP #${pipNumber}`;
+    if (stage === "third_evaluation") return "Open 3rd evaluation form";
+    if (stage === "termination_review") return "Review termination";
+    if (stage === "pip_1") {
+        if (bundle.pips.length === 0) return "Create PIP";
         const currentPip = [...bundle.pips].sort((a, b) => b.id - a.id)[0];
         const phase = derivePipPhase({
             status: currentPip.status,
             employeeAcknowledgedAt: currentPip.employee_acknowledged_at,
         });
-        if (phase === "ready_for_review") return `Record PIP #${pipNumber} outcome`;
-        return `Edit PIP #${pipNumber} plan`;
+        if (phase === "ready_for_review") return "Record PIP outcome";
+        return "Edit PIP plan";
     }
     if (stage === "recommendation") return "Open recommendation form";
     if (stage === "regularization") return "Open regularization form";
@@ -82,9 +100,11 @@ function formatClosingDate(value: string | null | undefined): string {
     return formatHiredDate(value.slice(0, 10));
 }
 
-function ClosingSummary({ bundle }: { bundle: WorkspaceBundle }) {
+function ClosingSummary({ bundle, derivedRegular }: { bundle: WorkspaceBundle; derivedRegular: boolean }) {
     const tracking = bundle.tracking;
-    const regular = tracking?.regularized_at !== null && tracking?.regularized_at !== undefined;
+    const regular =
+        derivedRegular ||
+        (tracking?.regularized_at !== null && tracking?.regularized_at !== undefined);
     const closingDate = regular
         ? formatClosingDate(tracking?.regularized_at)
         : formatClosingDate(tracking?.terminated_at);
@@ -116,8 +136,76 @@ function ClosingSummary({ bundle }: { bundle: WorkspaceBundle }) {
     );
 }
 
-function WorkspaceSkeletons() {
+function EarlyRegularizeBypass({ userId, onDone }: { userId: number; onDone: () => void }) {
+    const [saving, setSaving] = useState(false);
+    const [confirming, setConfirming] = useState(false);
+
+    const handleRegularize = async () => {
+        setSaving(true);
+        try {
+            await regularize(userId);
+            toast.success("Employee regularized");
+            setConfirming(false);
+            onDone();
+        } catch (err) {
+            toast.error(
+                err instanceof EvaluationClientError ? err.message : "Failed to regularize this employee.",
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
+        <Card>
+            <CardContent className="space-y-2 pt-6">
+                <p className="text-sm font-medium">HR early regularization bypass</p>
+                {confirming ? (
+                    <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                            Regularize this employee now, before the evaluation cycle completes?
+                        </p>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button
+                                size="sm"
+                                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                disabled={saving}
+                                onClick={() => void handleRegularize()}
+                            >
+                                {saving ? "Saving…" : "Yes, regularize now"}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                disabled={saving}
+                                onClick={() => setConfirming(false)}
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                            Available even after one or two evaluations — skips the remaining steps.
+                        </p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-h-11 w-full sm:w-auto md:min-h-0"
+                            onClick={() => setConfirming(true)}
+                        >
+                            Regularize early
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function WorkspaceSkeletons() {    return (
         <div className="space-y-6" aria-label="Loading workspace">
             <Skeleton className="h-44 w-full" />
             <Skeleton className="h-24 w-full" />
@@ -143,7 +231,8 @@ export function EvaluationWorkspace({
     const stage = facts ? deriveStage(facts) : null;
     const action = facts ? deriveNextAction(facts) : null;
     const dueDates = facts ? computeDueDates(facts.dateHired) : null;
-    const dueDate = action && dueDates ? dueDates[dueKeyForAction(action.key)] : null;
+    const dueKey = action && facts ? dueKeyForAction(action.key, facts) : null;
+    const dueDate = action && dueDates && dueKey ? dueDates[dueKey] : null;
     const rosterHref =
         scope === "hr"
             ? `/hrm/performance-evaluation?selected=${userId}`
@@ -266,7 +355,15 @@ export function EvaluationWorkspace({
                         showCta={showStageCta}
                     />
 
-                    {stage === "closed" ? <ClosingSummary bundle={bundle} /> : null}
+                    {stage === "closed" ? <ClosingSummary bundle={bundle} derivedRegular={status === "regular"} /> : null}
+
+                    {scope === "hr" &&
+                    (stage === "first_evaluation" ||
+                        stage === "pip_1" ||
+                        stage === "second_evaluation" ||
+                        stage === "third_evaluation") ? (
+                        <EarlyRegularizeBypass userId={userId} onDone={handleRefresh} />
+                    ) : null}
 
                     <HistoryPanel bundle={bundle} />
                 </div>

@@ -28,7 +28,7 @@ import {
 export function buildWorkflowFacts(bundle: WorkspaceBundle): WorkflowFacts {
     const evalTypeById = new Map(bundle.evaluations.map((entry) => [entry.id, entry.eval_type]));
     return {
-        dateHired: bundle.tracking?.date_hired_snapshot ?? null,
+        dateHired: bundle.employee.date_hired ?? null,
         regularizedAt: bundle.tracking?.regularized_at ?? null,
         terminatedAt: bundle.tracking?.terminated_at ?? null,
         recommendationIssuedAt: bundle.tracking?.recommendation_issued_at ?? null,
@@ -48,11 +48,12 @@ export function buildWorkflowFacts(bundle: WorkspaceBundle): WorkflowFacts {
 
 const STAGE_LABELS: Record<WorkflowStage, string> = {
     first_evaluation: "1st evaluation",
-    pip_1: "PIP #1",
+    pip_1: "PIP",
     second_evaluation: "2nd evaluation",
-    pip_2: "PIP #2",
+    third_evaluation: "3rd evaluation",
     recommendation: "Recommendation",
     regularization: "Regularization",
+    termination_review: "Termination review",
     closed: "Closed",
 };
 
@@ -85,6 +86,21 @@ function dueBadgeFor(due: string, relevant: boolean) {
     return null;
 }
 
+type DueKey = "day30" | "day60" | "day90" | "sixth";
+
+function pipDueKey(facts: WorkflowFacts): DueKey {
+    const openPip = facts.pips.find((pip) => pip.status === "open") ?? facts.pips[0] ?? null;
+    if (openPip?.evalType === "second") return "day60";
+    if (openPip?.evalType === "third") return "day90";
+    if (openPip !== null) return "day30";
+    const failed = facts.evaluations.find(
+        (entry) => entry.voidedAt === null && entry.result === "failed",
+    );
+    if (failed?.evalType === "second") return "day60";
+    if (failed?.evalType === "third") return "day90";
+    return "day30";
+}
+
 function DueRow({
     label,
     due,
@@ -93,8 +109,8 @@ function DueRow({
 }: {
     label: string;
     due: string;
-    dueKey: "third" | "fifth" | "sixth";
-    relevantKey: "third" | "fifth" | "sixth" | null;
+    dueKey: DueKey;
+    relevantKey: DueKey | null;
 }) {
     return (
         <div className="flex items-center justify-between gap-2">
@@ -121,13 +137,17 @@ export function WorkspaceHero({
     const stage = deriveStage(facts);
     const dueDates = computeDueDates(facts.dateHired);
     const relevantKey =
-        stage === "first_evaluation" || stage === "pip_1"
-            ? "third"
-            : stage === "second_evaluation" || stage === "pip_2"
-              ? "fifth"
-              : stage === "recommendation" || stage === "regularization"
-                ? "sixth"
-                : null;
+        stage === "first_evaluation"
+            ? ("day30" as DueKey)
+            : stage === "pip_1"
+              ? pipDueKey(facts)
+              : stage === "second_evaluation"
+                ? ("day60" as DueKey)
+                : stage === "third_evaluation"
+                  ? ("day90" as DueKey)
+                  : stage === "recommendation" || stage === "regularization"
+                    ? ("sixth" as DueKey)
+                    : null;
     const identity = [employee?.department_name, employee?.position].filter(
         (part): part is string => part !== null && part !== undefined && part !== "",
     );
@@ -147,8 +167,9 @@ export function WorkspaceHero({
                     ) : null}
                     {dueDates ? (
                         <dl className="space-y-1 pt-2 text-sm">
-                            <DueRow label="3rd-month due" due={dueDates.third} dueKey="third" relevantKey={relevantKey} />
-                            <DueRow label="5th-month due" due={dueDates.fifth} dueKey="fifth" relevantKey={relevantKey} />
+                            <DueRow label="30-day due" due={dueDates.day30} dueKey="day30" relevantKey={relevantKey} />
+                            <DueRow label="60-day due" due={dueDates.day60} dueKey="day60" relevantKey={relevantKey} />
+                            <DueRow label="90-day due" due={dueDates.day90} dueKey="day90" relevantKey={relevantKey} />
                             <DueRow label="6th-month due" due={dueDates.sixth} dueKey="sixth" relevantKey={relevantKey} />
                         </dl>
                     ) : (

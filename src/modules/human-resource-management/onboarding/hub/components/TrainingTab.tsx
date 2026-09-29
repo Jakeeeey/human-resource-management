@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, GraduationCap } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,11 +14,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 
+import { HireGateResponseSchema } from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
+import type { HireGateState } from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
 import { TASK_STATUS_LABELS, taskStatusTone } from "../rosterData";
 import type {
   WorkspacePhaseGroup,
   WorkspaceTaskItem,
 } from "../workspaceTasks";
+import { HireGateCard } from "./HireGateCard";
 
 // TrainingTab.tsx — the per-hire workspace Training section, rewritten onto the
 // training-templates system. The hire's TRAINING-phase `onboarding_task` rows
@@ -35,11 +38,13 @@ function isSatisfied(item: WorkspaceTaskItem): boolean {
 }
 
 export function TrainingTab({
+  userId,
   groups,
   loading,
   error,
   onRefresh,
 }: {
+  userId: number;
   groups: WorkspacePhaseGroup[];
   loading: boolean;
   error: string | null;
@@ -47,9 +52,41 @@ export function TrainingTab({
 }) {
   const [checkingId, setCheckingId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [gate, setGate] = useState<HireGateState | null>(null);
 
   const group = groups.find((entry) => entry.phase === TRAINING_PHASE) ?? null;
   const items = group?.items ?? [];
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadGate() {
+      try {
+        const res = await fetch(
+          `/api/hrm/onboarding/hire-gate?user_id=${userId}`,
+          { cache: "no-store" }
+        );
+        const body: unknown = await res.json().catch(() => null);
+        const parsed = HireGateResponseSchema.safeParse(body);
+        if (cancelled) return;
+        setGate(
+          res.ok && parsed.success && parsed.data.success
+            ? (parsed.data.data?.gate ?? null)
+            : null
+        );
+      } catch {
+        if (!cancelled) setGate(null);
+      }
+    }
+    void loadGate();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, groups]);
+
+  const showGate =
+    gate !== null &&
+    (gate.applicantStatus === "signing_complete" ||
+      (gate.applicantStatus === "for_training" && gate.needsTrainingChoice));
 
   const markDone = useCallback(
     async (taskId: number) => {
@@ -124,6 +161,10 @@ export function TrainingTab({
           <AlertTitle>Could not mark this item done</AlertTitle>
           <AlertDescription>{actionError}</AlertDescription>
         </Alert>
+      ) : null}
+
+      {showGate && gate ? (
+        <HireGateCard applicantId={gate.applicantId} onDone={onRefresh} />
       ) : null}
 
       {error ? null : items.length === 0 ? (

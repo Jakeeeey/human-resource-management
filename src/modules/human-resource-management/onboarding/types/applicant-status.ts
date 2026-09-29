@@ -25,6 +25,8 @@ export const APPLICANT_STATUS = [
   "final_approved",
   "for_signing",
   "incomplete",
+  "signing_complete",
+  "for_training",
   "hired",
   "rejected",
   "withdrawn",

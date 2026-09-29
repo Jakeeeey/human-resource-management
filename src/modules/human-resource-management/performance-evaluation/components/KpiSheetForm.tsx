@@ -124,7 +124,7 @@ function RatingSelector(props: {
 export function KpiSheetForm(props: {
   scope: "hr" | "head";
   userId: number;
-  evalType: "first" | "second";
+  evalType: "first" | "second" | "third";
   bundle: WorkspaceBundle;
   onSaved: () => void;
   backHref: string;
@@ -355,7 +355,7 @@ export function KpiSheetForm(props: {
             KPI Rating Sheet
           </CardTitle>
           <StatusBadge tone="info">
-            {evalType === "first" ? "First Evaluation" : "Second Evaluation"}
+            {evalType === "first" ? "First Evaluation" : evalType === "second" ? "Second Evaluation" : "Third Evaluation"}
           </StatusBadge>
           <StatusBadge tone="neutral">
             {scope === "hr" ? "HR" : "Department Head"}

@@ -47,7 +47,8 @@ function resolveTargetDepartment(
     if (!Number.isInteger(parsed) || parsed <= 0) {
       return validationFailed({ department_id: ["Invalid department_id"] });
     }
-    if (!cap.headScopeDepartmentIds.includes(parsed)) return forbidden();
+    if (cap.visibleDepartmentIds === null) return parsed;
+    if (!cap.visibleDepartmentIds.includes(parsed)) return forbidden();
     return parsed;
   }
   const first = cap.headScopeDepartmentIds[0];

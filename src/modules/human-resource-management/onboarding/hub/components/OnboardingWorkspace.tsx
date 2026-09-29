@@ -172,6 +172,7 @@ export function OnboardingWorkspace({
         <TabsContent value="training" className="m-0">
           <TrainingTab
             key={`training-${userId}`}
+            userId={userId}
             groups={phaseGroups}
             loading={loading}
             error={error}

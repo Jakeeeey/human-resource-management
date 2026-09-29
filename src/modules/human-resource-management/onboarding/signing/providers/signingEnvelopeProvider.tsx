@@ -47,6 +47,10 @@ export interface SignJobOfferPayload {
   signed_pdf_file?: string | null;
 }
 
+export interface SaveOfferResult {
+  offer: JobOffer;
+}
+
 export interface SignItemResult {
   item: PaperworkItem;
   envelope: SigningEnvelope;
@@ -69,6 +73,10 @@ interface SigningSetFetchContextType {
     offerId: number,
     payload: SignJobOfferPayload | null
   ) => Promise<SignOfferResult>;
+  saveJobOffer: (
+    offerId: number,
+    payload: SignJobOfferPayload | null
+  ) => Promise<SaveOfferResult>;
   signPaperworkItem: (
     itemId: number,
     strokes: string,
@@ -144,6 +152,13 @@ export function SigningEnvelopeFetchProvider({
         signature_file: payload?.signature_file ?? null,
         strokes: payload?.strokes ?? null,
         signed_pdf_file: payload?.signed_pdf_file ?? null,
+      }),
+    saveJobOffer: (offerId, payload) =>
+      patch<SaveOfferResult>(`/api/hrm/onboarding/job-offer/${offerId}`, {
+        signature_file: payload?.signature_file ?? null,
+        strokes: payload?.strokes ?? null,
+        signed_pdf_file: payload?.signed_pdf_file ?? null,
+        finalize: false,
       }),
     signPaperworkItem: (itemId, strokes, pdfFile) =>
       patch<SignItemResult>(`/api/hrm/onboarding/paperwork-item/${itemId}`, {

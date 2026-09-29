@@ -28,6 +28,7 @@ import {
 import {
   deriveNextAction,
   deriveStage,
+  type EvalType,
   type WorkflowFacts,
 } from "@/modules/human-resource-management/performance-evaluation/utils/workflow";
 
@@ -53,7 +54,7 @@ export async function POST(
     }
 
     const workspace = await getEvaluationWorkspace(userId);
-    const evalTypeById = new Map<number, "first" | "second">();
+    const evalTypeById = new Map<number, EvalType>();
     for (const evaluation of workspace.evaluations) {
       evalTypeById.set(evaluation.id, evaluation.eval_type);
     }

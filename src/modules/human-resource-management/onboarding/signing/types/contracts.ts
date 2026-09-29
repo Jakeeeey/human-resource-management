@@ -114,9 +114,8 @@ export type PaperworkItemStatus = (typeof PAPERWORK_ITEM_STATUS)[number];
 // the applicant WAS hired but the post-hire orchestrator failed.
 export type SigningCompletion =
   | { kind: "incomplete" }
-  | { kind: "hired"; userCreated: boolean }
-  | { kind: "blocked"; reason: string }
-  | { kind: "failed"; reason: string };
+  | { kind: "signing_complete" }
+  | { kind: "blocked"; reason: string };
 
 export const PaperworkItemStatusSchema = z.enum(PAPERWORK_ITEM_STATUS);
 
