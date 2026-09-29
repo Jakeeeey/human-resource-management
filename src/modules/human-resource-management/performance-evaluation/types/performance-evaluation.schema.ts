@@ -180,12 +180,29 @@ export const EmployeeProfileSchema = z.object({
   department_name: z.string().nullable(),
   position: z.string().nullable(),
   date_hired: z.string().nullable(),
+  company_id: z.number().int().nullable(),
 });
 
 export type EmployeeProfile = z.infer<typeof EmployeeProfileSchema>;
 
+export const EvaluationCompanySchema = z.object({
+  company_id: z.number().int(),
+  company_name: z.string(),
+  company_address: z.string().nullable(),
+  company_brgy: z.string().nullable(),
+  company_city: z.string().nullable(),
+  company_province: z.string().nullable(),
+  company_zipCode: z.string().nullable(),
+  company_contact: z.string().nullable(),
+  company_email: z.string().nullable(),
+  logo_data_url: z.string().nullable(),
+});
+
+export type EvaluationCompany = z.infer<typeof EvaluationCompanySchema>;
+
 export const WorkspaceBundleSchema = z.object({
   employee: EmployeeProfileSchema,
+  company: EvaluationCompanySchema.nullable(),
   tracking: EvaluationTrackingSchema.nullable(),
   evaluations: z.array(EmployeeEvaluationSchema),
   evaluationItems: z.array(EmployeeEvaluationItemSchema),

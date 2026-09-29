@@ -60,7 +60,7 @@ export const CreateEvaluationSchema = z
     eval_type: z.enum(["first", "second", "third"]),
     evaluation_date: DateStringSchema,
     result: z.enum(["passed", "failed"]),
-    evaluator_comments: z.string().max(4000).nullable().optional(),
+    evaluator_comments: z.string().trim().min(1, { error: "Evaluator Remarks is required" }).max(4000),
     ratings: z.array(EvaluationRatingSchema).min(1),
   })
   .strict();
@@ -110,7 +110,7 @@ export const CreatePipSchema = z
     pip_start_date: PipDateString.nullable().optional(),
     pip_end_date: PipDateString.nullable().optional(),
     immediate_superior_id: z.number().int().positive().nullable().optional(),
-    detailed_concerns: z.string().max(4000).nullable().optional(),
+    detailed_concerns: z.string().trim().min(1, { error: "Remarks is required" }).max(4000),
     action_plan: z.array(CreatePipActionPlanItemSchema).min(1),
   })
   .strict()

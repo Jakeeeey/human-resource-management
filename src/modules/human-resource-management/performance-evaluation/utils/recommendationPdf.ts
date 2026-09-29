@@ -39,6 +39,28 @@ function formatLongDate(input: string): string {
 
 const blank = (v: string) => (v.trim() ? v : "________________");
 
+export interface RecommendationCompanyAddress {
+    company_address: string | null;
+    company_brgy: string | null;
+    company_city: string | null;
+    company_province: string | null;
+    company_zipCode: string | null;
+}
+
+export function formatRecommendationCompanyAddress(
+    parts: RecommendationCompanyAddress
+): string {
+    return [
+        parts.company_address,
+        parts.company_brgy,
+        parts.company_city,
+        parts.company_province,
+        parts.company_zipCode,
+    ]
+        .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+        .join(", ");
+}
+
 function departmentDisplay(value: string): string {
     const name = value.trim();
     if (!name) return "________________";

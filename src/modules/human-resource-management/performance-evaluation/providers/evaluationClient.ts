@@ -249,6 +249,24 @@ export async function regularize(userId: number): Promise<EvaluationTracking> {
   );
 }
 
+const EmployeeCompanySchema = z.object({
+  user_id: z.number().int(),
+  company_id: z.number().int(),
+});
+
+export type EmployeeCompany = z.infer<typeof EmployeeCompanySchema>;
+
+export async function setEmployeeCompany(
+  userId: number,
+  companyId: number,
+): Promise<EmployeeCompany> {
+  return requestParsed(
+    `${HR_BASE}/employee-company`,
+    EmployeeCompanySchema,
+    jsonInit("PATCH", { user_id: userId, company_id: companyId }),
+  );
+}
+
 export const TERMINATION_SEPARATION_TYPES = [
   "failed_probation",
   "laid_off",

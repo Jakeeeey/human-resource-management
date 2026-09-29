@@ -270,7 +270,7 @@ export function PipAcknowledgeView({ pipId }: PipAcknowledgeViewProps): JSX.Elem
           </section>
           <Separator />
           <section className="space-y-2">
-            <h3 className="text-sm font-semibold">Detailed concerns</h3>
+            <h3 className="text-sm font-semibold">Remarks</h3>
             {pip.detailed_concerns ? (
               <p className="whitespace-pre-wrap text-sm leading-relaxed">
                 {pip.detailed_concerns}
