@@ -32,16 +32,16 @@ import { WorkspaceOverview } from "./WorkspaceOverview";
 
 // OnboardingWorkspace.tsx — the per-hire workspace (todo 28). One canonical
 // employee from the route param (`userId`) drives every section; the in-page
-// navigation is the six WORKFLOW sections (Overview/Documents/Orientation/
-// Training/Equipment/Completion), never the applicant statuses, and there is
-// no second hire selector anywhere inside. Each phase surface consumes the
+// navigation is the six WORKFLOW sections (Overview/Training/Documents/
+// Orientation/Equipment/Completion), never the applicant statuses, and there
+// is no second hire selector anywhere inside. Each phase surface consumes the
 // re-keyed module component through its `userId` seam.
 
 const SECTIONS = [
   { value: "overview", label: "Overview" },
+  { value: "training", label: "Training" },
   { value: "documents", label: "Documents" },
   { value: "orientation", label: "Orientation" },
-  { value: "training", label: "Training" },
   { value: "equipment", label: "Equipment" },
   { value: "completion", label: "Completion" },
 ] as const;
@@ -184,21 +184,6 @@ export function OnboardingWorkspace({
           />
         </TabsContent>
 
-        <TabsContent value="documents" className="m-0">
-          <VerificationFetchProvider>
-            <VerificationTab
-              key={`documents-${userId}-${refreshTick}`}
-              userId={userId}
-            />
-          </VerificationFetchProvider>
-        </TabsContent>
-
-        <TabsContent value="orientation" className="m-0">
-          <OrientationFetchProvider>
-            <OrientationTab key={`orientation-${userId}-${refreshTick}`} userId={userId} />
-          </OrientationFetchProvider>
-        </TabsContent>
-
         <TabsContent value="training" className="m-0">
           <div className="space-y-8">
             {gate?.applicantId == null ? (
@@ -227,6 +212,21 @@ export function OnboardingWorkspace({
               />
             ) : null}
           </div>
+        </TabsContent>
+
+        <TabsContent value="documents" className="m-0">
+          <VerificationFetchProvider>
+            <VerificationTab
+              key={`documents-${userId}-${refreshTick}`}
+              userId={userId}
+            />
+          </VerificationFetchProvider>
+        </TabsContent>
+
+        <TabsContent value="orientation" className="m-0">
+          <OrientationFetchProvider>
+            <OrientationTab key={`orientation-${userId}-${refreshTick}`} userId={userId} />
+          </OrientationFetchProvider>
         </TabsContent>
 
         <TabsContent value="equipment" className="m-0">
