@@ -75,7 +75,7 @@ export function OnboardingWorkspace({
     void refresh();
   };
 
-  const title = row?.name ?? "Unnamed employee";
+  const title = row?.name ?? gate?.applicantName ?? "Unnamed employee";
 
   useEffect(() => {
     let cancelled = false;
@@ -201,13 +201,15 @@ export function OnboardingWorkspace({
 
         <TabsContent value="training" className="m-0">
           <div className="space-y-8">
-            <TrainingTab
-              key={`training-${userId}`}
-              groups={phaseGroups}
-              loading={loading}
-              error={error}
-              onRefresh={() => void refresh()}
-            />
+            {gate?.applicantId == null ? (
+              <TrainingTab
+                key={`training-${userId}`}
+                groups={phaseGroups}
+                loading={loading}
+                error={error}
+                onRefresh={() => void refresh()}
+              />
+            ) : null}
             {gate?.applicantId != null ? (
               <PreEmploymentTrainingSection
                 key={`pre-employment-training-${userId}`}

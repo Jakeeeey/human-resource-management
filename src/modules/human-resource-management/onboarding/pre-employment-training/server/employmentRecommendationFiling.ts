@@ -329,14 +329,16 @@ export async function markEmploymentRecommendationIssued(ref: {
   if (existing.status === RECOMMENDATION_ISSUED_STATUS) {
     return { marked: false, previousStatus };
   }
-  const path = `/items/onboarding_pre_employment_training?filter[id][_eq]=${existing.id}&fields=id,status&limit=1`;
-  const body: unknown = await dFetch(path, {
-    method: "PATCH",
-    body: JSON.stringify({
-      status: RECOMMENDATION_ISSUED_STATUS,
-      updated_at: nowPH(),
-    }),
-  });
+  const body: unknown = await dFetch(
+    `/items/onboarding_pre_employment_training/${existing.id}?fields=id,status`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        status: RECOMMENDATION_ISSUED_STATUS,
+        updated_at: nowPH(),
+      }),
+    }
+  );
   const errorText = directusErrorText(body);
   if (errorText) {
     throw new Error(

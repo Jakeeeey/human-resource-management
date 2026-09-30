@@ -485,28 +485,20 @@ export async function runHireGateChoice(
     return getHireGateState({ applicantId: input.applicantId });
   }
 
-  const preexistingUserId = await resolveHireUserIdByApplicant(
-    input.applicantId
-  );
-  let userId: number;
-  if (preexistingUserId !== null) {
-    userId = preexistingUserId;
-  } else {
-    const orchestrated = await runHireOrchestrator({
-      applicantId: input.applicantId,
-      ...(actorId !== null ? { actorId } : {}),
-      allowedStatuses: [...GATE_ALLOWED_STATUSES],
-      skipSteps: [ONBOARDING_TASK_MATERIALIZE_STEP_NAME],
-    });
-    userId = orchestrated.userId;
-    await logHireActivity({
-      userId,
-      userName: `Applicant #${input.applicantId}`,
-      userEmail: orchestrated.email,
-      ok: true,
-      reason: `hire-gate training: applicant=${input.applicantId} user_id=${userId}`,
-    });
-  }
+  const orchestrated = await runHireOrchestrator({
+    applicantId: input.applicantId,
+    ...(actorId !== null ? { actorId } : {}),
+    allowedStatuses: [...GATE_ALLOWED_STATUSES],
+    skipSteps: [ONBOARDING_TASK_MATERIALIZE_STEP_NAME],
+  });
+  const userId = orchestrated.userId;
+  await logHireActivity({
+    userId,
+    userName: `Applicant #${input.applicantId}`,
+    userEmail: orchestrated.email,
+    ok: true,
+    reason: `hire-gate training: applicant=${input.applicantId} user_id=${userId}`,
+  });
   await materializeNonTrainingTasks(userId, actorId);
   await setApplicantStatus({
     applicantId: input.applicantId,

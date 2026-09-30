@@ -189,9 +189,9 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
             ...f,
             companyId: row.id,
             companyName: row.company_name,
-            headerAddress: row.headerAddress ?? f.headerAddress,
-            headerContact: row.headerContact ?? f.headerContact,
-            headerEmail: row.headerEmail ?? f.headerEmail,
+            headerAddress: row.headerAddress ?? "",
+            headerContact: row.headerContact ?? "",
+            headerEmail: row.headerEmail ?? "",
         }));
     };
 
@@ -432,23 +432,27 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                 <p className={section}>Training details</p>
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <Label className={labelClass} htmlFor="pet-start-date">Start date</Label>
+                        <Label className={labelClass} htmlFor="pet-start-date">Start date <span aria-hidden="true">*</span><span className="sr-only"> (required)</span></Label>
                         <Input
                             id="pet-start-date"
                             className={field}
                             type="date"
                             value={form.startDate}
                             onChange={set("startDate")}
+                            required
+                            aria-required="true"
                         />
                     </div>
                     <div>
-                        <Label className={labelClass} htmlFor="pet-end-date">End date</Label>
+                        <Label className={labelClass} htmlFor="pet-end-date">End date <span aria-hidden="true">*</span><span className="sr-only"> (required)</span></Label>
                         <Input
                             id="pet-end-date"
                             className={field}
                             type="date"
                             value={form.endDate}
                             onChange={set("endDate")}
+                            required
+                            aria-required="true"
                         />
                     </div>
                 </div>

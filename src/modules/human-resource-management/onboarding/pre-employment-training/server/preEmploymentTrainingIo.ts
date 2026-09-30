@@ -180,7 +180,7 @@ export async function createOrUpdateTrainingRecord(input: {
   let persisted: TrainingRecord;
   if (existing) {
     const body: unknown = await dFetch(
-      `/items/${COLLECTION}?filter[id][_eq]=${existing.id}&fields=${FIELDS}&limit=1`,
+      `/items/${COLLECTION}/${existing.id}?fields=${FIELDS}`,
       {
         method: "PATCH",
         body: JSON.stringify({
@@ -195,16 +195,7 @@ export async function createOrUpdateTrainingRecord(input: {
         }),
       }
     );
-    const rows = parseRows(
-      body,
-      `/items/${COLLECTION}?filter[id][_eq]=${existing.id}`
-    );
-    if (!rows[0]) {
-      throw new Error(
-        `${PRE_EMPLOYMENT_TRAINING_IO_ERROR_CODES.verifyFailed}: training record ${existing.id} missing after update`
-      );
-    }
-    persisted = rows[0];
+    persisted = parseSingle(body, COLLECTION);
   } else {
     const body: unknown = await dFetch(`/items/${COLLECTION}`, {
       method: "POST",
@@ -251,7 +242,7 @@ export async function markTrainingRecordSigned(
   }
   const now = nowPH();
   const body: unknown = await dFetch(
-    `/items/${COLLECTION}?filter[id][_eq]=${idValidation.data}&fields=${FIELDS}&limit=1`,
+    `/items/${COLLECTION}/${idValidation.data}?fields=${FIELDS}`,
     {
       method: "PATCH",
       body: JSON.stringify({
@@ -262,12 +253,7 @@ export async function markTrainingRecordSigned(
       }),
     }
   );
-  const rows = parseRows(body, `/items/${COLLECTION}?filter[id][_eq]=${idValidation.data}`);
-  if (!rows[0]) {
-    throw new Error(
-      `${PRE_EMPLOYMENT_TRAINING_IO_ERROR_CODES.notFound}: training record ${idValidation.data} not found`
-    );
-  }
+  parseSingle(body, COLLECTION);
   const verified = await readById(idValidation.data);
   if (verified.signed_pdf_file !== validation.data.signedPdfFile) {
     throw new Error(
@@ -303,18 +289,13 @@ export async function markTrainingRecordDecided(
     payload["remarks"] = validation.data.remarks;
   }
   const body: unknown = await dFetch(
-    `/items/${COLLECTION}?filter[id][_eq]=${idValidation.data}&fields=${FIELDS}&limit=1`,
+    `/items/${COLLECTION}/${idValidation.data}?fields=${FIELDS}`,
     {
       method: "PATCH",
       body: JSON.stringify(payload),
     }
   );
-  const rows = parseRows(body, `/items/${COLLECTION}?filter[id][_eq]=${idValidation.data}`);
-  if (!rows[0]) {
-    throw new Error(
-      `${PRE_EMPLOYMENT_TRAINING_IO_ERROR_CODES.notFound}: training record ${idValidation.data} not found`
-    );
-  }
+  parseSingle(body, COLLECTION);
   const verified = await readById(idValidation.data);
   if (verified.status !== validation.data.status) {
     throw new Error(

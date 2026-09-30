@@ -118,7 +118,7 @@ export function HireRoster() {
   if (rows.length === 0) {
     return (
       <div className="grid gap-3">
-        <HireGatePendingSection />
+        <HireGatePendingSection query={filters.query} />
         <Empty className="rounded-2xl border border-dashed">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -137,7 +137,7 @@ export function HireRoster() {
 
   return (
     <div className="grid gap-3">
-      <HireGatePendingSection />
+      <HireGatePendingSection query={filters.query} />
       <HireRosterFilterBar
         filters={filters}
         phaseOptions={phaseOptions}

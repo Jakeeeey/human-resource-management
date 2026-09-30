@@ -90,13 +90,18 @@ export async function decidePreEmploymentTraining(
       error instanceof Error ? error.message : String(error)
     );
   }
-  if (current !== "for_training") {
-    throw notEligibleError(applicantId, current);
-  }
-
   const target: ApplicantStatus = decision === "pass" ? "hired" : "rejected";
   const outcome: "passed" | "failed" =
     decision === "pass" ? "passed" : "failed";
+
+  const alreadyApplied = current === target;
+  if (alreadyApplied) {
+    return { outcome, applicantStatus: target };
+  }
+
+  if (current !== "for_training") {
+    throw notEligibleError(applicantId, current);
+  }
 
   try {
     await setApplicantStatus({

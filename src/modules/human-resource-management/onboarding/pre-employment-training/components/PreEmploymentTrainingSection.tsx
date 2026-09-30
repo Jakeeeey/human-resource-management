@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertCircle, Briefcase, CheckCircle2, GraduationCap, Loader2, XCircle } from "lucide-react";
+import { AlertCircle, Briefcase, CheckCircle2, Download, GraduationCap, Loader2, XCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,7 +89,11 @@ function todayInputValue(): string {
 function readErrorMessage(body: unknown, fallback: string): string {
     if (typeof body === "object" && body !== null) {
         const message = (body as { message?: unknown }).message;
-        if (typeof message === "string" && message.trim()) return message;
+        if (typeof message === "string" && message.trim()) {
+            const stripped = message.replace(/^[A-Z][A-Z0-9]*_[A-Z0-9_]+:\s*/, "").trim();
+            const text = stripped.length > 0 ? stripped : message;
+            return text.charAt(0).toUpperCase() + text.slice(1);
+        }
     }
     return fallback;
 }
@@ -122,6 +126,7 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     const [gateError, setGateError] = React.useState<string | null>(null);
     const [busyChoice, setBusyChoice] = React.useState<"employment" | "training" | null>(null);
     const [confirmingTemplate, setConfirmingTemplate] = React.useState(false);
+    const [confirmingEmployment, setConfirmingEmployment] = React.useState(false);
     const [selectedTemplate, setSelectedTemplate] = React.useState<number | null>(null);
     const [assembled, setAssembled] = React.useState<EmploymentRecommendationAssembled | null>(null);
     const [assembledLoading, setAssembledLoading] = React.useState(false);
@@ -296,6 +301,13 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
 
     const handleGenerated = React.useCallback(
         async (result: GeneratedTrainingLetter, fields?: PreEmploymentTrainingFormData) => {
+            const startDate = fields?.startDate?.trim() ?? "";
+            const endDate = fields?.endDate?.trim() ?? "";
+            if (!startDate || !endDate) {
+                setActionError("Enter the training start and end dates before issuing the letter.");
+                setNotice(null);
+                return;
+            }
             setBusy(true);
             setActionError(null);
             setNotice(null);
@@ -452,6 +464,10 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
             <p className="text-sm text-muted-foreground">
                 Send this hiree for pre-employment training, or hire them for employment directly.
             </p>
+            <p className="text-xs text-muted-foreground">
+                Choosing For Employment hires the applicant immediately and skips the training
+                letter, signing, template and decision steps. This cannot be undone.
+            </p>
             {renderActionError()}
             {gateError && !gate ? (
                 <Alert variant="destructive">
@@ -460,37 +476,69 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
                     <AlertDescription>{gateError}</AlertDescription>
                 </Alert>
             ) : null}
-            <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                    type="button"
-                    className="w-full sm:w-auto"
-                    disabled={choosing || gateLoading}
-                    onClick={() => void runGateChoice("training")}
-                    aria-label="Send applicant for training"
-                >
-                    {busyChoice === "training" ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                        <GraduationCap className="mr-2 h-4 w-4" aria-hidden="true" />
-                    )}
-                    {busyChoice === "training" ? "Creating account…" : "For Training"}
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    disabled={choosing || gateLoading}
-                    onClick={() => void runGateChoice("employment")}
-                    aria-label="Hire applicant for employment"
-                >
-                    {busyChoice === "employment" ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                        <Briefcase className="mr-2 h-4 w-4" aria-hidden="true" />
-                    )}
-                    {busyChoice === "employment" ? "Creating account…" : "For Employment"}
-                </Button>
-            </div>
+            {confirmingEmployment ? (
+                <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/5 p-3">
+                    <p className="text-sm">
+                        Hire this applicant for employment now? The pre-employment training flow
+                        will be skipped and this cannot be undone.
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            className="w-full sm:w-auto"
+                            disabled={choosing || gateLoading}
+                            onClick={() => void runGateChoice("employment")}
+                        >
+                            {busyChoice === "employment" ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            ) : null}
+                            {busyChoice === "employment" ? "Creating account…" : "Confirm hire for employment"}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            disabled={choosing}
+                            onClick={() => setConfirmingEmployment(false)}
+                        >
+                            Back
+                        </Button>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                        type="button"
+                        className="w-full sm:w-auto"
+                        disabled={choosing || gateLoading}
+                        onClick={() => void runGateChoice("training")}
+                        aria-label="Send applicant for training"
+                    >
+                        {busyChoice === "training" ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                            <GraduationCap className="mr-2 h-4 w-4" aria-hidden="true" />
+                        )}
+                        {busyChoice === "training" ? "Creating account…" : "For Training"}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        disabled={choosing || gateLoading}
+                        onClick={() => setConfirmingEmployment(true)}
+                        aria-label="Hire applicant for employment"
+                    >
+                        {busyChoice === "employment" ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                            <Briefcase className="mr-2 h-4 w-4" aria-hidden="true" />
+                        )}
+                        {busyChoice === "employment" ? "Creating account…" : "For Employment"}
+                    </Button>
+                </div>
+            )}
         </div>
     );
 
@@ -523,6 +571,16 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
             </div>
             {renderActionError()}
             {renderNotice()}
+            {signable ? (
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                        <a href={signable.url} download={signable.fileName}>
+                            <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                            Download issued letter
+                        </a>
+                    </Button>
+                </div>
+            ) : null}
             {pdfError ? (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" aria-hidden="true" />

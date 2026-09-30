@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Loader2,
   UserPlus,
 } from "lucide-react";
@@ -16,7 +18,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -25,6 +26,11 @@ import { useHireGatePending } from "../hooks/useHireGatePending";
 import { HIRE_ROSTER_REFRESH_EVENT } from "../hooks/useHireRoster";
 
 const PROVISION_URL = "/api/hrm/onboarding/hire-gate/provision";
+
+const PENDING_VISIBLE_LIMIT = 5;
+
+const RETRY_FAILURE_COPY =
+  "The hiree account could not be created. Check that the applicant record and its signing paperwork are complete, then retry. Nothing was created or changed, so retrying is safe.";
 
 function PendingRow({
   item,
@@ -73,17 +79,11 @@ function PendingRow({
         message?: string;
       } | null;
       if (!res.ok || !body?.success) {
-        throw new Error(
-          body?.message ?? "The hiree account could not be created yet."
-        );
+        throw new Error(RETRY_FAILURE_COPY);
       }
       onHealed();
-    } catch (err) {
-      setRetryError(
-        err instanceof Error
-          ? err.message
-          : "The hiree account could not be created yet."
-      );
+    } catch {
+      setRetryError(RETRY_FAILURE_COPY);
     } finally {
       setBusy(false);
     }
@@ -94,34 +94,36 @@ function PendingRow({
       <p className="truncate text-sm font-medium" title={item.name}>
         {item.name}
       </p>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        {item.position ?? "Applicant"} · the hiree account is not ready yet, so
-        the workspace cannot open — retry creating it below.
-      </p>
+      <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="min-w-0 truncate text-xs text-muted-foreground">
+          {item.position ?? "Applicant"} · Account not created
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full shrink-0 sm:w-auto"
+          disabled={busy}
+          onClick={() => void retry()}
+        >
+          {busy ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+          )}
+          {busy ? "Creating account…" : "Retry account creation"}
+        </Button>
+      </div>
       {retryError ? (
         <p className="mt-1 text-xs text-destructive break-words">{retryError}</p>
       ) : null}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-2 w-full sm:w-auto"
-        disabled={busy}
-        onClick={() => void retry()}
-      >
-        {busy ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-        ) : (
-          <UserPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-        )}
-        {busy ? "Creating account…" : "Retry account creation"}
-      </Button>
     </div>
   );
 }
 
-export function HireGatePendingSection() {
+export function HireGatePendingSection({ query = "" }: { query?: string }) {
   const { pending, loading, error, refresh } = useHireGatePending();
+  const [expanded, setExpanded] = useState(false);
 
   if (loading) {
     return (
@@ -154,29 +156,70 @@ export function HireGatePendingSection() {
 
   if (pending.length === 0) return null;
 
+  const needle = query.trim().toLowerCase();
+  const visible =
+    needle === ""
+      ? pending
+      : pending.filter((item) =>
+          `${item.name} ${item.position ?? ""} ${item.applicantId}`
+            .toLowerCase()
+            .includes(needle)
+        );
+  const shown = expanded ? visible : visible.slice(0, PENDING_VISIBLE_LIMIT);
+
   return (
     <Card className="shadow-none border-border overflow-hidden">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <h2 className="flex items-center gap-2 leading-none font-semibold">
           <UserPlus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          Ready for onboarding ({pending.length})
-        </CardTitle>
+          Ready for onboarding ({visible.length})
+        </h2>
         <CardDescription>
           Signing is complete — open each hiree&apos;s workspace to continue
           onboarding in the linear workflow.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        {pending.map((item) => (
-          <PendingRow
-            key={item.applicantId}
-            item={item}
-            onHealed={() => {
-              void refresh();
-              window.dispatchEvent(new Event(HIRE_ROSTER_REFRESH_EVENT));
-            }}
-          />
-        ))}
+        {visible.some((item) => item.userId === null) ? (
+          <Alert>
+            <AlertCircle className="h-4 w-4" aria-hidden="true" />
+            <AlertTitle>Some hiree accounts could not be created</AlertTitle>
+            <AlertDescription>{RETRY_FAILURE_COPY}</AlertDescription>
+          </Alert>
+        ) : null}
+        {visible.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No pending hirees match this search.
+          </p>
+        ) : (
+          shown.map((item) => (
+            <PendingRow
+              key={item.applicantId}
+              item={item}
+              onHealed={() => {
+                void refresh();
+                window.dispatchEvent(new Event(HIRE_ROSTER_REFRESH_EVENT));
+              }}
+            />
+          ))
+        )}
+        {visible.length > PENDING_VISIBLE_LIMIT ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full sm:w-auto justify-self-start"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            {expanded ? (
+              <ChevronUp className="mr-2 h-4 w-4" aria-hidden="true" />
+            ) : (
+              <ChevronDown className="mr-2 h-4 w-4" aria-hidden="true" />
+            )}
+            {expanded ? "Show fewer" : `Show all (${visible.length})`}
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );
