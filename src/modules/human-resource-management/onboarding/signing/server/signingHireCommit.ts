@@ -14,6 +14,7 @@ import type {
 } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
 
 import { canSigningSetFireHired } from "./signing-set-service";
+import { provisionHireUserAtSigning } from "@/modules/human-resource-management/onboarding/hire/server/provisionHireUserAtSigning";
 
 // signingHireCommit.ts — THE completion commitment step (todo 15 + todo 16).
 //
@@ -120,6 +121,20 @@ export async function fireHiredIfComplete(
       applicantStatus: applicant.status,
       completion: { kind: "incomplete" },
     };
+  }
+
+  if (currentStatus !== "signing_complete") {
+    try {
+      await provisionHireUserAtSigning({
+        applicantId: input.applicantId,
+        ...(input.actorId != null ? { actorId: input.actorId } : {}),
+      });
+    } catch (error) {
+      console.error(
+        `[signing] signing-time user provisioning failed for applicant=${input.applicantId}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   return {

@@ -430,6 +430,8 @@ function SettingsPanel({
     onTemplateKeyChange,
     subject,
     onSubjectChange,
+    isActive,
+    onIsActiveChange,
     exportNotes,
 }: {
     readonly templateName: string;
@@ -438,6 +440,8 @@ function SettingsPanel({
     readonly onTemplateKeyChange: (next: string) => void;
     readonly subject: string;
     readonly onSubjectChange: (next: string) => void;
+    readonly isActive: boolean;
+    readonly onIsActiveChange: (next: boolean) => void;
     readonly exportNotes: string | null;
 }) {
     const zoom = useCanvasDoc((state) => state.viewport.zoom);
@@ -499,6 +503,21 @@ function SettingsPanel({
                             {MS_TEMPLATE_KEY_HINT}
                         </p>
                     </div>
+                    <div className="flex items-center justify-between gap-2">
+                        <Label className="text-xs font-medium text-muted-foreground" htmlFor="settings-active">
+                            {isActive ? "Active" : "Inactive"}
+                        </Label>
+                        <Switch
+                            aria-label={isActive ? "Active" : "Inactive"}
+                            checked={isActive}
+                            id="settings-active"
+                            size="sm"
+                            onCheckedChange={onIsActiveChange}
+                        />
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        Inactive templates are not used for sending; bindings that point at them are skipped.
+                    </p>
                 </section>
 
                 <section className="flex flex-col gap-2.5">
@@ -649,6 +668,11 @@ function isActiveCatalogRow(row: MsCatalogRow): boolean {
     return flag === true || flag === 1 || flag === "1" || flag === "true";
 }
 
+function toDesignIsActive(value: unknown): boolean {
+    if (value === false || value === 0 || value === "0" || value === "false") return false;
+    return true;
+}
+
 function applyPreviewSample(
     baseHtml: string,
     baseWarnings: readonly string[],
@@ -720,6 +744,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
     const [subject, setSubject] = useState<string>(DEFAULT_DESIGN_META.subject);
     const [templateKeyDraft, setTemplateKeyDraft] = useState<string | null>(null);
     const [templateId, setTemplateId] = useState<number | string | null>(null);
+    const [isActive, setIsActive] = useState(true);
     const [previewing, setPreviewing] = useState(false);
     const [previewHtml, setPreviewHtml] = useState<string | null>(null);
     const [previewWarnings, setPreviewWarnings] = useState<string[]>([]);
@@ -758,8 +783,9 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
             templateKey: effectiveKey,
             templateName,
             subject,
+            isActive,
         }),
-        [templateId, effectiveKey, templateName, subject],
+        [templateId, effectiveKey, templateName, subject, isActive],
     );
     const { save, status, error, dirty } = useDesignAutosave(autosaveOptions);
 
@@ -772,6 +798,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                 const row = await getDesign(templateKey);
                 if (cancelled) return;
                 setTemplateId(row?.id ?? null);
+                setIsActive(row ? toDesignIsActive(row.is_active) : true);
                 if (
                     keyRewritten &&
                     requestedKey &&
@@ -930,6 +957,7 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
         }
         const { ok, message: saveMessage, row } = await save();
         if (!ok) return;
+        if (row?.is_active !== undefined) setIsActive(toDesignIsActive(row.is_active));
         if (row && row.template_key !== templateKey) {
             setTemplateKeyDraft(row.template_key);
             router.replace(
@@ -1446,9 +1474,11 @@ function StudioEditor({ templateKey: propTemplateKey }: { readonly templateKey?:
                 {panel === "settings" ? (
                     <SettingsPanel
                         exportNotes={exportNotes}
+                        isActive={isActive}
                         subject={subject}
                         templateKey={effectiveKey}
                         templateName={templateName}
+                        onIsActiveChange={setIsActive}
                         onSubjectChange={setSubject}
                         onTemplateKeyChange={setTemplateKeyDraft}
                         onTemplateNameChange={setTemplateName}

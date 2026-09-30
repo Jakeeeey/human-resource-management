@@ -7,9 +7,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const OUTBOX_LIST_FIELDS =
-    "id,idempotency_key,to_email,template_id,event_key,status,sent_at,attempts,next_attempt_at";
+    "id,idempotency_key,to_email,template_id,event_key,status,sent_at,attempts,next_attempt_at,rendered_subject";
 const OUTBOX_LIST_FIELDS_BASE =
-    "id,idempotency_key,to_email,template_id,event_key,status,sent_at";
+    "id,idempotency_key,to_email,template_id,event_key,status,sent_at,rendered_subject";
 
 const SORT_ALLOWLIST = ["-id", "id", "-sent_at", "sent_at", "status", "-status"] as const;
 
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
         const searchParam = (params.get("search") ?? "").trim();
         const searchFilter = searchParam
-            ? ["to_email", "event_key", "idempotency_key"]
+            ? ["to_email", "event_key", "idempotency_key", "rendered_subject"]
                 .map(
                     (field, index) =>
                         `&filter[_or][${index}][${field}][_contains]=${encodeURIComponent(searchParam)}`,

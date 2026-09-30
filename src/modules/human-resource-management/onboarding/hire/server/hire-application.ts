@@ -396,6 +396,7 @@ export function buildSpringUserPayload(
 
 const HireUserContactRowSchema = z.object({
   user_id: z.number().int().positive(),
+  applicant_id: z.number().int().nullable().optional(),
   personal_email: z.string().nullable().optional(),
   user_email: z.string().nullable().optional(),
   user_fname: z.string().nullable().optional(),
@@ -417,7 +418,7 @@ export async function resolveHireApplicantIdByUserId(
   userId: number
 ): Promise<number | null> {
   const userBody: unknown = await dFetch(
-    `/items/user?filter[user_id][_eq]=${userId}&fields=user_id,personal_email,user_email,user_fname,user_lname&limit=1`
+    `/items/user?filter[user_id][_eq]=${userId}&fields=user_id,applicant_id,personal_email,user_email,user_fname,user_lname&limit=1`
   );
   const userError = directusErrorMessage(userBody);
   if (userError) {
@@ -431,6 +432,9 @@ export async function resolveHireApplicantIdByUserId(
       ? HireUserContactRowSchema.safeParse(userRows[0])
       : null;
   if (!user?.success) return null;
+
+  const linkedApplicantId = parsePositiveInt(user.data.applicant_id);
+  if (linkedApplicantId !== null) return linkedApplicantId;
 
   const email = trimmedLinkValue(user.data.personal_email);
   if (email) {

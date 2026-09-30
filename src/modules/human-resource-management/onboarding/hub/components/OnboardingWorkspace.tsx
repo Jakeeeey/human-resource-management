@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardCheck, RefreshCw } from "lucide-react";
 
@@ -22,6 +22,9 @@ import {
 } from "@/modules/human-resource-management/onboarding/verification";
 
 import { useHireWorkspace } from "../hooks/useHireWorkspace";
+import { HireGateResponseSchema } from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
+import type { HireGateState } from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
+import { PreEmploymentTrainingSection } from "@/modules/human-resource-management/onboarding/pre-employment-training/components/PreEmploymentTrainingSection";
 import { phaseLabel, ROSTER_STATUS_LABELS, rosterStatusTone } from "../rosterData";
 import type { WorkspaceOperator } from "../taskInbox";
 import { TrainingTab } from "./TrainingTab";
@@ -29,16 +32,16 @@ import { WorkspaceOverview } from "./WorkspaceOverview";
 
 // OnboardingWorkspace.tsx — the per-hire workspace (todo 28). One canonical
 // employee from the route param (`userId`) drives every section; the in-page
-// navigation is the six WORKFLOW sections (Overview/Documents/Orientation/
-// Training/Equipment/Completion), never the applicant statuses, and there is
-// no second hire selector anywhere inside. Each phase surface consumes the
+// navigation is the six WORKFLOW sections (Overview/Training/Documents/
+// Orientation/Equipment/Completion), never the applicant statuses, and there
+// is no second hire selector anywhere inside. Each phase surface consumes the
 // re-keyed module component through its `userId` seam.
 
 const SECTIONS = [
   { value: "overview", label: "Overview" },
+  { value: "training", label: "Training" },
   { value: "documents", label: "Documents" },
   { value: "orientation", label: "Orientation" },
-  { value: "training", label: "Training" },
   { value: "equipment", label: "Equipment" },
   { value: "completion", label: "Completion" },
 ] as const;
@@ -56,6 +59,7 @@ export function OnboardingWorkspace({
     useHireWorkspace(userId);
   const [active, setActive] = useState<string>("overview");
   const [refreshTick, setRefreshTick] = useState(0);
+  const [gate, setGate] = useState<HireGateState | null>(null);
   const operator: WorkspaceOperator = {
     userId: operatorUserId,
     role: operatorRole,
@@ -71,7 +75,33 @@ export function OnboardingWorkspace({
     void refresh();
   };
 
-  const title = row?.name ?? "Unnamed employee";
+  const title = row?.name ?? gate?.applicantName ?? "Unnamed employee";
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadGate() {
+      try {
+        const res = await fetch(
+          `/api/hrm/onboarding/hire-gate?user_id=${userId}`,
+          { cache: "no-store" }
+        );
+        const body: unknown = await res.json().catch(() => null);
+        const parsed = HireGateResponseSchema.safeParse(body);
+        if (cancelled) return;
+        setGate(
+          res.ok && parsed.success && parsed.data.success
+            ? (parsed.data.data?.gate ?? null)
+            : null
+        );
+      } catch {
+        if (!cancelled) setGate(null);
+      }
+    }
+    void loadGate();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   return (
     <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
@@ -154,6 +184,36 @@ export function OnboardingWorkspace({
           />
         </TabsContent>
 
+        <TabsContent value="training" className="m-0">
+          <div className="space-y-8">
+            {gate?.applicantId == null ? (
+              <TrainingTab
+                key={`training-${userId}`}
+                groups={phaseGroups}
+                loading={loading}
+                error={error}
+                onRefresh={() => void refresh()}
+              />
+            ) : null}
+            {gate?.applicantId != null ? (
+              <PreEmploymentTrainingSection
+                key={`pre-employment-training-${userId}`}
+                applicantId={gate.applicantId}
+                userId={userId}
+                applicantStatus={gate.applicantStatus}
+                prefill={{
+                  applicantName: row?.name,
+                  position: row?.position ?? undefined,
+                }}
+                trainingGroups={phaseGroups}
+                trainingLoading={loading}
+                trainingError={error}
+                onTrainingRefresh={() => void refresh()}
+              />
+            ) : null}
+          </div>
+        </TabsContent>
+
         <TabsContent value="documents" className="m-0">
           <VerificationFetchProvider>
             <VerificationTab
@@ -167,17 +227,6 @@ export function OnboardingWorkspace({
           <OrientationFetchProvider>
             <OrientationTab key={`orientation-${userId}-${refreshTick}`} userId={userId} />
           </OrientationFetchProvider>
-        </TabsContent>
-
-        <TabsContent value="training" className="m-0">
-          <TrainingTab
-            key={`training-${userId}`}
-            userId={userId}
-            groups={phaseGroups}
-            loading={loading}
-            error={error}
-            onRefresh={() => void refresh()}
-          />
         </TabsContent>
 
         <TabsContent value="equipment" className="m-0">
