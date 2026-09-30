@@ -175,6 +175,7 @@ export async function runHireOrchestrator(
       domain,
       payload,
       authToken,
+      applicantId,
     });
     resolvedUserId = resolved.userId;
 

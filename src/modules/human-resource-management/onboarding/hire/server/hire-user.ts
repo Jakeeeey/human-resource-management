@@ -79,6 +79,19 @@ async function findUserIdByIdentity(
   return parsed.data.data[0]?.user_id ?? null;
 }
 
+async function findUserIdByApplicant(applicantId: number): Promise<number | null> {
+  const body: unknown = await dFetch(
+    `/items/user?filter[applicant_id][_eq]=${applicantId}&fields=user_id&sort=user_id&limit=1`
+  );
+  const parsed = UserIdListSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new Error(
+      `${HIRE_ORCHESTRATOR_ERROR_CODES.readFailed}: user applicant-link lookup failed (${JSON.stringify(body).slice(0, 300)})`
+    );
+  }
+  return parsed.data.data[0]?.user_id ?? null;
+}
+
 async function findUserIdByUserEmail(email: string): Promise<number | null> {
   const body: unknown = await dFetch(
     `/items/user?filter[user_email][_eq]=${encodeURIComponent(email)}&fields=user_id&sort=user_id&limit=1`
@@ -284,7 +297,17 @@ export async function resolveHireUser(input: {
   domain: string;
   payload: SpringUserCreatePayload;
   authToken?: string;
+  applicantId?: number;
 }): Promise<ResolvedHireUser> {
+  if (
+    typeof input.applicantId === "number" &&
+    Number.isInteger(input.applicantId) &&
+    input.applicantId > 0
+  ) {
+    const linked = await findUserIdByApplicant(input.applicantId);
+    if (linked !== null) return { userId: linked, created: false };
+  }
+
   const identity = normalizeEmail(input.personalEmail);
   const quickHit = await findUserIdByIdentity(identity);
   if (quickHit !== null) return { userId: quickHit, created: false };

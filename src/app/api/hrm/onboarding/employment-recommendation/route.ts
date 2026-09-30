@@ -33,6 +33,7 @@ const PostBodySchema = z
     applicant_id: z.coerce.number().int().positive().optional(),
     file_name: z.string().trim().min(1).max(255),
     pdf_base64: z.string().min(1),
+    replace_existing: z.boolean().optional(),
   })
   .strict();
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
     if (!validation.success) {
       return validationFailed(validation.error.flatten().fieldErrors);
     }
-    const { user_id, applicant_id, file_name, pdf_base64 } = validation.data;
+    const { user_id, applicant_id, file_name, pdf_base64, replace_existing } = validation.data;
     if (pdf_base64.length > MAX_BASE64_CHARS) {
       return failed("The letter file is too large. Maximum size is 10 MB.", 413);
     }
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
           ? { userId: user_id }
           : { userId: user_id, applicantId: applicant_id }
       );
-      if (settled.issued && settled.fileRef !== null && settled.recordId !== null) {
+      if (!replace_existing && settled.issued && settled.fileRef !== null && settled.recordId !== null) {
         const healed = await markEmploymentRecommendationIssued(
           applicant_id === undefined
             ? { userId: user_id }
@@ -137,6 +138,7 @@ export async function POST(req: NextRequest) {
         fileName: file_name,
         ...(applicant_id !== undefined ? { applicantId: applicant_id } : {}),
         ...(actorId !== null ? { actorId } : {}),
+        ...(replace_existing ? { replaceExisting: true } : {}),
       });
       const mark = await markEmploymentRecommendationIssued(
         applicant_id === undefined

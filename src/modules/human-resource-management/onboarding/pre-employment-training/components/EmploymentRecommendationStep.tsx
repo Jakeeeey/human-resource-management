@@ -355,7 +355,7 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
         setPdfFileName(fileName);
     };
 
-    const handleGenerateAndSave = async () => {
+    const handleGenerateAndSave = async (replace: boolean = false) => {
         if (saving) return;
         setSaving(true);
         setError(null);
@@ -375,6 +375,7 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
                     ...(applicantId ? { applicant_id: applicantId } : {}),
                     file_name: fileName,
                     pdf_base64: pdfBase64,
+                    ...(replace ? { replace_existing: true } : {}),
                 }),
             });
             const json: unknown = await res.json().catch(() => null);
@@ -392,27 +393,17 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
                 recordId: null,
                 recordStatus: null,
             });
-            setSavedNote("Letter generated and saved to the employee records.");
+            setSavedNote(
+                replace
+                    ? "Letter regenerated from the current details and saved to the employee records."
+                    : "Letter generated and saved to the employee records."
+            );
             setPreviewOpen(true);
             onGenerated?.({ blob, fileName, url });
         } catch (err) {
             setError(err instanceof Error ? err.message : "The letter was not saved. Please try again.");
         } finally {
             setSaving(false);
-        }
-    };
-
-    const handleSavePrintable = async () => {
-        if (loadingSaved) return;
-        setLoadingSaved(true);
-        setError(null);
-        try {
-            await ensureSavedPdf();
-            setPreviewOpen(true);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "The saved letter could not be loaded. Please try again.");
-        } finally {
-            setLoadingSaved(false);
         }
     };
 
@@ -480,13 +471,13 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
                     {issued ? (
                         <div className="flex flex-col sm:flex-row gap-2">
                             <Button
-                                onClick={() => void handleSavePrintable()}
+                                onClick={() => void handleGenerateAndSave(true)}
                                 className="w-full sm:w-auto"
                                 type="button"
-                                disabled={loadingSaved || issuanceLoading}
+                                disabled={saving || issuanceLoading}
                             >
                                 <Save className="mr-2 h-4 w-4" />
-                                {loadingSaved ? "Loading…" : "Save + printable"}
+                                {saving ? "Saving…" : "Save + printable"}
                             </Button>
                             <Button
                                 onClick={() => void handleDownloadSaved()}
@@ -509,26 +500,6 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
                             >
                                 <Eye className="mr-2 h-4 w-4" />
                                 {saving ? "Saving…" : "Generate and save letter"}
-                            </Button>
-                            <Button
-                                onClick={() => setPreviewOpen(true)}
-                                variant="outline"
-                                className="w-full sm:w-auto"
-                                type="button"
-                                disabled={!pdfUrl}
-                            >
-                                <Eye className="mr-2 h-4 w-4" />
-                                Preview
-                            </Button>
-                            <Button
-                                onClick={handleDownload}
-                                variant="outline"
-                                className="w-full sm:w-auto"
-                                type="button"
-                                disabled={!pdfUrl}
-                            >
-                                <Download className="mr-2 h-4 w-4" />
-                                Download
                             </Button>
                         </div>
                     )}

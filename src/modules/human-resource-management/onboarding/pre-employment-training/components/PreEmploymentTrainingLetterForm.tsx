@@ -28,6 +28,9 @@ import {
     type PreEmploymentTrainingLetterFormProps,
 } from "./types";
 
+const TRAINING_DEFAULT_DAYS = 14;
+const TRAINING_DEFAULT_ALLOWANCE = "505";
+
 interface CompanyLogoRow {
     id: number;
     company_name: string;
@@ -39,6 +42,15 @@ interface CompanyLogoRow {
 
 function todayInputValue(): string {
     const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
+function addDaysInputValue(days: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
@@ -81,6 +93,7 @@ function applyPrefill(
         ...base,
         applicantName: prefill.applicantName ?? base.applicantName,
         applicantAddress: prefill.applicantAddress ?? base.applicantAddress,
+        salutationName: prefill.salutationName ?? base.salutationName,
         position: prefill.position ?? base.position,
         companyName: prefill.companyName ?? base.companyName,
         headerAddress: prefill.headerAddress ?? base.headerAddress,
@@ -102,6 +115,9 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
     const [form, setForm] = React.useState<PreEmploymentTrainingFormData>(() => ({
         ...applyPrefill(EMPTY_PRE_EMPLOYMENT_TRAINING, prefill),
         letterDate: todayInputValue(),
+        startDate: todayInputValue(),
+        endDate: addDaysInputValue(TRAINING_DEFAULT_DAYS),
+        allowance: TRAINING_DEFAULT_ALLOWANCE,
     }));
     const [logos, setLogos] = React.useState<CompanyLogoRow[]>([]);
     const [selectedLogoId, setSelectedLogoId] = React.useState("");
@@ -176,6 +192,36 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
             cancelled = true;
         };
     }, []);
+
+    const appliedPrefillKeyRef = React.useRef<string | null>(null);
+
+    React.useEffect(() => {
+        if (!prefill) return;
+        const key = JSON.stringify(prefill);
+        if (appliedPrefillKeyRef.current === key) return;
+        appliedPrefillKeyRef.current = key;
+        setForm((f) => ({
+            ...f,
+            ...(prefill.applicantName ? { applicantName: prefill.applicantName } : {}),
+            ...(prefill.applicantAddress ? { applicantAddress: prefill.applicantAddress } : {}),
+            ...(prefill.salutationName ? { salutationName: prefill.salutationName } : {}),
+            ...(prefill.position ? { position: prefill.position } : {}),
+            ...(prefill.companyName ? { companyName: prefill.companyName } : {}),
+            ...(prefill.headerAddress ? { headerAddress: prefill.headerAddress } : {}),
+            ...(prefill.headerContact ? { headerContact: prefill.headerContact } : {}),
+            ...(prefill.headerEmail ? { headerEmail: prefill.headerEmail } : {}),
+        }));
+        if (prefill.logoDataUrl) setPrefillLogo(prefill.logoDataUrl);
+    }, [prefill]);
+
+    React.useEffect(() => {
+        const wanted = prefill?.companyName?.trim().toLowerCase();
+        if (!wanted || logos.length === 0) return;
+        const match = logos.find((row) => row.company_name.toLowerCase() === wanted);
+        if (!match) return;
+        setSelectedLogoId((current) => (current === "" ? String(match.id) : current));
+        setPrefillLogo((current) => current ?? match.logo_data_url);
+    }, [prefill, logos]);
 
     const set = (key: keyof PreEmploymentTrainingFormData) => (e: React.ChangeEvent<HTMLInputElement>) =>
         setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -262,66 +308,65 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
 
     const viewUrl = pdfUrl ? toFitWidthUrl(pdfUrl) : null;
     const field = "w-full";
-    const labelClass = "text-sm font-medium mb-1 block";
-    const section = "text-xs font-bold uppercase tracking-wider text-muted-foreground pt-2";
+    const labelClass = "block text-sm font-medium mb-1.5";
+    const groupClass = "space-y-3 rounded-lg border border-border bg-card p-4";
+    const groupHeadingClass = "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
 
     return (
-        <div className="p-2 sm:p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen space-y-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-2">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-primary/10 rounded-2xl shadow-sm border border-primary/20">
-                        <FileText className="w-8 h-8 text-primary" />
+        <div className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <FileText className="h-5 w-5 text-primary" aria-hidden="true" />
                     </div>
-                    <div>
-                        <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-                            Pre-Employment Training Letter
-                        </h1>
-                        <p className="text-muted-foreground/80 font-medium mt-1 text-base sm:text-lg">
-                            Fill in the training details
+                    <div className="min-w-0">
+                        <h3 className="text-base font-semibold leading-tight">
+                            Training letter details
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Fill in the details, then generate the letter to preview and issue it.
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-col gap-2 w-full sm:w-auto sm:items-end">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <Button onClick={handleGenerate} className="w-full sm:w-auto" type="button">
-                            <Eye className="mr-2 h-4 w-4" />
-                            Generate letter
-                        </Button>
-                        <Button
-                            onClick={() => setPreviewOpen(true)}
-                            variant="outline"
-                            className="w-full sm:w-auto"
-                            type="button"
-                            disabled={!pdfUrl}
-                        >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Preview
-                        </Button>
-                        <Button
-                            onClick={handleDownload}
-                            variant="outline"
-                            className="w-full sm:w-auto"
-                            type="button"
-                            disabled={!pdfUrl}
-                        >
-                            <Download className="mr-2 h-4 w-4" />
-                            Download
-                        </Button>
-                    </div>
-                    {pdfFileName ? (
-                        <p
-                            className="text-xs text-muted-foreground truncate max-w-full sm:max-w-[260px]"
-                            title={pdfFileName}
-                        >
-                            {pdfFileName}
-                        </p>
-                    ) : null}
-                    {error ? <p className="text-xs text-destructive">{error}</p> : null}
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Button onClick={handleGenerate} size="sm" type="button">
+                        <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Generate letter
+                    </Button>
+                    <Button
+                        onClick={() => setPreviewOpen(true)}
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        disabled={!pdfUrl}
+                    >
+                        <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Preview
+                    </Button>
+                    <Button
+                        onClick={handleDownload}
+                        variant="outline"
+                        size="sm"
+                        type="button"
+                        disabled={!pdfUrl}
+                    >
+                        <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Download
+                    </Button>
                 </div>
             </div>
 
-            <div className="bg-card shadow-sm border rounded-xl p-6 space-y-4 max-w-[720px]">
-                <p className={section}>Recipient</p>
+            {error ? (
+                <p className="text-xs text-destructive">{error}</p>
+            ) : pdfFileName ? (
+                <p className="truncate text-xs text-muted-foreground" title={pdfFileName}>
+                    Last generated: {pdfFileName}
+                </p>
+            ) : null}
+
+            <div className="grid gap-4 lg:grid-cols-2">
+                <section className={groupClass}>
+                    <h4 className={groupHeadingClass}>Recipient</h4>
                 <div>
                     <Label className={labelClass} htmlFor="pet-applicant-name">Applicant name</Label>
                     <Input
@@ -353,7 +398,10 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                     />
                 </div>
 
-                <p className={section}>Letter</p>
+                </section>
+
+                <section className={groupClass}>
+                    <h4 className={groupHeadingClass}>Letter</h4>
                 <div>
                     <Label className={labelClass} htmlFor="pet-letter-date">Letter date</Label>
                     <Input
@@ -401,36 +449,31 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                         </SelectContent>
                     </Select>
                 </div>
-                <div>
-                    <Label className={labelClass} htmlFor="pet-header-address">Letterhead address</Label>
-                    <Input
-                        id="pet-header-address"
-                        className={field}
-                        value={form.headerAddress}
-                        onChange={set("headerAddress")}
-                    />
-                </div>
-                <div>
-                    <Label className={labelClass} htmlFor="pet-header-contact">Letterhead contact</Label>
-                    <Input
-                        id="pet-header-contact"
-                        className={field}
-                        value={form.headerContact}
-                        onChange={set("headerContact")}
-                    />
-                </div>
-                <div>
-                    <Label className={labelClass} htmlFor="pet-header-email">Letterhead email</Label>
-                    <Input
-                        id="pet-header-email"
-                        className={field}
-                        value={form.headerEmail}
-                        onChange={set("headerEmail")}
-                    />
+                <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                        Letterhead from the selected company
+                    </p>
+                    <dl className="space-y-0.5 text-xs">
+                        <div className="flex gap-2">
+                            <dt className="w-16 shrink-0 text-muted-foreground">Address</dt>
+                            <dd className="min-w-0 truncate">{form.headerAddress || "—"}</dd>
+                        </div>
+                        <div className="flex gap-2">
+                            <dt className="w-16 shrink-0 text-muted-foreground">Contact</dt>
+                            <dd className="min-w-0 truncate">{form.headerContact || "—"}</dd>
+                        </div>
+                        <div className="flex gap-2">
+                            <dt className="w-16 shrink-0 text-muted-foreground">Email</dt>
+                            <dd className="min-w-0 truncate">{form.headerEmail || "—"}</dd>
+                        </div>
+                    </dl>
                 </div>
 
-                <p className={section}>Training details</p>
-                <div className="grid grid-cols-2 gap-3">
+                </section>
+
+                <section className={groupClass}>
+                    <h4 className={groupHeadingClass}>Training details</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                         <Label className={labelClass} htmlFor="pet-start-date">Start date <span aria-hidden="true">*</span><span className="sr-only"> (required)</span></Label>
                         <Input
@@ -467,7 +510,7 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                     />
                 </div>
                 <div>
-                    <Label className={labelClass} htmlFor="pet-allowance">Training allowance (₱)</Label>
+                    <Label className={labelClass} htmlFor="pet-allowance">Training allowance (Php)</Label>
                     <Input
                         id="pet-allowance"
                         className={field}
@@ -498,8 +541,11 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                     />
                 </div>
 
-                <p className={section}>Signatories</p>
-                <div className="grid grid-cols-2 gap-3">
+                </section>
+
+                <section className={`${groupClass} lg:col-span-2`}>
+                    <h4 className={groupHeadingClass}>Signatories</h4>
+                <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                         <Label className={labelClass} htmlFor="pet-prepared-name">Prepared by — name</Label>
                         <Input
@@ -521,7 +567,7 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                         />
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                         <Label className={labelClass} htmlFor="pet-noted-name">Noted by — name</Label>
                         <Input
@@ -543,7 +589,7 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                         />
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                         <Label className={labelClass} htmlFor="pet-approved-name">Approved by — name</Label>
                         <Input
@@ -566,7 +612,10 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                     </div>
                 </div>
 
-                <p className={section}>Trainee</p>
+                </section>
+
+                <section className={`${groupClass} lg:col-span-2`}>
+                    <h4 className={groupHeadingClass}>Trainee</h4>
                 <div>
                     <Label className={labelClass} htmlFor="pet-trainee-name">Trainee printed name</Label>
                     <Input
@@ -587,6 +636,7 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                         placeholder="Conforme:"
                     />
                 </div>
+                </section>
             </div>
 
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>

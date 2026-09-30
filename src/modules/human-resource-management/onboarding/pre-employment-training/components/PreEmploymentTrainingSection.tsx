@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { z } from "zod";
 import { AlertCircle, Briefcase, CheckCircle2, Download, GraduationCap, Loader2, XCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,58 @@ interface ApiEnvelope<T> {
 const BASE = "/api/hrm/onboarding/pre-employment-training";
 const GATE_URL = "/api/hrm/onboarding/hire-gate";
 const RECOMMENDATION_URL = "/api/hrm/onboarding/employment-recommendation";
+const PREFILL_URL = `${BASE}/prefill`;
+
+const PrefillResponseSchema = z.looseObject({
+    success: z.boolean(),
+    data: z
+        .looseObject({
+            applicantName: z.string().optional(),
+            applicantAddress: z.string().optional(),
+            salutationName: z.string().optional(),
+            position: z.string().optional(),
+            companyName: z.string().optional(),
+            headerAddress: z.string().optional(),
+            headerContact: z.string().optional(),
+            headerEmail: z.string().optional(),
+            logoDataUrl: z.string().nullish(),
+        })
+        .nullish(),
+});
+
+function withAssembledPrefill(
+    base: PreEmploymentTrainingLetterPrefill | undefined,
+    assembled: PreEmploymentTrainingLetterPrefill | null
+): PreEmploymentTrainingLetterPrefill | undefined {
+    if (!assembled) return base;
+    const merged: PreEmploymentTrainingLetterPrefill = { ...(base ?? {}) };
+    const adopt = (
+        key:
+            | "applicantName"
+            | "applicantAddress"
+            | "salutationName"
+            | "position"
+            | "companyName"
+            | "headerAddress"
+            | "headerContact"
+            | "headerEmail"
+    ): void => {
+        const value = assembled[key];
+        if (typeof value === "string" && value.trim() !== "") {
+            merged[key] = value;
+        }
+    };
+    adopt("applicantName");
+    adopt("applicantAddress");
+    adopt("salutationName");
+    adopt("position");
+    adopt("companyName");
+    adopt("headerAddress");
+    adopt("headerContact");
+    adopt("headerEmail");
+    if (assembled.logoDataUrl) merged.logoDataUrl = assembled.logoDataUrl;
+    return merged;
+}
 
 const WIZARD_STEPS = [
     { n: 1, label: "Path choice" },
@@ -129,9 +182,15 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     const [confirmingEmployment, setConfirmingEmployment] = React.useState(false);
     const [selectedTemplate, setSelectedTemplate] = React.useState<number | null>(null);
     const [assembled, setAssembled] = React.useState<EmploymentRecommendationAssembled | null>(null);
+    const [assembledPrefill, setAssembledPrefill] = React.useState<PreEmploymentTrainingLetterPrefill | null>(null);
     const [assembledLoading, setAssembledLoading] = React.useState(false);
     const [assembledError, setAssembledError] = React.useState<string | null>(null);
     const signableUrlRef = React.useRef<string | null>(null);
+
+    const letterPrefill = React.useMemo(
+        () => withAssembledPrefill(prefill, assembledPrefill),
+        [prefill, assembledPrefill]
+    );
 
     const fetchRecord = React.useCallback(async () => {
         setLoading(true);
@@ -176,6 +235,31 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     React.useEffect(() => {
         void fetchGate();
     }, [fetchGate]);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(
+                    `${PREFILL_URL}?user_id=${userId}&applicant_id=${applicantId}`,
+                    { cache: "no-store" }
+                );
+                const body: unknown = await res.json().catch(() => null);
+                const parsed = PrefillResponseSchema.safeParse(body);
+                if (cancelled) return;
+                setAssembledPrefill(
+                    res.ok && parsed.success && parsed.data.success
+                        ? (parsed.data.data ?? null)
+                        : null
+                );
+            } catch {
+                if (!cancelled) setAssembledPrefill(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [userId, applicantId]);
 
     React.useEffect(() => {
         return () => {
@@ -415,25 +499,46 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     const choosing = busyChoice !== null || confirmingTemplate;
 
     const renderStepIndicator = () => (
-        <ol aria-label="Training wizard steps" className="flex flex-wrap items-center gap-1.5">
-            {WIZARD_STEPS.map((step) => {
+        <ol
+            aria-label="Training wizard steps"
+            className="flex flex-wrap items-center gap-x-1 gap-y-2"
+        >
+            {WIZARD_STEPS.map((step, index) => {
                 const state = stepState(step.n);
                 return (
-                    <li key={step.n} className="flex items-center gap-1.5">
+                    <li key={step.n} className="flex items-center">
                         <span
                             aria-current={state === "current" ? "step" : undefined}
                             title={state === "skipped" ? `${step.label} — skipped for direct hires` : `${step.label} — ${state}`}
                             className={cn(
-                                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium",
-                                state === "done" && "border-primary/40 bg-primary/10 text-primary",
-                                state === "current" && "border-primary bg-primary text-primary-foreground",
-                                state === "todo" && "border-border text-muted-foreground",
-                                state === "skipped" && "border-dashed border-border text-muted-foreground/70"
+                                "inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs font-medium transition-colors",
+                                state === "done" && "border-primary/30 bg-primary/10 text-primary",
+                                state === "current" && "border-primary bg-primary text-primary-foreground shadow-sm",
+                                state === "todo" && "border-border bg-card text-muted-foreground",
+                                state === "skipped" && "border-dashed border-border text-muted-foreground/60"
                             )}
                         >
-                            <span aria-hidden="true">{state === "done" ? "✓" : state === "skipped" ? "–" : step.n}</span>
-                            {step.label}
+                            <span
+                                aria-hidden="true"
+                                className={cn(
+                                    "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold leading-none tabular-nums",
+                                    state === "current"
+                                        ? "border-transparent bg-primary-foreground/20 text-primary-foreground"
+                                        : state === "done"
+                                          ? "border-primary/40 bg-primary/15 text-primary"
+                                          : "border-border text-muted-foreground"
+                                )}
+                            >
+                                {state === "done" ? "✓" : state === "skipped" ? "–" : step.n}
+                            </span>
+                            <span className="whitespace-nowrap">{step.label}</span>
                         </span>
+                        {index < WIZARD_STEPS.length - 1 ? (
+                            <span
+                                aria-hidden="true"
+                                className="mx-1 h-px w-3 shrink-0 bg-border sm:w-4"
+                            />
+                        ) : null}
                     </li>
                 );
             })}
@@ -559,7 +664,7 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
                 </Alert>
             ) : null}
             <div className={busy ? "pointer-events-none opacity-60" : undefined} aria-busy={busy}>
-                <PreEmploymentTrainingLetterForm prefill={prefill} onGenerated={(result, fields) => void handleGenerated(result, fields)} />
+                <PreEmploymentTrainingLetterForm prefill={letterPrefill} onGenerated={(result, fields) => void handleGenerated(result, fields)} />
             </div>
         </div>
     );
@@ -866,7 +971,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     if (loading) {
         return (
             <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                 {renderStepIndicator()}
                 <div className="grid gap-3">
                     <Skeleton className="h-10 w-full" />
@@ -880,7 +997,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     if (loadError) {
         return (
             <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                 {renderStepIndicator()}
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" aria-hidden="true" />
@@ -898,7 +1027,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         if (hired) {
             return (
                 <div className="space-y-6">
-                    <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                    <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                     {renderStepIndicator()}
                     <p className="text-sm text-muted-foreground">
                         Hired directly for employment — the training steps were skipped.
@@ -910,7 +1051,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         if (status === "signing_complete") {
             return (
                 <div className="space-y-6">
-                    <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                    <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                     {renderStepIndicator()}
                     {renderPathChoice()}
                 </div>
@@ -919,7 +1072,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         if (status === "for_training") {
             return (
                 <div className="space-y-6">
-                    <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                    <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                     {renderStepIndicator()}
                     {renderLetterForm()}
                 </div>
@@ -927,7 +1092,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         }
         return (
             <div className="space-y-4">
-                <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                 {renderStepIndicator()}
                 <p className="text-sm text-muted-foreground">
                     Pre-employment training does not apply at this stage.
@@ -939,7 +1116,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     if (record.status === "issued") {
         return (
             <div className="space-y-6">
-                <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                 {renderStepIndicator()}
                 {renderSigning()}
             </div>
@@ -950,7 +1139,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         if (needsChoice) {
             return (
                 <div className="space-y-6">
-                    <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                    <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                     {renderStepIndicator()}
                     {renderTemplatePicker()}
                 </div>
@@ -958,7 +1159,19 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         }
         return (
             <div className="space-y-6">
-                <h2 className="text-lg font-semibold">Pre-employment training</h2>
+                <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
                 {renderStepIndicator()}
                 {renderTrainingTasks()}
                 {renderDecision()}
@@ -970,8 +1183,7 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         <div className="space-y-6">
             <h2 className="text-lg font-semibold">Pre-employment training</h2>
             {renderStepIndicator()}
-            {renderSettled()}
-            {hired ? renderRecommendation() : null}
+            {hired ? renderRecommendation() : renderSettled()}
         </div>
     );
 }

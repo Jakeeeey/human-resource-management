@@ -20,8 +20,23 @@ interface RawCompanyRow {
     company_code: string;
     company_name: string;
     company_city: string | null;
+    company_brgy: string | null;
+    company_province: string | null;
+    company_zipCode: string | null;
+    company_address: string | null;
+    company_contact: string | null;
+    company_email: string | null;
     company_logo: string | null;
     is_default: boolean | number | null;
+}
+
+function composeAddress(row: RawCompanyRow): string | null {
+    const direct = typeof row.company_address === "string" ? row.company_address.trim() : "";
+    if (direct) return direct;
+    const parts = [row.company_brgy, row.company_city, row.company_province, row.company_zipCode]
+        .filter((part): part is string => typeof part === "string" && part.trim() !== "")
+        .map((part) => part.trim());
+    return parts.length > 0 ? parts.join(", ") : null;
 }
 
 async function fetchAssetDataUrl(logoFile: unknown): Promise<string | null> {
@@ -57,13 +72,13 @@ export async function GET() {
         // schemas — Directus answers unknown fields with 400 (surfaced by
         // dFetch as a body without `data`), so retry without it and let the
         // picker work with name+logo only instead of breaking the list.
-        const withCity = (await dFetch(
-            `/items/company_list?fields=company_id,company_code,company_name,company_city,company_logo,is_default&sort=company_code&limit=-1`
+        const withContact = (await dFetch(
+            `/items/company_list?fields=company_id,company_code,company_name,company_city,company_brgy,company_province,company_zipCode,company_address,company_contact,company_email,company_logo,is_default&sort=company_code&limit=-1`
         )) as { data?: RawCompanyRow[] };
-        let rows = Array.isArray(withCity?.data) ? withCity.data : null;
+        let rows = Array.isArray(withContact?.data) ? withContact.data : null;
         if (!rows) {
             const base = (await dFetch(
-                `/items/company_list?fields=company_id,company_code,company_name,company_logo,is_default&sort=company_code&limit=-1`
+                `/items/company_list?fields=company_id,company_code,company_name,company_city,company_logo,is_default&sort=company_code&limit=-1`
             )) as { data?: RawCompanyRow[] };
             rows = base?.data ?? [];
         }
@@ -74,6 +89,9 @@ export async function GET() {
                 company_code: row.company_code,
                 company_name: row.company_name,
                 company_city: row.company_city ?? null,
+                company_address: composeAddress(row),
+                company_contact: row.company_contact ?? null,
+                company_email: row.company_email ?? null,
                 logo_data_url: await fetchAssetDataUrl(row.company_logo),
                 is_default: Boolean(row.is_default),
             }))

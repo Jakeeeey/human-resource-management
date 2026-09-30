@@ -31,11 +31,11 @@ export const EMPTY_PRE_EMPLOYMENT_TRAINING: PreEmploymentTrainingFormData = {
     salutationName: "",
     letterDate: "",
     position: "",
-    companyName: "Men2 Marketing Corporation",
+    companyName: "",
     companyId: null,
-    headerAddress: "Gonzales St. Bonuan Boquig, Dagupan City Pangasinan",
-    headerContact: "(075) 658-2182",
-    headerEmail: "recruit@men2corp.com",
+    headerAddress: "",
+    headerContact: "",
+    headerEmail: "",
     startDate: "",
     endDate: "",
     reportingTo: "",
@@ -55,6 +55,7 @@ export const EMPTY_PRE_EMPLOYMENT_TRAINING: PreEmploymentTrainingFormData = {
 export interface PreEmploymentTrainingLetterPrefill {
     applicantName?: string;
     applicantAddress?: string;
+    salutationName?: string;
     position?: string;
     companyName?: string;
     headerAddress?: string;

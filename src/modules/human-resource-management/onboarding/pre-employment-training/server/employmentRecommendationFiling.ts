@@ -24,6 +24,7 @@ export const FileEmploymentRecommendationInputSchema = z
     fileName: z.string().trim().min(1),
     applicantId: z.number().int().positive().optional(),
     actorId: z.number().int().positive().optional(),
+  replaceExisting: z.boolean().optional(),
   })
   .strict();
 
@@ -236,7 +237,8 @@ export async function fileEmploymentRecommendationLetter(
         .join("; ")}`
     );
   }
-  const { userId, bytes, fileName, applicantId, actorId } = validation.data;
+  const { userId, bytes, fileName, applicantId, actorId, replaceExisting } =
+    validation.data;
   if (bytes.byteLength === 0) {
     throw new Error(
       `${EMPLOYMENT_RECOMMENDATION_FILING_ERROR_CODES.invalidInput}: bytes must not be empty`
@@ -249,7 +251,7 @@ export async function fileEmploymentRecommendationLetter(
   const latest = existing.reduce<
     z.infer<typeof EmployeeFileRecordRowSchema> | null
   >((best, row) => (best === null || row.id > best.id ? row : best), null);
-  if (latest) {
+  if (latest && !replaceExisting) {
     return {
       recordId: latest.id,
       fileRef: latest.file_ref,
@@ -258,6 +260,40 @@ export async function fileEmploymentRecommendationLetter(
     };
   }
   const fileRef = await uploadRecommendationPdf(bytes, fileName);
+  if (latest && replaceExisting) {
+    const replaceBody: unknown = await dFetch(
+      `/items/employee_file_records/${latest.id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          file_ref: fileRef,
+          description: describeHire({ userId, fileName, applicantId, actorId }),
+          updated_at: nowPH(),
+        }),
+      }
+    );
+    const replaceError = directusErrorText(replaceBody);
+    if (replaceError) {
+      throw new Error(
+        `${EMPLOYMENT_RECOMMENDATION_FILING_ERROR_CODES.verifyFailed}: replacing the filed letter was rejected (${replaceError})`
+      );
+    }
+    const replaced = await readRows(
+      filedByRefPath(userId, fileRef),
+      EmployeeFileRecordRowSchema
+    );
+    if (!replaced[0]) {
+      throw new Error(
+        `${EMPLOYMENT_RECOMMENDATION_FILING_ERROR_CODES.verifyFailed}: employee_file_records missing after replacement: ${fileRef}`
+      );
+    }
+    return {
+      recordId: replaced[0].id,
+      fileRef,
+      listId: replaced[0].list_id,
+      alreadyFiled: false,
+    };
+  }
   const filed = await readRows(
     filedByRefPath(userId, fileRef),
     EmployeeFileRecordRowSchema

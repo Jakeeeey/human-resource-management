@@ -170,38 +170,33 @@ export function PreEmploymentTrainingLetterSign({
         : "Draw your signature anywhere to enable signing";
 
     return (
-        <div className="mx-auto w-full max-w-[880px] space-y-6">
+        <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="rounded-2xl border border-primary/20 bg-primary/10 p-3 shadow-sm">
-                        <PenLine className="h-8 w-8 text-primary" />
+                <div className="flex min-w-0 items-start gap-3">
+                    <div className="shrink-0 rounded-lg border border-warning/25 bg-warning/10 p-2">
+                        <PenLine className="h-5 w-5 text-warning" aria-hidden="true" />
                     </div>
-                    <div>
-                        <h2 className="text-2xl font-extrabold tracking-tight text-foreground">
-                            Sign training letter
-                        </h2>
-                        <p className="mt-1 text-base font-medium text-muted-foreground/80">
-                            Draw on the letter, then confirm
+                    <div className="min-w-0">
+                        <h3 className="text-base font-semibold leading-tight">
+                            Sign the issued letter
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground" role="status">
+                            {validityText}
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <Button
                         type="button"
                         variant="outline"
+                        size="sm"
                         onClick={handleClearAll}
                         disabled={signing || !hasInk}
-                        className="w-full sm:w-auto"
                     >
                         <Eraser className="mr-2 h-4 w-4" aria-hidden="true" />
                         Clear all
                     </Button>
-                    <Button
-                        type="button"
-                        onClick={() => void handleSign()}
-                        disabled={!canSign}
-                        className="w-full sm:w-auto"
-                    >
+                    <Button type="button" size="sm" onClick={() => void handleSign()} disabled={!canSign}>
                         {signing ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                         ) : (
@@ -211,10 +206,6 @@ export function PreEmploymentTrainingLetterSign({
                     </Button>
                 </div>
             </div>
-
-            <p className="text-sm text-muted-foreground" role="status">
-                {validityText}
-            </p>
 
             {docError !== null ? (
                 <div
@@ -238,7 +229,7 @@ export function PreEmploymentTrainingLetterSign({
             {pages.map((page) => {
                 const size = sizes[page] ?? fallbackSize();
                 return (
-                    <div key={page} className="w-full overflow-hidden">
+                    <div key={page} className="mx-auto w-full max-w-3xl overflow-hidden">
                         <div className="mb-2 flex items-center gap-2">
                             <span className="text-xs font-medium text-muted-foreground">Page {page}</span>
                         </div>
@@ -270,6 +261,24 @@ export function PreEmploymentTrainingLetterSign({
                     </div>
                 );
             })}
+
+            {pages.length > 0 ? (
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-muted-foreground">
+                        {hasInk
+                            ? "Your signature is ready — confirm to produce the signed PDF."
+                            : "Draw your signature on any page to enable confirming."}
+                    </p>
+                    <Button type="button" size="sm" onClick={() => void handleSign()} disabled={!canSign}>
+                        {signing ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                            <FileSignature className="mr-2 h-4 w-4" aria-hidden="true" />
+                        )}
+                        Confirm signature
+                    </Button>
+                </div>
+            ) : null}
 
             {signed !== null ? (
                 <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
