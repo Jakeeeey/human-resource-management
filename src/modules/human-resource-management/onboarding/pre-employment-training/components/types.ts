@@ -73,4 +73,7 @@ export interface GeneratedTrainingLetter {
 export interface PreEmploymentTrainingLetterFormProps {
     prefill?: PreEmploymentTrainingLetterPrefill;
     onGenerated?: (result: GeneratedTrainingLetter, fields?: PreEmploymentTrainingFormData) => void;
+    saved?: boolean;
+    saving?: boolean;
+    onProceed?: () => void;
 }

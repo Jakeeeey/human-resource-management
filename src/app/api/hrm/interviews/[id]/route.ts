@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { interviewService, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
-import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
-import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
+import { emitInterviewGradedEvent } from "@/modules/human-resource-management/recruitment/interviews/services/interviewMailEvents";
 import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
@@ -114,18 +113,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 verdict: data.verdict,
                 ...(actorId != null ? { actorId } : {}),
             });
-            // Mail hook (mailing-module todo 11): stage-routed graded event, never awaited.
-            void dispatchMail(data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
-                event_key: data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",
-                application_id: data.application_id,
-                interview_id: data.id,
-                verdict: data.verdict,
-                vars: {
-                    verdict: String(data.verdict ?? ""),
-                    result: String(data.verdict ?? ""),
-                    stage: String(data.stage ?? ""),
-                },
-            }).catch(logRedacted);
+            void emitInterviewGradedEvent({
+                interviewId: data.id,
+                applicationId: data.application_id,
+                stage: String(data.stage ?? ""),
+                verdict: String(data.verdict ?? ""),
+            });
             return NextResponse.json({ data, autoApproved, autoRejected });
         }
 
@@ -152,18 +145,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
                 verdict: data.verdict,
                 ...(actorId != null ? { actorId } : {}),
             });
-            // Mail hook (mailing-module todo 11): real verdict transitions only, never awaited.
-            void dispatchMail(data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded", {
-                event_key: data.stage === "Final" ? "final_interview.graded" : "initial_interview.graded",
-                application_id: data.application_id,
-                interview_id: data.id,
-                verdict: data.verdict,
-                vars: {
-                    verdict: String(data.verdict ?? ""),
-                    result: String(data.verdict ?? ""),
-                    stage: String(data.stage ?? ""),
-                },
-            }).catch(logRedacted);
+            void emitInterviewGradedEvent({
+                interviewId: data.id,
+                applicationId: data.application_id,
+                stage: String(data.stage ?? ""),
+                verdict: String(data.verdict ?? ""),
+            });
         }
         return NextResponse.json({ data, autoApproved, autoRejected });
     } catch (e: unknown) {

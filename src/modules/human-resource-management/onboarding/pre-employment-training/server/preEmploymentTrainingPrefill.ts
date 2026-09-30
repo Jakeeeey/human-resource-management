@@ -104,10 +104,8 @@ async function fetchLogoDataUrl(logoFile: unknown): Promise<string | null> {
 
 function companyAddressOf(company: CompanyRow | null): string {
   if (!company) return "";
-  const direct = trimmed(company.company_address);
-  if (direct) return direct;
   return joined(
-    [company.company_brgy, company.company_city, company.company_province, company.company_zipCode],
+    [company.company_brgy, company.company_city, company.company_province],
     ", "
   );
 }

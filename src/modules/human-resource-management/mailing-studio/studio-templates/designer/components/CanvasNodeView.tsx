@@ -328,6 +328,7 @@ export default function CanvasNodeView({ node, nodes, badgesById, catalog, varia
             }}
             tabIndex={0}
             onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     event.stopPropagation();

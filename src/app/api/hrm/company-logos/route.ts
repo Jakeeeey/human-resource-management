@@ -31,9 +31,7 @@ interface RawCompanyRow {
 }
 
 function composeAddress(row: RawCompanyRow): string | null {
-    const direct = typeof row.company_address === "string" ? row.company_address.trim() : "";
-    if (direct) return direct;
-    const parts = [row.company_brgy, row.company_city, row.company_province, row.company_zipCode]
+    const parts = [row.company_brgy, row.company_city, row.company_province]
         .filter((part): part is string => typeof part === "string" && part.trim() !== "")
         .map((part) => part.trim());
     return parts.length > 0 ? parts.join(", ") : null;

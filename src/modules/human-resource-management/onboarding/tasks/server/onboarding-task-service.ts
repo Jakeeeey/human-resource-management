@@ -11,12 +11,6 @@ import { ensureOnboardingTaskTemplates } from "./task-template-service";
 import { listOnboardingTaskTemplates } from "./task-template-service";
 import { readUserDepartmentId } from "../../training/server/trainingCatalogIo";
 import { filterMaterializableTrainingTemplates } from "../../training/server/trainingCatalogService";
-import { resolveHireApplicantIdByUserId } from "../../hire/server/hire-application";
-import { logHireActivity } from "../../hire/server/hire-log";
-import {
-  getApplicantStatus,
-  setApplicantStatus,
-} from "@/modules/human-resource-management/shared/services/applicant-status-service";
 import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
 import type {
   OnboardingOwnerRole,
@@ -206,50 +200,6 @@ export interface UpdateOnboardingTaskInput {
   actorId?: number | null;
 }
 
-async function maybePromoteTrainingHire(
-  userId: number,
-  writtenTemplateId: number | null,
-  actorId: number | null
-): Promise<void> {
-  const templates = await listOnboardingTaskTemplates();
-  const writtenPhase =
-    writtenTemplateId === null
-      ? undefined
-      : templates.find((template) => template.id === writtenTemplateId)?.phase;
-  if (writtenPhase !== "training") return;
-  const tasks = await listTaskRows({ userId });
-  const phaseByTemplate = new Map(
-    templates.map((template) => [template.id, template.phase])
-  );
-  const training = tasks.filter(
-    (task) =>
-      task.template_id !== null &&
-      phaseByTemplate.get(task.template_id) === "training"
-  );
-  if (training.length === 0) return;
-  if (
-    !training.every((task) => task.status === "done" || task.status === "na")
-  ) {
-    return;
-  }
-  const applicantId = await resolveHireApplicantIdByUserId(userId);
-  if (applicantId === null) return;
-  const status = await getApplicantStatus(applicantId);
-  if (status !== "for_training") return;
-  await setApplicantStatus({
-    applicantId,
-    status: "hired",
-    ...(actorId !== null ? { actorId } : {}),
-  });
-  await logHireActivity({
-    userId,
-    userName: `Applicant #${applicantId}`,
-    userEmail: `applicant-${applicantId}@hire-gate.local`,
-    ok: true,
-    reason: `hire-gate promotion: applicant=${applicantId} user_id=${userId} for_training -> hired on satisfied training tasks`,
-  });
-}
-
 /**
  * Applies a partial update (`status` / `notes` / `due_date` /
  * `owner_user_id`). Moving a task to `done` stamps `completed_at` /
@@ -286,15 +236,6 @@ export async function updateOnboardingTask(
   }
 
   const updated = await patchTaskRow(input.taskId, patch);
-  try {
-    await maybePromoteTrainingHire(
-      updated.user_id,
-      updated.template_id,
-      actorId
-    );
-  } catch (error) {
-    console.error("[onboarding-task] training promotion error:", error);
-  }
   return updated;
 }
 
@@ -373,14 +314,5 @@ export async function completeOnboardingTask(
     updated_at: now,
     ...(input.completedBy != null ? { updated_by: input.completedBy } : {}),
   });
-  try {
-    await maybePromoteTrainingHire(
-      task.user_id,
-      task.template_id,
-      input.completedBy
-    );
-  } catch (error) {
-    console.error("[onboarding-task] training promotion error:", error);
-  }
   return { task, alreadyDone: false };
 }
