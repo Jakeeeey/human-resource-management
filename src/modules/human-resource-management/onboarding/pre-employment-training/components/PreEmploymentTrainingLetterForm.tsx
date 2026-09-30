@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Download, Eye, FileText, Printer } from "lucide-react";
+import { ArrowRight, Download, Eye, FileText, Printer, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -23,7 +23,6 @@ import {
 import { buildPreEmploymentTrainingPdf } from "../utils/preEmploymentTrainingPdf";
 import {
     EMPTY_PRE_EMPLOYMENT_TRAINING,
-    type GeneratedTrainingLetter,
     type PreEmploymentTrainingFormData,
     type PreEmploymentTrainingLetterFormProps,
 } from "./types";
@@ -111,7 +110,7 @@ function toFitWidthUrl(url: string): string {
     return fragment ? `${base}#${fragment}&zoom=page-width` : `${base}#zoom=page-width`;
 }
 
-export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmploymentTrainingLetterFormProps) {
+export function PreEmploymentTrainingLetterForm({ prefill, onGenerated, saved = false, saving = false, onProceed }: PreEmploymentTrainingLetterFormProps) {
     const [form, setForm] = React.useState<PreEmploymentTrainingFormData>(() => ({
         ...applyPrefill(EMPTY_PRE_EMPLOYMENT_TRAINING, prefill),
         letterDate: todayInputValue(),
@@ -241,33 +240,32 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
         }));
     };
 
-    const handleGenerate = () => {
+    const buildInput = () => ({
+        applicantName: form.applicantName,
+        applicantAddress: form.applicantAddress,
+        salutationName: form.salutationName,
+        position: form.position,
+        companyName: form.companyName,
+        letterDate: form.letterDate,
+        headerAddress: form.headerAddress,
+        headerContact: form.headerContact,
+        headerEmail: form.headerEmail,
+        scheduleText: form.scheduleText,
+        durationText: form.durationText,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reportingTo: form.reportingTo,
+        allowanceText: formatAllowance(form.allowance),
+        preparedBy: { name: form.preparedByName, title: form.preparedByTitle },
+        notedBy: { name: form.notedByName, title: form.notedByTitle },
+        approvedBy: { name: form.approvedByName, title: form.approvedByTitle },
+        trainee: { label: form.traineeLabel, printedName: form.traineeName },
+    });
+
+    const previewLetter = () => {
         setError(null);
         try {
-            const blob = buildPreEmploymentTrainingPdf(
-                {
-                    applicantName: form.applicantName,
-                    applicantAddress: form.applicantAddress,
-                    salutationName: form.salutationName,
-                    position: form.position,
-                    companyName: form.companyName,
-                    letterDate: form.letterDate,
-                    headerAddress: form.headerAddress,
-                    headerContact: form.headerContact,
-                    headerEmail: form.headerEmail,
-                    scheduleText: form.scheduleText,
-                    durationText: form.durationText,
-                    startDate: form.startDate,
-                    endDate: form.endDate,
-                    reportingTo: form.reportingTo,
-                    allowanceText: formatAllowance(form.allowance),
-                    preparedBy: { name: form.preparedByName, title: form.preparedByTitle },
-                    notedBy: { name: form.notedByName, title: form.notedByTitle },
-                    approvedBy: { name: form.approvedByName, title: form.approvedByTitle },
-                    trainee: { label: form.traineeLabel, printedName: form.traineeName },
-                },
-                prefillLogo
-            );
+            const blob = buildPreEmploymentTrainingPdf(buildInput(), prefillLogo);
             const name = form.applicantName.trim() || "Trainee";
             const fileName = `Pre-Employment-Training-${name.replace(/\s+/g, "-")}.pdf`;
             const url = URL.createObjectURL(blob);
@@ -275,12 +273,21 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
             pdfUrlRef.current = url;
             setPdfUrl(url);
             setPdfFileName(fileName);
-            setPreviewOpen(true);
-            const result: GeneratedTrainingLetter = { blob, fileName, url };
-            onGenerated?.(result, { ...form });
+            return { blob, fileName, url };
         } catch {
             setError("Failed to generate the training letter PDF.");
+            return null;
         }
+    };
+
+    const handleGenerate = () => {
+        if (previewLetter()) setPreviewOpen(true);
+    };
+
+    const handleSave = () => {
+        const result = previewLetter();
+        if (!result) return;
+        onGenerated?.(result, { ...form });
     };
 
     const handleDownload = () => {
@@ -324,12 +331,13 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                             Training letter details
                         </h3>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Fill in the details, then generate the letter to preview and issue it.
+                            Fill in the details, generate the letter to preview it, then save it and
+                            continue to signing.
                         </p>
                     </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <Button onClick={handleGenerate} size="sm" type="button">
+                    <Button onClick={handleGenerate} variant="outline" size="sm" type="button">
                         <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
                         Generate letter
                     </Button>
@@ -353,6 +361,21 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated }: PreEmp
                         <Download className="mr-2 h-4 w-4" aria-hidden="true" />
                         Download
                     </Button>
+                    <Button
+                        onClick={handleSave}
+                        size="sm"
+                        type="button"
+                        disabled={saving}
+                    >
+                        <Save className="mr-2 h-4 w-4" aria-hidden="true" />
+                        {saving ? "Saving…" : saved ? "Save changes" : "Save letter"}
+                    </Button>
+                    {saved ? (
+                        <Button onClick={() => onProceed?.()} size="sm" type="button">
+                            <ArrowRight className="mr-2 h-4 w-4" aria-hidden="true" />
+                            Proceed to next step
+                        </Button>
+                    ) : null}
                 </div>
             </div>
 

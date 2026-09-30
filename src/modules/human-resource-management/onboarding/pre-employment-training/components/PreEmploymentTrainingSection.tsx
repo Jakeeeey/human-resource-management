@@ -183,6 +183,7 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
     const [selectedTemplate, setSelectedTemplate] = React.useState<number | null>(null);
     const [assembled, setAssembled] = React.useState<EmploymentRecommendationAssembled | null>(null);
     const [assembledPrefill, setAssembledPrefill] = React.useState<PreEmploymentTrainingLetterPrefill | null>(null);
+    const [proceededToSigning, setProceededToSigning] = React.useState(false);
     const [assembledLoading, setAssembledLoading] = React.useState(false);
     const [assembledError, setAssembledError] = React.useState<string | null>(null);
     const signableUrlRef = React.useRef<string | null>(null);
@@ -334,7 +335,7 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
         ? 7
         : !hasRecord
           ? status === "signing_complete" ? 1 : status === "for_training" ? 2 : 1
-          : record.status === "issued" ? 3
+          : record.status === "issued" ? (proceededToSigning ? 3 : 2)
           : record.status === "signed" ? (needsChoice ? 4 : 5)
           : 6;
 
@@ -664,7 +665,13 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
                 </Alert>
             ) : null}
             <div className={busy ? "pointer-events-none opacity-60" : undefined} aria-busy={busy}>
-                <PreEmploymentTrainingLetterForm prefill={letterPrefill} onGenerated={(result, fields) => void handleGenerated(result, fields)} />
+                <PreEmploymentTrainingLetterForm
+                    prefill={letterPrefill}
+                    saved={record?.status === "issued"}
+                    saving={busy}
+                    onGenerated={(result, fields) => void handleGenerated(result, fields)}
+                    onProceed={() => setProceededToSigning(true)}
+                />
             </div>
         </div>
     );
@@ -1109,6 +1116,28 @@ export function PreEmploymentTrainingSection({ applicantId, userId, applicantSta
                 <p className="text-sm text-muted-foreground">
                     Pre-employment training does not apply at this stage.
                 </p>
+            </div>
+        );
+    }
+
+    if (record.status === "issued" && !proceededToSigning) {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-start gap-3 border-b border-border pb-4">
+                    <div className="shrink-0 rounded-lg border border-primary/20 bg-primary/10 p-2">
+                        <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold leading-tight">
+                            Pre-employment training
+                        </h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Complete each step in order. The current step is highlighted below.
+                        </p>
+                    </div>
+                </div>
+                {renderStepIndicator()}
+                {renderLetterForm()}
             </div>
         );
     }

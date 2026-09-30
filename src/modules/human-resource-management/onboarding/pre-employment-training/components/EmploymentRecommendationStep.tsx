@@ -331,9 +331,9 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
         setForm((f) => ({
             ...f,
             companyName: row.company_name,
-            headerAddress: row.headerAddress ?? f.headerAddress,
-            headerContact: row.headerContact ?? f.headerContact,
-            headerEmail: row.headerEmail ?? f.headerEmail,
+            headerAddress: row.headerAddress ?? "",
+            headerContact: row.headerContact ?? "",
+            headerEmail: row.headerEmail ?? "",
         }));
     };
 
@@ -655,32 +655,24 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
                         </SelectContent>
                     </Select>
                 </div>
-                <div>
-                    <Label className={labelClass} htmlFor="rec-header-address">Letterhead address</Label>
-                    <Input
-                        id="rec-header-address"
-                        className={field}
-                        value={form.headerAddress}
-                        onChange={set("headerAddress")}
-                    />
-                </div>
-                <div>
-                    <Label className={labelClass} htmlFor="rec-header-contact">Letterhead contact</Label>
-                    <Input
-                        id="rec-header-contact"
-                        className={field}
-                        value={form.headerContact}
-                        onChange={set("headerContact")}
-                    />
-                </div>
-                <div>
-                    <Label className={labelClass} htmlFor="rec-header-email">Letterhead email</Label>
-                    <Input
-                        id="rec-header-email"
-                        className={field}
-                        value={form.headerEmail}
-                        onChange={set("headerEmail")}
-                    />
+                <div className="space-y-1.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                    <p className="text-xs font-medium text-muted-foreground">
+                        Letterhead from the selected company
+                    </p>
+                    <dl className="space-y-0.5 text-xs">
+                        <div className="flex gap-2">
+                            <dt className="w-16 shrink-0 text-muted-foreground">Address</dt>
+                            <dd className="min-w-0 truncate">{form.headerAddress || "—"}</dd>
+                        </div>
+                        <div className="flex gap-2">
+                            <dt className="w-16 shrink-0 text-muted-foreground">Contact</dt>
+                            <dd className="min-w-0 truncate">{form.headerContact || "—"}</dd>
+                        </div>
+                        <div className="flex gap-2">
+                            <dt className="w-16 shrink-0 text-muted-foreground">Email</dt>
+                            <dd className="min-w-0 truncate">{form.headerEmail || "—"}</dd>
+                        </div>
+                    </dl>
                 </div>
 
                 <p className={section}>Signatories</p>
