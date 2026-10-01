@@ -8,7 +8,7 @@ const BASELINE_PREFIXES = ["/main-dashboard"]
 // Edge Memory Cache — Subsystem Prefixes
 let CACHED_PREFIXES: string[] = [...BASELINE_PREFIXES]
 let LAST_FETCH_TIME = 0
-const CACHE_TTL = process.env.NODE_ENV === "development" ? 0 : 300000 // 5 minutes in production
+const CACHE_TTL = process.env.NODE_ENV === "development" ? 60000 : 300000 // 5 minutes in production
 
 // Edge Memory Cache — Subscription Lock
 let CACHED_COMPANY_TIER: number | null = null
@@ -231,7 +231,9 @@ async function isSubscriptionLocked(pathname: string): Promise<boolean> {
             getModuleTierForPath(cleanPathname),
         ])
 
-        console.log(`[SubscriptionLock] Path: ${cleanPathname} | Company Tier: ${companyTier} | Module Tier: ${moduleTier} | Lock Mode: ${lockMode}`)
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`[SubscriptionLock] Path: ${cleanPathname} | Company Tier: ${companyTier} | Module Tier: ${moduleTier} | Lock Mode: ${lockMode}`)
+        }
 
         if (
             companyTier !== null &&
@@ -352,11 +354,15 @@ export async function middleware(req: NextRequest) {
             const now = Math.floor(Date.now() / 1000);
             // If expired or expiring within 10 seconds, treat as expired to trigger refresh
             if (payload.exp <= now + 10) {
+            if (process.env.NODE_ENV === 'development') {
                 console.log("[Middleware] Access token is expired or expiring soon. Forcing refresh...");
+            }
                 token = undefined;
             }
         } else {
-            console.log("[Middleware] Access token payload is invalid. Forcing refresh...");
+            if (process.env.NODE_ENV === 'development') {
+                console.log("[Middleware] Access token payload is invalid. Forcing refresh...");
+            }
             token = undefined;
         }
     }
@@ -368,7 +374,9 @@ export async function middleware(req: NextRequest) {
 
         if (refreshToken && springBase) {
             try {
-                console.log("[Middleware] Access token missing or expired, attempting refresh...");
+                if (process.env.NODE_ENV === 'development') {
+                    console.log("[Middleware] Access token missing or expired, attempting refresh...");
+                }
                 const refreshUrl = `${springBase.replace(/\/$/, "")}/auth/refresh`;
 
                 const refreshRes = await fetch(refreshUrl, {
@@ -384,7 +392,9 @@ export async function middleware(req: NextRequest) {
                     const newToken = pickTokenFromPayload(data);
 
                     if (newToken) {
-                        console.log("[Middleware] Refresh successful.");
+                        if (process.env.NODE_ENV === 'development') {
+                            console.log("[Middleware] Refresh successful.");
+                        }
                         if (currentToken) {
                             USER_PERMISSIONS_CACHE.delete(currentToken);
                         }
@@ -648,4 +658,5 @@ export async function middleware(req: NextRequest) {
 export const config = {
     matcher: ["/:path*"],
 }
+
 
