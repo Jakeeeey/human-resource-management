@@ -1,4 +1,4 @@
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/mailing-studio/studio-templates/utils/directus";
 
 import { MS_DESIGN_JSON_MAX } from "../types/ms-template.schema";
 import { compileVariablesFromDesignJson, normaliseVariablesList } from "../../utils/ms-variables";

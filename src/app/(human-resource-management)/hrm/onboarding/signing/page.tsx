@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { SigningDeskModule } from "@/modules/human-resource-management/onboarding/signing-desk";
+import { SigningDeskModule } from "@/modules/human-resource-management/recruitment/onboarding/signing-desk";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

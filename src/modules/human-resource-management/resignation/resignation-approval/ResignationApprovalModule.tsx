@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { CalendarIcon, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatPHT } from "./utils/time";
 import {
     ResignationApprovalProvider,
     useResignationApprovalContext,

@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { QuizHistoryModule } from "@/modules/human-resource-management/quiz-file-management/quiz-history";
+import { QuizHistoryModule } from "@/modules/human-resource-management/recruitment/quiz-file-management/quiz-history";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

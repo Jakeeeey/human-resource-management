@@ -1,5 +1,5 @@
 import { emitEvent } from "@/app/api/hrm/mailing-studio/studio-bindings/events/emit/route";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/interviews/utils/directus";
 
 export const INTERVIEW_MAIL_EVENT_KEYS = {
     initialGraded: "initial_interview.graded",

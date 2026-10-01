@@ -1,5 +1,5 @@
 import type { ResignationStatus } from "./types";
-import { parseUtcInstant } from "@/modules/human-resource-management/shared/utils/time";
+import { parseUtcInstant } from "./utils/time";
 
 export const RESIGNATION_COOLDOWN_DAYS = 30;
 

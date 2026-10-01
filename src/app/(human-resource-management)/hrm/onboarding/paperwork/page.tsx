@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { PaperworkRegistryModule } from "@/modules/human-resource-management/onboarding/paperwork";
+import { PaperworkRegistryModule } from "@/modules/human-resource-management/recruitment/paperwork";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

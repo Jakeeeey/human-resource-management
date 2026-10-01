@@ -9,7 +9,7 @@ import {
     buildPayloadSchema,
     validateVariableRows,
 } from "@/modules/human-resource-management/mailing-studio/studio-event-registry/utils/ms-event-variables";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/mailing-studio/studio-event-registry/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

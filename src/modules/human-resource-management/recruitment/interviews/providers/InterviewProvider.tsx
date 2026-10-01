@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import { toast } from "sonner";
 import { Interview, InterviewCreateInput } from "../types";
 
-const API_PATH = "/api/hrm/interviews";
+const API_PATH = "/api/hrm/recruitment/interviews";
 
 /**
  * Grading stage tab shared by the eligible list tabs.

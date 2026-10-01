@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { InterviewCriteriaTemplatesModule } from "@/modules/human-resource-management/interview-criteria/templates";
+import { InterviewCriteriaTemplatesModule } from "@/modules/human-resource-management/recruitment/interview-criteria/templates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

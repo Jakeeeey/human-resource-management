@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
-import { ApplicationFormModule } from "@/modules/human-resource-management/application-form";
+import { ApplicationFormModule } from "@/modules/human-resource-management/recruitment/application-form";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { PerformanceDashboardModule } from "@/modules/human-resource-management/performance-evaluation/PerformanceDashboardModule";
+import { PerformanceDashboardModule } from "@/modules/human-resource-management/performance-evaluation/evaluation-dashboard/PerformanceDashboardModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

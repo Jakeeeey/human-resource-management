@@ -3,7 +3,7 @@
 // directly from the client).
 //
 // The applicant list is READ-ONLY here: it reuses the existing
-// `/api/hrm/applicants` shape (`{ id, full_name, position_applied_for,
+// `/api/hrm/recruitment/applicants` shape (`{ id, full_name, position_applied_for,
 // application_id, ... }` — the job-offer module's mapping is the precedent)
 // without modifying that route. Only applicants WITH an application_id are
 // sendable (dispatch needs an application_id for its manual key).
@@ -49,7 +49,7 @@ interface ApplicantListRow {
  */
 export async function listSendNowApplicants(): Promise<Envelope<SendNowApplicant[]>> {
     try {
-        const res = await fetch("/api/hrm/applicants");
+        const res = await fetch("/api/hrm/recruitment/applicants");
         if (!res.ok) return { success: false, message: "Failed to list applicants" };
         const body = (await res.json()) as { data?: ApplicantListRow[] };
         if (!Array.isArray(body?.data)) return { success: false, message: "Failed to list applicants" };
@@ -81,7 +81,7 @@ export async function listSendNowApplicants(): Promise<Envelope<SendNowApplicant
 export async function getApplicantEmail(applicationId: string | number): Promise<string | null> {
     try {
         const res = await fetch(
-            `/api/hrm/mailing/applicant-email?application_id=${encodeURIComponent(String(applicationId))}`
+            `/api/hrm/recruitment/mailing/applicant-email?application_id=${encodeURIComponent(String(applicationId))}`
         );
         const body = (await res.json()) as {
             success?: boolean;
@@ -123,7 +123,7 @@ export async function postManualMailSend(
     input: ManualMailSendInput
 ): Promise<Envelope<ManualMailSendResult>> {
     try {
-        const res = await fetch("/api/hrm/mailing/manual-send", {
+        const res = await fetch("/api/hrm/recruitment/mailing/manual-send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(input),
@@ -149,7 +149,7 @@ export async function postManualSendNow(
     input: ManualSendNowInput
 ): Promise<Envelope<ManualSendNowResult>> {
     try {
-        const res = await fetch("/api/hrm/mailing/send-now", {
+        const res = await fetch("/api/hrm/recruitment/mailing/send-now", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(input),

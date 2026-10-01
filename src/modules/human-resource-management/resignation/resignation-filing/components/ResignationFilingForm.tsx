@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Loader2, Paperclip, Send, X } from "lucide-react";
 import { ATTACHMENT_ALLOWED_MIME, ATTACHMENT_MAX_BYTES, REASON_MAX_LENGTH, ResignationFormSchema } from "../types";
-import { phToday } from "@/modules/human-resource-management/shared/utils/time";
+import { phToday } from "../utils/time";
 import { useResignationFilingContext } from "../providers/ResignationFilingProvider";
 
 const ALLOWED_MIME_LIST = ATTACHMENT_ALLOWED_MIME as readonly string[];

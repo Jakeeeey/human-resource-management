@@ -11,12 +11,12 @@ import {
     type ReferenceRow,
     type TrainingRow,
     type WorkExperienceRow,
-} from "@/modules/human-resource-management/application-form/types";
+} from "@/modules/human-resource-management/recruitment/application-form/types";
 
 // ============================================================================
-// Directus row bundle (GET /api/hrm/applications/by-applicant) →
+// Directus row bundle (GET /api/hrm/recruitment/applicants/applications/by-applicant) →
 // ApplicationFormValues. Inverse of the submit mapping in
-// app/api/hrm/application-form/route.ts. Read-only viewer use only.
+// app/api/hrm/recruitment/application-form/route.ts. Read-only viewer use only.
 // ============================================================================
 
 type Row = Record<string, unknown>;
