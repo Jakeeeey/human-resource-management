@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { listTopicRows, readTopicRowByCode } from "@/modules/human-resource-management/onboarding/orientation/server/orientationTopicIo";
-import { upsertTopic } from "@/modules/human-resource-management/onboarding/orientation/orientationStore";
+import { listTopicRows, readTopicRowByCode } from "@/modules/human-resource-management/recruitment/onboarding/orientation/server/orientationTopicIo";
+import { upsertTopic } from "@/modules/human-resource-management/recruitment/onboarding/orientation/orientationStore";
 import {
   REQUIREMENTS_ERROR_CODES,
   mapRequirementsFailure,
@@ -11,8 +11,8 @@ import {
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
-import { CreateOrientationTopicBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
+import { CreateOrientationTopicBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

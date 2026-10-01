@@ -3,15 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listDocSlotRows,
   reorderDocSlots,
-} from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
+} from "@/modules/human-resource-management/recruitment/employee-portal/server/documentSlotIo";
 import {
   assertOrderEntriesExist,
   mapRequirementsFailure,
   readRequirementsSession,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
-import { RequirementsReorderBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
+import { RequirementsReorderBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

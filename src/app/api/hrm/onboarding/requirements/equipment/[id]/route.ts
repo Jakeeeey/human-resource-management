@@ -4,8 +4,8 @@ import {
   listEquipmentItemRows,
   patchEquipmentItemRow,
   softDeleteEquipmentItemRow,
-} from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/equipment/server/equipmentItemIo";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 import {
   hardDeleteItem,
   invalidId,
@@ -14,8 +14,8 @@ import {
   requirementsNotFound,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
-import { UpdateEquipmentItemBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
+import { UpdateEquipmentItemBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/task-template-service";
 import {
   readOnboardingTaskSession,
   serverError,
   unauthorized,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

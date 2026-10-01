@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { mailBindingSchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-binding.schema";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/mailing/utils/directus";
 import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 import {
     actorIdFromJwt,
     nowUTC,
     stampUpdate,
-} from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/mailing/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

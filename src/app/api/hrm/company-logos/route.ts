@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { dFetch, DIRECTUS_URL } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch, DIRECTUS_URL } from "@/modules/human-resource-management/recruitment/job-offer/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

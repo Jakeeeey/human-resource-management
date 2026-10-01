@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   isAbsentItemError,
   notFound,
   readSigningSession,
   serverError,
   unauthorized,
-} from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
-import { SigningEnvelopeSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
+} from "@/modules/human-resource-management/recruitment/signing/server/signingApiServer";
+import { SigningEnvelopeSchema } from "@/modules/human-resource-management/recruitment/signing/types/contracts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

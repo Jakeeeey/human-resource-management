@@ -3,19 +3,19 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listOnboardingTasks,
   materializeOnboardingTasks,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
-import { ONBOARDING_TASK_ERROR_CODES } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
+import { ONBOARDING_TASK_ERROR_CODES } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskIo";
 import {
   readOnboardingTaskSession,
   serverError,
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 import {
   MaterializeOnboardingTasksSchema,
   OnboardingTaskListQuerySchema,
-} from "@/modules/human-resource-management/onboarding/tasks/types/onboarding-task-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/types/onboarding-task-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

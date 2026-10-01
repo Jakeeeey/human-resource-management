@@ -1,0 +1,1 @@
+export { CriteriaAdminModule } from "./CriteriaAdminModule";

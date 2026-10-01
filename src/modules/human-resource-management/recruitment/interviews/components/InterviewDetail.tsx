@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { FileText, Loader2 } from "lucide-react";
-import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatPHT } from "../utils/time";
 
 type InterviewVerdict = "Pending" | "Passed" | "Failed";
 

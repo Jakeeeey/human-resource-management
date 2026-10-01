@@ -4,7 +4,7 @@ import {
   createDocSlotRows,
   listDocSlotRows,
   type DocSlotWriteRow,
-} from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
+} from "@/modules/human-resource-management/recruitment/employee-portal/server/documentSlotIo";
 import {
   mapRequirementsFailure,
   nextSortOrder,
@@ -13,9 +13,9 @@ import {
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
-import { CreateDocumentSlotBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
+import { CreateDocumentSlotBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

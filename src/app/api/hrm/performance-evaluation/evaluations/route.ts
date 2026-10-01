@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/directus";
 import {
   EVALUATION_ERROR_CODES,
   evaluationError,
@@ -10,30 +10,30 @@ import {
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationApiServer";
-import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationApiServer";
+import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationCapability";
 import {
   listKpiCriteria,
   resolveEmployeeDepartmentId,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluation-service";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/criteriaService";
 import {
   EmployeeEvaluationItemSchema,
   EmployeeEvaluationSchema,
   EvaluationTrackingSchema,
-} from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation.schema";
-import { CreateEvaluationSchema } from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation-api.schema";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/types/performance-evaluation.schema";
+import { CreateEvaluationSchema } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/types/performance-evaluation-api.schema";
 import {
   computeTotalScore,
   isWeightSetValid,
   ratingBand,
   sumWeights,
-} from "@/modules/human-resource-management/performance-evaluation/utils/kpiScore";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/kpiScore";
 import {
   actorIdFromJwt,
   nowPH,
   stampCreate,
   stampUpdate,
-} from "@/modules/human-resource-management/performance-evaluation/utils/audit";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

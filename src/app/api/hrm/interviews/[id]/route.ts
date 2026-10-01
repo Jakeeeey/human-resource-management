@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { interviewService, maybeAutoApproveRecommendation, maybeAutoRejectRecommendation, advanceApplicantForInterviewVerdict } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { emitInterviewGradedEvent } from "@/modules/human-resource-management/recruitment/interviews/services/interviewMailEvents";
-import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/recruitment/interviews/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";

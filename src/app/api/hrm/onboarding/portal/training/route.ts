@@ -3,14 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   readPortalToken,
   resolvePortalIdentity,
-} from "@/modules/human-resource-management/employee-portal";
-import type { PortalTrainingItem } from "@/modules/human-resource-management/employee-portal/types/portal-training.schema";
-import { listOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
-import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
+} from "@/modules/human-resource-management/recruitment/employee-portal";
+import type { PortalTrainingItem } from "@/modules/human-resource-management/recruitment/employee-portal/types/portal-training.schema";
+import { listOnboardingTasks } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/task-template-service";
 import type {
   OnboardingTask,
   OnboardingTaskTemplate,
-} from "@/modules/human-resource-management/onboarding/types/onboarding-task.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/types/onboarding-task.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -4,13 +4,13 @@ import { z } from "zod";
 import {
   createOrUpdateTrainingRecord,
   getTrainingRecordByApplicantOrUser,
-} from "@/modules/human-resource-management/onboarding/pre-employment-training/server/preEmploymentTrainingIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/pre-employment-training/server/preEmploymentTrainingIo";
 import {
   readOnboardingTaskSession,
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

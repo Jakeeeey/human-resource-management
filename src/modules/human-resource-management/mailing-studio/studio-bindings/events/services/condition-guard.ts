@@ -1,4 +1,4 @@
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/mailing-studio/utils/directus";
 
 import {
   parseConditions,

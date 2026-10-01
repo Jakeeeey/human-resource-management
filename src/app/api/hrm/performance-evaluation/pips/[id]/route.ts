@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/directus";
 import {
   actorIdFromJwt,
   nowPH,
   stampCreate,
   stampUpdate,
-} from "@/modules/human-resource-management/performance-evaluation/utils/audit";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/audit";
 import {
   mapWriteFailure,
   notFound,
@@ -16,18 +16,18 @@ import {
   unauthorized,
   unwrapData,
   validationFailed,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationApiServer";
-import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationApiServer";
+import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationCapability";
 import {
   EmployeePipActionPlanSchema,
   EmployeePipAreaSchema,
   type EmployeePip,
   type EmployeePipActionPlan,
-} from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation.schema";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/types/performance-evaluation.schema";
 import {
   UpdatePipSchema,
   type UpdatePipInput,
-} from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation-api.schema";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/types/performance-evaluation-api.schema";
 import {
   assertCanRecordOutcome,
   assertEmployeeOpen,
@@ -45,7 +45,7 @@ import {
   mergedOutcomeRows,
   PIP_ERROR_CODES,
   PipGateError,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluation-service";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/pipService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

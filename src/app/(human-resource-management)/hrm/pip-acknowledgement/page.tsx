@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { PipAcknowledgementModule } from "@/modules/human-resource-management/performance-evaluation";
+import { PipAcknowledgementModule } from "@/modules/human-resource-management/performance-evaluation/pip-acknowledgement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

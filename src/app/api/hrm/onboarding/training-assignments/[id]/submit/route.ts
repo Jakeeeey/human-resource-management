@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
@@ -11,16 +11,16 @@ import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 import {
   gradeAnswers,
   persistGradedAttempt,
-} from "@/modules/human-resource-management/quiz-file-management/utils/grading";
+} from "@/modules/human-resource-management/recruitment/quiz-file-management/utils/grading";
 import {
   SubmitTrainingAttemptSchema,
-} from "@/modules/human-resource-management/onboarding/training/types/training-taking.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/types/training-taking.schema";
 import {
   assertAssignmentOwner,
   normalizeTrainingAssignment,
   resolveEngineApplicant,
-} from "@/modules/human-resource-management/onboarding/training/trainingTaking";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/trainingTaking";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 import {
   abandonedInProgress,
   buildCompletionScalars,
@@ -28,7 +28,7 @@ import {
   describeRetakeTarget,
   transitionAssignment,
   type TrainingAssignment,
-} from "@/modules/human-resource-management/onboarding/training/trainingAssignmentAdapter";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/trainingAssignmentAdapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

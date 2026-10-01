@@ -4,7 +4,7 @@ import {
   createEquipmentItemRows,
   listEquipmentItemRows,
   type EquipmentItemWriteRow,
-} from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/equipment/server/equipmentItemIo";
 import {
   mapRequirementsFailure,
   nextSortOrder,
@@ -13,9 +13,9 @@ import {
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
-import { CreateEquipmentItemBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
+import { CreateEquipmentItemBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,4 +1,4 @@
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { nowUTC } from "@/modules/human-resource-management/resignation/utils/audit";
 import {
     type EnrichedResignationRequest,
     type ResignationRequest,

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
-import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { setApplicantStatus } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/applicantStatus";
 import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
-import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";

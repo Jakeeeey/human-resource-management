@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/directus";
 import {
   mapRouteError,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluation-route-guards";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluation-route-guards";
 import {
   mapWriteFailure,
   ok,
@@ -12,24 +12,24 @@ import {
   unauthorized,
   unwrapData,
   validationFailed,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationApiServer";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationApiServer";
 import {
   assertCapability,
   resolveEvaluationCapability,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
-import { getEvaluationWorkspace } from "@/modules/human-resource-management/performance-evaluation/server/evaluation-service";
-import { EvaluationTrackingSchema } from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation.schema";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationCapability";
+import { getEvaluationWorkspace } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/workspaceService";
+import { EvaluationTrackingSchema } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/types/performance-evaluation.schema";
 import {
   actorIdFromJwt,
   nowPH,
   stampCreate,
   stampUpdate,
-} from "@/modules/human-resource-management/performance-evaluation/utils/audit";
-import { hasCompletedProbation } from "@/modules/human-resource-management/performance-evaluation/utils/probationClock";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/audit";
+import { hasCompletedProbation } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/probationClock";
 import {
   type EvalType,
   type WorkflowFacts,
-} from "@/modules/human-resource-management/performance-evaluation/utils/workflow";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/workflow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

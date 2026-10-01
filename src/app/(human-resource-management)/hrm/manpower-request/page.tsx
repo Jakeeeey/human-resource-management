@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 import { cookies } from "next/headers";
-import { ManpowerRequestModule } from "@/modules/human-resource-management/manpower-request/ManpowerRequestModule";
+import { ManpowerRequestModule } from "@/modules/human-resource-management/recruitment/manpower-request/ManpowerRequestModule";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

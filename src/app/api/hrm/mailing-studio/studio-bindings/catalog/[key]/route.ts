@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     msEventKeyShapeSchema,
 } from "@/modules/human-resource-management/mailing-studio/studio-bindings/catalog/ms-catalog.schema";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/mailing-studio/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { loadEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
-import { findCatalogItem } from "@/modules/human-resource-management/onboarding/equipment/equipmentCatalog";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
+import { loadEquipmentCatalog } from "@/modules/human-resource-management/recruitment/onboarding/equipment/server/equipmentItemIo";
+import { findCatalogItem } from "@/modules/human-resource-management/recruitment/onboarding/equipment/equipmentCatalog";
 import {
   buildEquipmentItemStates,
   equipmentDocRef,
   issuerSigner,
-} from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
-import { IssueEquipmentItemSchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
-import { EquipmentQuerySchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
-import { readUserExists } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/equipment/equipmentPredicate";
+import { IssueEquipmentItemSchema } from "@/modules/human-resource-management/recruitment/onboarding/equipment/types/equipment-issue.schema";
+import { EquipmentQuerySchema } from "@/modules/human-resource-management/recruitment/onboarding/equipment/types/equipment-issue.schema";
+import { readUserExists } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskIo";
 import {
   completeOnboardingTask,
   listOnboardingTasks,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
-import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/task-template-service";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

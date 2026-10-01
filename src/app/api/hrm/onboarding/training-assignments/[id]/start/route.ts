@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
 // Draw entry reused from the untouched quiz engine: this is the SAME
 // `drawQuizQuestions` function the existing auth-gated
 // `quiz-attempt/start` route calls — called through the Todo 4 adapter's
 // `buildDrawInput`, never re-implemented.
-import { drawQuizQuestions } from "@/modules/human-resource-management/quiz-file-management/utils/quiz-draw";
+import { drawQuizQuestions } from "@/modules/human-resource-management/recruitment/quiz-file-management/utils/quiz-draw";
 import {
   StartTrainingAttemptSchema,
-} from "@/modules/human-resource-management/onboarding/training/types/training-taking.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/types/training-taking.schema";
 import {
   assertAssignmentOwner,
   normalizeTrainingAssignment,
-} from "@/modules/human-resource-management/onboarding/training/trainingTaking";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
-import { buildDrawInput } from "@/modules/human-resource-management/onboarding/training/trainingAssignmentAdapter";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/trainingTaking";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
+import { buildDrawInput } from "@/modules/human-resource-management/recruitment/onboarding/training/trainingAssignmentAdapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   CreateOrientationTopicSchema,
   type OrientationTopic,
-} from "@/modules/human-resource-management/onboarding/orientation/types/orientation.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/orientation/types/orientation.schema";
 import {
   listTopics,
   upsertTopic,
-} from "@/modules/human-resource-management/onboarding/orientation/orientationStore";
+} from "@/modules/human-resource-management/recruitment/onboarding/orientation/orientationStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

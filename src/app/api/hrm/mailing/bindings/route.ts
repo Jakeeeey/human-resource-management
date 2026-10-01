@@ -5,14 +5,14 @@ import {
     mailSendConditionSchema,
 } from "@/modules/human-resource-management/recruitment/mailing/types/mail-binding.schema";
 import { mailEventKeySchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-template.schema";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/mailing/utils/directus";
 import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 import {
     actorIdFromJwt,
     nowUTC,
     stampCreate,
     stampUpdate,
-} from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/mailing/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

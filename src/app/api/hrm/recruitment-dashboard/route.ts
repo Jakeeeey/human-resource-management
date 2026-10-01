@@ -18,7 +18,7 @@ import {
     type DashboardInput,
 } from "@/modules/human-resource-management/recruitment/recruitment-dashboard/server/metrics";
 import { countPendingAcknowledgement } from "@/modules/human-resource-management/recruitment/recruitment-dashboard/server/probation";
-import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
+import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationCapability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

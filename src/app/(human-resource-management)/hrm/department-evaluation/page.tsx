@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { DepartmentEvaluationModule } from "@/modules/human-resource-management/performance-evaluation";
+import { DepartmentEvaluationModule } from "@/modules/human-resource-management/performance-evaluation/department-evaluation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

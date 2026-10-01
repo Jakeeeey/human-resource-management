@@ -4,7 +4,7 @@ import {
   createTemplateRows,
   listTemplateRows,
   type TemplateWriteRow,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskIo";
 import {
   REQUIREMENTS_ERROR_CODES,
   mapRequirementsFailure,
@@ -15,13 +15,13 @@ import {
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 import {
   CreateTaskTemplateBodySchema,
   RequirementsTaskPhaseSchema,
   isManagedTemplatePhase,
-} from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

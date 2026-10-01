@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   ReplacePaperworkTemplateCompaniesSchema,
   type PaperworkTemplateCompany,
-} from "@/modules/human-resource-management/onboarding/paperwork/types/paperwork-template-company.schema";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/paperwork/types/paperwork-template-company.schema";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

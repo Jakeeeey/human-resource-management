@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { completeOnboardingTask } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
-import { ONBOARDING_TASK_ERROR_CODES } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+import { completeOnboardingTask } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
+import { ONBOARDING_TASK_ERROR_CODES } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskIo";
 import {
   notFound,
   readOnboardingTaskSession,
@@ -9,8 +9,8 @@ import {
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
-import { OnboardingTaskCompleteSchema } from "@/modules/human-resource-management/onboarding/tasks/types/onboarding-task-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
+import { OnboardingTaskCompleteSchema } from "@/modules/human-resource-management/recruitment/onboarding/tasks/types/onboarding-task-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

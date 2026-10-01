@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   mapWriteFailure,
   readSigningSession,
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
-import { actorIdFromJwt, nowUTC, stampCreate } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/signing/server/signingApiServer";
+import { actorIdFromJwt, nowUTC, stampCreate } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 import {
   PaperworkItemCreateSchema,
   PaperworkItemListQuerySchema,
-} from "@/modules/human-resource-management/onboarding/signing/types/signing-api.schema";
-import { PaperworkItemSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
+} from "@/modules/human-resource-management/recruitment/signing/types/signing-api.schema";
+import { PaperworkItemSchema } from "@/modules/human-resource-management/recruitment/signing/types/contracts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -4,8 +4,8 @@ import {
   deactivateTrainingItem,
   listTrainingItems,
   updateTrainingItem,
-} from "@/modules/human-resource-management/onboarding/training/server/trainingCatalogService";
-import { UpdateTrainingItemBodySchema } from "@/modules/human-resource-management/onboarding/training/server/trainingTemplatesApi.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/server/trainingCatalogService";
+import { UpdateTrainingItemBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/training/server/trainingTemplatesApi.schema";
 import {
   invalidId,
   mapTrainingCatalogFailure,
@@ -13,7 +13,7 @@ import {
   trainingItemNotFound,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/training/server/trainingTemplatesApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/server/trainingTemplatesApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   CreatePaperworkTemplateSchema,
   type PaperworkTemplate,
   type PaperworkZone,
-} from "@/modules/human-resource-management/onboarding/paperwork/types/paperwork-template.schema";
-import { actorIdFromJwt, nowUTC, stampCreate } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/paperwork/types/paperwork-template.schema";
+import { actorIdFromJwt, nowUTC, stampCreate } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 import { COOKIE_NAME, decodeJwtPayload } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";

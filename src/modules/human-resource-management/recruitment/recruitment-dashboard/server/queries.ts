@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/recruitment-dashboard/utils/directus";
 import type { StatusCount } from "../types";
 import {
     applicantRowSchema,

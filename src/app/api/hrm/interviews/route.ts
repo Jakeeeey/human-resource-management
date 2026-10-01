@@ -4,8 +4,8 @@ import { interviewService, maybeAutoApproveRecommendation, maybeAutoRejectRecomm
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { InterviewSchema } from "@/modules/human-resource-management/recruitment/interviews/types";
 import { emitInterviewGradedEvent } from "@/modules/human-resource-management/recruitment/interviews/services/interviewMailEvents";
-import { getApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { getApplicantStatus } from "@/modules/human-resource-management/recruitment/interviews/services/applicantStatus";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/recruitment/interviews/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";

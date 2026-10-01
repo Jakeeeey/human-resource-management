@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { assembleEmploymentRecommendationInput } from "@/modules/human-resource-management/onboarding/pre-employment-training/server/employmentRecommendationInput";
+import { assembleEmploymentRecommendationInput } from "@/modules/human-resource-management/recruitment/onboarding/pre-employment-training/server/employmentRecommendationInput";
 import {
   EMPLOYMENT_RECOMMENDATION_FILING_ERROR_CODES,
   fileEmploymentRecommendationLetter,
   markEmploymentRecommendationIssued,
   readEmploymentRecommendationIssuance,
-} from "@/modules/human-resource-management/onboarding/pre-employment-training/server/employmentRecommendationFiling";
+} from "@/modules/human-resource-management/recruitment/onboarding/pre-employment-training/server/employmentRecommendationFiling";
 import {
   readOnboardingTaskSession,
   serverError,
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

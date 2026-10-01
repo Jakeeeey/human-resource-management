@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   CreateAcknowledgementLogSchema,
   type AcknowledgementLog,
-} from "@/modules/human-resource-management/onboarding/verification/types/acknowledgement-log.schema";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/verification/types/acknowledgement-log.schema";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

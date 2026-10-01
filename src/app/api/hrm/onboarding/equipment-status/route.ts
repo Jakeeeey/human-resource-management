@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { loadEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
+import { loadEquipmentCatalog } from "@/modules/human-resource-management/recruitment/onboarding/equipment/server/equipmentItemIo";
 import {
   buildEquipmentItemStates,
   isFullyEquipped,
   parseEquipmentDocRef,
-} from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
-import { EquipmentQuerySchema } from "@/modules/human-resource-management/onboarding/equipment/types/equipment-issue.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/equipment/equipmentPredicate";
+import { EquipmentQuerySchema } from "@/modules/human-resource-management/recruitment/onboarding/equipment/types/equipment-issue.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

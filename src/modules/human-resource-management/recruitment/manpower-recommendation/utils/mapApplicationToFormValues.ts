@@ -11,7 +11,7 @@ import {
     type ReferenceRow,
     type TrainingRow,
     type WorkExperienceRow,
-} from "@/modules/human-resource-management/application-form/types";
+} from "@/modules/human-resource-management/recruitment/application-form/types";
 
 // ============================================================================
 // Directus row bundle (GET /api/hrm/applications/by-applicant) →

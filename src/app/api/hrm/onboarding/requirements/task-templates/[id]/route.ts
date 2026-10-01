@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   listTemplateRows,
   patchTemplateRow,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskIo";
 import {
   REQUIREMENTS_ERROR_CODES,
   assertTemplateNotReferenced,
@@ -15,9 +15,9 @@ import {
   requirementsNotFound,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
-import { UpdateTaskTemplateBodySchema } from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
+import { UpdateTaskTemplateBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

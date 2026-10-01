@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { ensureOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
+import { ensureOnboardingTaskTemplates } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/task-template-service";
 import {
   readOnboardingTaskSession,
   serverError,
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
-import { SeedOnboardingTaskTemplatesSchema } from "@/modules/human-resource-management/onboarding/tasks/types/onboarding-task-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
+import { SeedOnboardingTaskTemplatesSchema } from "@/modules/human-resource-management/recruitment/onboarding/tasks/types/onboarding-task-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

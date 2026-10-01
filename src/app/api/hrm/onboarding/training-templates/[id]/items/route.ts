@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createTrainingItem,
   listTrainingItems,
-} from "@/modules/human-resource-management/onboarding/training/server/trainingCatalogService";
-import { CreateTrainingItemBodySchema } from "@/modules/human-resource-management/onboarding/training/server/trainingTemplatesApi.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/server/trainingCatalogService";
+import { CreateTrainingItemBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/training/server/trainingTemplatesApi.schema";
 import {
   invalidId,
   mapTrainingCatalogFailure,
@@ -12,7 +12,7 @@ import {
   readTrainingTemplatesSession,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/training/server/trainingTemplatesApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/server/trainingTemplatesApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -5,12 +5,12 @@ import {
   enforceDepartmentScope,
   EvaluationWorkspaceQuerySchema,
   mapRouteError,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluation-route-guards";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluation-route-guards";
 import {
   ok,
   validationFailed,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationApiServer";
-import { listDepartmentSuperiors } from "@/modules/human-resource-management/performance-evaluation/server/evaluation-service";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationApiServer";
+import { listDepartmentSuperiors } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/rosterService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

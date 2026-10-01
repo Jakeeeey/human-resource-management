@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/applicants/utils/directus";
 import {
     ApplicantStatusSchema,
     type ApplicantStatus,
-} from "@/modules/human-resource-management/onboarding/types/applicant-status";
+} from "@/modules/human-resource-management/recruitment/onboarding/types/applicant-status";
 
 export const dynamic = "force-dynamic";
 

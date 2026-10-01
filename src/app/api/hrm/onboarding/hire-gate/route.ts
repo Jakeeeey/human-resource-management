@@ -5,19 +5,19 @@ import {
   getHireGateState,
   listPendingHireGates,
   runHireGateChoice,
-} from "@/modules/human-resource-management/onboarding/hire/server/hire-gate-service";
-import { HIRE_ORCHESTRATOR_ERROR_CODES } from "@/modules/human-resource-management/onboarding/hire/types/hire.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/hire/server/hire-gate-service";
+import { HIRE_ORCHESTRATOR_ERROR_CODES } from "@/modules/human-resource-management/recruitment/onboarding/hire/types/hire.schema";
 import {
   HireGateGetQuerySchema,
   HireGatePostBodySchema,
-} from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/hire/types/hire-gate.schema";
 import {
   readOnboardingTaskSession,
   serverError,
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

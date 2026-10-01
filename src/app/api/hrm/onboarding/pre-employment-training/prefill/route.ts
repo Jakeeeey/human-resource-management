@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { assemblePreEmploymentTrainingPrefill } from "@/modules/human-resource-management/onboarding/pre-employment-training/server/preEmploymentTrainingPrefill";
+import { assemblePreEmploymentTrainingPrefill } from "@/modules/human-resource-management/recruitment/onboarding/pre-employment-training/server/preEmploymentTrainingPrefill";
 import {
   readOnboardingTaskSession,
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

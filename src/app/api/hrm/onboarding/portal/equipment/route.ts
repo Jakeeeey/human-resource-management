@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   readPortalToken,
   resolvePortalIdentity,
-} from "@/modules/human-resource-management/employee-portal";
+} from "@/modules/human-resource-management/recruitment/employee-portal";
 import {
   AcknowledgePortalEquipmentSchema,
   type PortalEquipmentItem,
-} from "@/modules/human-resource-management/employee-portal/types/portal-equipment.schema";
-import { loadEquipmentCatalog } from "@/modules/human-resource-management/onboarding/equipment/server/equipmentItemIo";
-import { findCatalogItem } from "@/modules/human-resource-management/onboarding/equipment/equipmentCatalog";
+} from "@/modules/human-resource-management/recruitment/employee-portal/types/portal-equipment.schema";
+import { loadEquipmentCatalog } from "@/modules/human-resource-management/recruitment/onboarding/equipment/server/equipmentItemIo";
+import { findCatalogItem } from "@/modules/human-resource-management/recruitment/onboarding/equipment/equipmentCatalog";
 import {
   equipmentDocRef,
   hireeSigner,
   parseEquipmentDocRef,
-} from "@/modules/human-resource-management/onboarding/equipment/equipmentPredicate";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/equipment/equipmentPredicate";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

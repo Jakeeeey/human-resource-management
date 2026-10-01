@@ -1,4 +1,4 @@
-import type { ApplicantStatus } from "@/modules/human-resource-management/onboarding/types/applicant-status";
+import type { ApplicantStatus } from "@/modules/human-resource-management/recruitment/onboarding/types/applicant-status";
 import { APPLICANT_STATUS_LABELS } from "@/modules/human-resource-management/recruitment/applicants/types";
 
 // applicantPipeline.ts — the manpower-recommendation module's read model of the

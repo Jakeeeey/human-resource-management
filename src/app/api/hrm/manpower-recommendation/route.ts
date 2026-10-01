@@ -3,10 +3,10 @@ import { cookies } from "next/headers";
 import { manpowerRecommendationService } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/manpowerRecommendation.service";
 import { interviewService } from "@/modules/human-resource-management/recruitment/interviews/services/interview.service";
 import { ManpowerRecommendationSchema } from "@/modules/human-resource-management/recruitment/manpower-recommendation/types";
-import { ALLOWED_TRANSITIONS, setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { ALLOWED_TRANSITIONS, setApplicantStatus } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/applicantStatus";
+import type { ApplicantStatus } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/applicantStatus";
 import { humanizeApplicantStatusError } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/humanizeApplicantStatusError";
-import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/audit";
 import type { JwtPayload } from "@/lib/auth-utils";
 
 // manpower-recommendation — the recommendation row is a recruitment ARTIFACT

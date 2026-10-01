@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/mailing/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

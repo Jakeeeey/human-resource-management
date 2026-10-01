@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { APPLICANT_STATUS_ERROR_CODES } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { APPLICANT_STATUS_ERROR_CODES } from "@/modules/human-resource-management/recruitment/onboarding/services/applicantStatus";
 import {
   notFound,
   readSigningSession,
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
+} from "@/modules/human-resource-management/recruitment/signing/server/signingApiServer";
 import {
   CloseOutOutcomeSchema,
   SIGNING_CLOSEOUT_ERROR_CODES,
   closeOutNonSigner,
-} from "@/modules/human-resource-management/onboarding/signing/server/signing-closeout-service";
+} from "@/modules/human-resource-management/recruitment/signing/server/signing-closeout-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { mapRouteError } from "@/modules/human-resource-management/performance-evaluation/server/evaluation-route-guards";
+import { dFetch } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/directus";
+import { mapRouteError } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluation-route-guards";
 import {
   isAbsentItemError,
   mapWriteFailure,
@@ -12,15 +12,15 @@ import {
   unauthorized,
   unwrapData,
   validationFailed,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationApiServer";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationApiServer";
 import {
   assertCapability,
   resolveEvaluationCapability,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationCapability";
 import {
   actorIdFromJwt,
   stampUpdate,
-} from "@/modules/human-resource-management/performance-evaluation/utils/audit";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

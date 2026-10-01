@@ -2,8 +2,8 @@ import { z } from "zod";
 import {
     APPLICANT_STATUS,
     ApplicantStatusSchema,
-} from "@/modules/human-resource-management/onboarding/types/applicant-status";
-import type { ApplicantStatus } from "@/modules/human-resource-management/onboarding/types/applicant-status";
+} from "@/modules/human-resource-management/recruitment/onboarding/types/applicant-status";
+import type { ApplicantStatus } from "@/modules/human-resource-management/recruitment/onboarding/types/applicant-status";
 
 // The single applicant-status vocabulary (snake_case `applicant.status` values)
 // is owned by the onboarding contracts; re-exported here so consumers of this

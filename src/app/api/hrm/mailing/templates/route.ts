@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { actorIdFromJwt, nowUTC } from "@/modules/human-resource-management/recruitment/mailing/utils/audit";
 import { mailTemplateSchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-template.schema";
 import { assertMailableHtml } from "@/modules/human-resource-management/recruitment/mailing/utils/mailScrub";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/mailing/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

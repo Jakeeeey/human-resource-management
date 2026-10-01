@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Download, FileWarning, Loader2, RefreshCw } from "lucide-react";
-import { formatDateOnly, formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatDateOnly, formatPHT } from "../utils/time";
 import { RESIGNATION_STATUS_LABELS } from "../types";
 import type { ResignationRequestWithUser } from "../types";
 

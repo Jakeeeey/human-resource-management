@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/directus";
 import {
   EVALUATION_ERROR_CODES,
   evaluationError,
@@ -14,14 +14,14 @@ import {
   unauthorized,
   unwrapData,
   validationFailed,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluationApiServer";
-import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/server/evaluationCapability";
-import { EmployeeEvaluationSchema } from "@/modules/human-resource-management/performance-evaluation/types/performance-evaluation.schema";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationApiServer";
+import { resolveEvaluationCapability } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/server/evaluationCapability";
+import { EmployeeEvaluationSchema } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/types/performance-evaluation.schema";
 import {
   actorIdFromJwt,
   nowPH,
   stampUpdate,
-} from "@/modules/human-resource-management/performance-evaluation/utils/audit";
+} from "@/modules/human-resource-management/performance-evaluation/admin-evaluation/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

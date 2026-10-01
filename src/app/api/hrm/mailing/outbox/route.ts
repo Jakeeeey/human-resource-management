@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/mailing/utils/directus";
 import { mailOutboxStatusSchema } from "@/modules/human-resource-management/recruitment/mailing/types/mail-outbox.schema";
 import { toMaskedOutboxRow } from "@/modules/human-resource-management/recruitment/mailing/utils/mailMask";
 

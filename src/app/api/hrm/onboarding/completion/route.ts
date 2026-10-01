@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 import {
@@ -10,16 +10,16 @@ import {
   missingChecklistItems,
   runCompletionChecklist,
   type ChecklistItem,
-} from "@/modules/human-resource-management/onboarding/completion/completionChecklist";
-import { listOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
-import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
+} from "@/modules/human-resource-management/recruitment/onboarding/completion/completionChecklist";
+import { listOnboardingTasks } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/task-template-service";
 import {
   readOnboardingTaskSession,
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
-import type { OnboardingTask } from "@/modules/human-resource-management/onboarding/types/onboarding-task.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
+import type { OnboardingTask } from "@/modules/human-resource-management/recruitment/onboarding/types/onboarding-task.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

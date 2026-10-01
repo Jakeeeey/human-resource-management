@@ -6,8 +6,8 @@ import {
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
-import { readMissingHirePrerequisite } from "@/modules/human-resource-management/onboarding/signing/server/signingHireCommit";
+} from "@/modules/human-resource-management/recruitment/signing/server/signingApiServer";
+import { readMissingHirePrerequisite } from "@/modules/human-resource-management/recruitment/signing/server/signingHireCommit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

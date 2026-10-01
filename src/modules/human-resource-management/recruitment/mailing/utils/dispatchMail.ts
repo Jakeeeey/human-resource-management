@@ -1,4 +1,4 @@
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/mailing/utils/directus";
 import {
     getMailConfigStatus,
     getMailTransport,
@@ -8,7 +8,7 @@ import { logRedacted, scrubSecretsFromText } from "./mailLog";
 import { hasForbiddenMailHtml, assertMailableHtml } from "./mailScrub";
 import { renderMailTemplate } from "./mailRenderer";
 import { mailHtmlToText } from "./mailText";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/mailing/utils/audit";
 
 // Dispatch core (mailing-module todo 10, Appendix DispatchCtx row).
 //

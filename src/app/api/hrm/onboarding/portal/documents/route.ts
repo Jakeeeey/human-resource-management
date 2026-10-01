@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   buildChecklist,
   isChecklistComplete,
@@ -10,15 +10,15 @@ import {
   portalMarkerPrefix,
   readPortalToken,
   resolvePortalIdentity,
-} from "@/modules/human-resource-management/employee-portal";
-import { resetDocumentVerificationIfPresent } from "@/modules/human-resource-management/employee-portal/server/documentVerificationIo";
-import { filePortalDocumentsForUser } from "@/modules/human-resource-management/onboarding/hire/server/hiring-documents-filing-service";
+} from "@/modules/human-resource-management/recruitment/employee-portal";
+import { resetDocumentVerificationIfPresent } from "@/modules/human-resource-management/recruitment/employee-portal/server/documentVerificationIo";
+import { filePortalDocumentsForUser } from "@/modules/human-resource-management/recruitment/onboarding/hire/server/hiring-documents-filing-service";
 import {
   completeOnboardingTask,
   listOnboardingTasks,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
-import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
-import { findVerificationTasks } from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/task-template-service";
+import { findVerificationTasks } from "@/modules/human-resource-management/recruitment/onboarding/verification/types/verification-queue.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

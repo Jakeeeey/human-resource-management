@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import { setApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import type { SubmitApplicationPayload } from "@/modules/human-resource-management/application-form/types";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
-import { submissionError } from "@/modules/human-resource-management/application-form/lib/submissionRules";
+import { dFetch } from "@/modules/human-resource-management/recruitment/application-form/utils/directus";
+import { setApplicantStatus } from "@/modules/human-resource-management/recruitment/application-form/services/applicantStatus";
+import type { SubmitApplicationPayload } from "@/modules/human-resource-management/recruitment/application-form/types";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/application-form/utils/audit";
+import { submissionError } from "@/modules/human-resource-management/recruitment/application-form/lib/submissionRules";
 
 export const runtime = "nodejs";
 

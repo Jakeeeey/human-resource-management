@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   isAbsentItemError,
   notFound,
@@ -9,13 +9,13 @@ import {
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/signing/server/signingApiServer";
+} from "@/modules/human-resource-management/recruitment/signing/server/signingApiServer";
 import {
   SIGNING_ROLLUP_ERROR_CODES,
   signPaperworkItem,
-} from "@/modules/human-resource-management/onboarding/signing/server/signing-rollup-service";
-import { PaperworkItemSchema } from "@/modules/human-resource-management/onboarding/signing/types/contracts";
-import { actorIdFromJwt } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/signing/server/signing-rollup-service";
+import { PaperworkItemSchema } from "@/modules/human-resource-management/recruitment/signing/types/contracts";
+import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

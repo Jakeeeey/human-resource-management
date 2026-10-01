@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
-import type { PaperworkTemplateCompany } from "@/modules/human-resource-management/onboarding/paperwork/types/paperwork-template-company.schema";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
+import type { PaperworkTemplateCompany } from "@/modules/human-resource-management/recruitment/paperwork/types/paperwork-template-company.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

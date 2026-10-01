@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/mailing/utils/directus";
 import { mailVarAllowlist } from "@/modules/human-resource-management/recruitment/mailing/types/mail-template.schema";
 import { renderMailTemplate } from "@/modules/human-resource-management/recruitment/mailing/utils/mailRenderer";
 import {

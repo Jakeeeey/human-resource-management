@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { manpowerApprovalService } from "@/modules/human-resource-management/employee-admin/manpower-approval/services/manpowerApproval.service";
+import { manpowerApprovalService } from "@/modules/human-resource-management/recruitment/manpower-approval/services/manpowerApproval.service";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-import { actorIdFromJwt } from "@/modules/human-resource-management/shared/utils/audit";
+import { actorIdFromJwt } from "@/modules/human-resource-management/recruitment/manpower-approval/utils/audit";
 
 export async function GET() {
     try {

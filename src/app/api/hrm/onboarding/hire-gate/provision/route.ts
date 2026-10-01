@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { provisionHireUserAtSigning } from "@/modules/human-resource-management/onboarding/hire/server/provisionHireUserAtSigning";
-import { HireGateProvisionBodySchema } from "@/modules/human-resource-management/onboarding/hire/types/hire-gate.schema";
+import { provisionHireUserAtSigning } from "@/modules/human-resource-management/recruitment/onboarding/hire/server/provisionHireUserAtSigning";
+import { HireGateProvisionBodySchema } from "@/modules/human-resource-management/recruitment/onboarding/hire/types/hire-gate.schema";
 import {
   readOnboardingTaskSession,
   serverError,
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

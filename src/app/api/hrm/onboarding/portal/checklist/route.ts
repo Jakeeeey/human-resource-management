@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   buildChecklist,
   portalMarkerPrefix,
   readPortalToken,
   resolvePortalIdentity,
-} from "@/modules/human-resource-management/employee-portal";
-import { listDocumentVerificationsByUser } from "@/modules/human-resource-management/employee-portal/server/documentVerificationIo";
+} from "@/modules/human-resource-management/recruitment/employee-portal";
+import { listDocumentVerificationsByUser } from "@/modules/human-resource-management/recruitment/employee-portal/server/documentVerificationIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

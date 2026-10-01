@@ -1,4 +1,4 @@
-import { APPLICANT_STATUS_ERROR_CODES } from "@/modules/human-resource-management/shared/services/applicant-status-service";
+import { APPLICANT_STATUS_ERROR_CODES } from "@/modules/human-resource-management/recruitment/manpower-recommendation/services/applicantStatus";
 
 type StatusAction = "recommend" | "close";
 

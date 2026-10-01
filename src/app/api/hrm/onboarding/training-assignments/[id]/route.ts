@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   TransitionTrainingAssignmentSchema,
-} from "@/modules/human-resource-management/onboarding/training/types/training-taking.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/types/training-taking.schema";
 import {
   assertAssignmentOwner,
   normalizeTrainingAssignment,
-} from "@/modules/human-resource-management/onboarding/training/trainingTaking";
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/trainingTaking";
+import { nowUTC } from "@/modules/human-resource-management/recruitment/onboarding/utils/audit";
 import {
   transitionAssignment,
   type TrainingAssignment,
-} from "@/modules/human-resource-management/onboarding/training/trainingAssignmentAdapter";
+} from "@/modules/human-resource-management/recruitment/onboarding/training/trainingAssignmentAdapter";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

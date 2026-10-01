@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   readPortalToken,
   resolvePortalIdentity,
-} from "@/modules/human-resource-management/employee-portal";
+} from "@/modules/human-resource-management/recruitment/employee-portal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

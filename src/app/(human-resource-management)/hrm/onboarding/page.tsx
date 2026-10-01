@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { OnboardingHubModule } from "@/modules/human-resource-management/onboarding/hub";
+import { OnboardingHubModule } from "@/modules/human-resource-management/recruitment/onboarding/hub";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

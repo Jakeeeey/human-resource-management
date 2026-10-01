@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   ORIENTATION_ERROR_CODES,
   checkOffOrientationTopic,
-} from "@/modules/human-resource-management/onboarding/orientation/orientation-task-service";
-import { CheckOffOrientationSchema } from "@/modules/human-resource-management/onboarding/orientation/types/orientation.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/orientation/orientation-task-service";
+import { CheckOffOrientationSchema } from "@/modules/human-resource-management/recruitment/onboarding/orientation/types/orientation.schema";
 import {
   notFound,
   readOnboardingTaskSession,
@@ -12,8 +12,8 @@ import {
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
-import { ONBOARDING_TASK_ERROR_CODES } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
+import { ONBOARDING_TASK_ERROR_CODES } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,43 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   dispatchMail,
   type DispatchCtx,
 } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
-import { buildCompletionDedupKey } from "@/modules/human-resource-management/onboarding/completion/completionChecklist";
+import { buildCompletionDedupKey } from "@/modules/human-resource-management/recruitment/onboarding/completion/completionChecklist";
 import {
   completeOnboardingTask,
   listOnboardingTasks,
   updateOnboardingTask,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
 import {
   readOnboardingTaskSession,
   sessionActorId,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
-import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/onboarding/tasks/server/task-template-service";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
+import { listOnboardingTaskTemplates } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/task-template-service";
 import {
   DocumentDecisionSchema,
   rollupDocumentState,
   type DocumentDecision,
   type DocumentVerificationState,
-} from "@/modules/human-resource-management/onboarding/verification/types/document-verification.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/verification/types/document-verification.schema";
 import {
   listDocumentVerificationsByUser,
   upsertDocumentDecision,
   type DocumentVerificationEntry,
-} from "@/modules/human-resource-management/onboarding/verification/server/documentVerificationIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/verification/server/documentVerificationIo";
 import {
   aggregateQueue,
   buildQueueRow,
   findVerificationTasks,
   VerificationDecisionSchema,
-} from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
-import type { QueueDocument } from "@/modules/human-resource-management/onboarding/verification/types/verification-queue.schema";
-import { parsePortalFileMarker } from "@/modules/human-resource-management/employee-portal";
-import { listActiveDocSlotConfig } from "@/modules/human-resource-management/employee-portal/server/documentSlotIo";
+} from "@/modules/human-resource-management/recruitment/onboarding/verification/types/verification-queue.schema";
+import type { QueueDocument } from "@/modules/human-resource-management/recruitment/onboarding/verification/types/verification-queue.schema";
+import { parsePortalFileMarker } from "@/modules/human-resource-management/recruitment/employee-portal";
+import { listActiveDocSlotConfig } from "@/modules/human-resource-management/recruitment/employee-portal/server/documentSlotIo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

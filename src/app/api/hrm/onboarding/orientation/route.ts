@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getOrientationState } from "@/modules/human-resource-management/onboarding/orientation/orientation-task-service";
-import { listOrientationEmployees } from "@/modules/human-resource-management/onboarding/orientation/orientationRoster";
+import { getOrientationState } from "@/modules/human-resource-management/recruitment/onboarding/orientation/orientation-task-service";
+import { listOrientationEmployees } from "@/modules/human-resource-management/recruitment/onboarding/orientation/orientationRoster";
 import {
   readOnboardingTaskSession,
   serverError,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

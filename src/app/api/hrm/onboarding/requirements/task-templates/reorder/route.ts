@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { listTemplateRows } from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskIo";
+import { listTemplateRows } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskIo";
 import {
   REQUIREMENTS_ERROR_CODES,
   assertOrderEntriesExist,
@@ -10,11 +10,11 @@ import {
   requirementsConflict,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/requirements/server/requirementsApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/server/requirementsApiServer";
 import {
   RequirementsReorderBodySchema,
   isManagedTemplatePhase,
-} from "@/modules/human-resource-management/onboarding/requirements/types/requirements-api.schema";
+} from "@/modules/human-resource-management/recruitment/onboarding/requirements/types/requirements-api.schema";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

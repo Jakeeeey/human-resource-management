@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Eye, FileText } from "lucide-react";
 import { AttachmentPreviewDialog, type ApplicationAttachmentFile } from "./AttachmentPreviewDialog";
-import { formatPHT, parseUtcInstant } from "@/modules/human-resource-management/shared/utils/time";
+import { formatPHT, parseUtcInstant } from "../utils/time";
 
 import { Form } from "@/components/ui/form";
 import {
@@ -21,18 +21,18 @@ import { Button } from "@/components/ui/button";
 import {
     DEFAULT_APPLICATION_FORM,
     type ApplicationFormValues,
-} from "@/modules/human-resource-management/application-form/types";
-import { ApplicationDetailsSection } from "@/modules/human-resource-management/application-form/components/sections/ApplicationDetailsSection";
-import { PhotoCapture } from "@/modules/human-resource-management/application-form/components/PhotoCapture";
-import { PersonalInfoSection } from "@/modules/human-resource-management/application-form/components/sections/PersonalInfoSection";
-import { FamilyBackgroundSection } from "@/modules/human-resource-management/application-form/components/sections/FamilyBackgroundSection";
-import { CompanyRelativesSection } from "@/modules/human-resource-management/application-form/components/sections/CompanyRelativesSection";
-import { EducationSection } from "@/modules/human-resource-management/application-form/components/sections/EducationSection";
-import { LicensureExamSection } from "@/modules/human-resource-management/application-form/components/sections/LicensureExamSection";
-import { SkillsSection } from "@/modules/human-resource-management/application-form/components/sections/SkillsSection";
-import { WorkExperienceSection } from "@/modules/human-resource-management/application-form/components/sections/WorkExperienceSection";
-import { ReferencesSection } from "@/modules/human-resource-management/application-form/components/sections/ReferencesSection";
-import { TrainingsSection } from "@/modules/human-resource-management/application-form/components/sections/TrainingsSection";
+} from "@/modules/human-resource-management/recruitment/application-form/types";
+import { ApplicationDetailsSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/ApplicationDetailsSection";
+import { PhotoCapture } from "@/modules/human-resource-management/recruitment/application-form/components/PhotoCapture";
+import { PersonalInfoSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/PersonalInfoSection";
+import { FamilyBackgroundSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/FamilyBackgroundSection";
+import { CompanyRelativesSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/CompanyRelativesSection";
+import { EducationSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/EducationSection";
+import { LicensureExamSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/LicensureExamSection";
+import { SkillsSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/SkillsSection";
+import { WorkExperienceSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/WorkExperienceSection";
+import { ReferencesSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/ReferencesSection";
+import { TrainingsSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/TrainingsSection";
 import {
     mapApplicationToFormValues,
     type ApplicationBundle,

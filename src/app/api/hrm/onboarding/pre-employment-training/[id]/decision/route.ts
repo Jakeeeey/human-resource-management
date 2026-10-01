@@ -4,19 +4,19 @@ import { z } from "zod";
 import {
   decidePreEmploymentTraining,
   PRE_EMPLOYMENT_TRAINING_DECISION_ERROR_CODES,
-} from "@/modules/human-resource-management/onboarding/pre-employment-training/server/preEmploymentTrainingDecision";
+} from "@/modules/human-resource-management/recruitment/onboarding/pre-employment-training/server/preEmploymentTrainingDecision";
 import {
   markTrainingRecordDecided,
   PRE_EMPLOYMENT_TRAINING_IO_ERROR_CODES,
-} from "@/modules/human-resource-management/onboarding/pre-employment-training/server/preEmploymentTrainingIo";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+} from "@/modules/human-resource-management/recruitment/onboarding/pre-employment-training/server/preEmploymentTrainingIo";
+import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import {
   readOnboardingTaskSession,
   serverError,
   sessionActorId,
   unauthorized,
   validationFailed,
-} from "@/modules/human-resource-management/onboarding/tasks/server/onboardingTaskApiServer";
+} from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboardingTaskApiServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

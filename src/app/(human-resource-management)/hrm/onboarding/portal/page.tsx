@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import { PortalModule } from "@/modules/human-resource-management/employee-portal";
+import { PortalModule } from "@/modules/human-resource-management/recruitment/employee-portal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -3,9 +3,9 @@ import type { NextRequest } from "next/server";
 import {
     authorizeEvaluationRouteAny,
     mapRouteError,
-} from "@/modules/human-resource-management/performance-evaluation/server/evaluation-route-guards";
-import { ok } from "@/modules/human-resource-management/performance-evaluation/server/evaluationApiServer";
-import { getPerformanceDashboard } from "@/modules/human-resource-management/performance-evaluation/server/evaluationDashboard";
+} from "@/modules/human-resource-management/performance-evaluation/evaluation-dashboard/server/evaluation-route-guards";
+import { ok } from "@/modules/human-resource-management/performance-evaluation/evaluation-dashboard/server/evaluationApiServer";
+import { getPerformanceDashboard } from "@/modules/human-resource-management/performance-evaluation/evaluation-dashboard/server/evaluationDashboard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
