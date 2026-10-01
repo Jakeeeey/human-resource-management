@@ -24,9 +24,9 @@ import {
 // contract drift surfaces as an error state instead of a silent empty
 // workspace (the todo-6 false-empty lesson).
 
-const ROSTER_URL = "/api/hrm/onboarding/hire-roster";
-const TASKS_URL = "/api/hrm/onboarding/onboarding-task";
-const TEMPLATES_URL = "/api/hrm/onboarding/onboarding-task-template";
+const ROSTER_URL = "/api/hrm/recruitment/onboarding/hire-roster";
+const TASKS_URL = "/api/hrm/recruitment/onboarding/onboarding-task";
+const TEMPLATES_URL = "/api/hrm/recruitment/onboarding/onboarding-task-template";
 
 const TaskListResponseSchema = z.object({
   success: z.boolean(),

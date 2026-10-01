@@ -106,7 +106,7 @@ export async function linkFiling(
     throw new Error("LINK_BEFORE_UUID: cannot link with no upload UUID");
   }
   const res = await fetch(
-    `/api/hrm/onboarding/signing-envelope/${applicantId}/file`,
+    `/api/hrm/recruitment/signing/signing-envelope/${applicantId}/file`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

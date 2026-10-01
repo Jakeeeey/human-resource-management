@@ -47,6 +47,7 @@ export class EvaluationClientError extends Error {
 }
 
 const HR_BASE = "/api/hrm/performance-evaluation";
+const ADMIN_BASE = "/api/hrm/performance-evaluation/admin-evaluation";
 const HEAD_ROSTER_PATH = "/api/hrm/performance-evaluation/department-evaluation/roster";
 const HEAD_WORKSPACE_PATH = "/api/hrm/performance-evaluation/department-evaluation/workspace";
 const PIP_ACK_BASE = "/api/hrm/performance-evaluation/pip-acknowledgement";
@@ -120,7 +121,7 @@ function jsonInit(method: string, payload: unknown): RequestInit {
 }
 
 function rosterPath(scope: EvaluationScope, includeRegular?: boolean): string {
-  const base = scope === "hr" ? `${HR_BASE}/roster` : HEAD_ROSTER_PATH;
+  const base = scope === "hr" ? `${ADMIN_BASE}/roster` : HEAD_ROSTER_PATH;
   return includeRegular ? `${base}?include_regular=1` : base;
 }
 
@@ -141,11 +142,11 @@ const DepartmentSuperiorSchema = z.object({
 export type DepartmentSuperior = z.infer<typeof DepartmentSuperiorSchema>;
 
 export async function getDepartmentSuperiors(userId: number): Promise<DepartmentSuperior[]> {
-  return requestParsed(`${HR_BASE}/superiors?user_id=${userId}`, z.array(DepartmentSuperiorSchema));
+  return requestParsed(`${ADMIN_BASE}/superiors?user_id=${userId}`, z.array(DepartmentSuperiorSchema));
 }
 
 export async function getWorkspace(scope: EvaluationScope, userId: number): Promise<WorkspaceBundle> {
-  const base = scope === "hr" ? `${HR_BASE}/workspace` : HEAD_WORKSPACE_PATH;
+  const base = scope === "hr" ? `${ADMIN_BASE}/workspace` : HEAD_WORKSPACE_PATH;
   return requestParsed(`${base}?user_id=${userId}`, WorkspaceBundleSchema);
 }
 
@@ -203,7 +204,7 @@ export async function reorderKpiCriteria(input: ReorderInput, departmentId?: num
 }
 
 export async function createEvaluation(input: CreateEvaluationInput): Promise<EvaluationResult> {
-  return requestParsed(`${HR_BASE}/evaluations`, EvaluationResultSchema, jsonInit("POST", input));
+  return requestParsed(`${ADMIN_BASE}/evaluations`, EvaluationResultSchema, jsonInit("POST", input));
 }
 
 export async function updateEvaluation(
@@ -211,7 +212,7 @@ export async function updateEvaluation(
   input: UpdateEvaluationInput,
 ): Promise<EvaluationResult> {
   return requestParsed(
-    `${HR_BASE}/evaluations/${id}`,
+    `${ADMIN_BASE}/evaluations/${id}`,
     EvaluationResultSchema,
     jsonInit("PATCH", input),
   );
@@ -219,23 +220,23 @@ export async function updateEvaluation(
 
 export async function voidEvaluation(id: number, voidReason: string): Promise<EmployeeEvaluation> {
   return requestParsed(
-    `${HR_BASE}/evaluations/${id}/void`,
+    `${ADMIN_BASE}/evaluations/${id}/void`,
     EmployeeEvaluationSchema,
     jsonInit("POST", { void_reason: voidReason }),
   );
 }
 
 export async function createPip(input: CreatePipInput): Promise<PipResult> {
-  return requestParsed(`${HR_BASE}/pips`, PipResultSchema, jsonInit("POST", input));
+  return requestParsed(`${ADMIN_BASE}/pips`, PipResultSchema, jsonInit("POST", input));
 }
 
 export async function updatePip(id: number, input: UpdatePipInput): Promise<PipResult> {
-  return requestParsed(`${HR_BASE}/pips/${id}`, PipResultSchema, jsonInit("PATCH", input));
+  return requestParsed(`${ADMIN_BASE}/pips/${id}`, PipResultSchema, jsonInit("PATCH", input));
 }
 
 export async function issueRecommendation(userId: number): Promise<EvaluationTracking> {
   return requestParsed(
-    `${HR_BASE}/tracking/${userId}/recommendation`,
+    `${ADMIN_BASE}/tracking/${userId}/recommendation`,
     EvaluationTrackingSchema,
     { method: "POST" },
   );
@@ -243,7 +244,7 @@ export async function issueRecommendation(userId: number): Promise<EvaluationTra
 
 export async function regularize(userId: number): Promise<EvaluationTracking> {
   return requestParsed(
-    `${HR_BASE}/tracking/${userId}/regularize`,
+    `${ADMIN_BASE}/tracking/${userId}/regularize`,
     EvaluationTrackingSchema,
     { method: "POST" },
   );
@@ -261,7 +262,7 @@ export async function setEmployeeCompany(
   companyId: number,
 ): Promise<EmployeeCompany> {
   return requestParsed(
-    `${HR_BASE}/employee-company`,
+    `${ADMIN_BASE}/employee-company`,
     EmployeeCompanySchema,
     jsonInit("PATCH", { user_id: userId, company_id: companyId }),
   );
@@ -280,7 +281,7 @@ export async function terminateEmployment(
   input: { separation_type: TerminationSeparationType; termination_reason?: string | null },
 ): Promise<EvaluationTracking> {
   return requestParsed(
-    `${HR_BASE}/tracking/${userId}/terminate`,
+    `${ADMIN_BASE}/tracking/${userId}/terminate`,
     EvaluationTrackingSchema,
     jsonInit("POST", input),
   );

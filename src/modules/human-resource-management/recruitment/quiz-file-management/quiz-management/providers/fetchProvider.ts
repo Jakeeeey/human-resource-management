@@ -34,7 +34,7 @@ export function QuizManagementFetchProvider({
             setIsError(false);
 
             const res = await fetch(
-                "/api/hrm/quiz-file-management/quiz-management",
+                "/api/hrm/recruitment/quiz-file-management/quiz-management",
                 { cache: "no-store" }
             );
 
@@ -57,7 +57,7 @@ export function QuizManagementFetchProvider({
     const createQuiz = useCallback(
         async (data: QuizFormData) => {
             const res = await fetch(
-                "/api/hrm/quiz-file-management/quiz-management",
+                "/api/hrm/recruitment/quiz-file-management/quiz-management",
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -76,7 +76,7 @@ export function QuizManagementFetchProvider({
     const updateQuiz = useCallback(
         async (id: number, data: QuizFormData) => {
             const res = await fetch(
-                "/api/hrm/quiz-file-management/quiz-management",
+                "/api/hrm/recruitment/quiz-file-management/quiz-management",
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -95,7 +95,7 @@ export function QuizManagementFetchProvider({
     const deleteQuiz = useCallback(
         async (id: number) => {
             const res = await fetch(
-                `/api/hrm/quiz-file-management/quiz-management?id=${id}`,
+                `/api/hrm/recruitment/quiz-file-management/quiz-management?id=${id}`,
                 { method: "DELETE" }
             );
             if (!res.ok) {
@@ -110,7 +110,7 @@ export function QuizManagementFetchProvider({
     const archiveQuiz = useCallback(
         async (id: number) => {
             const res = await fetch(
-                "/api/hrm/quiz-file-management/quiz-management",
+                "/api/hrm/recruitment/quiz-file-management/quiz-management",
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },

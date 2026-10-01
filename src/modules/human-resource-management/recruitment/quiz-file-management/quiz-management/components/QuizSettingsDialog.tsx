@@ -89,7 +89,7 @@ export function QuizSettingsDialog({
 
     useEffect(() => {
         if (!open) return;
-        fetch("/api/hrm/quiz-file-management/file-management?includeInactive=true")
+        fetch("/api/hrm/recruitment/quiz-file-management/file-management?includeInactive=true")
             .then((res) => res.json())
             .then((data) => {
                 const rows: { category: string | null; is_active?: boolean }[] = data.questions || [];

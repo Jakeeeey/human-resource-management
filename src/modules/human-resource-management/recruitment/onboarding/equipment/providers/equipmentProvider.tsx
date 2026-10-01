@@ -48,8 +48,8 @@ const EquipmentFetchContext = createContext<
   EquipmentFetchContextType | undefined
 >(undefined);
 
-const ISSUES_BASE = "/api/hrm/onboarding/equipment-issues";
-const STATUS_BASE = "/api/hrm/onboarding/equipment-status";
+const ISSUES_BASE = "/api/hrm/recruitment/onboarding/equipment-issues";
+const STATUS_BASE = "/api/hrm/recruitment/onboarding/equipment-status";
 
 async function readBody(res: Response): Promise<{
   success: boolean;

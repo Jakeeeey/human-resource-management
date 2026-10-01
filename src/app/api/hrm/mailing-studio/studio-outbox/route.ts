@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { msOutboxStatusSchema } from "@/modules/human-resource-management/mailing-studio/studio-outbox/types/ms-outbox.schema";
 import { msToOutboxRow } from "@/modules/human-resource-management/mailing-studio/studio-outbox/types/ms-outbox-row";
-import { dFetch } from "@/modules/human-resource-management/mailing-studio/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/mailing-studio/studio-outbox/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

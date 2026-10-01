@@ -56,7 +56,7 @@ export interface FireHiredIfCompleteResult {
  * Read-only — the caller writes nothing when this answers non-null.
  *
  * Exported so the read-only completion PREVIEW route
- * (`/api/hrm/onboarding/signing-envelope/completion`) can name the missing
+ * (`/api/hrm/recruitment/signing/signing-envelope/completion`) can name the missing
  * prerequisite on a cold load of a completed-but-blocked set, instead of
  * showing the generic "completion pending" copy until the user retries
  * (S5 re-QA finding N1). The preview route performs ZERO writes.

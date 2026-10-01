@@ -168,7 +168,7 @@ export function SigningOfferSection({
       try {
         const form = new FormData();
         form.append("file", file);
-        const uploadRes = await fetch("/api/hrm/onboarding/job-offer/upload", {
+        const uploadRes = await fetch("/api/hrm/recruitment/job-offer/upload", {
           method: "POST",
           body: form,
         });
@@ -184,7 +184,7 @@ export function SigningOfferSection({
         }
 
         const patchRes = await fetch(
-          `/api/hrm/onboarding/job-offer/${offer.id}/offer`,
+          `/api/hrm/recruitment/job-offer/${offer.id}/offer`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },

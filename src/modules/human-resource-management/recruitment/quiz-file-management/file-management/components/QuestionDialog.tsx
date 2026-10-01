@@ -303,7 +303,7 @@ export function QuestionDialog({
                 uploadForm.append("file", selectedFile);
 
                 const uploadRes = await fetch(
-                    "/api/hrm/quiz-file-management/file-management/question-image-upload",
+                    "/api/hrm/recruitment/quiz-file-management/file-management/question-image-upload",
                     { method: "POST", body: uploadForm }
                 );
                 const uploadResult = await uploadRes.json();
@@ -323,7 +323,7 @@ export function QuestionDialog({
                         const fd = new FormData();
                         fd.append("file", file);
                         const res = await fetch(
-                            "/api/hrm/quiz-file-management/file-management/question-image-upload",
+                            "/api/hrm/recruitment/quiz-file-management/file-management/question-image-upload",
                             { method: "POST", body: fd }
                         );
                         const result = await res.json();

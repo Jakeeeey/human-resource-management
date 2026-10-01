@@ -6,7 +6,7 @@ import {
     evaluateResignationEligibility,
     type ResignationEligibility,
 } from "@/modules/human-resource-management/resignation/resignation-filing/cooldown";
-import { nowUTC } from "@/modules/human-resource-management/resignation/utils/audit";
+import { nowUTC } from "@/modules/human-resource-management/resignation/resignation-filing/utils/audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

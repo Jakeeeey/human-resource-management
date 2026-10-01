@@ -39,7 +39,7 @@ const PaperworkTemplateFetchContext = createContext<
   PaperworkTemplateFetchContextType | undefined
 >(undefined);
 
-const BASE = "/api/hrm/onboarding/paperwork-templates";
+const BASE = "/api/hrm/recruitment/paperwork/paperwork-templates";
 
 async function readEnvelope(res: Response): Promise<PaperworkTemplateResponse> {
   return (await res.json().catch(() => null)) as PaperworkTemplateResponse;

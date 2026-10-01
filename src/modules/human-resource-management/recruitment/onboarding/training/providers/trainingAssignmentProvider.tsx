@@ -75,7 +75,7 @@ const TrainingAssignmentFetchContext = createContext<
   TrainingAssignmentFetchContextType | undefined
 >(undefined);
 
-const BASE = "/api/hrm/onboarding/training-assignments";
+const BASE = "/api/hrm/recruitment/onboarding/training-assignments";
 
 async function readEnvelope(res: Response): Promise<TrainingTakingResponse> {
   return (await res.json().catch(() => null)) as TrainingTakingResponse;

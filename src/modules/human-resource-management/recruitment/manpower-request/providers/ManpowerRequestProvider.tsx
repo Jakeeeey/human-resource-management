@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import { toast } from "sonner";
 import { ManpowerRequest } from "../types";
 
-const API_PATH = "/api/hrm/manpower-request";
+const API_PATH = "/api/hrm/recruitment/manpower-request";
 
 interface ManpowerRequestContextType {
     requests: ManpowerRequest[];

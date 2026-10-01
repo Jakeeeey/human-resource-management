@@ -34,7 +34,7 @@ export function TemplateFetchProvider({
             setIsError(false);
 
             const res = await fetch(
-                "/api/hrm/interview-criteria/templates",
+                "/api/hrm/recruitment/interview-criteria/templates",
                 { cache: "no-store" }
             );
 
@@ -56,7 +56,7 @@ export function TemplateFetchProvider({
 
     const createTemplate = useCallback(
         async (data: TemplateFormData) => {
-            const res = await fetch("/api/hrm/interview-criteria/templates", {
+            const res = await fetch("/api/hrm/recruitment/interview-criteria/templates", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
@@ -72,7 +72,7 @@ export function TemplateFetchProvider({
 
     const updateTemplate = useCallback(
         async (id: number, data: TemplateFormData) => {
-            const res = await fetch("/api/hrm/interview-criteria/templates", {
+            const res = await fetch("/api/hrm/recruitment/interview-criteria/templates", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, ...data }),
@@ -89,7 +89,7 @@ export function TemplateFetchProvider({
     const deleteTemplate = useCallback(
         async (id: number) => {
             const res = await fetch(
-                `/api/hrm/interview-criteria/templates?id=${id}`,
+                `/api/hrm/recruitment/interview-criteria/templates?id=${id}`,
                 { method: "DELETE" }
             );
             if (!res.ok) {
@@ -107,7 +107,7 @@ export function TemplateFetchProvider({
 
     const archiveTemplate = useCallback(
         async (id: number) => {
-            const res = await fetch("/api/hrm/interview-criteria/templates", {
+            const res = await fetch("/api/hrm/recruitment/interview-criteria/templates", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, status: "archived" }),

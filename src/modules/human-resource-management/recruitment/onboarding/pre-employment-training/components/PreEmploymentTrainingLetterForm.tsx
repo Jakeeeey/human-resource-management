@@ -139,7 +139,7 @@ export function PreEmploymentTrainingLetterForm({ prefill, onGenerated, saved = 
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch("/api/hrm/company-logos");
+                const res = await fetch("/api/hrm/recruitment/job-offer/company-logos");
                 if (!res.ok) {
                     if (!cancelled) setLogosError(true);
                     return;

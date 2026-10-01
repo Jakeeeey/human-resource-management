@@ -29,6 +29,7 @@ export class EvaluationClientError extends Error {
 }
 
 const HR_BASE = "/api/hrm/performance-evaluation";
+const ADMIN_BASE = "/api/hrm/performance-evaluation/admin-evaluation";
 const HEAD_ROSTER_PATH = "/api/hrm/performance-evaluation/department-evaluation/roster";
 const HEAD_WORKSPACE_PATH = "/api/hrm/performance-evaluation/department-evaluation/workspace";
 
@@ -86,7 +87,7 @@ function jsonInit(method: string, payload: unknown): RequestInit {
 }
 
 function rosterPath(scope: EvaluationScope, includeRegular?: boolean): string {
-  const base = scope === "hr" ? `${HR_BASE}/roster` : HEAD_ROSTER_PATH;
+  const base = scope === "hr" ? `${ADMIN_BASE}/roster` : HEAD_ROSTER_PATH;
   return includeRegular ? `${base}?include_regular=1` : base;
 }
 
@@ -98,7 +99,7 @@ export async function getRoster(
 }
 
 export function getWorkspacePath(scope: EvaluationScope): string {
-  return scope === "hr" ? `${HR_BASE}/workspace` : HEAD_WORKSPACE_PATH;
+  return scope === "hr" ? `${ADMIN_BASE}/workspace` : HEAD_WORKSPACE_PATH;
 }
 
 function kpiCriteriaQuery(includeInactive?: boolean, departmentId?: number): string {

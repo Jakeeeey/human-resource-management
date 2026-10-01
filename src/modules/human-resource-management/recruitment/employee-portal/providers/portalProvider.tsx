@@ -46,7 +46,7 @@ const PortalFetchContext = createContext<PortalFetchContextType | undefined>(
   undefined
 );
 
-const BASE = "/api/hrm/onboarding/portal";
+const BASE = "/api/hrm/recruitment/employee-portal/portal";
 
 async function readJson(res: Response): Promise<Record<string, unknown>> {
   return (await res.json().catch(() => null)) as Record<string, unknown>;

@@ -25,7 +25,7 @@ import type { HireGatePendingItem } from "@/modules/human-resource-management/re
 import { useHireGatePending } from "../hooks/useHireGatePending";
 import { HIRE_ROSTER_REFRESH_EVENT } from "../hooks/useHireRoster";
 
-const PROVISION_URL = "/api/hrm/onboarding/hire-gate/provision";
+const PROVISION_URL = "/api/hrm/recruitment/onboarding/hire-gate/provision";
 
 const PENDING_VISIBLE_LIMIT = 5;
 

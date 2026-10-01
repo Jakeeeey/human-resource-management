@@ -8,7 +8,7 @@ import {
 } from "@/modules/human-resource-management/recruitment/onboarding/hire/types/hire-gate.schema";
 import { HIRE_ROSTER_REFRESH_EVENT } from "./useHireRoster";
 
-const PENDING_URL = "/api/hrm/onboarding/hire-gate?scope=pending";
+const PENDING_URL = "/api/hrm/recruitment/onboarding/hire-gate?scope=pending";
 
 export interface HireGatePendingState {
   pending: HireGatePendingItem[];

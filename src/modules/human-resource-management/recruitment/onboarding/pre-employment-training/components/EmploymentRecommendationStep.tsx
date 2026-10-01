@@ -161,7 +161,7 @@ function toBuilderInput(form: RecommendationFields): EmploymentRecommendationPdf
     };
 }
 
-const RECOMMENDATION_URL = "/api/hrm/onboarding/employment-recommendation";
+const RECOMMENDATION_URL = "/api/hrm/recruitment/onboarding/employment-recommendation";
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 interface RecommendationIssuance {
@@ -243,7 +243,7 @@ export function EmploymentRecommendationStep({ userId, applicantId, effectivityD
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch("/api/hrm/company-logos");
+                const res = await fetch("/api/hrm/recruitment/job-offer/company-logos");
                 if (!res.ok) {
                     if (!cancelled) setLogosError(true);
                     return;

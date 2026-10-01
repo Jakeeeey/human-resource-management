@@ -135,7 +135,7 @@ export function InterviewDetail() {
         Promise.all(
             unique.map(async (sheetId) => {
                 try {
-                    const response = await fetch(`/api/hrm/interviews/sheets/${sheetId}/items`);
+                    const response = await fetch(`/api/hrm/recruitment/interviews/sheets/${sheetId}/items`);
                     if (!response.ok) return { sheetId, items: [] as ClientSheetItem[] };
                     const json = await response.json();
                     return { sheetId, items: (Array.isArray(json.data) ? json.data : []) as ClientSheetItem[] };

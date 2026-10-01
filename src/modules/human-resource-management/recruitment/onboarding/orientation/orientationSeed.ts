@@ -7,7 +7,7 @@
 // + KRA/KPI + reporting + procedures). No invented topics.
 //
 // Admin-editable: the topics routes (GET/POST/PATCH under
-// `/api/hrm/onboarding/orientation/topics`) overlay this seed at runtime —
+// `/api/hrm/recruitment/onboarding/orientation/topics`) overlay this seed at runtime —
 // every consumer reads through `orientationStore.listTopics()`, never this
 // array directly and never inline literals.
 

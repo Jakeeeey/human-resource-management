@@ -17,7 +17,7 @@ import { OnboardingOwnerRoleSchema } from "../../types/onboarding-task.schema";
 // schemas reject them outright (strict → 400).
 //
 // The reorder body is the PINNED contract, identical for all four catalogs:
-//   PATCH /api/hrm/onboarding/requirements/<catalog>/reorder
+//   PATCH /api/hrm/recruitment/onboarding/requirements/<catalog>/reorder
 //   { order: [{ id: number, sort_order: number }] }
 
 export const RequirementsOrderEntrySchema = z

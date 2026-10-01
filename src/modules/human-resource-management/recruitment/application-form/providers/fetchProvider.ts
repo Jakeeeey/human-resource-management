@@ -15,7 +15,7 @@ export async function uploadApplicationFile(
     form.append("kind", kind);
     form.append("file", file, filename);
 
-    const res = await fetch("/api/hrm/application-form/upload", {
+    const res = await fetch("/api/hrm/recruitment/application-form/upload", {
         method: "POST",
         body: form,
     });
@@ -31,7 +31,7 @@ export async function uploadApplicationFile(
 export async function submitApplication(
     payload: SubmitApplicationPayload
 ): Promise<SubmitApplicationResult> {
-    const res = await fetch("/api/hrm/application-form", {
+    const res = await fetch("/api/hrm/recruitment/application-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -44,7 +44,7 @@ export async function submitApplication(
 }
 
 export async function resolveTargetQuizId(overrideQuizId: number | null): Promise<number | null> {
-    const res = await fetch("/api/hrm/quiz-file-management/quiz-management", {
+    const res = await fetch("/api/hrm/recruitment/quiz-file-management/quiz-management", {
         cache: "no-store",
     });
     if (!res.ok) return null;

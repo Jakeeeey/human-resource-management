@@ -178,7 +178,7 @@ export function useMailTemplateForm({ template, saving, editorRef, onSave }: Use
     };
 
     // DRY_RUN test-send: routes through the normal save, then records ONE
-    // `dry_run` probe row via POST /api/hrm/mailing/test-send (save alone
+    // `dry_run` probe row via POST /api/hrm/recruitment/mailing/test-send (save alone
     // writes zero outbox rows — this POST is what makes the click visible in
     // the Outbox viewer). Never touches the transporter: nothing is emailed.
     const handleDryRunTestSend = async () => {
@@ -189,7 +189,7 @@ export function useMailTemplateForm({ template, saving, editorRef, onSave }: Use
             const key = templateKey.trim();
             let recorded = false;
             try {
-                const res = await fetch("/api/hrm/mailing/test-send", {
+                const res = await fetch("/api/hrm/recruitment/mailing/test-send", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ template_key: key }),

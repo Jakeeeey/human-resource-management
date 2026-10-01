@@ -57,7 +57,7 @@ export function TrainingTab({
       setActionError(null);
       try {
         const res = await fetch(
-          `/api/hrm/onboarding/onboarding-task/${taskId}/complete`,
+          `/api/hrm/recruitment/onboarding/onboarding-task/${taskId}/complete`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

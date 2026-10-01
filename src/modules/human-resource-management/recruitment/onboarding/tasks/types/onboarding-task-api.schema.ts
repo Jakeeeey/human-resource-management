@@ -10,11 +10,11 @@ import {
 // `../../types/onboarding-task.schema` (the live Directus mirror); these are
 // the HTTP-boundary shapes:
 //
-//   POST  /api/hrm/onboarding/onboarding-task               -> materialize body
-//   GET   /api/hrm/onboarding/onboarding-task               -> list query
-//   PATCH /api/hrm/onboarding/onboarding-task/[id]          -> update body
-//   POST  /api/hrm/onboarding/onboarding-task/[id]/complete -> complete body
-//   POST  /api/hrm/onboarding/onboarding-task-template/seed -> seed body
+//   POST  /api/hrm/recruitment/onboarding/onboarding-task               -> materialize body
+//   GET   /api/hrm/recruitment/onboarding/onboarding-task               -> list query
+//   PATCH /api/hrm/recruitment/onboarding/onboarding-task/[id]          -> update body
+//   POST  /api/hrm/recruitment/onboarding/onboarding-task/[id]/complete -> complete body
+//   POST  /api/hrm/recruitment/onboarding/onboarding-task-template/seed -> seed body
 //
 // `.strict()` everywhere: unknown keys answer 400 BEFORE any Directus write.
 // `owner_role` / `status` reuse the todo-1 enums — there is no second status

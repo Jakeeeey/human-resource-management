@@ -125,7 +125,7 @@ function EmployeeCompanyPicker({
         setLoading(true);
         setLoadFailed(false);
         try {
-            const res = await fetch("/api/hrm/company-logos", { cache: "no-store" });
+            const res = await fetch("/api/hrm/recruitment/job-offer/company-logos", { cache: "no-store" });
             if (!res.ok) {
                 setLoadFailed(true);
                 return;

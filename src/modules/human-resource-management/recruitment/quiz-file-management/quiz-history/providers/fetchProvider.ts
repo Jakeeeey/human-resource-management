@@ -28,7 +28,7 @@ export function QuizHistoryFetchProvider({
             setIsLoading(true);
             setIsError(false);
 
-            const res = await fetch("/api/hrm/quiz-file-management/quiz-attempt", {
+            const res = await fetch("/api/hrm/recruitment/quiz-file-management/quiz-attempt", {
                 cache: "no-store",
             });
 

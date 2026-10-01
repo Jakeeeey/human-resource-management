@@ -5,7 +5,7 @@
 // the Directus file UUID the registry persists as `pdf_file` (extraction
 // mirrors `application-form/providers/fetchProvider.ts`: `body?.data?.id`).
 
-const BASE = "/api/hrm/onboarding/paperwork-templates/upload";
+const BASE = "/api/hrm/recruitment/paperwork/paperwork-templates/upload";
 
 export async function uploadPaperworkPdf(file: File): Promise<string> {
   const form = new FormData();

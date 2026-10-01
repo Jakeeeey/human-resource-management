@@ -69,7 +69,7 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
         let cancelled = false;
         setIsLoading(true);
         setLoadError(null);
-        fetch(`/api/hrm/applications/by-applicant?applicant_id=${applicantId}`)
+        fetch(`/api/hrm/recruitment/applicants/applications/by-applicant?applicant_id=${applicantId}`)
             .then(async (res) => {
                 const body = (await res.json()) as {
                     data?: ApplicationBundle & { application: Record<string, unknown> };

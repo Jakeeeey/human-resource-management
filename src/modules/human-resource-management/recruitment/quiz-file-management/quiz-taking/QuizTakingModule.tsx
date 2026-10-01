@@ -54,7 +54,7 @@ export default function QuizTakingModule({
         }
         (async () => {
             try {
-                const res = await fetch(`/api/hrm/quiz-file-management/quiz-attempt/start?quiz_id=${quizId}`);
+                const res = await fetch(`/api/hrm/recruitment/quiz-file-management/quiz-attempt/start?quiz_id=${quizId}`);
                 const body = await res.json();
                 if (!res.ok) {
                     setBlockedVariant("start");
@@ -88,7 +88,7 @@ export default function QuizTakingModule({
         setStep("submitting");
 
         try {
-            const submitRes = await fetch("/api/hrm/quiz-file-management/quiz-attempt", {
+            const submitRes = await fetch("/api/hrm/recruitment/quiz-file-management/quiz-attempt", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

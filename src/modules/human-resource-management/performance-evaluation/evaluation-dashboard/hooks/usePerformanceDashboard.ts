@@ -13,7 +13,7 @@ export interface PerformanceDashboardState {
     readonly refresh: () => Promise<void>;
 }
 
-const DASHBOARD_PATH: string = "/api/hrm/performance-evaluation/dashboard";
+const DASHBOARD_PATH: string = "/api/hrm/performance-evaluation/evaluation-dashboard";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object";

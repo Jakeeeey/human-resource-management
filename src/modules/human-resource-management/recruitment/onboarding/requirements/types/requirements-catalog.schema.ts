@@ -28,7 +28,7 @@ export type OrientationTopicCatalogRow = OrientationTopicRow;
 export type EquipmentItemRow = OnboardingEquipmentItem;
 
 // ---------------------------------------------------------------------------
-// Catalog slugs — the `/api/hrm/onboarding/requirements/<slug>` route segment
+// Catalog slugs — the `/api/hrm/recruitment/onboarding/requirements/<slug>` route segment
 // ---------------------------------------------------------------------------
 
 export const REQUIREMENTS_CATALOGS = [

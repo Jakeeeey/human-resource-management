@@ -7,14 +7,14 @@ import type {
 // requirementsCatalogClient.ts — CLIENT fetch layer for the todo-13
 // requirements CRUD routes. One generic client is instantiated per catalog
 // slug and hits this app's own proxy at
-// `/api/hrm/onboarding/requirements/<slug>` — never Directus directly (the
+// `/api/hrm/recruitment/onboarding/requirements/<slug>` — never Directus directly (the
 // static token stays server-side; the browser cookie is sent automatically).
 //
 // READ-ONLY BY DEFAULT: `list` is a bare GET (`cache: "no-store"`). Every
 // mutation is a distinct method a caller invokes explicitly; nothing in this
 // module writes on its own.
 
-export const REQUIREMENTS_API_BASE = "/api/hrm/onboarding/requirements";
+export const REQUIREMENTS_API_BASE = "/api/hrm/recruitment/onboarding/requirements";
 
 interface ErrorEnvelope {
   success?: boolean;

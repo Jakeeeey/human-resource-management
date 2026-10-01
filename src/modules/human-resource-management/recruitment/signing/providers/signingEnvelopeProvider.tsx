@@ -131,37 +131,37 @@ export function SigningEnvelopeFetchProvider({
   const value: SigningSetFetchContextType = {
     listEnvelopes: (applicantId) =>
       readList<SigningEnvelope>(
-        `/api/hrm/onboarding/signing-envelope${scope(applicantId)}`
+        `/api/hrm/recruitment/signing/signing-envelope${scope(applicantId)}`
       ),
     listJobOffers: (applicantId) =>
-      readList<JobOffer>(`/api/hrm/onboarding/job-offer${scope(applicantId)}`),
+      readList<JobOffer>(`/api/hrm/recruitment/job-offer${scope(applicantId)}`),
     listPaperworks: (applicantId) =>
-      readList<Paperworks>(`/api/hrm/onboarding/paperworks${scope(applicantId)}`),
+      readList<Paperworks>(`/api/hrm/recruitment/paperwork/paperworks${scope(applicantId)}`),
     listPaperworkItems: (paperworksId) =>
       readList<PaperworkItem>(
-        `/api/hrm/onboarding/paperwork-item?paperworks_id=${paperworksId}`
+        `/api/hrm/recruitment/paperwork/paperwork-item?paperworks_id=${paperworksId}`
       ),
     previewHireBlockReason: async (applicantId) => {
       const data = await readOne<{ blockedReason: string | null }>(
-        `/api/hrm/onboarding/signing-envelope/completion?applicant_id=${applicantId}`
+        `/api/hrm/recruitment/signing/signing-envelope/completion?applicant_id=${applicantId}`
       );
       return data.blockedReason ?? null;
     },
     signJobOffer: (offerId, payload) =>
-      patch<SignOfferResult>(`/api/hrm/onboarding/job-offer/${offerId}`, {
+      patch<SignOfferResult>(`/api/hrm/recruitment/job-offer/${offerId}`, {
         signature_file: payload?.signature_file ?? null,
         strokes: payload?.strokes ?? null,
         signed_pdf_file: payload?.signed_pdf_file ?? null,
       }),
     saveJobOffer: (offerId, payload) =>
-      patch<SaveOfferResult>(`/api/hrm/onboarding/job-offer/${offerId}`, {
+      patch<SaveOfferResult>(`/api/hrm/recruitment/job-offer/${offerId}`, {
         signature_file: payload?.signature_file ?? null,
         strokes: payload?.strokes ?? null,
         signed_pdf_file: payload?.signed_pdf_file ?? null,
         finalize: false,
       }),
     signPaperworkItem: (itemId, strokes, pdfFile) =>
-      patch<SignItemResult>(`/api/hrm/onboarding/paperwork-item/${itemId}`, {
+      patch<SignItemResult>(`/api/hrm/recruitment/paperwork/paperwork-item/${itemId}`, {
         strokes,
         pdf_file: pdfFile,
       }),

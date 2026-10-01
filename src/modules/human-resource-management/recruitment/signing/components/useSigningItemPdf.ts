@@ -34,7 +34,7 @@ function pdfSourceFor(template: PaperworkTemplate | null): {
     return { url: null, reason: "Template PDF is not linked yet" };
   }
   return {
-    url: `/api/hrm/onboarding/paperwork-templates/${template.id}/pdf`,
+    url: `/api/hrm/recruitment/paperwork/paperwork-templates/${template.id}/pdf`,
     reason: null,
   };
 }

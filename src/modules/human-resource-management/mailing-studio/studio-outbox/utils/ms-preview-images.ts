@@ -1,4 +1,4 @@
-import { toAssetUrl } from "@/modules/human-resource-management/mailing-studio/utils/directus";
+import { toAssetUrl } from "@/modules/human-resource-management/mailing-studio/studio-outbox/utils/directus";
 
 const ASSET_URL_PATTERN =
     /https?:\/\/[^\s"'<>]+\/assets\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/g;

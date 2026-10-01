@@ -11,8 +11,8 @@ import type {
 
 // trainingTemplatesCatalogClient.ts — CLIENT fetch layer for the frozen
 // training-templates API. Template calls hit
-// `/api/hrm/onboarding/training-templates`; item calls are scoped under
-// `/api/hrm/onboarding/training-templates/<templateId>/items`. This is a NEW
+// `/api/hrm/recruitment/training-templates`; item calls are scoped under
+// `/api/hrm/recruitment/training-templates/<templateId>/items`. This is a NEW
 // client: the requirements `createCatalogClient` binds ONE flat slug and cannot
 // express the template -> item nesting.
 //
@@ -22,7 +22,7 @@ import type {
 // verbatim.
 
 export const TRAINING_TEMPLATES_API_BASE =
-  "/api/hrm/onboarding/training-templates";
+  "/api/hrm/recruitment/training-templates";
 
 interface ErrorEnvelope {
   success?: boolean;

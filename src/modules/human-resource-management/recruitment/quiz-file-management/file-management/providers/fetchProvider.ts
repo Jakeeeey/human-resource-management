@@ -34,7 +34,7 @@ export function FileManagementFetchProvider({
             setIsError(false);
 
             const res = await fetch(
-                "/api/hrm/quiz-file-management/file-management?includeInactive=true",
+                "/api/hrm/recruitment/quiz-file-management/file-management?includeInactive=true",
                 { cache: "no-store" }
             );
 
@@ -57,7 +57,7 @@ export function FileManagementFetchProvider({
     const createQuestion = useCallback(
         async (data: QuizQuestionFormData) => {
             const res = await fetch(
-                "/api/hrm/quiz-file-management/file-management",
+                "/api/hrm/recruitment/quiz-file-management/file-management",
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -73,7 +73,7 @@ export function FileManagementFetchProvider({
     const updateQuestion = useCallback(
         async (id: number, data: QuizQuestionFormData) => {
             const res = await fetch(
-                "/api/hrm/quiz-file-management/file-management",
+                "/api/hrm/recruitment/quiz-file-management/file-management",
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
@@ -89,7 +89,7 @@ export function FileManagementFetchProvider({
     const deleteQuestion = useCallback(
         async (id: number) => {
             const res = await fetch(
-                `/api/hrm/quiz-file-management/file-management?id=${id}`,
+                `/api/hrm/recruitment/quiz-file-management/file-management?id=${id}`,
                 { method: "DELETE" }
             );
             if (!res.ok) throw new Error("Delete failed");
@@ -101,7 +101,7 @@ export function FileManagementFetchProvider({
     const reactivateQuestion = useCallback(
         async (id: number) => {
             const res = await fetch(
-                "/api/hrm/quiz-file-management/file-management",
+                "/api/hrm/recruitment/quiz-file-management/file-management",
                 {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },

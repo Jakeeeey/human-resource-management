@@ -154,7 +154,7 @@ export function CompletionTab({ userId }: { userId: number }) {
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch(`/api/hrm/onboarding/completion?user_id=${id}`, {
+      const res = await fetch(`/api/hrm/recruitment/onboarding/completion?user_id=${id}`, {
         cache: "no-store",
       });
       const body = await readJson(res);
@@ -186,7 +186,7 @@ export function CompletionTab({ userId }: { userId: number }) {
     setError(null);
     setNotice(null);
     try {
-      const res = await fetch("/api/hrm/onboarding/completion", {
+      const res = await fetch("/api/hrm/recruitment/onboarding/completion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId }),

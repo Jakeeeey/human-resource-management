@@ -53,7 +53,7 @@ export function ApplicantIntakeDialog({ open, onOpenChange, quiz }: ApplicantInt
             setIsSearching(true);
             try {
                 const res = await fetch(
-                    `/api/hrm/quiz-file-management/applicant?search=${encodeURIComponent(search.trim())}`
+                    `/api/hrm/recruitment/quiz-file-management/applicant?search=${encodeURIComponent(search.trim())}`
                 );
                 const data = await res.json();
                 setResults(data.applicants || []);

@@ -95,7 +95,7 @@ function ZonesEditorBody({
     let dropped = false;
     let live: SigningPdfDocument | null = null;
     void loadPdfDocument(
-      `/api/hrm/onboarding/paperwork-templates/${templateId}/pdf`
+      `/api/hrm/recruitment/paperwork/paperwork-templates/${templateId}/pdf`
     )
       .then((loaded) => {
         if (dropped) {

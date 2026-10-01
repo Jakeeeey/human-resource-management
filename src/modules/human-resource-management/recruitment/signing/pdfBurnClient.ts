@@ -74,7 +74,7 @@ export async function requestPdfBurn(
   input: RequestPdfBurnInput
 ): Promise<PdfBurnPointer> {
   const res = await fetch(
-    `/api/hrm/onboarding/signing-envelope/${input.applicantId}/pdf-burn`,
+    `/api/hrm/recruitment/signing/signing-envelope/${input.applicantId}/pdf-burn`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

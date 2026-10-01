@@ -82,7 +82,7 @@ export function OnboardingWorkspace({
     async function loadGate() {
       try {
         const res = await fetch(
-          `/api/hrm/onboarding/hire-gate?user_id=${userId}`,
+          `/api/hrm/recruitment/onboarding/hire-gate?user_id=${userId}`,
           { cache: "no-store" }
         );
         const body: unknown = await res.json().catch(() => null);

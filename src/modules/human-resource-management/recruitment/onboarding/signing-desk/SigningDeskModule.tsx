@@ -394,8 +394,8 @@ function DeskBody() {
       setIsError(false);
       setError(null);
       const [applicantsRes, templatesRes] = await Promise.all([
-        fetch("/api/hrm/applicants", { cache: "no-store" }),
-        fetch("/api/hrm/onboarding/paperwork-templates?limit=100", {
+        fetch("/api/hrm/recruitment/applicants", { cache: "no-store" }),
+        fetch("/api/hrm/recruitment/paperwork/paperwork-templates?limit=100", {
           cache: "no-store",
         }),
       ]);

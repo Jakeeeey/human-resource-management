@@ -86,7 +86,7 @@ export const HireRosterRowSchema = z.object({
 
 export type HireRosterRow = z.infer<typeof HireRosterRowSchema>;
 
-/** GET /api/hrm/onboarding/hire-roster envelope. */
+/** GET /api/hrm/recruitment/onboarding/hire-roster envelope. */
 export const HireRosterResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().optional(),

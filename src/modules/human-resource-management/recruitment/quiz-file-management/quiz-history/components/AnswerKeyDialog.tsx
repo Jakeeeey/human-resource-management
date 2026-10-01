@@ -30,7 +30,7 @@ export function AnswerKeyDialog({ open, onOpenChange, attemptId }: AnswerKeyDial
         let cancelled = false;
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setIsLoading(true);
-        fetch(`/api/hrm/quiz-file-management/quiz-attempt/${attemptId}`)
+        fetch(`/api/hrm/recruitment/quiz-file-management/quiz-attempt/${attemptId}`)
             .then((res) => res.json())
             .then((data) => {
                 if (!cancelled) setDetail(data);

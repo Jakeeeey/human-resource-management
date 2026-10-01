@@ -59,9 +59,9 @@ interface ApiEnvelope<T> {
     message?: string;
 }
 
-const BASE = "/api/hrm/onboarding/pre-employment-training";
-const GATE_URL = "/api/hrm/onboarding/hire-gate";
-const RECOMMENDATION_URL = "/api/hrm/onboarding/employment-recommendation";
+const BASE = "/api/hrm/recruitment/onboarding/pre-employment-training";
+const GATE_URL = "/api/hrm/recruitment/onboarding/hire-gate";
+const RECOMMENDATION_URL = "/api/hrm/recruitment/onboarding/employment-recommendation";
 const PREFILL_URL = `${BASE}/prefill`;
 
 const PrefillResponseSchema = z.looseObject({

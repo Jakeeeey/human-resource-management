@@ -40,7 +40,7 @@ const OrientationFetchContext = createContext<
   OrientationFetchContextType | undefined
 >(undefined);
 
-const BASE = "/api/hrm/onboarding/orientation";
+const BASE = "/api/hrm/recruitment/onboarding/orientation";
 
 export function OrientationFetchProvider({
   children,

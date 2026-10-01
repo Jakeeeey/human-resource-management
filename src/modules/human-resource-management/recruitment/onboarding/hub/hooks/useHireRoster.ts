@@ -12,7 +12,7 @@ import {
 // error envelope or contract drift surfaces as an error state instead of a
 // silent empty roster (the todo-6 false-empty lesson).
 
-const ROSTER_URL = "/api/hrm/onboarding/hire-roster";
+const ROSTER_URL = "/api/hrm/recruitment/onboarding/hire-roster";
 
 /** Window event the module header's Refresh button dispatches. */
 export const HIRE_ROSTER_REFRESH_EVENT = "onboarding-hub:refresh";

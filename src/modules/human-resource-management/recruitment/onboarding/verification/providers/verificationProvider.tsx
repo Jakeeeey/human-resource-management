@@ -37,7 +37,7 @@ const VerificationFetchContext = createContext<
   VerificationFetchContextType | undefined
 >(undefined);
 
-const QUEUE_BASE = "/api/hrm/onboarding/verifications";
+const QUEUE_BASE = "/api/hrm/recruitment/onboarding/verifications";
 
 async function readQueue(res: Response): Promise<VerificationQueueResponse> {
   return (await res.json().catch(() => null)) as VerificationQueueResponse;

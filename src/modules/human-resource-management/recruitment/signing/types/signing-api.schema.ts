@@ -22,7 +22,7 @@ import {
 // Responses are parsed back with the RECORD schemas by the route handlers;
 // `.strict()` makes unknown body keys a 400 BEFORE any Directus write.
 //
-// Route -> collection map (all under /api/hrm/onboarding):
+// Route -> collection map (all under /api/hrm/recruitment/onboarding):
 //   signing-envelope -> signing_envelope (by applicant)
 //   job-offer        -> job_offer        (by applicant)
 //   paperworks       -> paperworks       (by applicant)

@@ -10,7 +10,7 @@ import type {
 // `paperwork-templates/[id]/companies` (per-template GET + PUT-replace).
 // Thin fetch helpers mirroring the template provider shape.
 
-const BASE = "/api/hrm/onboarding/paperwork-templates";
+const BASE = "/api/hrm/recruitment/paperwork/paperwork-templates";
 
 async function readEnvelope(
   res: Response
