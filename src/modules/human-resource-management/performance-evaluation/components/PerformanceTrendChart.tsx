@@ -25,7 +25,7 @@ function formatPeriod(period: string): string {
     if (!match) return period;
     const month = Number(match[2]);
     if (month < 1 || month > 12) return period;
-    return `${SHORT_MONTHS[month - 1]} ${match[1].slice(2)}`;
+    return `${SHORT_MONTHS[month - 1]} ${match[1]}`;
 }
 
 interface TrendRow {
@@ -58,7 +58,7 @@ export function PerformanceTrendChart({
     const subtitle =
         rows.length === 0
             ? "Average score per month · no periods yet"
-            : `Average score per month · ${formatPeriod(rows[0].period)} to ${formatPeriod(rows[rows.length - 1].period)} · n=${totalCount}`;
+            : `Average score per month · ${formatPeriod(rows[0].period)} to ${formatPeriod(rows[rows.length - 1].period)} · ${totalCount} evaluations`;
     const ariaSummary =
         scored.length === 0
             ? "Monthly average score chart with no data"
@@ -105,12 +105,13 @@ export function PerformanceTrendChart({
                                     ]}
                                     labelFormatter={(label) => `Period: ${label}`}
                                     contentStyle={{
-                                        backgroundColor: "#1e1b4b",
-                                        border: "none",
+                                        backgroundColor: "hsl(var(--popover))",
+                                        border: "1px solid hsl(var(--border))",
                                         borderRadius: 12,
                                         fontSize: 12,
-                                        color: "#ffffff",
                                     }}
+                                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                                     cursor={{ fill: "#7c3aed", fillOpacity: 0.1 }}
                                 />
                                 {showReference && (

@@ -32,7 +32,7 @@ export function ScoreDistributionChart({
     );
     const total = bins.reduce((sum, bin) => sum + bin.count, 0);
     const title = "Score Distribution";
-    const subtitle = `All evaluations · n=${total}`;
+    const subtitle = `All evaluations · ${total} evaluations`;
     const ariaSummary =
         total === 0
             ? "Score distribution chart with no data"
@@ -74,12 +74,13 @@ export function ScoreDistributionChart({
                                     formatter={(value) => [value, "Evaluations"]}
                                     labelFormatter={(label) => `Score range: ${label}`}
                                     contentStyle={{
-                                        backgroundColor: "#1e1b4b",
-                                        border: "none",
+                                        backgroundColor: "hsl(var(--popover))",
+                                        border: "1px solid hsl(var(--border))",
                                         borderRadius: 12,
                                         fontSize: 12,
-                                        color: "#ffffff",
                                     }}
+                                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                                     cursor={{ fill: "#7c3aed", fillOpacity: 0.1 }}
                                 />
                                 <Bar dataKey="count" name="Evaluations" fill="#8b5cf6" radius={[8, 8, 0, 0]} maxBarSize={44} isAnimationActive={false} />

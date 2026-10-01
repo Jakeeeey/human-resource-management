@@ -36,7 +36,7 @@ export function RatingMixChart({ distribution }: { readonly distribution: readon
     }, [distribution]);
     const total = slices.reduce((sum, slice) => sum + slice.count, 0);
     const title = "Rating Distribution";
-    const subtitle = `Share of ratings · n=${total} evaluated`;
+    const subtitle = `Share of ratings · ${total} evaluated`;
     const ariaSummary = total === 0
         ? "Rating mix chart with no data"
         : `Rating mix chart. ${slices.map((s) => `${s.band} ${s.count}`).join(", ")}.`;
@@ -61,12 +61,13 @@ export function RatingMixChart({ distribution }: { readonly distribution: readon
                                     <Tooltip
                                         formatter={(value, name) => [value, name]}
                                         contentStyle={{
-                                            backgroundColor: "#1e1b4b",
-                                            border: "none",
+                                            backgroundColor: "hsl(var(--popover))",
+                                            border: "1px solid hsl(var(--border))",
                                             borderRadius: 12,
                                             fontSize: 12,
-                                            color: "#ffffff",
                                         }}
+                                        labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                                        itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                                     />
                                     <Pie
                                         data={slices}

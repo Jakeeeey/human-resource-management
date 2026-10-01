@@ -49,7 +49,7 @@ export function TopPerformersPanel({ performers }: { readonly performers: readon
         [rows]
     );
     const title = "Top Performers";
-    const subtitle = `Ranked by evaluation score · n=${rows.length} ranked`;
+    const subtitle = `Ranked by evaluation score · top ${rows.length}`;
     const chartHeight = Math.max(220, Math.min(420, 72 + chartRows.length * 40));
     const ariaSummary = rows.length === 0
         ? "Top performers chart with no data"
@@ -156,12 +156,13 @@ export function TopPerformersPanel({ performers }: { readonly performers: readon
                                         return row ? `${row.name} · ${row.band}` : label;
                                     }}
                                     contentStyle={{
-                                        backgroundColor: "#1e1b4b",
-                                        border: "none",
+                                        backgroundColor: "hsl(var(--popover))",
+                                        border: "1px solid hsl(var(--border))",
                                         borderRadius: 12,
                                         fontSize: 12,
-                                        color: "#ffffff",
                                     }}
+                                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                                     cursor={{ fill: "#7c3aed", fillOpacity: 0.1 }}
                                 />
                                 <Bar dataKey="score" name="Score" fill="#10b981" radius={[0, 8, 8, 0]} maxBarSize={26} isAnimationActive={false} />

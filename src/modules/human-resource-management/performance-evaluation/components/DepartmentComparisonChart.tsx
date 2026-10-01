@@ -80,7 +80,7 @@ export function DepartmentComparisonChart({ departments }: { readonly department
     );
     const totalCount = departments.reduce((sum, row) => sum + row.count, 0);
     const title = "Average Score by Department";
-    const subtitle = `Average score by department · n=${totalCount} evaluated`;
+    const subtitle = `Average score by department · ${totalCount} evaluated`;
     const ariaSummary = sorted.length === 0
         ? "Department comparison chart with no data"
         : `Department comparison chart. ${sorted.map((r) => `${r.name} ${r.avg !== null ? r.avg.toFixed(2) : "no data"}`).join(", ")}.`;
@@ -122,12 +122,13 @@ export function DepartmentComparisonChart({ departments }: { readonly department
                                             return row ? row.name : label;
                                         }}
                                         contentStyle={{
-                                            backgroundColor: "#1e1b4b",
-                                            border: "none",
+                                            backgroundColor: "hsl(var(--popover))",
+                                            border: "1px solid hsl(var(--border))",
                                             borderRadius: 12,
                                             fontSize: 12,
-                                            color: "#ffffff",
                                         }}
+                                        labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                                        itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                                         cursor={{ fill: "#7c3aed", fillOpacity: 0.1 }}
                                     />
                                     <Bar dataKey="avg" name="Avg score" radius={[0, 8, 8, 0]} maxBarSize={26} isAnimationActive={false}>
@@ -140,7 +141,7 @@ export function DepartmentComparisonChart({ departments }: { readonly department
                         </div>
                         <div className="mt-3 max-h-56 overflow-y-auto rounded-xl border border-border">
                             <table className="w-full text-left text-xs">
-                                <thead className="sticky top-0 bg-muted/80">
+                                <thead className="sticky top-0 bg-muted">
                                     <tr>
                                         <th scope="col" className="px-3 py-2 font-semibold text-muted-foreground">Department</th>
                                         <th scope="col" className="px-3 py-2 text-right font-semibold tabular-nums text-muted-foreground">Avg</th>
