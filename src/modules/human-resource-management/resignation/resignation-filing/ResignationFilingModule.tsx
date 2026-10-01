@@ -22,7 +22,7 @@ import { ResignationStatusCard } from "./components/ResignationStatusCard";
 import { useResignationFiling } from "./hooks/useResignationFiling";
 import { ResignationFilingProvider } from "./providers/ResignationFilingProvider";
 import type { ResignationEligibility } from "./cooldown";
-import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatPHT } from "./utils/time";
 
 function eligibilityMessage(eligibility: ResignationEligibility): string {
     if (eligibility.canFile) {

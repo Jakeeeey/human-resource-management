@@ -218,7 +218,7 @@ export function MailManualSend() {
         void (async () => {
             try {
                 const res = await fetch(
-                    `/api/hrm/applications/by-applicant?applicant_id=${pickedApplicantId}`
+                    `/api/hrm/recruitment/applicants/applications/by-applicant?applicant_id=${pickedApplicantId}`
                 );
                 if (!res.ok || cancelled) return;
                 const json = await res.json();

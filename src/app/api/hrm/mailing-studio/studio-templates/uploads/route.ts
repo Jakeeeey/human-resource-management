@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
     DIRECTUS_URL,
     toAssetUrl,
-} from "@/modules/human-resource-management/shared/utils/directus";
+} from "@/modules/human-resource-management/mailing-studio/studio-templates/utils/directus";
 import {
     validateImageFileMeta,
     validateStoredImageUrl,

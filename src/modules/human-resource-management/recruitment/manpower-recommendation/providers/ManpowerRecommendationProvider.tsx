@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useMemo } 
 import { toast } from "sonner";
 import { ManpowerRecommendation, ManpowerRecommendationCreateInput } from "../types";
 
-const API_PATH = "/api/hrm/manpower-recommendation";
+const API_PATH = "/api/hrm/recruitment/manpower-recommendation";
 
 interface ManpowerRecommendationContextType {
     recommendations: ManpowerRecommendation[];

@@ -14,7 +14,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import { EvaluationStageView } from "@/modules/human-resource-management/performance-evaluation/components/EvaluationStageView";
+import { EvaluationStageView } from "@/modules/human-resource-management/performance-evaluation/department-evaluation/components/EvaluationStageView";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

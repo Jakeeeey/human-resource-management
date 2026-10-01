@@ -13,7 +13,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { EvaluationWorkspace } from "@/modules/human-resource-management/performance-evaluation";
+import { EvaluationWorkspace } from "@/modules/human-resource-management/performance-evaluation/admin-evaluation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

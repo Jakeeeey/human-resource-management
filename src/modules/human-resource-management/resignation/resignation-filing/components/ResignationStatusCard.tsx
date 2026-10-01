@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Paperclip, Undo2 } from "lucide-react";
 import { RESIGNATION_STATUS_LABELS } from "../types";
 import type { EnrichedResignationRequest, ResignationStatus } from "../types";
-import { formatDateOnly, formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatDateOnly, formatPHT } from "../utils/time";
 
 const STATUS_BADGE_STYLES: Record<ResignationStatus, string> = {
     pending: "bg-amber-500/10 text-amber-700 border-amber-500/30",

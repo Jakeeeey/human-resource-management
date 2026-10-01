@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { formatDateOnly, formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatDateOnly, formatPHT } from "../utils/time";
 import { RESIGNATION_STATUS_LABELS } from "../types";
 import type { ResignationRequestWithUser } from "../types";
 import { ResignationApprovalDialog } from "./ResignationApprovalDialog";

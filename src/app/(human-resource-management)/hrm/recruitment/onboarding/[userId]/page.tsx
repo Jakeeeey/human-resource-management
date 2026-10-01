@@ -13,10 +13,10 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { OnboardingWorkspace } from "@/modules/human-resource-management/onboarding/hub";
-import { resolveOnboardingOperator } from "@/modules/human-resource-management/onboarding/hub/operatorIdentity";
-import { getHireGateState } from "@/modules/human-resource-management/onboarding/hire/server/hire-gate-service";
-import { listOnboardingTasks } from "@/modules/human-resource-management/onboarding/tasks/server/onboarding-task-service";
+import { OnboardingWorkspace } from "@/modules/human-resource-management/recruitment/onboarding/hub";
+import { resolveOnboardingOperator } from "@/modules/human-resource-management/recruitment/onboarding/hub/operatorIdentity";
+import { getHireGateState } from "@/modules/human-resource-management/recruitment/onboarding/hire/server/hire-gate-service";
+import { listOnboardingTasks } from "@/modules/human-resource-management/recruitment/onboarding/tasks/server/onboarding-task-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

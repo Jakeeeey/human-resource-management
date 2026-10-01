@@ -30,7 +30,7 @@ type GradeFormValues = z.infer<typeof GradeFormSchema>;
 
 /**
  * Scoring template shape from the existing
- * `/api/hrm/interview-criteria/templates` endpoint (GET returns
+ * `/api/hrm/recruitment/interview-criteria/templates` endpoint (GET returns
  * `{ templates: [...] }` with criteria joined per template).
  * Declared locally so this page never imports the criteria module —
  * the endpoint contract is the only coupling.
@@ -56,7 +56,7 @@ interface ScoreTemplate {
 }
 
 /**
- * Scheduled interview row shape from GET `/api/hrm/interviews/[id]`
+ * Scheduled interview row shape from GET `/api/hrm/recruitment/interviews/[id]`
  * (`{ data }` envelope). Only the fields grading needs are declared.
  */
 interface ScheduledInterview {
@@ -158,7 +158,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
             setIsLoading(true);
             setLoadError(null);
             try {
-                const interviewRes = await fetch(`/api/hrm/interviews/${interviewId}`, { cache: "no-store" });
+                const interviewRes = await fetch(`/api/hrm/recruitment/interviews/${interviewId}`, { cache: "no-store" });
                 if (!interviewRes.ok) throw new Error("Could not load this interview.");
                 const interviewJson = await interviewRes.json();
                 const row = interviewJson.data as ScheduledInterview | null;
@@ -168,8 +168,8 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
                 if (row.score_sheet_id != null) return;
 
                 const [envelopeRes, templatesRes] = await Promise.all([
-                    fetch("/api/hrm/interviews", { cache: "no-store" }),
-                    fetch("/api/hrm/interview-criteria/templates", { cache: "no-store" }),
+                    fetch("/api/hrm/recruitment/interviews", { cache: "no-store" }),
+                    fetch("/api/hrm/recruitment/interview-criteria/templates", { cache: "no-store" }),
                 ]);
                 if (!templatesRes.ok) throw new Error("Could not load scoring templates.");
                 const templatesJson = await templatesRes.json();
@@ -299,7 +299,7 @@ export function GradeInterviewClient({ interviewId }: { interviewId: number | nu
             // Pass a subpar grade at their discretion (user decision). The
             // server creates the sheet + items + composite, then links them
             // onto the scheduled row with interviewed_by from the session.
-            const response = await fetch(`/api/hrm/interviews/${interview.id}`, {
+            const response = await fetch(`/api/hrm/recruitment/interviews/${interview.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

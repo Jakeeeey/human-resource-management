@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Ban, CalendarClock, CircleCheck, ClipboardList } from "lucide-react";
 import type { ResignationEligibility } from "../cooldown";
-import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatPHT } from "../utils/time";
 
 interface ResignationFilingStatusPanelProps {
     eligibility: ResignationEligibility | null;

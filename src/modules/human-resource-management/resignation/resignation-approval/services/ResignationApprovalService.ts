@@ -1,4 +1,4 @@
-import { nowUTC } from "@/modules/human-resource-management/shared/utils/audit";
+import { nowUTC } from "@/modules/human-resource-management/resignation/resignation-approval/utils/audit";
 import type { ResignationRequestWithUser } from "../types";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
