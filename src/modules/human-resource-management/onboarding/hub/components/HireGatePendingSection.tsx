@@ -45,7 +45,7 @@ function PendingRow({
   if (item.userId !== null) {
     return (
       <Link
-        href={`/hrm/onboarding/${item.userId}`}
+        href={`/hrm/recruitment/onboarding/${item.userId}`}
         aria-label={`Open onboarding workspace for ${item.name}`}
         className="flex w-full items-center justify-between gap-3 rounded-xl border border-border px-4 py-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
       >

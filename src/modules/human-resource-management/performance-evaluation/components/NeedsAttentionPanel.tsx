@@ -77,7 +77,7 @@ export function NeedsAttentionPanel({
                                     className="rounded-xl border border-border bg-muted/40 transition-colors"
                                 >
                                     <Link
-                                        href={`/hrm/performance-evaluation/${item.user_id}`}
+                                        href={`/hrm/performance-evaluation/admin-evaluation/${item.user_id}`}
                                         aria-label={`Open ${item.name}'s evaluation workspace`}
                                         className="group block rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                     >

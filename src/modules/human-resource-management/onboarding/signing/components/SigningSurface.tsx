@@ -83,7 +83,7 @@ export function SigningSurface({
           "Signing complete — the applicant is ready for the next onboarding step. Opening the onboarding hub…"
         );
         window.setTimeout(() => {
-          router.push("/hrm/onboarding");
+          router.push("/hrm/recruitment/onboarding");
         }, 2500);
       }
     },

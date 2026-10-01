@@ -159,7 +159,7 @@ export function HireRoster() {
         }}
         row={activeRow}
         workspaceHref={
-          activeRow ? `/hrm/onboarding/${activeRow.userId}` : undefined
+          activeRow ? `/hrm/recruitment/onboarding/${activeRow.userId}` : undefined
         }
       />
     </div>

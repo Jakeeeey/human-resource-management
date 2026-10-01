@@ -92,7 +92,7 @@ export function MailingModule() {
                         <TabsTrigger value="bindings" className="text-base max-sm:min-h-[44px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary">Bindings</TabsTrigger>
                     </TabsList>
                     {tab === "templates" && (
-                        <Button size="sm" className="w-full sm:w-auto" onClick={() => router.push("/hrm/mailing/templates/new")}>
+                        <Button size="sm" className="w-full sm:w-auto" onClick={() => router.push("/hrm/recruitment/mailing/templates/new")}>
                             New template
                         </Button>
                     )}

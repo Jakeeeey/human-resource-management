@@ -30,7 +30,7 @@ export function MailTemplateList() {
     }, [refresh]);
 
     const openEdit = (row: MailTemplateRow) => {
-        router.push(`/hrm/mailing/templates/${String(row.id)}`);
+        router.push(`/hrm/recruitment/mailing/templates/${String(row.id)}`);
     };
 
     if (loading && templates.length === 0) {

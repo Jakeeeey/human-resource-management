@@ -140,7 +140,7 @@ export function OnboardingWorkspace({
             size="sm"
             className="min-h-11 w-full sm:w-auto md:min-h-0"
           >
-            <Link href={`/hrm/onboarding?selected=${userId}`}>Back to hub</Link>
+            <Link href={`/hrm/recruitment/onboarding?selected=${userId}`}>Back to hub</Link>
           </Button>
           <Button
             variant="outline"

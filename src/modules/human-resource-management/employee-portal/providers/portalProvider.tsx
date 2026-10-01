@@ -6,7 +6,7 @@
 // employee after the hire. The browser no longer asserts any identity header
 // and never receives the Directus token (every fetch below hits our own Next
 // routes). Signing envelopes are NOT fetched here: kiosk signing runs on the
-// HR-operated, applicant-scoped signing desk (`hrm/onboarding/signing`).
+// HR-operated, applicant-scoped signing desk (`hrm/recruitment/onboarding/signing`).
 
 import {
   createContext,

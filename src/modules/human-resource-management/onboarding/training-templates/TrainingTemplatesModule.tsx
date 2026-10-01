@@ -3,7 +3,7 @@
 // TrainingTemplatesModule.tsx — onboarding training-templates admin root: the
 // per-department (or global) training TEMPLATES and their child ITEMS, in a
 // master-detail layout. Standalone module shell (mirrors
-// RequirementsRegistryModule), mounted at `hrm/onboarding/training-templates` —
+// RequirementsRegistryModule), mounted at `hrm/recruitment/onboarding/training-templates` —
 // never inside the per-hire OnboardingWorkspace. There is no admin/role gate:
 // access is governed externally by the platform module authorization.
 

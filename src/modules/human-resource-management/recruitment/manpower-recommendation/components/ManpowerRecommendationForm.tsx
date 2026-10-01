@@ -72,7 +72,7 @@ export function ManpowerRecommendationForm() {
                 form.reset();
                 // Workflow: a recommendation auto-creates the Pending Final row
                 // server-side, so hand off to the Final tab to continue grading.
-                router.push("/hrm/interviews?stage=Final");
+                router.push("/hrm/recruitment/interviews?stage=Final");
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : "Failed to submit recommendation.";
