@@ -76,7 +76,7 @@ export function MailTemplatePage({ mode, templateId }: MailTemplatePageProps) {
         }
     };
 
-    const goBack = () => router.push("/hrm/mailing");
+    const goBack = () => router.push("/hrm/recruitment/mailing");
 
     const requestBack = () => {
         const cleanBody = editorRef.current?.getCleanHtml() ?? form.bodyHtml;

@@ -6,7 +6,7 @@
 // session resolves the caller's own applicant (pre-hire) or employee
 // (post-hire) identity server-side, so training and equipment only appear
 // after the hire. Signing runs
-// on the HR-operated, applicant-scoped signing desk (`hrm/onboarding/signing`)
+// on the HR-operated, applicant-scoped signing desk (`hrm/recruitment/onboarding/signing`)
 // — no signing entry, surface, or envelope wiring lives here. Module header
 // per QA §6. The HR hub is never rendered here — no hub route/action leaks
 // into the portal, and vice versa.

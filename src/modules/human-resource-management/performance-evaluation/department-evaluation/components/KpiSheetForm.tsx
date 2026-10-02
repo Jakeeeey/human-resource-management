@@ -433,7 +433,7 @@ export function KpiSheetForm(props: {
               before an evaluation can be recorded.
             </p>
             <Button type="button" variant="outline" size="sm" asChild>
-              <Link href="/hrm/department-evaluation/criteria">
+              <Link href="/hrm/performance-evaluation/evaluation-criteria">
                 Open evaluation criteria
               </Link>
             </Button>

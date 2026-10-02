@@ -59,8 +59,8 @@ function dueKeyForAction(key: NextAction["key"], facts: WorkflowFacts): DueKey |
 
 function stageHrefForAction(scope: EvaluationScope, userId: number): string {
     return scope === "hr"
-        ? `/hrm/performance-evaluation/${userId}/stage`
-        : `/hrm/department-evaluation/${userId}/stage`;
+        ? `/hrm/performance-evaluation/admin-evaluation/${userId}/stage`
+        : `/hrm/performance-evaluation/department-evaluation/${userId}/stage`;
 }
 
 function stageCtaLabel(bundle: WorkspaceBundle): string | null {
@@ -235,8 +235,8 @@ export function EvaluationWorkspace({
     const dueDate = action && dueDates && dueKey ? dueDates[dueKey] : null;
     const rosterHref =
         scope === "hr"
-            ? `/hrm/performance-evaluation?selected=${userId}`
-            : `/hrm/department-evaluation?selected=${userId}`;
+            ? `/hrm/performance-evaluation/admin-evaluation?selected=${userId}`
+            : `/hrm/performance-evaluation/department-evaluation?selected=${userId}`;
     const activeOwnedByOther = action !== null && action.owner !== scope;
     const latestPip =
         bundle !== null && bundle.pips.length > 0

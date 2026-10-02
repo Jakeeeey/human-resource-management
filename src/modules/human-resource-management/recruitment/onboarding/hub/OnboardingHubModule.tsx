@@ -39,7 +39,7 @@ export function OnboardingHubModule() {
             asChild
           >
             <Link
-              href="/hrm/onboarding/requirements"
+              href="/hrm/recruitment/onboarding/requirements"
               aria-label="Manage onboarding requirements"
               title="Manage onboarding requirements"
             >
