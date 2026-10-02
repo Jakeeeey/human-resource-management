@@ -165,7 +165,7 @@ export function InterviewDetail() {
         setIsSaving(true);
         try {
             await updateInterview(latest.id, { verdict: newVerdict });
-            if (latest.stage === "Initial" && newVerdict === "Passed") router.push("/hrm/manpower-recommendation");
+            if (latest.stage === "Initial" && newVerdict === "Passed") router.push("/hrm/recruitment/manpower-recommendation");
         } finally {
             setIsSaving(false);
         }

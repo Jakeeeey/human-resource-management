@@ -3,7 +3,7 @@
 // PaperworkRegistryModule.tsx — paperwork registry root: PDF templates per
 // company + click-drag zone marking + the single validity predicate (exported
 // from `./paperworkValidity` for the signing surface). Standalone module shell
-// per QA §6, mounted at `hrm/onboarding/paperwork` — never inside the hub.
+// per QA §6, mounted at `hrm/recruitment/onboarding/paperwork` — never inside the hub.
 
 import { PaperworkTemplateFetchProvider } from "./providers/paperworkTemplateProvider";
 import { TemplatesTab } from "./components/TemplatesTab";

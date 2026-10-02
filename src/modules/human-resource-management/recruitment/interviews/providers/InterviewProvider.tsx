@@ -82,7 +82,7 @@ const InterviewContext = createContext<InterviewContextType | undefined>(undefin
  * Fetches the T4 GET envelope ({ data, eligibleInitial, eligibleFinal, users })
  * and exposes list state plus stage-tab / detail-selection state and
  * mutations. Grading lives on the dedicated grade page
- * (`/hrm/interviews/grade/[id]`), which fetches and submits directly —
+ * (`/hrm/recruitment/interviews/grade/[id]`), which fetches and submits directly —
  * the provider carries no grade-dialog state.
  * Client sends no timestamps — the server injects interviewed_at/created_at
  * via nowUTC() and interviewed_by/updated_by from the JWT.

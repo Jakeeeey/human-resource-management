@@ -75,7 +75,7 @@ export function ApplicantIntakeDialog({ open, onOpenChange, quiz }: ApplicantInt
 
     const handleNewApplicant = () => {
         onOpenChange(false);
-        router.push(`/hrm/application-form?quiz_id=${quiz?.id}`);
+        router.push(`/hrm/recruitment/application-form?quiz_id=${quiz?.id}`);
     };
 
     return (

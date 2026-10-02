@@ -50,8 +50,8 @@ import { RecommendationSection } from "./RecommendationSection";
 
 function stageScopePath(scope: EvaluationScope): string {
   return scope === "hr"
-    ? "/hrm/performance-evaluation"
-    : "/hrm/department-evaluation";
+    ? "/hrm/performance-evaluation/admin-evaluation"
+    : "/hrm/performance-evaluation/department-evaluation";
 }
 
 const TERMINATION_SEPARATION_OPTIONS: { value: TerminationSeparationType; label: string }[] = [

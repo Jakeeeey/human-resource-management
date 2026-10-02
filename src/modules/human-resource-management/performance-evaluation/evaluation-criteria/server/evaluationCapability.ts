@@ -1,6 +1,6 @@
 import { dFetch } from "../utils/directus";
 
-const HR_MODULE_BASE_PATH = "/hrm/performance-evaluation";
+const HR_MODULE_BASE_PATH = "/hrm/performance-evaluation/admin-evaluation";
 
 export interface EvaluationCapability {
   actorId: number;

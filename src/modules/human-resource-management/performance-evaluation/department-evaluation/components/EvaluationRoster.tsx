@@ -338,8 +338,8 @@ export function EvaluationRoster({ scope }: { scope: EvaluationScope }) {
         workspaceHref={
           activeRow
             ? scope === "hr"
-              ? `/hrm/performance-evaluation/${activeRow.user_id}`
-              : `/hrm/department-evaluation/${activeRow.user_id}`
+              ? `/hrm/performance-evaluation/admin-evaluation/${activeRow.user_id}`
+              : `/hrm/performance-evaluation/department-evaluation/${activeRow.user_id}`
             : undefined
         }
       />

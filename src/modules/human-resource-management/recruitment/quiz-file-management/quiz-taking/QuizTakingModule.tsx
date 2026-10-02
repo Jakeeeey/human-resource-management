@@ -21,8 +21,8 @@ interface QuizTakingModuleProps {
 }
 
 export default function QuizTakingModule({
-    returnHref = "/hrm/quiz-file-management/quiz-management",
-    exitHref = "/hrm/quiz-file-management/quiz-management",
+    returnHref = "/hrm/recruitment/quiz-file-management/quiz-management",
+    exitHref = "/hrm/recruitment/quiz-file-management/quiz-management",
     exitLabel = "Return to HR",
 }: QuizTakingModuleProps) {
     const router = useRouter();
