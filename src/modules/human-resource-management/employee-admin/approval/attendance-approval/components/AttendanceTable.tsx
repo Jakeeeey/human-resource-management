@@ -233,7 +233,7 @@ export function AttendanceTable({
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[9px] font-bold text-primary/60 uppercase">Actual:</span>
-                        <span className="text-[9px] font-mono font-bold text-primary">
+                        <span className={cn("text-[9px] font-mono font-bold", log.time_in ? "text-primary" : "text-muted-foreground/60")}>
                         {log.time_in ? format(new Date(log.time_in), "hh:mm a") : "--:--"} - {log.time_out ? format(new Date(log.time_out), "hh:mm a") : "--:--"}
                         </span>
                       </div>
@@ -247,7 +247,10 @@ export function AttendanceTable({
                       type="number"
                       value={log.work_minutes || 0}
                       onChange={(e) => onUpdateRow(log.log_id, "work_minutes", parseInt(e.target.value) || 0)}
-                      className="h-6 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-primary/30 text-center px-1"
+                      className={cn(
+                        "h-6 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-primary/30 text-center px-1",
+                        (log.work_minutes || 0) > 0 ? "text-foreground" : "text-muted-foreground/40"
+                      )}
                     />
                     <span className="text-[8px] text-muted-foreground uppercase font-medium tracking-tighter text-center">mins</span>
                   </div>
