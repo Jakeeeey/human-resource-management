@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +18,6 @@ import {
     useClearanceHubContext,
 } from "./providers/ClearanceHubProvider";
 import { ClearanceHubTable } from "./components/ClearanceHubTable";
-import { ClearanceDetailPanel } from "./components/ClearanceDetailPanel";
 import { AssignClearanceDialog } from "./components/AssignClearanceDialog";
 import {
     CLEARANCE_REQUEST_STATUS_LABELS,
@@ -30,10 +30,16 @@ type StatusFilter = "all" | ClearanceRequestStatus;
 
 function ClearanceHubContent() {
     const { requests, resignations, isLoading, error, refresh } = useClearanceHubContext();
+    const searchParams = useSearchParams();
 
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-    const [selectedId, setSelectedId] = useState<number | null>(null);
+    const selectedId = useMemo(() => {
+        const raw = searchParams.get("selected");
+        if (raw === null) return null;
+        const parsed = Number.parseInt(raw, 10);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }, [searchParams]);
     const [assignOpen, setAssignOpen] = useState(false);
 
     const captureAssignTrigger = useDialogTriggerFocus(assignOpen);
@@ -153,24 +159,16 @@ function ClearanceHubContent() {
                 </p>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-5">
-                <div className="xl:col-span-3">
-                    <ClearanceHubTable
-                        data={filteredRequests}
-                        resignations={resignations}
-                        selectedId={effectiveSelectedId}
-                        onSelect={setSelectedId}
-                        onRetry={handleRetry}
-                        onClearFilters={resetFilters}
-                        canClearFilters={hasActiveFilters}
-                        isLoading={isLoading}
-                        error={error}
-                    />
-                </div>
-                <div className="xl:col-span-2">
-                    <ClearanceDetailPanel requestId={effectiveSelectedId} />
-                </div>
-            </div>
+            <ClearanceHubTable
+                data={filteredRequests}
+                resignations={resignations}
+                selectedId={effectiveSelectedId}
+                onRetry={handleRetry}
+                onClearFilters={resetFilters}
+                canClearFilters={hasActiveFilters}
+                isLoading={isLoading}
+                error={error}
+            />
 
             <AssignClearanceDialog isOpen={assignOpen} onClose={() => setAssignOpen(false)} />
         </div>
@@ -180,7 +178,9 @@ function ClearanceHubContent() {
 export default function ClearanceHubModule() {
     return (
         <ClearanceHubProvider>
-            <ClearanceHubContent />
+            <Suspense>
+                <ClearanceHubContent />
+            </Suspense>
         </ClearanceHubProvider>
     );
 }

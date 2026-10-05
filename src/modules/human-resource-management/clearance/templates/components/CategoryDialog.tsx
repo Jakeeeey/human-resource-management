@@ -195,14 +195,14 @@ function CategoryForm(
                     </p>
                     {isEdit && signerType === "pool" && (
                         <p className="text-sm text-muted-foreground">
-                            Pool members are managed from the category list with Manage pool.
+                            Pool members are managed from the signer pool action on the category row.
                         </p>
                     )}
                 </div>
 
                 {needsDepartment && (
                     <div className="space-y-2">
-                        <Label htmlFor="clearance-category-department">
+                        <Label>
                             Department<span className="text-destructive" aria-hidden="true">{" *"}</span>
                         </Label>
                         <DepartmentSelect
@@ -222,7 +222,7 @@ function CategoryForm(
 
                 {needsPool && (
                     <div className="space-y-2">
-                        <Label htmlFor="clearance-category-pool">
+                        <Label>
                             Signers<span className="text-destructive" aria-hidden="true">{" *"}</span>
                         </Label>
                         <EmployeeSelect

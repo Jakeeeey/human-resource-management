@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { JSX } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 
@@ -15,43 +15,14 @@ import {
     CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { FilingCandidate } from "../providers/clearanceFilingClient";
 
-interface SignerOption {
+export interface ClearanceRequestOption {
     value: string;
     label: string;
 }
 
-export function toSignerOptions(candidates: readonly FilingCandidate[]): SignerOption[] {
-    const totals = new Map<string, number>();
-    for (const candidate of candidates) {
-        const base = toSignerBaseLabel(candidate);
-        totals.set(base, (totals.get(base) ?? 0) + 1);
-    }
-    const seen = new Map<string, number>();
-    return candidates.map((candidate) => {
-        const base = toSignerBaseLabel(candidate);
-        const total = totals.get(base) ?? 1;
-        const occurrence = (seen.get(base) ?? 0) + 1;
-        seen.set(base, occurrence);
-        return {
-            value: String(candidate.user_id),
-            label: total > 1 ? `${base} · ${occurrence} of ${total}` : base,
-        };
-    });
-}
-
-function toSignerBaseLabel(candidate: FilingCandidate): string {
-    const segments = [candidate.full_name.trim() === "" ? "Unnamed team member" : candidate.full_name];
-    if (candidate.department_name && candidate.department_name.trim() !== "") {
-        segments.push(candidate.department_name.trim());
-    }
-    const base = segments.join(" — ");
-    return candidate.is_department_head ? `${base} (Head)` : base;
-}
-
-export function SignerCombobox(props: {
-    candidates: readonly FilingCandidate[];
+export function ClearanceRequestCombobox(props: {
+    options: readonly ClearanceRequestOption[];
     value: string;
     onValueChange: (value: string) => void;
     id?: string;
@@ -59,18 +30,12 @@ export function SignerCombobox(props: {
     placeholder?: string;
     emptyMessage?: string;
 }): JSX.Element {
-    const { candidates, value, onValueChange, id, disabled = false, placeholder, emptyMessage } = props;
-
-    const options = useMemo(() => toSignerOptions(candidates), [candidates]);
+    const { options, value, onValueChange, id, disabled = false, placeholder, emptyMessage } = props;
 
     const normalizedValue = value.trim() === "" ? "" : value.trim();
-    const resolvedPlaceholder =
-        placeholder ?? (candidates.length > 0 ? `Search ${candidates.length} signers…` : "Select a signer…");
+    const resolvedPlaceholder = placeholder ?? "Select a clearance form…";
 
-    const selectedLabel = useMemo(
-        () => options.find((option) => option.value === normalizedValue)?.label,
-        [options, normalizedValue]
-    );
+    const selectedLabel = options.find((option) => option.value === normalizedValue)?.label;
 
     const [open, setOpen] = useState(false);
 
@@ -85,13 +50,15 @@ export function SignerCombobox(props: {
                     className={cn("w-full justify-between", !normalizedValue && "text-muted-foreground")}
                     disabled={disabled}
                 >
-                    {selectedLabel || resolvedPlaceholder}
+                    <span className="min-w-0 flex-1 truncate text-left">
+                        {selectedLabel || resolvedPlaceholder}
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                 <Command>
-                    <CommandInput placeholder={`Search ${resolvedPlaceholder.toLowerCase()}...`} />
+                    <CommandInput placeholder="Search clearance forms…" />
                     <div
                         className="max-h-64 overflow-y-auto overscroll-contain"
                         onWheel={(event) => {
@@ -101,7 +68,7 @@ export function SignerCombobox(props: {
                         }}
                     >
                         <CommandList className="max-h-none overflow-visible">
-                            <CommandEmpty>{emptyMessage ?? "No signer matches your search."}</CommandEmpty>
+                            <CommandEmpty>{emptyMessage ?? "No clearance form matches your search."}</CommandEmpty>
                             <CommandGroup>
                                 {options.map((option) => (
                                     <CommandItem

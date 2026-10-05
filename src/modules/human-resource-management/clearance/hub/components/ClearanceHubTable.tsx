@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
     TableBody,
@@ -24,7 +26,6 @@ interface ClearanceHubTableProps {
     data: ClearanceHubRequest[];
     resignations: ApprovableResignation[];
     selectedId: number | null;
-    onSelect: (id: number) => void;
     onRetry: () => Promise<void>;
     onClearFilters: () => void;
     canClearFilters: boolean;
@@ -51,13 +52,13 @@ export function ClearanceHubTable({
     data,
     resignations,
     selectedId,
-    onSelect,
     onRetry,
     onClearFilters,
     canClearFilters,
     isLoading = false,
     error = null,
 }: ClearanceHubTableProps) {
+    const router = useRouter();
     const [currentPage, setCurrentPage] = useState(1);
     const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
     const pageSize = 10;
@@ -159,10 +160,10 @@ export function ClearanceHubTable({
                                 </button>
                             </TableHead>
                             <TableHead className="bg-card">Template</TableHead>
-                            <TableHead className="bg-card">Progress</TableHead>
+                            <TableHead className="bg-card text-right">Progress</TableHead>
                             <TableHead className="bg-card">Status</TableHead>
-                            <TableHead className="bg-card">Filed</TableHead>
-                            <TableHead className="bg-card">Confirmed</TableHead>
+                            <TableHead className="bg-card text-right">Filed</TableHead>
+                            <TableHead className="bg-card text-right">Confirmed</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -174,28 +175,34 @@ export function ClearanceHubTable({
                                     key={request.id}
                                     aria-selected={isActive}
                                     tabIndex={0}
-                                    onClick={() => onSelect(request.id)}
+                                    onClick={() => router.push(`/hrm/clearance/hub/${request.id}`)}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter" || event.key === " ") {
                                             event.preventDefault();
-                                            onSelect(request.id);
+                                            router.push(`/hrm/clearance/hub/${request.id}`);
                                         }
                                     }}
                                     className={cn(
-                                        "cursor-pointer",
+                                        "cursor-pointer hover:bg-muted/50",
                                         isActive && "border-primary/30 bg-primary/5 hover:bg-primary/10"
                                     )}
                                 >
                                     <TableCell className="font-medium max-w-50 truncate" title={employeeName}>
-                                        {employeeName}
+                                        <Link
+                                            href={`/hrm/clearance/hub/${request.id}`}
+                                            onClick={(event) => event.stopPropagation()}
+                                            className="underline-offset-4 hover:underline"
+                                        >
+                                            {employeeName}
+                                        </Link>
                                     </TableCell>
                                     <TableCell className="max-w-50 truncate" title={request.template_title_snapshot ?? "Unknown template"}>
                                         {request.template_title_snapshot ?? "Unknown template"}
                                     </TableCell>
-                                    <TableCell>
-                                        <div className="flex min-w-30 items-center gap-2">
+                                    <TableCell className="text-right">
+                                        <div className="flex min-w-30 items-center justify-end gap-2">
                                             <Progress value={progressPercent(request)} className="h-2 w-16" />
-                                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                            <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                                                 {request.signed_count} of {request.total_count} signed
                                             </span>
                                         </div>
@@ -205,8 +212,8 @@ export function ClearanceHubTable({
                                             {CLEARANCE_REQUEST_STATUS_LABELS[request.status]}
                                         </StatusBadge>
                                     </TableCell>
-                                    <TableCell className="whitespace-nowrap">{formatPHT(request.created_at)}</TableCell>
-                                    <TableCell className="whitespace-nowrap">{formatPHT(request.confirmed_at)}</TableCell>
+                                    <TableCell className="whitespace-nowrap text-right tabular-nums">{formatPHT(request.created_at)}</TableCell>
+                                    <TableCell className="whitespace-nowrap text-right tabular-nums">{formatPHT(request.confirmed_at)}</TableCell>
                                 </TableRow>
                             );
                         })}

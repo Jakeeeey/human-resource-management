@@ -120,12 +120,6 @@ export function ClearanceItemCard({
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {item.expected_signer_user_id !== null && (
-                            <p className="text-sm">
-                                <span className="font-semibold">Chosen signer:</span>{" "}
-                                {expectedName ?? "Loading name…"}
-                            </p>
-                        )}
                         {!locked && (
                             <>
                                 {candidatesFailed ? (
@@ -164,15 +158,18 @@ export function ClearanceItemCard({
                                                 : "Change the signer"}
                                         </Label>
                                         <div className="flex flex-col gap-2 sm:flex-row">
-                                            <SignerCombobox
-                                                id={`clearance-signer-${item.id}`}
-                                                candidates={candidates}
-                                                value={selectedId}
-                                                onValueChange={setSelectedId}
-                                                disabled={pickBusy || busy}
-                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <SignerCombobox
+                                                    id={`clearance-signer-${item.id}`}
+                                                    candidates={candidates}
+                                                    value={selectedId}
+                                                    onValueChange={setSelectedId}
+                                                    disabled={pickBusy || busy}
+                                                />
+                                            </div>
                                             <Button
                                                 size="sm"
+                                                className="shrink-0"
                                                 onClick={() => void handlePick()}
                                                 disabled={!pickChanged || pickBusy || busy}
                                             >

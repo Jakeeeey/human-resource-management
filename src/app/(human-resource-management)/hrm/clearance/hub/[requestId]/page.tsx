@@ -11,15 +11,17 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 
-import { ClearanceTemplatesModule } from "@/modules/human-resource-management/clearance/templates";
+import { ClearanceHubProvider } from "@/modules/human-resource-management/clearance/hub/providers/ClearanceHubProvider";
+import { ClearanceWorkspace } from "@/modules/human-resource-management/clearance/hub/components/ClearanceWorkspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-    title: "Clearance Templates | HRM",
-    description: "HR authors clearance templates, categories, and signer pools.",
+    title: "Clearance Workspace | HRM",
+    description: "Per-request clearance workspace: progress, categories, and confirmation.",
 };
 
 const COOKIE_NAME = "vos_access_token";
@@ -40,12 +42,9 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
     }
 }
 
-function pickString(
-    obj: Record<string, unknown> | null | undefined,
-    keys: string[]
-): string {
+function pickString(obj: Record<string, unknown> | null, keys: string[]): string {
     for (const k of keys) {
-        const v = obj ? obj[k] : undefined;
+        const v = obj?.[k];
         if (typeof v === "string" && v.trim()) return v.trim();
     }
     return "";
@@ -75,22 +74,22 @@ function buildHeaderUserFromToken(token: string | null | undefined) {
     return {
         name,
         email: email || "",
+        avatar: "/avatars/shadcn.jpg",
     };
 }
 
 export default async function Page({
-    searchParams,
+    params,
 }: {
-    searchParams?: Promise<{ selected?: string }>;
+    params: Promise<{ requestId: string }>;
 }) {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value ?? null;
-
     const headerUser = buildHeaderUserFromToken(token);
 
-    const params = searchParams ? await searchParams : {};
-    const parsed = params.selected === undefined ? Number.NaN : Number.parseInt(params.selected, 10);
-    const selectedId = Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    const { requestId: rawRequestId } = await params;
+    const requestId = Number.parseInt(rawRequestId, 10);
+    if (!Number.isInteger(requestId) || requestId <= 0) notFound();
 
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -107,12 +106,14 @@ export default async function Page({
                         <Breadcrumb>
                             <BreadcrumbList className="min-w-0 overflow-hidden">
                                 <BreadcrumbItem className="hidden md:block shrink-0">
-                                    <BreadcrumbLink href="#">Clearance</BreadcrumbLink>
+                                    <BreadcrumbLink href="/hrm/clearance/hub">
+                                        Clearance Hub
+                                    </BreadcrumbLink>
                                 </BreadcrumbItem>
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Clearance Templates
+                                        Workspace
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -126,7 +127,9 @@ export default async function Page({
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
-                <ClearanceTemplatesModule selectedId={selectedId} />
+                <ClearanceHubProvider>
+                    <ClearanceWorkspace requestId={requestId} />
+                </ClearanceHubProvider>
             </main>
         </div>
     );

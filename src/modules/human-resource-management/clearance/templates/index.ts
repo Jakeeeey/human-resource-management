@@ -1,4 +1,5 @@
 export { ClearanceTemplatesModule } from "./ClearanceTemplatesModule";
+export { TemplateWorkspace } from "./components/TemplateWorkspace";
 export {
     CLEARANCE_EVENT_TYPE_LABELS,
     CLEARANCE_ITEM_STATUS_LABELS,

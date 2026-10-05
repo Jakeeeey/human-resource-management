@@ -14,6 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 import type { DirectoryEmployee } from "../providers/clearanceDirectoryClient";
 import type { ClearanceCategory } from "../types";
@@ -32,11 +33,9 @@ export interface SignerPoolDialogProps {
 }
 
 function SignerPoolForm(
-    props: Omit<SignerPoolDialogProps, "open" | "category" | "loadingPool"> & {
-        category: ClearanceCategory;
-    }
+    props: Omit<SignerPoolDialogProps, "open" | "category" | "loadingPool">
 ): JSX.Element {
-    const { category, employees, initialUserIds, saving, onClose, onSave, employeeName } = props;
+    const { employees, initialUserIds, saving, onClose, onSave, employeeName } = props;
 
     const [selected, setSelected] = useState<number[]>([...initialUserIds]);
     const [pickerValue, setPickerValue] = useState("");
@@ -58,21 +57,17 @@ function SignerPoolForm(
 
     return (
         <>
-            <DialogHeader>
-                <DialogTitle>Signer pool</DialogTitle>
-                <DialogDescription>
-                    Who may sign {category.label}. Replacing the pool never submits an empty list.
-                </DialogDescription>
-            </DialogHeader>
-
             <div className="space-y-4">
-                <EmployeeSelect
-                    employees={available}
-                    value={pickerValue}
-                    onValueChange={addMember}
-                    placeholder="Search employees to add…"
-                    disabled={saving}
-                />
+                <div className="space-y-2">
+                    <Label>Add signers</Label>
+                    <EmployeeSelect
+                        employees={available}
+                        value={pickerValue}
+                        onValueChange={addMember}
+                        placeholder="Search employees to add…"
+                        disabled={saving}
+                    />
+                </div>
 
                 {selected.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
@@ -131,13 +126,20 @@ export function SignerPoolDialog(props: SignerPoolDialogProps): JSX.Element {
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-h-[90vh] w-[95vw] overflow-y-auto rounded-2xl data-[state=closed]:duration-100 data-[state=open]:duration-150 sm:max-w-[520px]">
+                <DialogHeader>
+                    <DialogTitle>Signer pool</DialogTitle>
+                    {category !== null && !loadingPool && (
+                        <DialogDescription>
+                            Who may sign {category.label}. Replacing the pool never submits an empty list.
+                        </DialogDescription>
+                    )}
+                </DialogHeader>
                 {open &&
                     (category === null || loadingPool ? (
                         <p className="py-6 text-center text-sm text-muted-foreground">Loading signer pool…</p>
                     ) : (
                         <SignerPoolForm
                             key={`pool-${category.id}-${props.initialUserIds.join(",")}`}
-                            category={category}
                             employees={props.employees}
                             initialUserIds={props.initialUserIds}
                             saving={props.saving}

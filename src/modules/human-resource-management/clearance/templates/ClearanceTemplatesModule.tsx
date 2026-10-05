@@ -3,14 +3,15 @@
 import type { JSX } from "react";
 import { Settings2 } from "lucide-react";
 
-import { TemplatesWorkspace } from "./components/TemplatesWorkspace";
+import { TemplateCatalogue } from "./components/TemplateCatalogue";
 import { ClearanceTemplatesFetchProvider } from "./providers/clearanceTemplatesProvider";
 
-export function ClearanceTemplatesModule(): JSX.Element {
+export function ClearanceTemplatesModule(props: { selectedId?: number | null }): JSX.Element {
+    const { selectedId = null } = props;
     return (
-        <div className="p-2 sm:p-6 md:p-10 max-w-[1600px] mx-auto min-h-screen space-y-8">
+        <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
             <div className="flex items-center gap-4">
-                <div className="p-3 bg-primary/10 rounded-2xl shrink-0">
+                <div className="shrink-0 rounded-2xl bg-primary/10 p-3">
                     <Settings2 className="h-6 w-6 text-primary" />
                 </div>
                 <div className="min-w-0">
@@ -24,7 +25,7 @@ export function ClearanceTemplatesModule(): JSX.Element {
             </div>
 
             <ClearanceTemplatesFetchProvider>
-                <TemplatesWorkspace />
+                <TemplateCatalogue selectedId={selectedId} />
             </ClearanceTemplatesFetchProvider>
         </div>
     );

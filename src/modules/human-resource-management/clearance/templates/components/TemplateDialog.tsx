@@ -140,7 +140,7 @@ function TemplateForm(props: Omit<TemplateDialogProps, "open" | "template"> & { 
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="clearance-template-department">Auto-suggest department</Label>
+                    <Label>Auto-suggest department</Label>
                     <DepartmentSelect
                         id="clearance-template-department"
                         departments={departments}

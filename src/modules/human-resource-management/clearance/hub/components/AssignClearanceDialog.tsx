@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { OptionCombobox } from "./OptionCombobox";
 import { toast } from "sonner";
 import { formatPHT } from "../utils/time";
 import { useClearanceHubContext } from "../providers/ClearanceHubProvider";
@@ -163,7 +163,7 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
 
                     <div className="grid gap-2">
                         <Label>Approved resignation</Label>
-                        <SearchableSelect
+                        <OptionCombobox
                             options={resignationOptions}
                             value={resignationValue}
                             onValueChange={handleResignationChange}
@@ -185,7 +185,7 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
 
                     <div className="grid gap-2">
                         <Label>Template</Label>
-                        <SearchableSelect
+                        <OptionCombobox
                             options={templateOptions}
                             value={templateValue}
                             onValueChange={handleTemplateChange}
