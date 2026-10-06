@@ -6,7 +6,6 @@ import {
     MS_BULK_DRAIN_BATCH_SIZE,
     runBulkDrain,
 } from "@/modules/human-resource-management/mailing-studio/studio-outbox/server/bulk-drain-service";
-import { ensureBulkDriver } from "@/modules/human-resource-management/mailing-studio/studio-outbox/server/bulk-driver";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,7 +60,6 @@ function rejectSuspiciousTickBody(body: unknown): Record<string, string[]> | nul
 }
 
 export async function POST(req: NextRequest) {
-    ensureBulkDriver();
     try {
         if (!isTickAuthorized(req)) {
             return NextResponse.json({ success: false, message: "UNAUTHORIZED" }, { status: 401 });
