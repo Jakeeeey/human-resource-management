@@ -210,6 +210,15 @@ export async function cancelCampaign(id: number): Promise<CampaignCancelData> {
     return data;
 }
 
+export async function scheduleCampaign(id: number, scheduledAt: string | null): Promise<MsCampaignRow> {
+    const data = await request<{ campaign: MsCampaignRow }>(`/${id}/schedule`, {
+        method: "POST",
+        body: JSON.stringify({ scheduled_at: scheduledAt }),
+    });
+    if (!data) throw new CampaignApiError("Schedule returned no campaign.", 500);
+    return data.campaign;
+}
+
 export async function testSendCampaign(id: number, seeds: string[]): Promise<CampaignTestSendData> {
     const data = await request<CampaignTestSendData>(`/${id}/test-send`, {
         method: "POST",

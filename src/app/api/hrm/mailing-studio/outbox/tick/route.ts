@@ -1,15 +1,18 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 
+import { promoteDueScheduledCampaigns } from "@/modules/human-resource-management/mailing-studio/studio-campaigns/server/campaignService";
 import {
     MS_BULK_DRAIN_BATCH_SIZE,
     runBulkDrain,
 } from "@/modules/human-resource-management/mailing-studio/studio-outbox/server/bulk-drain-service";
+import { ensureBulkDriver } from "@/modules/human-resource-management/mailing-studio/studio-outbox/server/bulk-driver";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BODY_KEYS = ["limit"] as const;
+const PROMOTE_LIMIT = 20;
 
 function constantTimeEqual(a: string, b: string): boolean {
     const left = Buffer.from(a, "utf8");
@@ -58,6 +61,7 @@ function rejectSuspiciousTickBody(body: unknown): Record<string, string[]> | nul
 }
 
 export async function POST(req: NextRequest) {
+    ensureBulkDriver();
     try {
         if (!isTickAuthorized(req)) {
             return NextResponse.json({ success: false, message: "UNAUTHORIZED" }, { status: 401 });
@@ -80,8 +84,14 @@ export async function POST(req: NextRequest) {
             const record = body as Record<string, unknown>;
             if (typeof record.limit === "number") limit = record.limit;
         }
+        let promoted = 0;
+        try {
+            promoted = await promoteDueScheduledCampaigns(PROMOTE_LIMIT);
+        } catch (error) {
+            console.error("[mailing-studio-outbox-tick] scheduled promotion failed:", error);
+        }
         const result = await runBulkDrain(limit, { publicBaseUrl: new URL(req.url).origin });
-        return NextResponse.json({ success: true, data: result });
+        return NextResponse.json({ success: true, data: { ...result, promoted } });
     } catch (error) {
         console.error("[mailing-studio-outbox-tick] unexpected failure (never throw):", error);
         return NextResponse.json(

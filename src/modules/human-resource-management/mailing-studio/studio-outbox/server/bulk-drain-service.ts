@@ -66,6 +66,7 @@ interface CampaignState {
     id: string | number;
     status: string;
     startedAt: string | null;
+    totalCount: number;
 }
 
 interface AllowanceState {
@@ -197,7 +198,7 @@ async function patchOutboxRow(id: string | number, patch: Record<string, unknown
 
 async function readCampaignState(id: string | number): Promise<CampaignState | null> {
     const rows = await readDataArray(
-        `${CAMPAIGNS_COLLECTION}?filter[id][_eq]=${encodeURIComponent(String(id))}&fields=id,status,started_at&limit=1`
+        `${CAMPAIGNS_COLLECTION}?filter[id][_eq]=${encodeURIComponent(String(id))}&fields=id,status,started_at,total_count&limit=1`
     );
     if (!rows || rows.length === 0) return null;
     const row = rows[0] as Record<string, unknown>;
@@ -206,10 +207,12 @@ async function readCampaignState(id: string | number): Promise<CampaignState | n
     const status = row.status;
     if (typeof status !== "string") return null;
     const startedAt = row.started_at;
+    const totalRaw = row.total_count;
     return {
         id: rowId,
         status,
         startedAt: typeof startedAt === "string" && startedAt !== "" ? startedAt : null,
+        totalCount: typeof totalRaw === "number" && Number.isInteger(totalRaw) && totalRaw >= 0 ? totalRaw : 0,
     };
 }
 
@@ -327,8 +330,11 @@ async function syncCampaignProgress(campaignId: string | number): Promise<void> 
         if (campaign.startedAt === null) patch.started_at = nowUTC();
     }
     if ((campaign.status === "queued" || campaign.status === "sending") && unresolved === 0) {
-        patch.status = "sent";
-        patch.finished_at = nowUTC();
+        const resolved = sent + failed + skipped;
+        if (campaign.totalCount <= 0 || resolved >= campaign.totalCount) {
+            patch.status = "sent";
+            patch.finished_at = nowUTC();
+        }
     }
     await patchCampaign(campaignId, patch);
 }

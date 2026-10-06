@@ -13,6 +13,7 @@ import {
     CAMPAIGN_STATUSES,
     msCampaignCreateBodySchema,
 } from "@/modules/human-resource-management/mailing-studio/studio-campaigns/types";
+import { ensureBulkDriver } from "@/modules/human-resource-management/mailing-studio/studio-outbox/server/bulk-driver";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ function validationFailed(errors: Record<string, string[]>) {
 }
 
 export async function GET(req: NextRequest) {
+    ensureBulkDriver();
     try {
         const auth = await authorizeStudioCampaignsRoute(req, "canViewCampaigns");
         if ("failure" in auth) return auth.failure;

@@ -10,6 +10,7 @@ import {
     deleteCampaign,
     expandCampaign,
     listCampaigns,
+    scheduleCampaign,
     testSendCampaign,
     updateCampaign,
 } from "../providers/campaignsClient";
@@ -41,6 +42,11 @@ export interface CampaignCancelState {
     outcome: CampaignCancelData;
 }
 
+export interface CampaignScheduleState {
+    id: number;
+    outcome: MsCampaignRow;
+}
+
 export interface UseCampaignsResult {
     data: MsCampaignRow[] | null;
     isLoading: boolean;
@@ -53,6 +59,7 @@ export interface UseCampaignsResult {
     expandState: CampaignExpandState | null;
     testState: CampaignTestState | null;
     cancelState: CampaignCancelState | null;
+    scheduleState: CampaignScheduleState | null;
     clearOutcome: () => void;
     createItem: (input: MsCampaignCreateBody) => Promise<MsCampaignRow | null>;
     updateItem: (id: number, patch: MsCampaignUpdateBody) => Promise<MsCampaignRow | null>;
@@ -60,6 +67,7 @@ export interface UseCampaignsResult {
     confirmItem: (id: number) => Promise<CampaignConfirmState | null>;
     expandItem: (id: number) => Promise<CampaignExpandState | null>;
     cancelItem: (id: number) => Promise<CampaignCancelState | null>;
+    scheduleItem: (id: number, scheduledAt: string | null) => Promise<CampaignScheduleState | null>;
     testSendItem: (id: number, seeds: string[]) => Promise<CampaignTestState | null>;
 }
 
@@ -78,6 +86,7 @@ export function useCampaigns(): UseCampaignsResult {
     const [expandState, setExpandState] = useState<CampaignExpandState | null>(null);
     const [testState, setTestState] = useState<CampaignTestState | null>(null);
     const [cancelState, setCancelState] = useState<CampaignCancelState | null>(null);
+    const [scheduleState, setScheduleState] = useState<CampaignScheduleState | null>(null);
 
     const load = useCallback(async (loud: boolean): Promise<void> => {
         if (loud) setIsLoading(true);
@@ -104,6 +113,7 @@ export function useCampaigns(): UseCampaignsResult {
         setExpandState(null);
         setTestState(null);
         setCancelState(null);
+        setScheduleState(null);
         setNotice(null);
         setActionError(null);
     }, []);
@@ -212,6 +222,29 @@ export function useCampaigns(): UseCampaignsResult {
         }
     }, [load]);
 
+    const scheduleItem = useCallback(async (id: number, scheduledAt: string | null): Promise<CampaignScheduleState | null> => {
+        setBusyKey(`schedule:${id}`);
+        setActionError(null);
+        setNotice(null);
+        try {
+            const outcome = await scheduleCampaign(id, scheduledAt);
+            const state = { id, outcome };
+            setScheduleState(state);
+            setNotice(
+                scheduledAt === null
+                    ? "Schedule removed — the campaign is a draft again."
+                    : "Send scheduled — the campaign will go out automatically at the chosen time."
+            );
+            await load(false);
+            return state;
+        } catch (cause) {
+            setActionError(toMessage(cause));
+            return null;
+        } finally {
+            setBusyKey(null);
+        }
+    }, [load]);
+
     const testSendItem = useCallback(async (id: number, seeds: string[]): Promise<CampaignTestState | null> => {
         setBusyKey(`test:${id}`);
         setActionError(null);
@@ -240,6 +273,7 @@ export function useCampaigns(): UseCampaignsResult {
         expandState,
         testState,
         cancelState,
+        scheduleState,
         clearOutcome,
         createItem,
         updateItem,
@@ -247,6 +281,7 @@ export function useCampaigns(): UseCampaignsResult {
         confirmItem,
         expandItem,
         cancelItem,
+        scheduleItem,
         testSendItem,
     };
 }

@@ -33,6 +33,7 @@ import {
 import { CampaignDangerDialog } from "./components/CampaignDangerDialog";
 import { CampaignFormDialog, type CampaignFormValues } from "./components/CampaignFormDialog";
 import { CampaignQueueDialog } from "./components/CampaignQueueDialog";
+import { CampaignScheduleDialog } from "./components/CampaignScheduleDialog";
 import { CampaignStatusBadge } from "./components/CampaignStatusBadge";
 import { CampaignTestSendDialog } from "./components/CampaignTestSendDialog";
 import { useCampaignsContext } from "./providers/CampaignsProvider";
@@ -94,6 +95,7 @@ export function CampaignsModule() {
         confirmItem,
         expandItem,
         cancelItem,
+        scheduleItem,
         testSendItem,
         createItem,
         updateItem,
@@ -114,6 +116,10 @@ export function CampaignsModule() {
     const [testTarget, setTestTarget] = useState<MsCampaignRow | null>(null);
     const [testResult, setTestResult] = useState<CampaignTestSendData | null>(null);
     const [testError, setTestError] = useState<string | null>(null);
+    const [scheduleTarget, setScheduleTarget] = useState<MsCampaignRow | null>(null);
+    const [scheduleCounts, setScheduleCounts] = useState<CampaignConfirmCounts | null>(null);
+    const [scheduleNonce, setScheduleNonce] = useState(0);
+    const [scheduleError, setScheduleError] = useState<string | null>(null);
     const [expandBanner, setExpandBanner] = useState<ExpandBanner | null>(null);
     const [cancelBanner, setCancelBanner] = useState<CancelBanner | null>(null);
 
@@ -198,6 +204,36 @@ export function CampaignsModule() {
         }
     };
 
+    const openSchedule = (row: MsCampaignRow): void => {
+        clearOutcome();
+        setScheduleTarget(row);
+        setScheduleCounts(null);
+        setScheduleError(null);
+        setScheduleNonce((nonce) => nonce + 1);
+        void confirmItem(row.id).then((state) => {
+            if (state && state.id === row.id) {
+                setScheduleCounts(state.counts);
+            } else {
+                setScheduleError("Audience counts are unavailable right now — please try again.");
+            }
+        });
+    };
+
+    const handleScheduleConfirm = async (scheduledAt: string): Promise<void> => {
+        if (!scheduleTarget) return;
+        const state = await scheduleItem(scheduleTarget.id, scheduledAt);
+        if (state && state.id === scheduleTarget.id) {
+            setScheduleTarget(null);
+            setScheduleError(null);
+        } else {
+            setScheduleError("Scheduling failed — please try again.");
+        }
+    };
+
+    const handleUnschedule = async (row: MsCampaignRow): Promise<void> => {
+        await scheduleItem(row.id, null);
+    };
+
     const handleDangerConfirm = async (): Promise<void> => {
         if (!dangerTarget) return;
         if (dangerTarget.kind === "cancel") {
@@ -243,6 +279,8 @@ export function CampaignsModule() {
 
     const queueBusy = queueTarget !== null && busyKey === `confirm:${queueTarget.id}`;
     const queueExpanding = queueTarget !== null && busyKey === `expand:${queueTarget.id}`;
+    const scheduleBusy = scheduleTarget !== null && busyKey === `schedule:${scheduleTarget.id}`;
+    const scheduleCountsBusy = scheduleTarget !== null && busyKey === `confirm:${scheduleTarget.id}`;
     const formBusy =
         busyKey === "create" || (formTarget?.mode === "edit" && formTarget.row !== null && busyKey === `update:${formTarget.row.id}`);
     const dangerBusy =
@@ -259,7 +297,7 @@ export function CampaignsModule() {
                     </span>
                     <div className="min-w-0">
                         <h1 className="text-lg font-semibold tracking-tight">Campaigns</h1>
-                        <p className="text-sm text-muted-foreground">Draft, review, queue, and cancel bulk sends.</p>
+                        <p className="text-sm text-muted-foreground">Draft, schedule, send, and cancel bulk sends.</p>
                     </div>
                 </div>
                 <Button
@@ -370,7 +408,7 @@ export function CampaignsModule() {
                 </div>
             ) : null}
 
-            {actionError && !queueTarget && !dangerTarget && !testTarget ? (
+            {actionError && !queueTarget && !dangerTarget && !testTarget && !scheduleTarget ? (
                 <div className="rounded-lg border border-destructive/40 bg-card p-4" role="alert">
                     <p className="text-sm text-destructive">{actionError}</p>
                 </div>
@@ -413,12 +451,15 @@ export function CampaignsModule() {
                         <TableBody>
                             {filtered.map((row) => {
                                 const isDraft = row.status === "draft";
+                                const isScheduled = row.status === "scheduled";
                                 const canDelete = row.status === "draft" || row.status === "cancelled";
-                                const canQueue = row.status === "draft";
+                                const canSendNow = row.status === "draft" || row.status === "scheduled";
+                                const canSchedule = row.status === "draft" || row.status === "scheduled";
+                                const canUnschedule = row.status === "scheduled";
                                 const canResend = row.status === "sent" || row.status === "cancelled" || row.status === "failed";
                                 const canCancel = row.status === "queued" || row.status === "sending";
                                 const canTest = row.template_id !== null && row.template_id !== undefined;
-                                const hasActions = canQueue || canResend || isDraft || canCancel || canTest || canDelete;
+                                const hasActions = canSendNow || canResend || isDraft || canCancel || canTest || canDelete || canSchedule || canUnschedule;
                                 const ids = groupIdsOf(row);
                                 const names = ids.map((id) => groupNames.get(id) ?? "Unknown group");
                                 const rowBusy = busyKey !== null && busyKey.endsWith(`:${row.id}`);
@@ -450,7 +491,14 @@ export function CampaignsModule() {
                                             </span>
                                         </TableCell>
                                         <TableCell>
-                                            <CampaignStatusBadge status={row.status} />
+                                            <div className="flex min-w-0 flex-col gap-1">
+                                                <CampaignStatusBadge status={row.status} />
+                                                {isScheduled && row.scheduled_at ? (
+                                                    <span className="whitespace-nowrap text-[11px] tabular-nums text-muted-foreground" title={row.scheduled_at}>
+                                                        Sends {formatPHT(row.scheduled_at)}
+                                                    </span>
+                                                ) : null}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             {row.total_count > 0 ? (
@@ -485,14 +533,24 @@ export function CampaignsModule() {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-[200px]">
-                                                    {canQueue ? (
+                                                    {canSendNow ? (
                                                         <DropdownMenuItem disabled={rowBusy} onSelect={() => openQueue(row)}>
-                                                            Review and queue
+                                                            Send now
                                                         </DropdownMenuItem>
                                                     ) : null}
                                                     {canResend ? (
                                                         <DropdownMenuItem disabled={rowBusy} onSelect={() => openQueue(row)}>
                                                             Send again
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {canSchedule ? (
+                                                        <DropdownMenuItem disabled={rowBusy} onSelect={() => openSchedule(row)}>
+                                                            {isScheduled ? "Reschedule send" : "Schedule send"}
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {canUnschedule ? (
+                                                        <DropdownMenuItem disabled={rowBusy} onSelect={() => void handleUnschedule(row)}>
+                                                            Unschedule
                                                         </DropdownMenuItem>
                                                     ) : null}
                                                     {isDraft ? (
@@ -513,7 +571,7 @@ export function CampaignsModule() {
                                                             Test send
                                                         </DropdownMenuItem>
                                                     ) : null}
-                                                    {canQueue || canResend || isDraft || canTest ? <DropdownMenuSeparator /> : null}
+                                                    {canSendNow || canResend || isDraft || canTest ? <DropdownMenuSeparator /> : null}
                                                     {canCancel ? (
                                                         <DropdownMenuItem
                                                             className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -576,6 +634,22 @@ export function CampaignsModule() {
                         setQueueError(null);
                     }
                 }}
+            />
+
+            <CampaignScheduleDialog
+                busy={scheduleBusy}
+                campaign={scheduleTarget}
+                counts={scheduleCounts}
+                error={scheduleTarget ? scheduleError ?? actionError : null}
+                key={scheduleTarget === null ? "schedule-closed" : `schedule:${scheduleTarget.id}:${scheduleNonce}`}
+                loadingCounts={scheduleCountsBusy}
+                open={scheduleTarget !== null}
+                onClose={() => {
+                    setScheduleTarget(null);
+                    setScheduleCounts(null);
+                    setScheduleError(null);
+                }}
+                onConfirm={(scheduledAt) => void handleScheduleConfirm(scheduledAt)}
             />
 
             <CampaignDangerDialog

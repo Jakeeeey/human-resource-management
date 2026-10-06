@@ -434,8 +434,8 @@ export async function expandCampaign(id: number, actor: string | null): Promise<
         const reread = (await readCampaignRow(id)) ?? campaign;
         return toExpandResult(reread, 0, keys.size, true);
     }
-    if (campaign.status !== "draft" && campaign.status !== "sent" && campaign.status !== "cancelled" && campaign.status !== "failed") {
-        throw new CampaignConflictError(`Only draft, sent, cancelled or failed campaigns can be expanded (status is "${campaign.status}")`);
+    if (campaign.status !== "draft" && campaign.status !== "scheduled" && campaign.status !== "sent" && campaign.status !== "cancelled" && campaign.status !== "failed") {
+        throw new CampaignConflictError(`Only draft, scheduled, sent, cancelled or failed campaigns can be expanded (status is "${campaign.status}")`);
     }
     if (campaign.template_id === null || campaign.template_id === undefined) {
         throw new CampaignValidationError("Campaign has no template selected");
@@ -455,7 +455,7 @@ export async function expandCampaign(id: number, actor: string | null): Promise<
             query: {
                 filter: {
                     id: { _eq: id },
-                    status: { _in: ["draft", "sent", "cancelled", "failed"] },
+                    status: { _in: ["draft", "scheduled", "sent", "cancelled", "failed"] },
                     run_seq: { _eq: currentRun },
                 },
             },
@@ -521,6 +521,105 @@ export async function expandCampaign(id: number, actor: string | null): Promise<
         throw new CampaignNotFoundError("Campaign not found");
     }
     return toExpandResult(reread, queued, alreadyQueued, false);
+}
+
+const PH_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+function utcNowString(): string {
+    return new Date().toISOString().slice(0, 19);
+}
+
+function toUtcTimestamp(value: string): string | null {
+    const text = value.trim();
+    const bare = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+    if (bare) {
+        const year = Number(bare[1]);
+        const month = Number(bare[2]);
+        const day = Number(bare[3]);
+        const hour = Number(bare[4]);
+        const minute = Number(bare[5]);
+        const second = bare[6] === undefined ? 0 : Number(bare[6]);
+        if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59) {
+            return null;
+        }
+        const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+        if (day > daysInMonth) return null;
+        return new Date(Date.UTC(year, month - 1, day, hour, minute, second) - PH_OFFSET_MS)
+            .toISOString()
+            .slice(0, 19);
+    }
+    const parsed = Date.parse(text);
+    if (Number.isNaN(parsed)) return null;
+    return new Date(parsed).toISOString().slice(0, 19);
+}
+
+export async function promoteDueScheduledCampaigns(limit: number): Promise<number> {
+    const bounded = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : 20;
+    const now = utcNowString();
+    const body = await dFetch(
+        `${CAMPAIGNS}?filter[status][_eq]=scheduled&filter[scheduled_at][_lte]=${encodeURIComponent(now)}&sort=scheduled_at&limit=${bounded}&fields=${CAMPAIGN_FIELDS}`
+    );
+    const rows = unwrapStudioCampaignsData<MsCampaignRow[]>(body);
+    if (!Array.isArray(rows) || rows.length === 0) return 0;
+    let promoted = 0;
+    for (const row of rows) {
+        try {
+            const result = await expandCampaign(row.id, "scheduler");
+            if (!result.repeated) promoted += 1;
+        } catch (error) {
+            msLogRedacted("[studio-campaigns] scheduled promote failed:", { campaign_id: row.id, error });
+        }
+    }
+    return promoted;
+}
+
+export async function scheduleCampaign(
+    id: number,
+    scheduledAt: string | null | undefined,
+    actor: string | null
+): Promise<MsCampaignRow> {
+    const existing = await readCampaignRow(id);
+    if (!existing) {
+        throw new CampaignNotFoundError("Campaign not found");
+    }
+    if (typeof scheduledAt === "string") {
+        if (scheduledAt.trim() === "") {
+            throw new CampaignValidationError("scheduled_at must be a valid future datetime or null");
+        }
+        const candidate = toUtcTimestamp(scheduledAt);
+        if (candidate === null) {
+            throw new CampaignValidationError("scheduled_at must be a valid datetime");
+        }
+        if (candidate <= utcNowString()) {
+            throw new CampaignValidationError("scheduled_at must be a future time");
+        }
+        if (existing.status !== "draft" && existing.status !== "scheduled") {
+            throw new CampaignConflictError(
+                `Only draft or scheduled campaigns can be scheduled (status is "${existing.status}")`
+            );
+        }
+        const payload = stampUpdate({ status: "scheduled", scheduled_at: candidate }, actor);
+        const body = await dFetch(`${CAMPAIGNS}/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+        throwIfDirectusErrors(body, "Failed to schedule campaign");
+        const reread = await readCampaignRow(id);
+        if (!reread) {
+            throw new CampaignNotFoundError("Campaign not found");
+        }
+        return reread;
+    }
+    if (existing.status !== "scheduled") {
+        throw new CampaignConflictError(
+            `Only scheduled campaigns can be unscheduled (status is "${existing.status}")`
+        );
+    }
+    const payload = stampUpdate({ status: "draft", scheduled_at: null }, actor);
+    const body = await dFetch(`${CAMPAIGNS}/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+    throwIfDirectusErrors(body, "Failed to unschedule campaign");
+    const reread = await readCampaignRow(id);
+    if (!reread) {
+        throw new CampaignNotFoundError("Campaign not found");
+    }
+    return reread;
 }
 
 export async function cancelCampaign(id: number, actor: string | null): Promise<CancelResult> {
