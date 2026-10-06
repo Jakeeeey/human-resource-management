@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { dFetch } from "../utils/directus";
 import { nowUTC } from "../utils/audit";
+import { toPHPeriod } from "../utils/time";
 import type {
     ClearanceDashboardAgingBin,
     ClearanceDashboardBundle,
@@ -101,8 +102,8 @@ function mean(values: readonly number[]): number | null {
 
 function toPeriod(value: string | null): string | null {
     if (value === null) return null;
-    const period = value.slice(0, 7);
-    return /^\d{4}-\d{2}$/.test(period) ? period : null;
+    const period = toPHPeriod(value);
+    return period !== null && /^\d{4}-\d{2}$/.test(period) ? period : null;
 }
 
 function toInstantMs(value: string | null): number | null {

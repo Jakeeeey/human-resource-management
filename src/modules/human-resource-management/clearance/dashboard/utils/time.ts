@@ -45,3 +45,10 @@ export function phLocalToUtcIso(local: string | null | undefined): string | null
 export function phToday(): string {
     return new Date(Date.now() + PH_OFFSET_MS).toISOString().slice(0, 10);
 }
+export function toPHPeriod(value: string | Date | null | undefined): string | null {
+    const instant = parseUtcInstant(value);
+    if (!instant) return null;
+    const ph = new Date(instant.getTime() + PH_OFFSET_MS);
+    const month = String(ph.getUTCMonth() + 1).padStart(2, "0");
+    return `${ph.getUTCFullYear()}-${month}`;
+}

@@ -17,7 +17,6 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { formatPHT } from "../utils/time";
 import { CLEARANCE_REQUEST_STATUS_LABELS, type ClearanceRequestStatus } from "../types";
 import type { ApprovableResignation, ClearanceHubRequest } from "../hooks/useClearanceHub";
 import styles from "./hub-status.module.css";
@@ -98,7 +97,7 @@ export function ClearanceHubTable({
         return (
             <div className="space-y-2">
                 {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-16 w-full" />
+                    <Skeleton key={i} className="h-13 w-full" />
                 ))}
             </div>
         );
@@ -138,12 +137,18 @@ export function ClearanceHubTable({
     return (
         <div className="space-y-4">
             <div className="max-h-120 overflow-auto rounded-md border">
-                <table className="w-full caption-bottom text-sm">
+                <table className="w-full min-w-150 table-fixed caption-bottom text-sm">
+                    <colgroup>
+                        <col />
+                        <col />
+                        <col className="w-52" />
+                        <col className="w-32" />
+                    </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-card shadow-sm">
                         <TableRow>
                             <TableHead
                                 aria-sort={sortDirection === "asc" ? "ascending" : "descending"}
-                                className="bg-card"
+                                className="h-12 bg-card px-4"
                             >
                                 <button
                                     type="button"
@@ -159,11 +164,9 @@ export function ClearanceHubTable({
                                     )}
                                 </button>
                             </TableHead>
-                            <TableHead className="bg-card">Template</TableHead>
-                            <TableHead className="bg-card text-right">Progress</TableHead>
-                            <TableHead className="bg-card">Status</TableHead>
-                            <TableHead className="bg-card text-right">Filed</TableHead>
-                            <TableHead className="bg-card text-right">Confirmed</TableHead>
+                            <TableHead className="h-12 bg-card px-4">Template</TableHead>
+                            <TableHead className="h-12 bg-card px-4 text-right">Progress</TableHead>
+                            <TableHead className="h-12 bg-card px-4">Status</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -187,7 +190,7 @@ export function ClearanceHubTable({
                                         isActive && "border-primary/30 bg-primary/5 hover:bg-primary/10"
                                     )}
                                 >
-                                    <TableCell className="font-medium max-w-50 truncate" title={employeeName}>
+                                    <TableCell className="truncate px-4 py-4 font-medium" title={employeeName}>
                                         <Link
                                             href={`/hrm/clearance/hub/${request.id}`}
                                             onClick={(event) => event.stopPropagation()}
@@ -196,24 +199,22 @@ export function ClearanceHubTable({
                                             {employeeName}
                                         </Link>
                                     </TableCell>
-                                    <TableCell className="max-w-50 truncate" title={request.template_title_snapshot ?? "Unknown template"}>
+                                    <TableCell className="truncate px-4 py-4" title={request.template_title_snapshot ?? "Unknown template"}>
                                         {request.template_title_snapshot ?? "Unknown template"}
                                     </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex min-w-30 items-center justify-end gap-2">
-                                            <Progress value={progressPercent(request)} className="h-2 w-16" />
+                                    <TableCell className="px-4 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <Progress value={progressPercent(request)} className="h-2 w-20" />
                                             <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
                                                 {request.signed_count} of {request.total_count} signed
                                             </span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="px-4 py-4">
                                         <StatusBadge tone={statusTone(request.status)} className={statusClassName(request.status)}>
                                             {CLEARANCE_REQUEST_STATUS_LABELS[request.status]}
                                         </StatusBadge>
                                     </TableCell>
-                                    <TableCell className="whitespace-nowrap text-right tabular-nums">{formatPHT(request.created_at)}</TableCell>
-                                    <TableCell className="whitespace-nowrap text-right tabular-nums">{formatPHT(request.confirmed_at)}</TableCell>
                                 </TableRow>
                             );
                         })}

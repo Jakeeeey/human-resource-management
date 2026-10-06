@@ -2,7 +2,6 @@
 
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -111,48 +110,42 @@ function ClearanceHubContent() {
                 </div>
             </div>
 
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="relative w-62.5">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by employee or template..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <div className="relative w-72">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by employee or template..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
 
-                        <Select
-                            value={statusFilter}
-                            onValueChange={(value) => setStatusFilter(value as StatusFilter)}
-                        >
-                            <SelectTrigger className="w-42.5">
-                                <SelectValue placeholder="All Statuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                {CLEARANCE_REQUEST_STATUSES.map((status) => (
-                                    <SelectItem key={status} value={status}>
-                                        {CLEARANCE_REQUEST_STATUS_LABELS[status]}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                <Select
+                    value={statusFilter}
+                    onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                >
+                    <SelectTrigger className="w-44">
+                        <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        {CLEARANCE_REQUEST_STATUSES.map((status) => (
+                            <SelectItem key={status} value={status}>
+                                {CLEARANCE_REQUEST_STATUS_LABELS[status]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
 
-                        {hasActiveFilters && (
-                            <Button variant="outline" size="sm" onClick={resetFilters}>
-                                <X className="mr-2 h-4 w-4" />
-                                Clear
-                            </Button>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                {hasActiveFilters && (
+                    <Button variant="outline" size="sm" onClick={resetFilters}>
+                        <X className="mr-2 h-4 w-4" />
+                        Clear
+                    </Button>
+                )}
 
-            <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground" aria-live="polite">
+                <p className="ml-auto text-sm text-muted-foreground" aria-live="polite">
                     Showing <span className="font-semibold">{filteredRequests.length}</span>{" "}
                     of <span className="font-semibold">{requests.length}</span> clearance{" "}
                     {filteredRequests.length === 1 ? "request" : "requests"}
