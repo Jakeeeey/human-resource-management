@@ -87,6 +87,10 @@ export interface ConfirmResult {
     duplicateCount: number;
 }
 
+export interface ConfirmAudienceResult extends ConfirmResult {
+    bannedVariables: string[];
+}
+
 export interface ExpandResult {
     campaign: MsCampaignRow;
     queued: number;
@@ -125,12 +129,56 @@ interface Resolution extends ConfirmResult {
 
 const CAMPAIGNS = "/items/ms_campaigns";
 const OUTBOX = "/items/ms_outbox";
+const OUTBOX_CLAIMS = "/items/ms_outbox_claims";
 const SUPPRESSIONS = "/items/ms_suppressions";
 const CAMPAIGN_FIELDS =
     "id,campaign_key,campaign_name,template_id,group_ids,status,scheduled_at,started_at,finished_at,total_count,sent_count,failed_count,skipped_count,run_seq,created_at,created_by,updated_at,updated_by";
 const SUPPRESSION_CHUNK = 200;
 const OUTBOX_BATCH = 20;
+const OUTBOX_DELETE_BATCH = 100;
 const TEST_SEND_MAX_SEEDS = 5;
+
+export const CAMPAIGNS_PAGE_DEFAULT_LIMIT = 10;
+export const CAMPAIGNS_PAGE_MAX_LIMIT = 50;
+export const DELIVERIES_PAGE_DEFAULT_LIMIT = 25;
+export const DELIVERIES_PAGE_MAX_LIMIT = 100;
+
+const DELETABLE_CAMPAIGN_STATUSES: readonly CampaignStatus[] = [
+    "draft",
+    "scheduled",
+    "cancelled",
+    "sent",
+    "failed",
+];
+
+const DELIVERY_FIELDS = "id,to_email,status,attempts,error,published_at,sent_at,next_attempt_at";
+
+export const CAMPAIGN_SORT_VALUES = [
+    "created-desc",
+    "created-asc",
+    "name-asc",
+    "name-desc",
+    "status-asc",
+    "status-desc",
+] as const;
+
+export type CampaignSort = (typeof CAMPAIGN_SORT_VALUES)[number];
+
+const CAMPAIGN_SORT_MAP: Record<CampaignSort, string> = {
+    "created-desc": "-created_at",
+    "created-asc": "created_at",
+    "name-asc": "campaign_name",
+    "name-desc": "-campaign_name",
+    "status-asc": "status",
+    "status-desc": "-status",
+};
+
+export interface CampaignsPage {
+    rows: MsCampaignRow[];
+    total: number;
+    page: number;
+    limit: number;
+}
 
 function isDuplicateMessage(message: string): boolean {
     const text = message.toLowerCase();
@@ -276,10 +324,53 @@ async function readExistingOutboxKeys(campaignId: number): Promise<Set<string>> 
     return keys;
 }
 
-async function countOutboxRows(campaignId: number): Promise<number> {
-    const body = await dFetch(`${OUTBOX}?filter[campaign_id][_eq]=${campaignId}&fields=id&limit=-1`);
-    const rows = unwrapStudioCampaignsData<unknown[]>(body);
-    return Array.isArray(rows) ? rows.length : 0;
+async function readOutboxRowIds(campaignId: number): Promise<Array<string | number>> {
+    const body = await dFetch(`${OUTBOX}?filter[campaign_id][_eq]=${campaignId}&fields=id&sort=id&limit=-1`);
+    const rows = unwrapStudioCampaignsData<Array<{ id?: unknown }>>(body);
+    const ids: Array<string | number> = [];
+    if (Array.isArray(rows)) {
+        for (const row of rows) {
+            if (typeof row.id === "string" || typeof row.id === "number") {
+                ids.push(row.id);
+            }
+        }
+    }
+    return ids;
+}
+
+async function deleteOutboxClaims(outboxIds: Array<string | number>): Promise<void> {
+    const filter = outboxIds.map((rowId) => encodeURIComponent(String(rowId))).join(",");
+    const body = await dFetch(`${OUTBOX_CLAIMS}?filter[outbox_id][_in]=${filter}&fields=id&limit=-1`);
+    const rows = unwrapStudioCampaignsData<Array<{ id?: unknown }>>(body);
+    const claimIds: Array<string | number> = [];
+    if (Array.isArray(rows)) {
+        for (const row of rows) {
+            if (typeof row.id === "string" || typeof row.id === "number") {
+                claimIds.push(row.id);
+            }
+        }
+    }
+    for (let offset = 0; offset < claimIds.length; offset += OUTBOX_DELETE_BATCH) {
+        const chunk = claimIds.slice(offset, offset + OUTBOX_DELETE_BATCH);
+        await Promise.all(
+            chunk.map((claimId) =>
+                dFetch(`${OUTBOX_CLAIMS}/${encodeURIComponent(String(claimId))}`, { method: "DELETE" })
+            )
+        );
+    }
+}
+
+async function deleteCampaignOutbox(campaignId: number): Promise<void> {
+    const ids = await readOutboxRowIds(campaignId);
+    for (let offset = 0; offset < ids.length; offset += OUTBOX_DELETE_BATCH) {
+        const chunk = ids.slice(offset, offset + OUTBOX_DELETE_BATCH);
+        await deleteOutboxClaims(chunk);
+        await Promise.all(
+            chunk.map((rowId) =>
+                dFetch(`${OUTBOX}/${encodeURIComponent(String(rowId))}`, { method: "DELETE" })
+            )
+        );
+    }
 }
 
 async function postBulkRow(row: Record<string, unknown>): Promise<boolean> {
@@ -302,11 +393,45 @@ async function postBulkRow(row: Record<string, unknown>): Promise<boolean> {
     return true;
 }
 
-export async function listCampaigns(filter?: { status?: CampaignStatus }): Promise<MsCampaignRow[]> {
-    const clause = filter?.status === undefined ? "" : `&filter[status][_eq]=${filter.status}`;
-    const body = await dFetch(`${CAMPAIGNS}?fields=${CAMPAIGN_FIELDS}&sort=-id&limit=-1${clause}`);
+export interface ListCampaignsParams {
+    page: number;
+    limit: number;
+    sort: CampaignSort;
+    status?: CampaignStatus;
+    search?: string;
+}
+
+export async function listCampaignsPage(params: ListCampaignsParams): Promise<CampaignsPage> {
+    const page = Number.isInteger(params.page) && params.page > 0 ? params.page : 1;
+    const limit =
+        Number.isInteger(params.limit) && params.limit > 0
+            ? Math.min(params.limit, CAMPAIGNS_PAGE_MAX_LIMIT)
+            : CAMPAIGNS_PAGE_DEFAULT_LIMIT;
+    const offset = (page - 1) * limit;
+    const statusFilter = params.status === undefined ? "" : `&filter[status][_eq]=${params.status}`;
+    const search = (params.search ?? "").trim();
+    const searchFilter =
+        search === ""
+            ? ""
+            : `&filter[_or][0][campaign_name][_contains]=${encodeURIComponent(search)}` +
+              `&filter[_or][1][campaign_key][_contains]=${encodeURIComponent(search)}`;
+    const sort = CAMPAIGN_SORT_MAP[params.sort];
+    const body = await dFetch(
+        `${CAMPAIGNS}?fields=${CAMPAIGN_FIELDS}&sort=${encodeURIComponent(sort)}` +
+            `&limit=${limit}&offset=${offset}&meta=filter_count${statusFilter}${searchFilter}`
+    );
     const rows = unwrapStudioCampaignsData<MsCampaignRow[]>(body);
-    return Array.isArray(rows) ? rows : [];
+    const meta =
+        typeof body === "object" && body !== null
+            ? (body as { meta?: { filter_count?: unknown } }).meta
+            : undefined;
+    const total =
+        typeof meta?.filter_count === "number"
+            ? meta.filter_count
+            : Array.isArray(rows)
+              ? rows.length
+              : 0;
+    return { rows: Array.isArray(rows) ? rows : [], total, page, limit };
 }
 
 export async function getCampaign(id: number): Promise<MsCampaignRow> {
@@ -315,6 +440,81 @@ export async function getCampaign(id: number): Promise<MsCampaignRow> {
         throw new CampaignNotFoundError("Campaign not found");
     }
     return row;
+}
+
+export interface CampaignDeliveryRow {
+    id: string | number;
+    to_email: string;
+    status: string;
+    attempts: number;
+    error: string | null;
+    published_at: string | null;
+    sent_at: string | null;
+}
+
+export interface CampaignDeliveriesPage {
+    rows: CampaignDeliveryRow[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface ListCampaignDeliveriesParams {
+    page: number;
+    limit: number;
+}
+
+function toDeliveryRow(raw: unknown): CampaignDeliveryRow | null {
+    if (typeof raw !== "object" || raw === null) return null;
+    const row = raw as Record<string, unknown>;
+    const id = row.id;
+    if (typeof id !== "string" && typeof id !== "number") return null;
+    return {
+        id,
+        to_email: typeof row.to_email === "string" ? row.to_email : "",
+        status: typeof row.status === "string" ? row.status : "unknown",
+        attempts:
+            typeof row.attempts === "number" && Number.isInteger(row.attempts) && row.attempts >= 0
+                ? row.attempts
+                : 0,
+        error: typeof row.error === "string" ? row.error : null,
+        published_at: typeof row.published_at === "string" ? row.published_at : null,
+        sent_at: typeof row.sent_at === "string" ? row.sent_at : null,
+    };
+}
+
+export async function listCampaignDeliveriesPage(
+    campaignId: number,
+    params: ListCampaignDeliveriesParams
+): Promise<CampaignDeliveriesPage> {
+    const campaign = await readCampaignRow(campaignId);
+    if (!campaign) {
+        throw new CampaignNotFoundError("Campaign not found");
+    }
+    const page = Number.isInteger(params.page) && params.page > 0 ? params.page : 1;
+    const limit =
+        Number.isInteger(params.limit) && params.limit > 0
+            ? Math.min(params.limit, DELIVERIES_PAGE_MAX_LIMIT)
+            : DELIVERIES_PAGE_DEFAULT_LIMIT;
+    const offset = (page - 1) * limit;
+    const body = await dFetch(
+        `${OUTBOX}?filter[campaign_id][_eq]=${campaignId}&fields=${DELIVERY_FIELDS}` +
+            `&sort=id&limit=${limit}&offset=${offset}&meta=filter_count`
+    );
+    const rawRows = unwrapStudioCampaignsData<unknown[]>(body);
+    const rows: CampaignDeliveryRow[] = [];
+    if (Array.isArray(rawRows)) {
+        for (const raw of rawRows) {
+            const row = toDeliveryRow(raw);
+            if (row) rows.push(row);
+        }
+    }
+    const meta =
+        typeof body === "object" && body !== null
+            ? (body as { meta?: { filter_count?: unknown } }).meta
+            : undefined;
+    const total = typeof meta?.filter_count === "number" ? meta.filter_count : rows.length;
+    return { rows, total, page, limit };
 }
 
 export async function createCampaign(input: MsCampaignCreateBody, actor: string | null): Promise<MsCampaignRow> {
@@ -392,17 +592,29 @@ export async function softDeleteCampaign(id: number): Promise<DeleteCampaignResu
     if (!existing) {
         throw new CampaignNotFoundError("Campaign not found");
     }
-    if (existing.status !== "draft" && existing.status !== "cancelled") {
-        throw new CampaignConflictError(`Only draft or cancelled campaigns can be deleted (status is "${existing.status}")`);
+    if (!DELETABLE_CAMPAIGN_STATUSES.includes(existing.status)) {
+        throw new CampaignConflictError(
+            `Only draft, scheduled, cancelled, sent or failed campaigns can be deleted (status is "${existing.status}")`
+        );
     }
-    if ((await countOutboxRows(id)) > 0) {
-        throw new CampaignConflictError("Campaign has queued rows and cannot be deleted");
-    }
+    await deleteCampaignOutbox(id);
     await dFetch(`${CAMPAIGNS}/${id}`, { method: "DELETE" });
     return { campaign: existing };
 }
 
-export async function confirmCampaign(id: number): Promise<ConfirmResult> {
+async function readBannedVariables(templateId: number | null | undefined): Promise<string[]> {
+    if (templateId === null || templateId === undefined) return [];
+    try {
+        const template = await fetchActiveTemplate(templateId);
+        if (!template) return [];
+        return extractTemplateTokens(`${template.subject}\n${template.body_html}`);
+    } catch (error) {
+        msLogRedacted("[studio-campaigns] variable check failed:", error);
+        return [];
+    }
+}
+
+export async function confirmCampaign(id: number): Promise<ConfirmAudienceResult> {
     const campaign = await readCampaignRow(id);
     if (!campaign) {
         throw new CampaignNotFoundError("Campaign not found");
@@ -412,6 +624,7 @@ export async function confirmCampaign(id: number): Promise<ConfirmResult> {
         recipientCount: resolution.recipientCount,
         suppressedCount: resolution.suppressedCount,
         duplicateCount: resolution.duplicateCount,
+        bannedVariables: await readBannedVariables(campaign.template_id),
     };
 }
 

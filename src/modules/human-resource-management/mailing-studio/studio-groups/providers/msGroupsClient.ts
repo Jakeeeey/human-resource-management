@@ -1,10 +1,4 @@
-import type { GroupSourceKind, MsGroupMemberRow, MsGroupRow } from "../types";
-
-export interface MsGroupPreview {
-    recipientCount: number;
-    suppressedCount: number;
-    duplicateCount: number;
-}
+import type { GroupSourceKind, MemberSort, MsGroupMemberRow, MsGroupRow } from "../types";
 
 export interface MsGroupResyncResult {
     updated: number;
@@ -172,11 +166,12 @@ export async function deleteMsGroup(id: number): Promise<MsDeleteGroupOutcome> {
 
 export async function fetchMsGroupMembers(
     groupId: number,
-    query?: { page?: number; limit?: number }
+    query?: { page?: number; limit?: number; sort?: MemberSort }
 ): Promise<MsGroupMembersPage> {
     const params = new URLSearchParams();
     if (query?.page !== undefined) params.set("page", String(query.page));
     if (query?.limit !== undefined) params.set("limit", String(query.limit));
+    if (query?.sort !== undefined) params.set("sort", query.sort);
     const qs = params.size > 0 ? `?${params.toString()}` : "";
     const data = await unwrap<MsGroupMembersPage>(
         await fetch(`/api/hrm/mailing-studio/groups/${encodeURIComponent(String(groupId))}/members${qs}`)
@@ -255,6 +250,36 @@ export async function removeMsGroupMember(groupId: number, memberId: number): Pr
     return message;
 }
 
+export interface MsGroupMemberFilter {
+    search?: string;
+}
+
+export type MsBulkDeleteTarget = { memberIds: number[] } | { filter: MsGroupMemberFilter };
+
+export interface MsRemoveGroupMembersResult {
+    removed: number[];
+    notFound: number[];
+    message: string | null;
+}
+
+export async function bulkRemoveMsGroupMembers(
+    groupId: number,
+    target: MsBulkDeleteTarget
+): Promise<MsRemoveGroupMembersResult> {
+    const body = "memberIds" in target ? { member_ids: target.memberIds } : { filter: target.filter };
+    const { data, message } = await unwrapWithMessage<{ removed: number[]; notFound: number[] }>(
+        await fetch(
+            `/api/hrm/mailing-studio/groups/${encodeURIComponent(String(groupId))}/members/bulk-delete`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            }
+        )
+    );
+    return { removed: data?.removed ?? [], notFound: data?.notFound ?? [], message };
+}
+
 export async function resyncMsGroup(groupId: number): Promise<MsGroupResyncResult> {
     const data = await unwrap<MsGroupResyncResult>(
         await fetch(`/api/hrm/mailing-studio/groups/${encodeURIComponent(String(groupId))}/resync`, {
@@ -262,14 +287,6 @@ export async function resyncMsGroup(groupId: number): Promise<MsGroupResyncResul
         })
     );
     if (!data) throw new Error("Group re-sync returned no data.");
-    return data;
-}
-
-export async function previewMsGroup(groupId: number): Promise<MsGroupPreview> {
-    const data = await unwrap<MsGroupPreview>(
-        await fetch(`/api/hrm/mailing-studio/groups/${encodeURIComponent(String(groupId))}/preview`)
-    );
-    if (!data) throw new Error("Group preview returned no data.");
     return data;
 }
 

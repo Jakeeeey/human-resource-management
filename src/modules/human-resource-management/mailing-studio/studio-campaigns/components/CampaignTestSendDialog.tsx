@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 
 import type { MsCampaignRow } from "../types";
 import { extractBannedVariables, type CampaignTestSendData } from "../providers/campaignsClient";
+import { useDialogFocusReturn } from "../hooks/useDialogFocusReturn";
 
 interface CampaignTestSendDialogProps {
     readonly open: boolean;
@@ -54,6 +55,7 @@ export function CampaignTestSendDialog({
 }: CampaignTestSendDialogProps) {
     const [seedInput, setSeedInput] = useState("");
     const [formError, setFormError] = useState<string | null>(null);
+    const focusReturn = useDialogFocusReturn();
 
     const banned = result ? extractBannedVariables(result.warnings) : [];
     const isDryRun = result?.status === "dry_run";
@@ -83,7 +85,11 @@ export function CampaignTestSendDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[85vh] w-[95vw] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-[520px]">
+            <DialogContent
+                className="flex max-h-[85vh] w-[95vw] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-[520px]"
+                onCloseAutoFocus={focusReturn.onCloseAutoFocus}
+                onOpenAutoFocus={focusReturn.onOpenAutoFocus}
+            >
                 <DialogHeader className="px-6 pt-6 text-left">
                     <DialogTitle>Test send — {campaign?.campaign_name ?? "campaign"}</DialogTitle>
                     <DialogDescription>Up to {MAX_SEEDS} seed addresses, separated by commas or new lines.</DialogDescription>

@@ -14,6 +14,8 @@ import {
 
 import type { MsCampaignRow } from "../types";
 import type { CampaignConfirmCounts } from "../providers/campaignsClient";
+import { useDialogFocusReturn } from "../hooks/useDialogFocusReturn";
+import { CampaignVariablesNotice } from "./CampaignVariablesNotice";
 
 interface CampaignQueueDialogProps {
     readonly open: boolean;
@@ -36,14 +38,21 @@ export function CampaignQueueDialog({
     error,
     onConfirm,
 }: CampaignQueueDialogProps) {
+    const focusReturn = useDialogFocusReturn();
+    const showSuppressed = (counts?.suppressedCount ?? 0) > 0;
+    const showDuplicates = (counts?.duplicateCount ?? 0) > 0;
+    const cardCount = 1 + (showSuppressed ? 1 : 0) + (showDuplicates ? 1 : 0);
+    const gridColumns = cardCount === 3 ? "grid-cols-3" : cardCount === 2 ? "grid-cols-2" : "grid-cols-1";
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="w-[95vw] rounded-2xl sm:max-w-[480px]">
+            <DialogContent
+                className="w-[95vw] rounded-2xl sm:max-w-[480px]"
+                onCloseAutoFocus={focusReturn.onCloseAutoFocus}
+                onOpenAutoFocus={focusReturn.onOpenAutoFocus}
+            >
                 <DialogHeader className="text-left">
                     <DialogTitle>Queue “{campaign?.campaign_name ?? "campaign"}”?</DialogTitle>
-                    <DialogDescription>
-                        Check the real audience size below before anything is queued — this cannot be undone without cancelling.
-                    </DialogDescription>
+                    <DialogDescription>This cannot be undone once queued.</DialogDescription>
                 </DialogHeader>
                 {loadingCounts ? (
                     <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground" role="status">
@@ -52,32 +61,31 @@ export function CampaignQueueDialog({
                     </div>
                 ) : counts ? (
                     <div className="flex flex-col gap-3" role="status" aria-label="Audience counts">
-                        <p className="text-sm font-medium">
-                            {counts.recipientCount} will receive · {counts.suppressedCount} unsubscribed · {counts.duplicateCount} duplicates
-                        </p>
-                        <dl className="grid grid-cols-3 gap-2 text-center">
+                        <dl className={`grid ${gridColumns} gap-2 text-center`}>
                             <div className="rounded-lg border bg-emerald-500/10 px-2 py-3">
                                 <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Will receive</dt>
                                 <dd className="text-xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
                                     {counts.recipientCount}
                                 </dd>
                             </div>
-                            <div className="rounded-lg border bg-muted px-2 py-3">
-                                <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Unsubscribed</dt>
-                                <dd className="text-xl font-semibold tabular-nums">{counts.suppressedCount}</dd>
-                            </div>
-                            <div className="rounded-lg border bg-muted px-2 py-3">
-                                <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Duplicates</dt>
-                                <dd className="text-xl font-semibold tabular-nums">{counts.duplicateCount}</dd>
-                            </div>
+                            {showSuppressed ? (
+                                <div className="rounded-lg border bg-muted px-2 py-3">
+                                    <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Unsubscribed</dt>
+                                    <dd className="text-xl font-semibold tabular-nums">{counts.suppressedCount}</dd>
+                                </div>
+                            ) : null}
+                            {showDuplicates ? (
+                                <div className="rounded-lg border bg-muted px-2 py-3">
+                                    <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Duplicates</dt>
+                                    <dd className="text-xl font-semibold tabular-nums">{counts.duplicateCount}</dd>
+                                </div>
+                            ) : null}
                         </dl>
-                        <p className="text-xs leading-snug text-muted-foreground">
-                            Unsubscribed addresses are skipped automatically. Duplicate memberships across groups collapse into one send each.
-                        </p>
                     </div>
                 ) : (
                     <p className="py-4 text-sm text-muted-foreground">Audience counts are unavailable right now.</p>
                 )}
+                <CampaignVariablesNotice variables={counts?.bannedVariables ?? []} />
                 {error ? (
                     <p className="text-sm text-destructive" role="alert">
                         {error}

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-import { campaignOptionIsActive, previewCampaignGroup, type CampaignGroupOption } from "../providers/campaignsClient";
+import { campaignOptionIsActive, type CampaignGroupOption } from "../providers/campaignsClient";
 
 interface CampaignGroupPickerDialogProps {
     readonly open: boolean;
@@ -33,12 +33,6 @@ function matchesQuery(group: CampaignGroupOption, query: string): boolean {
     return group.group_name.toLowerCase().includes(query) || group.group_key.toLowerCase().includes(query);
 }
 
-function formatMemberCount(count: number | null | undefined): string {
-    if (count === undefined) return "…";
-    if (count === null) return "—";
-    return `${count} member${count === 1 ? "" : "s"}`;
-}
-
 export function CampaignGroupPickerDialog({
     open,
     onOpenChange,
@@ -51,7 +45,6 @@ export function CampaignGroupPickerDialog({
 }: CampaignGroupPickerDialogProps) {
     const [search, setSearch] = useState("");
     const [visibleCount, setVisibleCount] = useState(CHUNK_SIZE);
-    const [counts, setCounts] = useState<ReadonlyMap<number, number | null>>(new Map());
     const scrollRef = useRef<HTMLDivElement | null>(null);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -69,7 +62,6 @@ export function CampaignGroupPickerDialog({
 
     const visibleRows = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
     const hasMore = visibleRows.length < filtered.length;
-    const countsPending = visibleRows.some((group) => !counts.has(group.id));
     const selectableFiltered = useMemo(
         () => filtered.filter((group) => campaignOptionIsActive(group.is_active)),
         [filtered]
@@ -100,32 +92,6 @@ export function CampaignGroupPickerDialog({
         };
     }, [filtered.length, hasMore]);
 
-    useEffect(() => {
-        let live = true;
-        const missing = visibleRows.filter((group) => !counts.has(group.id));
-        if (missing.length === 0) return undefined;
-        void Promise.all(
-            missing.map(async (group) => {
-                try {
-                    const preview = await previewCampaignGroup(group.id);
-                    return { id: group.id, count: preview.recipientCount + preview.suppressedCount };
-                } catch {
-                    return { id: group.id, count: null };
-                }
-            })
-        ).then((results) => {
-            if (!live) return;
-            setCounts((prev) => {
-                const next = new Map(prev);
-                for (const result of results) next.set(result.id, result.count);
-                return next;
-            });
-        });
-        return () => {
-            live = false;
-        };
-    }, [visibleRows, counts]);
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="flex max-h-[85vh] w-[95vw] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-[600px]">
@@ -155,7 +121,7 @@ export function CampaignGroupPickerDialog({
                         <p className="text-[11px] tabular-nums text-muted-foreground" role="status">
                             {filtered.length === 0
                                 ? "No groups found."
-                                : `${filtered.length} group${filtered.length === 1 ? "" : "s"}`}
+                                : `${filtered.length} group${filtered.length === 1 ? "" : "s"} shown`}
                         </p>
                         {pendingSelectAll.length > 0 ? (
                             <Button
@@ -189,7 +155,6 @@ export function CampaignGroupPickerDialog({
                             visibleRows.map((group) => {
                                 const checked = selectedIds.includes(group.id);
                                 const active = campaignOptionIsActive(group.is_active);
-                                const count = counts.get(group.id);
                                 return (
                                     <label
                                         className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-2 text-sm hover:bg-muted/60"
@@ -201,7 +166,7 @@ export function CampaignGroupPickerDialog({
                                                 {group.group_name}
                                             </span>
                                             <span className="block truncate font-mono text-[11px] text-muted-foreground" title={group.group_key}>
-                                                {group.group_key} · {formatMemberCount(count)}
+                                                {group.group_key}
                                             </span>
                                         </span>
                                         {!active ? (
@@ -215,15 +180,6 @@ export function CampaignGroupPickerDialog({
                         )}
                         {hasMore ? <div aria-hidden="true" className="h-1 shrink-0" ref={sentinelRef} /> : null}
                     </div>
-                    {countsPending && visibleRows.length > 0 ? (
-                        <p
-                            className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground"
-                            role="status"
-                        >
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Updating counts…
-                        </p>
-                    ) : null}
                 </div>
                 <div className="flex shrink-0 flex-row items-center justify-between gap-2 border-t bg-muted/20 px-6 py-4">
                     <div className="flex min-w-0 items-center gap-2">

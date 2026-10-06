@@ -14,7 +14,7 @@ import {
     MEMBERS_PAGE_MAX_LIMIT,
     type AddMemberInput,
 } from "@/modules/human-resource-management/mailing-studio/studio-groups/server/groupService";
-import { msGroupMemberCreateBodySchema } from "@/modules/human-resource-management/mailing-studio/studio-groups/types";
+import { MEMBER_SORT_VALUES, msGroupMemberCreateBodySchema } from "@/modules/human-resource-management/mailing-studio/studio-groups/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +33,7 @@ const membersQuerySchema = z
     .object({
         page: z.coerce.number().int().min(1).max(10000).optional().default(1),
         limit: z.coerce.number().int().min(1).max(MEMBERS_PAGE_MAX_LIMIT).optional().default(MEMBERS_PAGE_DEFAULT_LIMIT),
+        sort: z.enum(MEMBER_SORT_VALUES).optional().default("added-desc"),
     })
     .strict();
 
@@ -56,6 +57,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const parsed = membersQuerySchema.safeParse({
         page: req.nextUrl.searchParams.get("page") ?? undefined,
         limit: req.nextUrl.searchParams.get("limit") ?? undefined,
+        sort: req.nextUrl.searchParams.get("sort") ?? undefined,
     });
     if (!parsed.success) {
         return validationFailed(parsed.error.flatten().fieldErrors);
@@ -64,6 +66,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         const result = await listMembersPage(id, {
             page: parsed.data.page ?? 1,
             limit: parsed.data.limit ?? MEMBERS_PAGE_DEFAULT_LIMIT,
+            sort: parsed.data.sort,
         });
         return NextResponse.json({ success: true, data: result });
     } catch (error) {

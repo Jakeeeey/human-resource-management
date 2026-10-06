@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { MsCampaignCreateBody, MsCampaignRow, MsCampaignUpdateBody } from "../types";
+import type { CampaignStatus, MsCampaignCreateBody, MsCampaignRow, MsCampaignUpdateBody } from "../types";
 import {
+    CAMPAIGNS_PAGE_SIZE,
     cancelCampaign,
     confirmCampaign,
     createCampaign,
@@ -18,8 +19,27 @@ import type {
     CampaignCancelData,
     CampaignConfirmCounts,
     CampaignExpandData,
+    CampaignSort,
     CampaignTestSendData,
 } from "../providers/campaignsClient";
+
+export type CampaignStatusFilter = CampaignStatus | "all";
+
+export interface CampaignsQuery {
+    page: number;
+    limit: number;
+    status: CampaignStatusFilter;
+    search: string;
+    sort: CampaignSort;
+}
+
+const DEFAULT_QUERY: CampaignsQuery = {
+    page: 1,
+    limit: CAMPAIGNS_PAGE_SIZE,
+    status: "all",
+    search: "",
+    sort: "created-desc",
+};
 
 export interface CampaignConfirmState {
     id: number;
@@ -49,6 +69,9 @@ export interface CampaignScheduleState {
 
 export interface UseCampaignsResult {
     data: MsCampaignRow[] | null;
+    total: number;
+    query: CampaignsQuery;
+    setQuery: (patch: Partial<CampaignsQuery>) => void;
     isLoading: boolean;
     error: string | null;
     refresh: () => Promise<void>;
@@ -61,6 +84,7 @@ export interface UseCampaignsResult {
     cancelState: CampaignCancelState | null;
     scheduleState: CampaignScheduleState | null;
     clearOutcome: () => void;
+    dismissNotice: () => void;
     createItem: (input: MsCampaignCreateBody) => Promise<MsCampaignRow | null>;
     updateItem: (id: number, patch: MsCampaignUpdateBody) => Promise<MsCampaignRow | null>;
     removeItem: (id: number) => Promise<boolean>;
@@ -77,6 +101,8 @@ function toMessage(cause: unknown): string {
 
 export function useCampaigns(): UseCampaignsResult {
     const [data, setData] = useState<MsCampaignRow[] | null>(null);
+    const [total, setTotal] = useState(0);
+    const [query, setQueryState] = useState<CampaignsQuery>(DEFAULT_QUERY);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -87,18 +113,54 @@ export function useCampaigns(): UseCampaignsResult {
     const [testState, setTestState] = useState<CampaignTestState | null>(null);
     const [cancelState, setCancelState] = useState<CampaignCancelState | null>(null);
     const [scheduleState, setScheduleState] = useState<CampaignScheduleState | null>(null);
+    const requestSeq = useRef(0);
+
+    const setQuery = useCallback((patch: Partial<CampaignsQuery>): void => {
+        setQueryState((prev) => {
+            const next: CampaignsQuery = { ...prev, ...patch };
+            if (
+                patch.page === undefined &&
+                (patch.status !== undefined || patch.search !== undefined || patch.sort !== undefined || patch.limit !== undefined)
+            ) {
+                next.page = 1;
+            }
+            if (
+                next.page === prev.page &&
+                next.limit === prev.limit &&
+                next.status === prev.status &&
+                next.search === prev.search &&
+                next.sort === prev.sort
+            ) {
+                return prev;
+            }
+            return next;
+        });
+    }, []);
 
     const load = useCallback(async (loud: boolean): Promise<void> => {
+        const seq = requestSeq.current + 1;
+        requestSeq.current = seq;
         if (loud) setIsLoading(true);
         setError(null);
         try {
-            setData(await listCampaigns());
+            const search = query.search.trim();
+            const result = await listCampaigns({
+                page: query.page,
+                limit: query.limit,
+                sort: query.sort,
+                ...(query.status === "all" ? {} : { status: query.status }),
+                ...(search === "" ? {} : { search }),
+            });
+            if (requestSeq.current !== seq) return;
+            setData(result.rows);
+            setTotal(result.total);
         } catch (cause) {
+            if (requestSeq.current !== seq) return;
             setError(toMessage(cause));
         } finally {
-            if (loud) setIsLoading(false);
+            if (requestSeq.current === seq && loud) setIsLoading(false);
         }
-    }, []);
+    }, [query]);
 
     useEffect(() => {
         void load(true);
@@ -116,6 +178,10 @@ export function useCampaigns(): UseCampaignsResult {
         setScheduleState(null);
         setNotice(null);
         setActionError(null);
+    }, []);
+
+    const dismissNotice = useCallback((): void => {
+        setNotice(null);
     }, []);
 
     const createItem = useCallback(async (input: MsCampaignCreateBody): Promise<MsCampaignRow | null> => {
@@ -263,6 +329,9 @@ export function useCampaigns(): UseCampaignsResult {
 
     return {
         data,
+        total,
+        query,
+        setQuery,
         isLoading,
         error,
         refresh,
@@ -275,6 +344,7 @@ export function useCampaigns(): UseCampaignsResult {
         cancelState,
         scheduleState,
         clearOutcome,
+        dismissNotice,
         createItem,
         updateItem,
         removeItem,

@@ -4,6 +4,7 @@ export interface CampaignConfirmCounts {
     recipientCount: number;
     suppressedCount: number;
     duplicateCount: number;
+    bannedVariables: string[];
 }
 
 export interface CampaignExpandData {
@@ -48,10 +49,54 @@ export interface CampaignGroupOption {
     is_active: boolean | number | string | null;
 }
 
-export interface CampaignGroupPreview {
-    recipientCount: number;
-    suppressedCount: number;
-    duplicateCount: number;
+export const CAMPAIGNS_PAGE_SIZE = 10;
+
+export const CAMPAIGN_SORT_VALUES = [
+    "created-desc",
+    "created-asc",
+    "name-asc",
+    "name-desc",
+    "status-asc",
+    "status-desc",
+] as const;
+
+export type CampaignSort = (typeof CAMPAIGN_SORT_VALUES)[number];
+
+export interface CampaignListQuery {
+    page: number;
+    limit: number;
+    sort: CampaignSort;
+    status?: string;
+    search?: string;
+}
+
+export interface CampaignListPage {
+    rows: MsCampaignRow[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface CampaignDeliveryRow {
+    id: string | number;
+    to_email: string;
+    status: string;
+    attempts: number;
+    error: string | null;
+    published_at: string | null;
+    sent_at: string | null;
+}
+
+export interface CampaignDeliveriesPage {
+    rows: CampaignDeliveryRow[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface CampaignDeliveriesQuery {
+    page: number;
+    limit: number;
 }
 
 export class CampaignApiError extends Error {
@@ -157,15 +202,33 @@ export function extractBannedVariables(warnings: string[]): string[] {
     return names;
 }
 
-export async function listCampaigns(status?: string): Promise<MsCampaignRow[]> {
-    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-    const data = await request<MsCampaignRow[]>(qs);
-    return data ?? [];
+export async function listCampaigns(query: CampaignListQuery): Promise<CampaignListPage> {
+    const params = new URLSearchParams();
+    params.set("page", String(query.page));
+    params.set("limit", String(query.limit));
+    params.set("sort", query.sort);
+    if (query.status) params.set("status", query.status);
+    if (query.search) params.set("search", query.search);
+    const data = await request<CampaignListPage>(`?${params.toString()}`);
+    if (!data) throw new CampaignApiError("Campaign list returned no data.", 500);
+    return data;
 }
 
 export async function getCampaign(id: number): Promise<MsCampaignRow> {
     const data = await request<MsCampaignRow>(`/${id}`);
     if (!data) throw new CampaignApiError("Campaign was not found.", 404);
+    return data;
+}
+
+export async function listCampaignDeliveries(
+    id: number,
+    query: CampaignDeliveriesQuery
+): Promise<CampaignDeliveriesPage> {
+    const params = new URLSearchParams();
+    params.set("page", String(query.page));
+    params.set("limit", String(query.limit));
+    const data = await request<CampaignDeliveriesPage>(`/${id}/deliveries?${params.toString()}`);
+    if (!data) throw new CampaignApiError("Deliveries returned no data.", 500);
     return data;
 }
 
@@ -236,10 +299,4 @@ export async function listCampaignTemplates(): Promise<CampaignTemplateOption[]>
 export async function listCampaignGroups(): Promise<CampaignGroupOption[]> {
     const data = await getJson<CampaignGroupOption[]>(GROUPS_BASE);
     return data ?? [];
-}
-
-export async function previewCampaignGroup(groupId: number): Promise<CampaignGroupPreview> {
-    const data = await getJson<CampaignGroupPreview>(`${GROUPS_BASE}/${encodeURIComponent(String(groupId))}/preview`);
-    if (!data) throw new CampaignApiError("Group preview returned no data.", 500);
-    return data;
 }

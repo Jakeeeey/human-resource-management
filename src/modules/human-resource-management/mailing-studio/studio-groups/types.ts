@@ -37,6 +37,17 @@ export interface MsGroupMemberRow {
     updated_by: string | null;
 }
 
+export const MEMBER_SORT_VALUES = [
+    "added-desc",
+    "added-asc",
+    "email-asc",
+    "email-desc",
+    "source-asc",
+    "source-desc",
+] as const;
+
+export type MemberSort = (typeof MEMBER_SORT_VALUES)[number];
+
 const groupKeyShapeSchema = z
     .string()
     .trim()

@@ -166,23 +166,67 @@ export async function listDueBulkRows(limit: number = MS_BULK_DRAIN_BATCH_SIZE):
     return rows;
 }
 
-async function tryClaimBulkRow(id: string | number, expectedAttempts: number): Promise<boolean> {
+const MS_BULK_CLAIM_LEASE_MS = 15 * 60 * 1000;
+
+function claimLeaseExpired(claimedAt: string): boolean {
+    const normalized = claimedAt.trim().replace(" ", "T");
+    const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}+08:00`;
+    const parsed = Date.parse(zoned);
+    if (Number.isNaN(parsed)) return false;
+    return Date.now() - parsed > MS_BULK_CLAIM_LEASE_MS;
+}
+
+async function postClaim(id: string | number, attempt: number): Promise<boolean> {
     try {
         const res = (await dFetch(CLAIMS_COLLECTION, {
             method: "POST",
             body: JSON.stringify({
                 outbox_id: id,
-                attempt: expectedAttempts + 1,
+                attempt,
                 claimed_at: getPhilippineTime(),
             }),
         })) as { data?: unknown; errors?: unknown };
-        if (isRecord(res) && !("errors" in res) && "data" in res) return true;
-        msLogRedacted("[bulk-drain] claim lost (row left due):", res);
-        return false;
+        return isRecord(res) && !("errors" in res) && "data" in res;
     } catch (error) {
-        msLogRedacted("[bulk-drain] claim failed (row left due):", error);
+        msLogRedacted("[bulk-drain] claim request failed (row left due):", error);
         return false;
     }
+}
+
+async function releaseStaleClaim(id: string | number, attempt: number): Promise<boolean> {
+    const rows = await readDataArray(
+        `${CLAIMS_COLLECTION}?filter[outbox_id][_eq]=${encodeURIComponent(String(id))}` +
+            `&filter[attempt][_eq]=${attempt}&fields=id,claimed_at&limit=1`
+    );
+    if (rows === null) return false;
+    if (rows.length === 0) return true;
+    const row = rows[0];
+    const claimedAt = row.claimed_at;
+    if (typeof claimedAt !== "string" || !claimLeaseExpired(claimedAt)) return false;
+    const claimId = row.id;
+    if (typeof claimId !== "string" && typeof claimId !== "number") return false;
+    try {
+        await dFetch(`${CLAIMS_COLLECTION}/${encodeURIComponent(String(claimId))}`, { method: "DELETE" });
+        return true;
+    } catch (error) {
+        msLogRedacted("[bulk-drain] stale claim release failed:", error);
+        return false;
+    }
+}
+
+async function tryClaimBulkRow(id: string | number, expectedAttempts: number): Promise<boolean> {
+    const attempt = expectedAttempts + 1;
+    if (await postClaim(id, attempt)) return true;
+    if (!(await releaseStaleClaim(id, attempt))) {
+        msLogRedacted("[bulk-drain] claim lost (row left due):", { id, attempt });
+        return false;
+    }
+    if (await postClaim(id, attempt)) {
+        msLogRedacted("[bulk-drain] stale claim recovered:", { id, attempt });
+        return true;
+    }
+    msLogRedacted("[bulk-drain] claim lost after stale release (row left due):", { id, attempt });
+    return false;
 }
 
 async function patchOutboxRow(id: string | number, patch: Record<string, unknown>): Promise<void> {

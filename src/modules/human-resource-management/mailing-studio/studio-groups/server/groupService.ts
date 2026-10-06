@@ -5,6 +5,7 @@ import { resolveEmployeeEmail } from "./emailResolution";
 import { collectAllCustomerCandidates, collectAllEmployeeCandidates, readCompanyDomains } from "./memberDirectory";
 import type {
     GroupSourceKind,
+    MemberSort,
     MsGroupCreateBody,
     MsGroupMemberRow,
     MsGroupRow,
@@ -76,21 +77,15 @@ export interface ResyncResult {
     missing: number;
 }
 
-export interface GroupPreview {
-    recipientCount: number;
-    suppressedCount: number;
-    duplicateCount: number;
-}
-
 const GROUPS = "/items/ms_groups";
 const MEMBERS = "/items/ms_group_members";
-const SUPPRESSIONS = "/items/ms_suppressions";
 const CUSTOMER = "/items/customer";
 const USER = "/items/user";
 const GROUP_FIELDS = "id,group_key,group_name,description,is_active,created_at,created_by,updated_at,updated_by";
 const MEMBER_FIELDS = "id,group_id,email,source_kind,source_ref,is_active,created_at,created_by,updated_at,updated_by";
-const RESYNC_CHUNK = 200;
 const INSERT_BATCH_SIZE = 200;
+const DELETE_BATCH_SIZE = 200;
+export const BULK_DELETE_MAX_IDS = 5000;
 
 export function normalizeEmail(value: string): string {
     return value.trim().toLowerCase();
@@ -115,10 +110,6 @@ function throwIfDirectusErrors(body: unknown, context: string): void {
     }
 }
 
-function isActiveRow(row: { is_active: boolean | number }): boolean {
-    return row.is_active === true || row.is_active === 1;
-}
-
 async function readGroupRow(id: number): Promise<MsGroupRow | null> {
     const body = await dFetch(`${GROUPS}?filter[id][_eq]=${id}&fields=${GROUP_FIELDS}&limit=1`);
     const rows = unwrapStudioGroupsData<MsGroupRow[]>(body);
@@ -131,6 +122,17 @@ async function readMemberRows(groupId: number): Promise<MsGroupMemberRow[]> {
     );
     const rows = unwrapStudioGroupsData<MsGroupMemberRow[]>(body);
     return Array.isArray(rows) ? rows : [];
+}
+
+async function readMemberIds(groupId: number): Promise<number[]> {
+    const body = await dFetch(`${MEMBERS}?filter[group_id][_eq]=${groupId}&fields=id&limit=-1`);
+    const rows = unwrapStudioGroupsData<Array<{ id?: unknown }>>(body);
+    if (!Array.isArray(rows)) return [];
+    const ids: number[] = [];
+    for (const row of rows) {
+        if (typeof row.id === "number" && Number.isInteger(row.id)) ids.push(row.id);
+    }
+    return ids;
 }
 
 function pickEmail(value: unknown): string | null {
@@ -256,9 +258,19 @@ export const MEMBERS_PAGE_MAX_LIMIT = 100;
 
 const MEMBER_CHECK_MAX_EACH = 100;
 
+const MEMBER_SORT_MAP: Record<MemberSort, string> = {
+    "added-desc": "-created_at,-id",
+    "added-asc": "created_at,id",
+    "email-asc": "email",
+    "email-desc": "-email",
+    "source-asc": "source_kind",
+    "source-desc": "-source_kind",
+};
+
 export interface MembersPageInput {
     page: number;
     limit: number;
+    sort: MemberSort;
 }
 
 export interface MembersPage {
@@ -298,8 +310,9 @@ export async function listMembersPage(groupId: number, input: MembersPageInput):
         Number.isInteger(input.limit) && input.limit > 0
             ? Math.min(input.limit, MEMBERS_PAGE_MAX_LIMIT)
             : MEMBERS_PAGE_DEFAULT_LIMIT;
+    const sort = MEMBER_SORT_MAP[input.sort] ?? MEMBER_SORT_MAP["added-desc"];
     const body = await dFetch(
-        `${MEMBERS}?filter[group_id][_eq]=${groupId}&fields=${MEMBER_FIELDS}&sort=-id&limit=${limit}&page=${page}&meta=total_count,filter_count`
+        `${MEMBERS}?filter[group_id][_eq]=${groupId}&fields=${MEMBER_FIELDS}&sort=${encodeURIComponent(sort)}&limit=${limit}&page=${page}&meta=total_count,filter_count`
     );
     const rows = unwrapStudioGroupsData<MsGroupMemberRow[]>(body);
     const list = Array.isArray(rows) ? rows : [];
@@ -519,6 +532,83 @@ export async function removeMember(groupId: number, memberId: number): Promise<v
     await dFetch(`${MEMBERS}/${memberId}`, { method: "DELETE" });
 }
 
+export interface RemoveMembersResult {
+    removed: number[];
+    notFound: number[];
+}
+
+export interface MemberFilterInput {
+    search: string;
+}
+
+async function deleteExplicitMemberIds(groupId: number, memberIds: number[]): Promise<RemoveMembersResult> {
+    const seen = new Set<number>();
+    const requested: number[] = [];
+    for (const value of memberIds) {
+        if (!Number.isInteger(value) || value <= 0 || seen.has(value)) continue;
+        seen.add(value);
+        requested.push(value);
+    }
+    const existing = new Set(await readMemberIds(groupId));
+    const removable = requested.filter((id) => existing.has(id));
+    const notFound = requested.filter((id) => !existing.has(id));
+    const removed: number[] = [];
+    for (let offset = 0; offset < removable.length; offset += DELETE_BATCH_SIZE) {
+        const batch = removable.slice(offset, offset + DELETE_BATCH_SIZE);
+        const body = await dFetch(MEMBERS, { method: "DELETE", body: JSON.stringify(batch) });
+        throwIfDirectusErrors(body, "Failed to remove group members");
+        removed.push(...batch);
+    }
+    return { removed, notFound };
+}
+
+async function resolveMemberIdsByFilter(groupId: number, filter: MemberFilterInput): Promise<number[]> {
+    const search = filter.search.trim();
+    const searchClause = search === "" ? "" : `&filter[email][_icontains]=${encodeURIComponent(search)}`;
+    const body = await dFetch(
+        `${MEMBERS}?filter[group_id][_eq]=${groupId}${searchClause}&fields=id&sort=id&limit=${BULK_DELETE_MAX_IDS + 1}`
+    );
+    const rows = unwrapStudioGroupsData<Array<{ id?: unknown }>>(body);
+    if (!Array.isArray(rows)) return [];
+    const ids: number[] = [];
+    for (const row of rows) {
+        if (typeof row.id === "number" && Number.isInteger(row.id)) ids.push(row.id);
+    }
+    return ids;
+}
+
+export async function removeMembers(groupId: number, memberIds: number[]): Promise<RemoveMembersResult> {
+    const group = await readGroupRow(groupId);
+    if (!group) {
+        throw new GroupNotFoundError("Group not found");
+    }
+    const hasPositive = memberIds.some((value) => Number.isInteger(value) && value > 0);
+    if (!hasPositive) {
+        throw new GroupValidationError("At least one member id is required");
+    }
+    return deleteExplicitMemberIds(groupId, memberIds);
+}
+
+export async function removeMembersByFilter(
+    groupId: number,
+    filter: MemberFilterInput
+): Promise<RemoveMembersResult> {
+    const group = await readGroupRow(groupId);
+    if (!group) {
+        throw new GroupNotFoundError("Group not found");
+    }
+    const ids = await resolveMemberIdsByFilter(groupId, filter);
+    if (ids.length > BULK_DELETE_MAX_IDS) {
+        throw new GroupValidationError(
+            `Matching set too large (${ids.length}). Bulk delete accepts at most ${BULK_DELETE_MAX_IDS} per run — narrow the filter.`
+        );
+    }
+    if (ids.length === 0) {
+        return { removed: [], notFound: [] };
+    }
+    return deleteExplicitMemberIds(groupId, ids);
+}
+
 export async function setMemberActive(
     groupId: number,
     memberId: number,
@@ -595,28 +685,4 @@ export async function resyncGroup(groupId: number, actor: string | null): Promis
         }
     }
     return { updated, unchanged, missing };
-}
-
-export async function previewGroup(groupId: number): Promise<GroupPreview> {
-    const group = await readGroupRow(groupId);
-    if (!group) {
-        throw new GroupNotFoundError("Group not found");
-    }
-    const members = await readMemberRows(groupId);
-    const active = members.filter((row) => isActiveRow(row));
-    const distinct = Array.from(
-        new Set(active.map((row) => normalizeEmail(row.email)).filter((email) => email !== ""))
-    );
-    const duplicateCount = active.length - distinct.length;
-    let suppressedCount = 0;
-    for (let offset = 0; offset < distinct.length; offset += RESYNC_CHUNK) {
-        const chunk = distinct.slice(offset, offset + RESYNC_CHUNK);
-        const filter = chunk.map((email) => encodeURIComponent(email)).join(",");
-        const body = await dFetch(`${SUPPRESSIONS}?filter[email][_in]=${filter}&fields=email&limit=-1`);
-        const rows = unwrapStudioGroupsData<Array<{ email?: unknown }>>(body);
-        if (Array.isArray(rows)) {
-            suppressedCount += rows.length;
-        }
-    }
-    return { recipientCount: distinct.length - suppressedCount, suppressedCount, duplicateCount };
 }

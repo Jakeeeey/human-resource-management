@@ -14,17 +14,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 
 import type { MsCampaignRow } from "../types";
 import { campaignOptionIsActive, type CampaignGroupOption, type CampaignTemplateOption } from "../providers/campaignsClient";
+import { useDialogFocusReturn } from "../hooks/useDialogFocusReturn";
 import { CampaignGroupPickerDialog } from "./CampaignGroupPickerDialog";
+import { MsCombobox } from "./MsCombobox";
 
 export interface CampaignFormValues {
     campaign_key: string;
@@ -54,6 +49,15 @@ function coerceGroupIds(value: unknown): number[] {
     return ids;
 }
 
+function slugify(value: string): string {
+    return value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 64);
+}
+
 export function CampaignFormDialog({
     open,
     onOpenChange,
@@ -72,7 +76,13 @@ export function CampaignFormDialog({
     );
     const [selectedGroups, setSelectedGroups] = useState<number[]>(() => coerceGroupIds(initial?.group_ids));
     const [pickerOpen, setPickerOpen] = useState(false);
-    const [formError, setFormError] = useState<string | null>(null);
+    const [formErrors, setFormErrors] = useState<string[]>([]);
+    const [keyTouched, setKeyTouched] = useState(mode === "edit" || (initial?.campaign_key ?? "") !== "");
+    const focusReturn = useDialogFocusReturn();
+
+    const templateOptions = templates
+        .filter((row) => campaignOptionIsActive(row.is_active))
+        .map((row) => ({ value: String(row.id), label: row.template_name }));
 
     const toggleGroup = (id: number): void => {
         setSelectedGroups((prev) => (prev.includes(id) ? prev.filter((entry) => entry !== id) : [...prev, id]));
@@ -82,37 +92,56 @@ export function CampaignFormDialog({
         setSelectedGroups((prev) => [...prev, ...ids.filter((id) => !prev.includes(id))]);
     };
 
+    const handleNameChange = (next: string): void => {
+        setCampaignName(next);
+        if (mode === "create" && !keyTouched) {
+            setCampaignKey(slugify(next));
+        }
+    };
+
     const handleSubmit = async (): Promise<void> => {
-        setFormError(null);
+        const errors: string[] = [];
+        let firstInvalid: string | null = null;
         const name = campaignName.trim();
+        const key = campaignKey.trim();
         if (name === "") {
-            setFormError("Campaign name is required.");
-            return;
+            errors.push("Campaign name is required.");
+            firstInvalid ??= "campaign-name";
         }
-        if (mode === "create" && campaignKey.trim() === "") {
-            setFormError("Campaign key is required.");
-            return;
+        if (mode === "create" && key === "") {
+            errors.push("Campaign key is required.");
+            firstInvalid ??= "campaign-key";
         }
+        let templateIdNumber: number | null = null;
         if (templateId === "") {
-            setFormError("Pick a template — a campaign cannot be queued without one.");
-            return;
-        }
-        const templateIdNumber = Number(templateId);
-        if (!Number.isInteger(templateIdNumber) || templateIdNumber <= 0) {
-            setFormError("Pick a template — a campaign cannot be queued without one.");
-            return;
-        }
-        const template = templates.find((row) => row.id === templateIdNumber) ?? null;
-        if (!template || !campaignOptionIsActive(template.is_active)) {
-            setFormError("Pick an active template — inactive templates cannot be queued.");
-            return;
+            errors.push("Pick a template — a campaign cannot be queued without one.");
+            firstInvalid ??= "campaign-template";
+        } else {
+            templateIdNumber = Number(templateId);
+            if (!Number.isInteger(templateIdNumber) || templateIdNumber <= 0) {
+                errors.push("Pick a template — a campaign cannot be queued without one.");
+                firstInvalid ??= "campaign-template";
+                templateIdNumber = null;
+            } else {
+                const template = templates.find((row) => row.id === templateIdNumber) ?? null;
+                if (!template || !campaignOptionIsActive(template.is_active)) {
+                    errors.push("Pick an active template — inactive templates cannot be queued.");
+                    firstInvalid ??= "campaign-template";
+                }
+            }
         }
         if (selectedGroups.length === 0) {
-            setFormError("Pick at least one group — a campaign with no audience cannot be queued.");
+            errors.push("Pick at least one group — a campaign with no audience cannot be queued.");
+            firstInvalid ??= "campaign-groups";
+        }
+        if (errors.length > 0) {
+            setFormErrors(errors);
+            if (firstInvalid !== null) document.getElementById(firstInvalid)?.focus();
             return;
         }
+        setFormErrors([]);
         const ok = await onSubmit({
-            campaign_key: campaignKey.trim(),
+            campaign_key: key,
             campaign_name: name,
             template_id: templateIdNumber,
             group_ids: [...selectedGroups],
@@ -123,7 +152,11 @@ export function CampaignFormDialog({
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="flex max-h-[85vh] w-[95vw] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-[560px]">
+                <DialogContent
+                    className="flex max-h-[85vh] w-[95vw] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-[560px]"
+                    onCloseAutoFocus={focusReturn.onCloseAutoFocus}
+                    onOpenAutoFocus={focusReturn.onOpenAutoFocus}
+                >
                     <DialogHeader className="px-6 pt-6 text-left">
                         <DialogTitle>{mode === "create" ? "New campaign" : "Edit draft"}</DialogTitle>
                         <DialogDescription>
@@ -143,12 +176,12 @@ export function CampaignFormDialog({
                                 id="campaign-name"
                                 placeholder="October payslip blast"
                                 value={campaignName}
-                                onChange={(event) => setCampaignName(event.target.value)}
+                                onChange={(event) => handleNameChange(event.target.value)}
                             />
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <Label className="text-xs font-medium text-muted-foreground" htmlFor="campaign-key">
-                                Campaign key <span className="text-destructive">*</span>
+                                Campaign key {mode === "create" ? <span className="text-destructive">*</span> : null}
                             </Label>
                             <Input
                                 className="h-9 font-mono text-sm"
@@ -156,7 +189,10 @@ export function CampaignFormDialog({
                                 id="campaign-key"
                                 placeholder="oct-payslip-2026"
                                 value={campaignKey}
-                                onChange={(event) => setCampaignKey(event.target.value)}
+                                onChange={(event) => {
+                                    setKeyTouched(true);
+                                    setCampaignKey(event.target.value);
+                                }}
                             />
                             {mode === "edit" ? (
                                 <p className="text-[11px] leading-snug text-muted-foreground">
@@ -168,20 +204,17 @@ export function CampaignFormDialog({
                             <Label className="text-xs font-medium text-muted-foreground" htmlFor="campaign-template">
                                 Template <span className="text-destructive">*</span>
                             </Label>
-                            <Select disabled={busy || lookupsLoading} value={templateId} onValueChange={setTemplateId}>
-                                <SelectTrigger className="h-9 text-sm" id="campaign-template">
-                                    <SelectValue placeholder={lookupsLoading ? "Loading templates…" : "Pick an active template"} />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-60">
-                                    {templates
-                                        .filter((row) => campaignOptionIsActive(row.is_active))
-                                        .map((row) => (
-                                            <SelectItem key={row.id} value={String(row.id)}>
-                                                {row.template_name}
-                                            </SelectItem>
-                                        ))}
-                                </SelectContent>
-                            </Select>
+                            <MsCombobox
+                                ariaLabel="Template"
+                                disabled={busy || lookupsLoading}
+                                emptyText="No active templates found."
+                                id="campaign-template"
+                                options={templateOptions}
+                                placeholder={lookupsLoading ? "Loading templates…" : "Pick an active template"}
+                                searchPlaceholder="Search templates…"
+                                value={templateId}
+                                onValueChange={setTemplateId}
+                            />
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <div className="flex items-center justify-between gap-2">
@@ -189,12 +222,13 @@ export function CampaignFormDialog({
                                     Audience groups <span className="text-destructive">*</span>
                                 </Label>
                                 <span className="text-[11px] tabular-nums text-muted-foreground" role="status">
-                                    {selectedGroups.length} of {groups.length} selected
+                                    {selectedGroups.length} of {groups.length} groups selected
                                 </span>
                             </div>
                             <Button
                                 className="min-h-11 justify-start gap-2 md:min-h-0"
                                 disabled={busy || lookupsLoading}
+                                id="campaign-groups"
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setPickerOpen(true)}
@@ -250,10 +284,14 @@ export function CampaignFormDialog({
                                 </button>
                             ) : null}
                         </div>
-                        {formError ? (
-                            <p className="text-sm text-destructive" role="alert">
-                                {formError}
-                            </p>
+                        {formErrors.length > 0 ? (
+                            <div className="flex flex-col gap-1" role="alert">
+                                {formErrors.map((message) => (
+                                    <p className="text-sm text-destructive" key={message}>
+                                        {message}
+                                    </p>
+                                ))}
+                            </div>
                         ) : null}
                     </div>
                     <DialogFooter className="flex-row justify-end gap-2 border-t bg-muted/20 px-6 py-4">

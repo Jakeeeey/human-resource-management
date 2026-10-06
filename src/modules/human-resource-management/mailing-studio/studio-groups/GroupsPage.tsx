@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Eye, Loader2, MoreVertical, RefreshCw, RotateCw, SearchX, Trash2, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Loader2, MoreVertical, RefreshCw, RotateCw, SearchX, Trash2, UserPlus, Users, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -21,26 +22,34 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 import { GroupDialog } from "./components/GroupDialog";
 import { MemberDialog } from "./components/MemberDialog";
 import { MsConfirmDialog } from "./components/MsConfirmDialog";
+import { MsNotice, MS_NOTICE_AUTO_DISMISS_MS } from "./components/MsNotice";
 import { MsPager } from "./components/MsPager";
 import { useMsGroupMembers } from "./hooks/useMsGroupMembers";
 import { useMsPagination } from "./hooks/useMsPagination";
 import { useMsGroupsContext } from "./providers/MsGroupsProvider";
 import {
+    bulkRemoveMsGroupMembers,
     deleteMsGroup,
     fetchMsGroupMembers,
-    previewMsGroup,
     removeMsGroupMember,
     resyncMsGroup,
     type MsAddGroupMembersResult,
-    type MsGroupPreview,
     type MsGroupResyncResult,
 } from "./providers/msGroupsClient";
 import { GROUP_SOURCE_KIND_LABELS } from "./types";
-import type { MsGroupMemberRow, MsGroupRow } from "./types";
+import type { MemberSort, MsGroupMemberRow, MsGroupRow } from "./types";
 import { formatPHT } from "./utils/time";
 
 type GroupStatusFilter = "all" | "active" | "inactive";
@@ -78,6 +87,71 @@ function statusTone(active: boolean): string {
     return "border-border bg-muted text-muted-foreground";
 }
 
+function descriptionRestatesName(name: string, description: string | null): boolean {
+    if (description === null) return false;
+    const words = (value: string): string[] =>
+        value
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .filter((word) => word !== "");
+    const nameWords = new Set(words(name));
+    if (nameWords.size === 0) return false;
+    const ignored = new Set(["all", "the", "a", "an"]);
+    const descriptionWords = words(description).filter((word) => !ignored.has(word));
+    return descriptionWords.length > 0 && descriptionWords.every((word) => nameWords.has(word));
+}
+
+type MemberSortColumn = "email" | "source" | "added";
+
+function memberColumnDirection(column: MemberSortColumn, sort: MemberSort): "asc" | "desc" | null {
+    if (column === "email") return sort === "email-asc" ? "asc" : sort === "email-desc" ? "desc" : null;
+    if (column === "source") return sort === "source-asc" ? "asc" : sort === "source-desc" ? "desc" : null;
+    return sort === "added-asc" ? "asc" : sort === "added-desc" ? "desc" : null;
+}
+
+function memberSortValueFor(column: MemberSortColumn, direction: "asc" | "desc"): MemberSort {
+    if (column === "email") return direction === "asc" ? "email-asc" : "email-desc";
+    if (column === "source") return direction === "asc" ? "source-asc" : "source-desc";
+    return direction === "asc" ? "added-asc" : "added-desc";
+}
+
+function SortIndicator({ direction }: { readonly direction: "asc" | "desc" | null }) {
+    if (direction === "asc") return <ArrowUp aria-hidden="true" className="h-3 w-3" />;
+    if (direction === "desc") return <ArrowDown aria-hidden="true" className="h-3 w-3" />;
+    return <ChevronsUpDown aria-hidden="true" className="h-3 w-3 opacity-50" />;
+}
+
+function SortableHead({
+    column,
+    label,
+    sort,
+    onSort,
+    className,
+}: {
+    readonly column: MemberSortColumn;
+    readonly label: string;
+    readonly sort: MemberSort;
+    readonly onSort: (column: MemberSortColumn) => void;
+    readonly className?: string;
+}) {
+    const direction = memberColumnDirection(column, sort);
+    return (
+        <TableHead
+            aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+            className={className}
+        >
+            <button
+                className="inline-flex items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+                type="button"
+                onClick={() => onSort(column)}
+            >
+                {label}
+                <SortIndicator direction={direction} />
+            </button>
+        </TableHead>
+    );
+}
+
 function GroupDetail({
     row,
     onBack,
@@ -91,6 +165,7 @@ function GroupDetail({
     readonly onDelete: (row: MsGroupRow) => void;
     readonly onChanged: () => void;
 }) {
+    const [memberSort, setMemberSort] = useState<MemberSort>("added-desc");
     const {
         data: members,
         total: memberTotal,
@@ -101,19 +176,35 @@ function GroupDetail({
         refresh,
         setPage: setMemberPage,
         resetPage: resetMemberPage,
-    } = useMsGroupMembers(row.id);
+    } = useMsGroupMembers(row.id, memberSort);
     const [addOpen, setAddOpen] = useState(false);
     const [removeTarget, setRemoveTarget] = useState<MsGroupMemberRow | null>(null);
     const [removeBusy, setRemoveBusy] = useState(false);
     const [memberNotice, setMemberNotice] = useState<GroupNotice | null>(null);
-    const [preview, setPreview] = useState<MsGroupPreview | null>(null);
-    const [previewBusy, setPreviewBusy] = useState(false);
-    const [previewError, setPreviewError] = useState<string | null>(null);
     const [resync, setResync] = useState<MsGroupResyncResult | null>(null);
     const [resyncBusy, setResyncBusy] = useState(false);
     const [resyncError, setResyncError] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(() => new Set());
+    const [selectAllMatching, setSelectAllMatching] = useState(false);
+    const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+    const [bulkDeleteBusy, setBulkDeleteBusy] = useState(false);
 
     const active = rowIsActive(row);
+    const pageRows = useMemo(() => members ?? [], [members]);
+    const pageSelectedCount = pageRows.filter((member) => selectedIds.has(member.id)).length;
+    const allPageSelected = pageRows.length > 0 && pageSelectedCount === pageRows.length;
+    const somePageSelected = pageSelectedCount > 0 && !allPageSelected;
+    const selectedCount = selectAllMatching ? memberTotal : selectedIds.size;
+    const showPageBanner = !selectAllMatching && allPageSelected;
+    const canEscalate = memberTotal > pageRows.length;
+
+    const dismissMemberNotice = useCallback(() => setMemberNotice(null), []);
+
+    useEffect(() => {
+        if (!resync) return;
+        const timer = window.setTimeout(() => setResync(null), MS_NOTICE_AUTO_DISMISS_MS);
+        return () => window.clearTimeout(timer);
+    }, [resync]);
 
     const handleMembersSaved = async (result: MsAddGroupMembersResult): Promise<void> => {
         const parts: string[] = [];
@@ -133,6 +224,11 @@ function GroupDetail({
         setRemoveBusy(true);
         try {
             await removeMsGroupMember(row.id, removeTarget.id);
+            setSelectedIds((current) => {
+                const next = new Set(current);
+                next.delete(removeTarget.id);
+                return next;
+            });
             setRemoveTarget(null);
             setMemberNotice({ tone: "info", text: `${removeTarget.email} removed from ${row.group_name}.` });
             await refresh();
@@ -145,15 +241,83 @@ function GroupDetail({
         }
     };
 
-    const handlePreview = async (): Promise<void> => {
-        setPreviewBusy(true);
-        setPreviewError(null);
+    const toggleMember = (memberId: number): void => {
+        const base = selectAllMatching ? new Set(pageRows.map((member) => member.id)) : new Set(selectedIds);
+        setSelectAllMatching(false);
+        if (base.has(memberId)) {
+            base.delete(memberId);
+        } else {
+            base.add(memberId);
+        }
+        setSelectedIds(base);
+    };
+
+    const toggleAllOnPage = (): void => {
+        if (selectAllMatching) {
+            setSelectAllMatching(false);
+            setSelectedIds(new Set());
+            return;
+        }
+        setSelectedIds((current) => {
+            const next = new Set(current);
+            const everySelected = pageRows.length > 0 && pageRows.every((member) => current.has(member.id));
+            for (const member of pageRows) {
+                if (everySelected) {
+                    next.delete(member.id);
+                } else {
+                    next.add(member.id);
+                }
+            }
+            return next;
+        });
+    };
+
+    const handleSelectAllMatching = (): void => setSelectAllMatching(true);
+
+    const handleReturnToPageSelection = (): void => {
+        setSelectAllMatching(false);
+        setSelectedIds(new Set(pageRows.map((member) => member.id)));
+    };
+
+    const clearSelection = (): void => {
+        setSelectAllMatching(false);
+        setSelectedIds(new Set());
+    };
+
+    const toggleMemberSort = (column: MemberSortColumn): void => {
+        const direction: "asc" | "desc" = memberColumnDirection(column, memberSort) === "asc" ? "desc" : "asc";
+        setMemberSort(memberSortValueFor(column, direction));
+        resetMemberPage();
+    };
+
+    const handleBulkDeleteConfirm = async (): Promise<void> => {
+        const escalate = selectAllMatching;
+        if (!escalate && selectedIds.size === 0) return;
+        setBulkDeleteBusy(true);
         try {
-            setPreview(await previewMsGroup(row.id));
+            const result = await bulkRemoveMsGroupMembers(
+                row.id,
+                escalate ? { filter: {} } : { memberIds: Array.from(selectedIds) }
+            );
+            setBulkDeleteOpen(false);
+            setSelectAllMatching(false);
+            setSelectedIds(new Set());
+            const removedCount = result.removed.length;
+            const notFoundCount = result.notFound.length;
+            const parts: string[] = [];
+            if (removedCount > 0) parts.push(`${removedCount} member${removedCount === 1 ? "" : "s"} removed`);
+            if (notFoundCount > 0) parts.push(`${notFoundCount} already gone`);
+            setMemberNotice({
+                tone: "info",
+                text: parts.length > 0 ? `${parts.join(", ")}.` : "No members were removed.",
+            });
+            await refresh();
+            onChanged();
         } catch (cause) {
-            setPreviewError(cause instanceof Error ? cause.message : String(cause));
+            setMemberNotice({ tone: "error", text: cause instanceof Error ? cause.message : String(cause) });
+            setBulkDeleteOpen(false);
         } finally {
-            setPreviewBusy(false);
+            setBulkDeleteBusy(false);
         }
     };
 
@@ -182,15 +346,17 @@ function GroupDetail({
                         <h2 className="truncate text-lg font-semibold tracking-tight" title={row.group_name}>
                             {row.group_name}
                         </h2>
-                        {row.description ? (
+                        {row.description && !descriptionRestatesName(row.group_name, row.description) ? (
                             <p className="mt-1 line-clamp-2 text-sm text-muted-foreground" title={row.description}>
                                 {row.description}
                             </p>
                         ) : null}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <Badge className={statusTone(active)} variant="outline">
-                                {active ? "Active" : "Inactive"}
-                            </Badge>
+                            {active ? null : (
+                                <Badge className={statusTone(active)} variant="outline">
+                                    Inactive
+                                </Badge>
+                            )}
                             <span className="text-xs text-muted-foreground">Created {formatPHT(row.created_at)}</span>
                         </div>
                     </div>
@@ -215,17 +381,6 @@ function GroupDetail({
 
             <div className="flex flex-wrap items-center gap-2">
                 <Button
-                    aria-label="Preview delivery counts"
-                    className="min-h-11 md:min-h-0"
-                    disabled={previewBusy}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void handlePreview()}
-                >
-                    {previewBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                    Preview delivery
-                </Button>
-                <Button
                     aria-label="Re-sync members from source"
                     className="min-h-11 md:min-h-0"
                     disabled={resyncBusy}
@@ -242,36 +397,6 @@ function GroupDetail({
                 </Button>
             </div>
 
-            {previewError ? (
-                <div className="rounded-lg border border-destructive/40 bg-card p-4" data-testid="group-preview-error" role="alert">
-                    <p className="text-sm text-destructive">{previewError}</p>
-                </div>
-            ) : null}
-
-            {preview ? (
-                <div className="rounded-lg border bg-card p-4" data-testid="group-preview" role="status">
-                    <p className="text-sm font-medium">Delivery preview</p>
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                        <div className="rounded-md border bg-muted/40 p-3 text-center">
-                            <p className="text-xl font-semibold tabular-nums sm:text-2xl">{preview.recipientCount}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">Will receive mail</p>
-                        </div>
-                        <div className="rounded-md border bg-muted/40 p-3 text-center">
-                            <p className="text-xl font-semibold tabular-nums sm:text-2xl">{preview.suppressedCount}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">Suppressed</p>
-                        </div>
-                        <div className="rounded-md border bg-muted/40 p-3 text-center">
-                            <p className="text-xl font-semibold tabular-nums sm:text-2xl">{preview.duplicateCount}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">Duplicates</p>
-                        </div>
-                    </div>
-                    <p className="mt-2 text-xs leading-snug text-muted-foreground">
-                        Based on the active members in this group: duplicates collapse to a
-                        single address and suppressed addresses are held back, so the send list can be smaller than the member list.
-                    </p>
-                </div>
-            ) : null}
-
             {resyncError ? (
                 <div className="rounded-lg border border-destructive/40 bg-card p-4" data-testid="group-resync-error" role="alert">
                     <p className="text-sm text-destructive">{resyncError}</p>
@@ -279,29 +404,35 @@ function GroupDetail({
             ) : null}
 
             {resync ? (
-                <div className="rounded-lg border bg-card p-4" data-testid="group-resync-result" role="status">
-                    <p className="text-sm">
-                        Re-sync finished: {resync.updated} updated, {resync.unchanged} unchanged, {resync.missing} missing from source.
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                        Updated members picked up a changed source email; unchanged members already match; missing members point at a
-                        source record that no longer has an email.
-                    </p>
+                <div
+                    className="flex items-start justify-between gap-3 rounded-lg border bg-card p-4"
+                    data-testid="group-resync-result"
+                    role="status"
+                >
+                    <div>
+                        <p className="text-sm">
+                            Re-sync finished: {resync.updated} updated, {resync.unchanged} unchanged, {resync.missing} missing from source.
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Updated members picked up a changed source email; unchanged members already match; missing members point at a
+                            source record that no longer has an email.
+                        </p>
+                    </div>
+                    <Button
+                        aria-label="Dismiss re-sync result"
+                        className="h-6 w-6 shrink-0"
+                        size="icon"
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setResync(null)}
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </Button>
                 </div>
             ) : null}
 
             {memberNotice ? (
-                <div
-                    className={
-                        memberNotice.tone === "error"
-                            ? "rounded-lg border border-destructive/40 bg-card p-4"
-                            : "rounded-lg border bg-card p-4"
-                    }
-                    data-testid="group-member-notice"
-                    role={memberNotice.tone === "error" ? "alert" : "status"}
-                >
-                    <p className={memberNotice.tone === "error" ? "text-sm text-destructive" : "text-sm"}>{memberNotice.text}</p>
-                </div>
+                <MsNotice notice={memberNotice} testId="group-member-notice" onDismiss={dismissMemberNotice} />
             ) : null}
 
             <div className="flex items-center gap-2">
@@ -354,39 +485,149 @@ function GroupDetail({
             ) : null}
 
             {members && members.length > 0 ? (
-                <ul className="flex flex-col gap-2" data-testid="group-members-list">
-                    {members.map((member) => {
-                        const memberActive = rowIsActive(member);
-                        return (
-                            <li
-                                className="flex items-center gap-3 rounded-lg border bg-card p-3"
-                                data-testid="group-member-row"
-                                key={member.id}
+                <div className="flex flex-col gap-2" data-testid="group-members-toolbar">
+                    {selectedCount > 0 ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span
+                                className="rounded-full border bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
+                                data-testid="group-members-selected-count"
                             >
-                                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                    <span className="truncate text-sm font-medium" title={member.email}>
-                                        {member.email}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {memberActive ? "Active" : "Inactive"}
-                                    </span>
-                                </div>
-                                <Badge className="border-border bg-muted text-muted-foreground" variant="outline">
-                                    {sourceLabel(member.source_kind)}
-                                </Badge>
+                                {selectedCount} selected
+                            </span>
+                            <Button
+                                className="h-7 text-xs"
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                                onClick={clearSelection}
+                            >
+                                Clear selection
+                            </Button>
+                            <Button
+                                aria-label={`Delete ${selectedCount} selected members`}
+                                className="ms-auto min-h-11 bg-red-600 hover:bg-red-700 focus-visible:ring-red-600 md:min-h-0"
+                                size="sm"
+                                type="button"
+                                onClick={() => setBulkDeleteOpen(true)}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Delete selected ({selectedCount})
+                            </Button>
+                        </div>
+                    ) : null}
+                    {selectAllMatching ? (
+                        <div
+                            className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2"
+                            data-testid="group-members-select-all-banner"
+                            role="status"
+                        >
+                            <span className="text-xs">
+                                All {memberTotal} member{memberTotal === 1 ? "" : "s"} matching this filter are selected.
+                            </span>
+                            <Button
+                                className="h-7 text-xs"
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                                onClick={handleReturnToPageSelection}
+                            >
+                                Return to page selection
+                            </Button>
+                            <span className="text-[11px] text-muted-foreground">
+                                Scope is the whole group; the count is re-derived from the server on every page load.
+                            </span>
+                        </div>
+                    ) : showPageBanner ? (
+                        <div
+                            className="flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2"
+                            data-testid="group-members-page-banner"
+                            role="status"
+                        >
+                            <span className="text-xs">
+                                All {pageRows.length} on this page are selected.
+                            </span>
+                            {canEscalate ? (
                                 <Button
-                                    aria-label={`Remove ${member.email}`}
-                                    className="h-8 w-8 shrink-0"
-                                    size="icon"
-                                    variant="ghost"
-                                    onClick={() => setRemoveTarget(member)}
+                                    className="h-7 text-xs"
+                                    size="sm"
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={handleSelectAllMatching}
                                 >
-                                    <Trash2 className="h-4 w-4" />
+                                    Select all {memberTotal} matching this filter
                                 </Button>
-                            </li>
-                        );
-                    })}
-                </ul>
+                            ) : null}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+
+            {members && members.length > 0 ? (
+                <div
+                    className="overflow-hidden rounded-lg border bg-card [&_[data-slot=table-container]]:max-h-[70vh] [&_[data-slot=table-container]]:overflow-auto"
+                    data-testid="group-members-list"
+                >
+                    <Table className="table-fixed min-w-[48rem]">
+                        <TableHeader className="sticky top-0 z-10 bg-card">
+                            <TableRow>
+                                <TableHead className="w-10">
+                                    <Checkbox
+                                        aria-label="Select all members on this page"
+                                        checked={selectAllMatching ? true : allPageSelected ? true : somePageSelected ? "indeterminate" : false}
+                                        onCheckedChange={() => toggleAllOnPage()}
+                                    />
+                                </TableHead>
+                                <SortableHead column="email" label="Email" sort={memberSort} onSort={toggleMemberSort} />
+                                <SortableHead column="source" label="Source" sort={memberSort} onSort={toggleMemberSort} className="w-32" />
+                                <SortableHead column="added" label="Added" sort={memberSort} onSort={toggleMemberSort} className="w-36" />
+                                <TableHead className="w-12 text-right">
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {members.map((member) => {
+                                return (
+                                    <TableRow data-testid="group-member-row" key={member.id}>
+                                        <TableCell>
+                                            <Checkbox
+                                                aria-label={`Select ${member.email}`}
+                                                checked={selectAllMatching || selectedIds.has(member.id)}
+                                                onCheckedChange={() => toggleMember(member.id)}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="block truncate text-sm font-medium" title={member.email}>
+                                                {member.email}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge className="border-border bg-muted text-muted-foreground" variant="outline">
+                                                {sourceLabel(member.source_kind)}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                                                {formatPHT(member.created_at)}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                aria-label={`Remove ${member.email}`}
+                                                className="h-8 w-8"
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => setRemoveTarget(member)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
             ) : null}
             <MsPager page={memberPage} totalPages={memberTotalPages} onPage={setMemberPage} />
 
@@ -410,6 +651,30 @@ function GroupDetail({
                     if (!open) setRemoveTarget(null);
                 }}
             />
+            <MsConfirmDialog
+                busy={bulkDeleteBusy}
+                busyLabel="Removing…"
+                confirmLabel={`Remove ${selectedCount} member${selectedCount === 1 ? "" : "s"}`}
+                description={
+                    selectAllMatching
+                        ? `All ${memberTotal} members matching the current filter will be permanently removed from ${row.group_name}. This cannot be undone.`
+                        : selectedCount === 1
+                          ? `1 selected member will be permanently removed from ${row.group_name}. This cannot be undone.`
+                          : `${selectedCount} selected members will be permanently removed from ${row.group_name}. This cannot be undone.`
+                }
+                open={bulkDeleteOpen}
+                title={
+                    selectAllMatching
+                        ? `Remove all ${memberTotal} matching members?`
+                        : selectedCount === 1
+                          ? "Remove 1 member?"
+                          : `Remove ${selectedCount} members?`
+                }
+                onConfirm={() => void handleBulkDeleteConfirm()}
+                onOpenChange={(open) => {
+                    if (!open) setBulkDeleteOpen(false);
+                }}
+            />
         </div>
     );
 }
@@ -427,6 +692,8 @@ export function GroupsPage() {
     const [deleteBusy, setDeleteBusy] = useState(false);
     const [notice, setNotice] = useState<GroupNotice | null>(null);
     const [retrying, setRetrying] = useState(false);
+
+    const dismissNotice = useCallback(() => setNotice(null), []);
 
     useEffect(() => {
         if (!groups) return;
@@ -598,17 +865,7 @@ export function GroupsPage() {
                     </div>
 
                     {notice ? (
-                        <div
-                            className={
-                                notice.tone === "error"
-                                    ? "rounded-lg border border-destructive/40 bg-card p-4"
-                                    : "rounded-lg border bg-card p-4"
-                            }
-                            data-testid="groups-notice"
-                            role={notice.tone === "error" ? "alert" : "status"}
-                        >
-                            <p className={notice.tone === "error" ? "text-sm text-destructive" : "text-sm"}>{notice.text}</p>
-                        </div>
+                        <MsNotice notice={notice} testId="groups-notice" onDismiss={dismissNotice} />
                     ) : null}
 
                     {isLoading && !groups ? (

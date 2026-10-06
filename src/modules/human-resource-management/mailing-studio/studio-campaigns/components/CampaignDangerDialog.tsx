@@ -13,6 +13,8 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { useDialogFocusReturn } from "../hooks/useDialogFocusReturn";
+
 interface CampaignDangerDialogProps {
     readonly open: boolean;
     readonly onOpenChange: (open: boolean) => void;
@@ -34,9 +36,13 @@ export function CampaignDangerDialog({
     busyLabel,
     onConfirm,
 }: CampaignDangerDialogProps) {
+    const focusReturn = useDialogFocusReturn();
     return (
         <AlertDialog open={open} onOpenChange={onOpenChange}>
-            <AlertDialogContent>
+            <AlertDialogContent
+                onCloseAutoFocus={focusReturn.onCloseAutoFocus}
+                onOpenAutoFocus={focusReturn.onOpenAutoFocus}
+            >
                 <AlertDialogHeader>
                     <AlertDialogTitle>{title}</AlertDialogTitle>
                     <AlertDialogDescription>{description}</AlertDialogDescription>

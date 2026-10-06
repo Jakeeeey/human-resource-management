@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { fetchMsGroupMembers } from "../providers/msGroupsClient";
-import type { MsGroupMemberRow } from "../types";
+import type { MemberSort, MsGroupMemberRow } from "../types";
 import { useMsPagination } from "./useMsPagination";
 
 export const MS_GROUP_MEMBERS_PAGE_SIZE = 25;
@@ -20,7 +20,7 @@ export interface UseMsGroupMembersResult {
     resetPage: () => void;
 }
 
-export function useMsGroupMembers(groupId: number | null): UseMsGroupMembersResult {
+export function useMsGroupMembers(groupId: number | null, sort: MemberSort = "added-desc"): UseMsGroupMembersResult {
     const [data, setData] = useState<MsGroupMemberRow[] | null>(null);
     const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(groupId !== null);
@@ -37,7 +37,7 @@ export function useMsGroupMembers(groupId: number | null): UseMsGroupMembersResu
         setIsLoading(true);
         setError(null);
         try {
-            const result = await fetchMsGroupMembers(groupId, { page, limit: MS_GROUP_MEMBERS_PAGE_SIZE });
+            const result = await fetchMsGroupMembers(groupId, { page, limit: MS_GROUP_MEMBERS_PAGE_SIZE, sort });
             setData(result.rows);
             setTotal(result.total);
         } catch (cause) {
@@ -45,7 +45,7 @@ export function useMsGroupMembers(groupId: number | null): UseMsGroupMembersResu
         } finally {
             setIsLoading(false);
         }
-    }, [groupId, page]);
+    }, [groupId, page, sort]);
 
     useEffect(() => {
         void refresh();
