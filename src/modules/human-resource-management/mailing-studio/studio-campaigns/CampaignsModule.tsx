@@ -1,0 +1,616 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Megaphone, MoreVertical, RefreshCw, SearchX } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+
+import { CampaignDangerDialog } from "./components/CampaignDangerDialog";
+import { CampaignFormDialog, type CampaignFormValues } from "./components/CampaignFormDialog";
+import { CampaignQueueDialog } from "./components/CampaignQueueDialog";
+import { CampaignStatusBadge } from "./components/CampaignStatusBadge";
+import { CampaignTestSendDialog } from "./components/CampaignTestSendDialog";
+import { useCampaignsContext } from "./providers/CampaignsProvider";
+import {
+    listCampaignGroups,
+    listCampaignTemplates,
+    type CampaignConfirmCounts,
+    type CampaignGroupOption,
+    type CampaignTemplateOption,
+    type CampaignTestSendData,
+} from "./providers/campaignsClient";
+import { CAMPAIGN_STATUSES, CAMPAIGN_STATUS_LABELS, type CampaignStatus, type MsCampaignRow } from "./types";
+import { formatPHT } from "./utils/time";
+
+type StatusFilter = "all" | CampaignStatus;
+
+interface ExpandBanner {
+    campaignName: string;
+    queued: number;
+    alreadyQueued: number;
+    total: number;
+    repeated: boolean;
+}
+
+interface CancelBanner {
+    campaignName: string;
+    skipped: number;
+}
+
+interface DangerTarget {
+    kind: "cancel" | "delete";
+    row: MsCampaignRow;
+}
+
+interface FormTarget {
+    mode: "create" | "edit";
+    row: MsCampaignRow | null;
+}
+
+function groupIdsOf(row: MsCampaignRow): number[] {
+    if (!Array.isArray(row.group_ids)) return [];
+    return row.group_ids.filter((entry): entry is number => typeof entry === "number");
+}
+
+function progressPercent(sent: number, total: number): number {
+    if (total <= 0) return 0;
+    return Math.min(100, Math.round((sent / total) * 100));
+}
+
+export function CampaignsModule() {
+    const {
+        data,
+        isLoading,
+        error,
+        refresh,
+        actionError,
+        notice,
+        busyKey,
+        confirmItem,
+        expandItem,
+        cancelItem,
+        testSendItem,
+        createItem,
+        updateItem,
+        removeItem,
+        clearOutcome,
+    } = useCampaignsContext();
+
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+    const [search, setSearch] = useState("");
+    const [templates, setTemplates] = useState<CampaignTemplateOption[]>([]);
+    const [groups, setGroups] = useState<CampaignGroupOption[]>([]);
+    const [lookupsLoading, setLookupsLoading] = useState(true);
+    const [formTarget, setFormTarget] = useState<FormTarget | null>(null);
+    const [queueTarget, setQueueTarget] = useState<MsCampaignRow | null>(null);
+    const [queueCounts, setQueueCounts] = useState<CampaignConfirmCounts | null>(null);
+    const [queueError, setQueueError] = useState<string | null>(null);
+    const [dangerTarget, setDangerTarget] = useState<DangerTarget | null>(null);
+    const [testTarget, setTestTarget] = useState<MsCampaignRow | null>(null);
+    const [testResult, setTestResult] = useState<CampaignTestSendData | null>(null);
+    const [testError, setTestError] = useState<string | null>(null);
+    const [expandBanner, setExpandBanner] = useState<ExpandBanner | null>(null);
+    const [cancelBanner, setCancelBanner] = useState<CancelBanner | null>(null);
+
+    useEffect(() => {
+        let live = true;
+        const load = async (): Promise<void> => {
+            setLookupsLoading(true);
+            try {
+                const [fetchedTemplates, fetchedGroups] = await Promise.all([listCampaignTemplates(), listCampaignGroups()]);
+                if (live) {
+                    setTemplates(fetchedTemplates);
+                    setGroups(fetchedGroups);
+                }
+            } catch {
+                if (live) {
+                    setTemplates([]);
+                    setGroups([]);
+                }
+            } finally {
+                if (live) setLookupsLoading(false);
+            }
+        };
+        void load();
+        return () => {
+            live = false;
+        };
+    }, []);
+
+    const templateNames = useMemo(() => {
+        const map = new Map<number, string>();
+        for (const row of templates) map.set(row.id, row.template_name);
+        return map;
+    }, [templates]);
+
+    const groupNames = useMemo(() => {
+        const map = new Map<number, string>();
+        for (const row of groups) map.set(row.id, row.group_name);
+        return map;
+    }, [groups]);
+
+    const filtered = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        return (data ?? []).filter((row) => {
+            if (statusFilter !== "all" && row.status !== statusFilter) return false;
+            if (query === "") return true;
+            return (
+                row.campaign_name.toLowerCase().includes(query) ||
+                row.campaign_key.toLowerCase().includes(query)
+            );
+        });
+    }, [data, search, statusFilter]);
+
+    const openQueue = (row: MsCampaignRow): void => {
+        clearOutcome();
+        setQueueTarget(row);
+        setQueueCounts(null);
+        setQueueError(null);
+        void confirmItem(row.id).then((state) => {
+            if (state && state.id === row.id) {
+                setQueueCounts(state.counts);
+            } else {
+                setQueueError("Audience counts are unavailable right now — please try again.");
+            }
+        });
+    };
+
+    const handleExpand = async (): Promise<void> => {
+        if (!queueTarget) return;
+        const state = await expandItem(queueTarget.id);
+        if (state && state.id === queueTarget.id) {
+            setQueueTarget(null);
+            setQueueCounts(null);
+            setExpandBanner({
+                campaignName: state.outcome.campaign.campaign_name,
+                queued: state.outcome.queued,
+                alreadyQueued: state.outcome.alreadyQueued,
+                total: state.outcome.total_count,
+                repeated: state.repeated,
+            });
+        } else {
+            setQueueError("Queuing failed — please try again.");
+        }
+    };
+
+    const handleDangerConfirm = async (): Promise<void> => {
+        if (!dangerTarget) return;
+        if (dangerTarget.kind === "cancel") {
+            const state = await cancelItem(dangerTarget.row.id);
+            if (state) {
+                setCancelBanner({ campaignName: dangerTarget.row.campaign_name, skipped: state.outcome.skipped });
+                setDangerTarget(null);
+            }
+        } else {
+            const ok = await removeItem(dangerTarget.row.id);
+            if (ok) setDangerTarget(null);
+        }
+    };
+
+    const handleTestSend = async (seeds: string[]): Promise<void> => {
+        if (!testTarget) return;
+        setTestError(null);
+        const state = await testSendItem(testTarget.id, seeds);
+        if (state && state.id === testTarget.id) {
+            setTestResult(state.outcome);
+        } else {
+            setTestError("Test send failed — please try again.");
+        }
+    };
+
+    const handleFormSubmit = async (values: CampaignFormValues): Promise<boolean> => {
+        if (formTarget?.mode === "edit" && formTarget.row) {
+            const row = await updateItem(formTarget.row.id, {
+                campaign_name: values.campaign_name,
+                template_id: values.template_id,
+                group_ids: values.group_ids,
+            });
+            return row !== null;
+        }
+        const row = await createItem({
+            campaign_key: values.campaign_key,
+            campaign_name: values.campaign_name,
+            template_id: values.template_id,
+            group_ids: values.group_ids,
+        });
+        return row !== null;
+    };
+
+    const queueBusy = queueTarget !== null && busyKey === `confirm:${queueTarget.id}`;
+    const queueExpanding = queueTarget !== null && busyKey === `expand:${queueTarget.id}`;
+    const formBusy =
+        busyKey === "create" || (formTarget?.mode === "edit" && formTarget.row !== null && busyKey === `update:${formTarget.row.id}`);
+    const dangerBusy =
+        dangerTarget !== null &&
+        (busyKey === `cancel:${dangerTarget.row.id}` || busyKey === `delete:${dangerTarget.row.id}`);
+    const testBusy = testTarget !== null && busyKey === `test:${testTarget.id}`;
+
+    return (
+        <section aria-label="Campaigns" className="flex min-h-0 flex-1 flex-col gap-4">
+            <header className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                    <span className="p-3 bg-primary/10 rounded-2xl text-primary">
+                        <Megaphone className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0">
+                        <h1 className="text-lg font-semibold tracking-tight">Campaigns</h1>
+                        <p className="text-sm text-muted-foreground">Draft, review, queue, and cancel bulk sends.</p>
+                    </div>
+                </div>
+                <Button
+                    aria-label="New campaign"
+                    className="min-h-11 md:min-h-0"
+                    size="sm"
+                    onClick={() => setFormTarget({ mode: "create", row: null })}
+                >
+                    New campaign
+                </Button>
+            </header>
+
+            <div className="flex flex-wrap items-center gap-2">
+                <Input
+                    aria-label="Search campaigns"
+                    className="h-8 w-full text-xs sm:max-w-xs"
+                    placeholder="Search name or key…"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                />
+                <Select value={statusFilter} onValueChange={(next) => setStatusFilter(next as StatusFilter)}>
+                    <SelectTrigger aria-label="Filter campaigns by status" className="h-8 max-w-[220px] text-xs" size="sm">
+                        <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                        <SelectItem value="all">All statuses</SelectItem>
+                        {CAMPAIGN_STATUSES.map((status) => (
+                            <SelectItem key={status} value={status}>
+                                {CAMPAIGN_STATUS_LABELS[status]}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Button
+                    aria-label="Refresh campaigns"
+                    className="min-h-11 md:min-h-0"
+                    disabled={isLoading}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void refresh()}
+                >
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Refresh
+                </Button>
+                {data ? (
+                    <span
+                        className="ms-auto rounded-full border bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground tabular-nums"
+                        data-testid="campaigns-count"
+                    >
+                        {filtered.length}
+                    </span>
+                ) : null}
+            </div>
+
+            {isLoading && !data ? (
+                <div className="flex flex-col gap-2" role="status" aria-label="Loading campaigns">
+                    {[0, 1].map((index) => (
+                        <div className="flex flex-col gap-2 rounded-lg border bg-card p-3" key={index}>
+                            <Skeleton className="h-4 w-1/3" />
+                            <Skeleton className="h-3 w-2/3" />
+                        </div>
+                    ))}
+                    <span className="sr-only">Loading campaigns…</span>
+                </div>
+            ) : null}
+
+            {error ? (
+                <div className="rounded-lg border border-destructive/40 bg-card p-4" role="alert">
+                    <p className="text-sm text-destructive">{error}</p>
+                    <Button className="mt-2 min-h-11 md:min-h-0" size="sm" variant="outline" onClick={() => void refresh()}>
+                        Retry
+                    </Button>
+                </div>
+            ) : null}
+
+            {expandBanner ? (
+                <div className="rounded-lg border border-amber-500/30 bg-card p-4" role="status">
+                    <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-amber-600 dark:text-amber-400" />
+                        <p className="text-sm font-medium">
+                            {expandBanner.repeated ? "Already queued — sending is in progress." : "Queued — sending is in progress."}
+                        </p>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {expandBanner.repeated
+                            ? `“${expandBanner.campaignName}” was expanded before — keeping the existing queue of ${expandBanner.total} recipients (${expandBanner.alreadyQueued} already queued).`
+                            : `“${expandBanner.campaignName}” queued ${expandBanner.queued} recipients${expandBanner.alreadyQueued > 0 ? ` (${expandBanner.alreadyQueued} were already queued)` : ""} — ${expandBanner.total} total.`}
+                    </p>
+                    <Button className="mt-2 min-h-11 md:min-h-0" size="sm" variant="outline" onClick={() => setExpandBanner(null)}>
+                        Dismiss
+                    </Button>
+                </div>
+            ) : null}
+
+            {notice ? (
+                <div className="rounded-lg border border-amber-500/30 bg-card p-4" role="status">
+                    <p className="text-sm text-amber-700 dark:text-amber-400">{notice}</p>
+                </div>
+            ) : null}
+
+            {cancelBanner ? (
+                <div className="rounded-lg border bg-card p-4" role="status">
+                    <p className="text-sm font-medium">“{cancelBanner.campaignName}” cancelled.</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{cancelBanner.skipped} pending sends skipped.</p>
+                    <Button className="mt-2 min-h-11 md:min-h-0" size="sm" variant="outline" onClick={() => setCancelBanner(null)}>
+                        Dismiss
+                    </Button>
+                </div>
+            ) : null}
+
+            {actionError && !queueTarget && !dangerTarget && !testTarget ? (
+                <div className="rounded-lg border border-destructive/40 bg-card p-4" role="alert">
+                    <p className="text-sm text-destructive">{actionError}</p>
+                </div>
+            ) : null}
+
+            {!isLoading && !error && data && data.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 rounded-lg border bg-card px-4 py-16 text-center">
+                    <Megaphone aria-hidden="true" className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No campaigns yet.</p>
+                    <Button className="min-h-11 md:min-h-0" size="sm" onClick={() => setFormTarget({ mode: "create", row: null })}>
+                        Create the first campaign
+                    </Button>
+                </div>
+            ) : null}
+
+            {!isLoading && !error && data && data.length > 0 && filtered.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 rounded-lg border bg-card px-4 py-16 text-center">
+                    <SearchX aria-hidden="true" className="size-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">No campaigns match the current filters.</p>
+                    <p className="text-xs text-muted-foreground">Try a different search or status.</p>
+                </div>
+            ) : null}
+
+            {filtered.length > 0 ? (
+                <div className="overflow-hidden rounded-lg border bg-card">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Campaign</TableHead>
+                                <TableHead>Template</TableHead>
+                                <TableHead>Groups</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Progress</TableHead>
+                                <TableHead>Created</TableHead>
+                                <TableHead className="w-12">
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filtered.map((row) => {
+                                const isDraft = row.status === "draft";
+                                const canDelete = row.status === "draft" || row.status === "cancelled";
+                                const canQueue = row.status === "draft";
+                                const canResend = row.status === "sent" || row.status === "cancelled" || row.status === "failed";
+                                const canCancel = row.status === "queued" || row.status === "sending";
+                                const canTest = row.template_id !== null && row.template_id !== undefined;
+                                const hasActions = canQueue || canResend || isDraft || canCancel || canTest || canDelete;
+                                const ids = groupIdsOf(row);
+                                const names = ids.map((id) => groupNames.get(id) ?? "Unknown group");
+                                const rowBusy = busyKey !== null && busyKey.endsWith(`:${row.id}`);
+                                return (
+                                    <TableRow key={row.id}>
+                                        <TableCell>
+                                            <div className="flex min-w-0 flex-col">
+                                                <span className="truncate text-sm font-medium" title={row.campaign_name}>
+                                                    {row.campaign_name}
+                                                </span>
+                                                <span className="truncate font-mono text-xs text-muted-foreground" title={row.campaign_key}>
+                                                    {row.campaign_key}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span
+                                                className="block max-w-40 truncate text-xs text-muted-foreground"
+                                                title={row.template_id === null || row.template_id === undefined ? "No template" : (templateNames.get(row.template_id) ?? "Unknown template")}
+                                            >
+                                                {row.template_id === null || row.template_id === undefined
+                                                    ? "No template"
+                                                    : (templateNames.get(row.template_id) ?? "Unknown template")}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="block max-w-48 truncate text-xs text-muted-foreground" title={names.join(", ")}>
+                                                {names.length > 0 ? `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2} more` : ""}` : "No groups"}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <CampaignStatusBadge status={row.status} />
+                                        </TableCell>
+                                        <TableCell>
+                                            {row.total_count > 0 ? (
+                                                <div className="flex min-w-28 flex-col gap-1">
+                                                    <Progress value={progressPercent(row.sent_count, row.total_count)} />
+                                                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                                                        {row.sent_count} of {row.total_count} sent
+                                                    </span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">
+                                                    {isDraft ? "Not queued yet" : "No recipients"}
+                                                </span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="whitespace-nowrap text-xs text-muted-foreground">
+                                                {formatPHT(row.created_at)}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        aria-label={`Actions for campaign ${row.campaign_name}`}
+                                                        className="h-8 w-8"
+                                                        disabled={rowBusy}
+                                                        size="icon"
+                                                        variant="ghost"
+                                                    >
+                                                        {rowBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" className="w-[200px]">
+                                                    {canQueue ? (
+                                                        <DropdownMenuItem disabled={rowBusy} onSelect={() => openQueue(row)}>
+                                                            Review and queue
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {canResend ? (
+                                                        <DropdownMenuItem disabled={rowBusy} onSelect={() => openQueue(row)}>
+                                                            Send again
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {isDraft ? (
+                                                        <DropdownMenuItem disabled={rowBusy} onSelect={() => setFormTarget({ mode: "edit", row })}>
+                                                            Edit draft
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {canTest ? (
+                                                        <DropdownMenuItem
+                                                            disabled={rowBusy}
+                                                            onSelect={() => {
+                                                                clearOutcome();
+                                                                setTestTarget(row);
+                                                                setTestResult(null);
+                                                                setTestError(null);
+                                                            }}
+                                                        >
+                                                            Test send
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {canQueue || canResend || isDraft || canTest ? <DropdownMenuSeparator /> : null}
+                                                    {canCancel ? (
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                            disabled={rowBusy}
+                                                            onSelect={() => setDangerTarget({ kind: "cancel", row })}
+                                                        >
+                                                            Cancel send
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {canDelete ? (
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                                            disabled={rowBusy}
+                                                            onSelect={() => setDangerTarget({ kind: "delete", row })}
+                                                        >
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    ) : null}
+                                                    {!hasActions ? (
+                                                        <DropdownMenuItem disabled>No actions available</DropdownMenuItem>
+                                                    ) : null}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            ) : null}
+
+            <CampaignFormDialog
+                busy={formBusy}
+                groups={groups}
+                initial={formTarget?.row ?? null}
+                key={formTarget === null ? "form-closed" : `${formTarget.mode}:${formTarget.row?.id ?? "new"}`}
+                lookupsLoading={lookupsLoading}
+                mode={formTarget?.mode ?? "create"}
+                open={formTarget !== null}
+                templates={templates}
+                onOpenChange={(open) => {
+                    if (!open) setFormTarget(null);
+                }}
+                onSubmit={handleFormSubmit}
+            />
+
+            <CampaignQueueDialog
+                counts={queueCounts}
+                campaign={queueTarget}
+                error={queueTarget ? queueError ?? actionError : null}
+                expanding={queueExpanding}
+                loadingCounts={queueBusy}
+                open={queueTarget !== null}
+                onConfirm={() => void handleExpand()}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setQueueTarget(null);
+                        setQueueCounts(null);
+                        setQueueError(null);
+                    }
+                }}
+            />
+
+            <CampaignDangerDialog
+                busy={dangerBusy}
+                busyLabel={dangerTarget?.kind === "cancel" ? "Cancelling…" : "Deleting…"}
+                confirmLabel={dangerTarget?.kind === "cancel" ? "Cancel send" : "Delete campaign"}
+                description={
+                    dangerTarget?.kind === "cancel"
+                        ? `This stops “${dangerTarget.row.campaign_name}” — pending sends are skipped. Already delivered mail cannot be recalled.`
+                        : `This permanently deletes “${dangerTarget?.row.campaign_name ?? "this campaign"}”. Only drafts and cancelled campaigns can be deleted.`
+                }
+                open={dangerTarget !== null}
+                title={dangerTarget?.kind === "cancel" ? "Cancel this send?" : "Delete this campaign?"}
+                onConfirm={() => void handleDangerConfirm()}
+                onOpenChange={(open) => {
+                    if (!open) setDangerTarget(null);
+                }}
+            />
+
+            <CampaignTestSendDialog
+                busy={testBusy}
+                campaign={testTarget}
+                error={testTarget ? testError ?? actionError : null}
+                key={testTarget === null ? "test-closed" : `test:${testTarget.id}`}
+                open={testTarget !== null}
+                result={testTarget && testResult ? testResult : null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setTestTarget(null);
+                        setTestResult(null);
+                        setTestError(null);
+                    }
+                }}
+                onSend={handleTestSend}
+            />
+        </section>
+    );
+}
