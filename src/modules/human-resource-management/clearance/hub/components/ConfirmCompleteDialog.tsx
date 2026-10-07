@@ -17,7 +17,7 @@ interface ConfirmCompleteDialogProps {
     onConfirm: () => Promise<void>;
     employeeName: string;
     templateTitle: string;
-    pendingLabels: string[];
+    unissuedDocuments?: string[];
     isConfirming?: boolean;
     onCloseAutoFocus?: (event: Event) => void;
 }
@@ -28,7 +28,7 @@ export function ConfirmCompleteDialog({
     onConfirm,
     employeeName,
     templateTitle,
-    pendingLabels,
+    unissuedDocuments = [],
     isConfirming = false,
     onCloseAutoFocus,
 }: ConfirmCompleteDialogProps) {
@@ -46,18 +46,17 @@ export function ConfirmCompleteDialog({
                 </DialogHeader>
 
                 <div className="grid gap-4 py-4">
-                    {pendingLabels.length > 0 ? (
+                    {unissuedDocuments.length > 0 ? (
                         <Alert>
                             <AlertDescription>
-                                The following categories are still unsigned: {pendingLabels.join(", ")}. Signatures
-                                collected on paper are never recorded in the system. Confirming closes this
-                                clearance as complete.
+                                Still needed for full completion: {unissuedDocuments.join(", ")}. Full
+                                completion needs the Clearance Form, SOA, and Quit Claims all issued.
                             </AlertDescription>
                         </Alert>
                     ) : (
                         <Alert>
                             <AlertDescription>
-                                Every category is signed. Confirming closes this clearance as complete and makes
+                                All three documents are issued. Confirming closes this clearance as complete and makes
                                 the record read-only.
                             </AlertDescription>
                         </Alert>

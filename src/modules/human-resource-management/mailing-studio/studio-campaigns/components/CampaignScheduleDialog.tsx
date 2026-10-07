@@ -57,8 +57,9 @@ export function CampaignScheduleDialog({
     const [formError, setFormError] = useState<string | null>(null);
     const minValue = toLocalInput(new Date());
     const focusReturn = useDialogFocusReturn();
-    const resolvedIso = value.trim() === "" ? null : phLocalToUtcIso(value.trim());
-    const resolvedPht = resolvedIso ? formatPHT(resolvedIso) : null;
+    const trimmedValue = value.trim();
+    const resolvedIso = trimmedValue === "" ? null : phLocalToUtcIso(trimmedValue);
+    const resolvedPht = resolvedIso && trimmedValue >= minValue ? formatPHT(resolvedIso) : null;
     const showSuppressed = (counts?.suppressedCount ?? 0) > 0;
     const showDuplicates = (counts?.duplicateCount ?? 0) > 0;
     const cardCount = 1 + (showSuppressed ? 1 : 0) + (showDuplicates ? 1 : 0);

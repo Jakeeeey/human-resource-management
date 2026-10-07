@@ -48,13 +48,8 @@ export interface ClearanceItemRow {
     department_name_snapshot: string | null;
     sort_order: number;
     status: string;
-    expected_signer_user_id: number | null;
-    signed_by_user_id: number | null;
-    captured_by_user_id: number | null;
-    substitution_reason: string | null;
-    signature_strokes: string | null;
+    signatory_id: number | null;
     remarks: string | null;
-    signed_at: string | null;
     created_at: string | null;
     created_by: number | null;
     updated_at: string | null;
@@ -249,13 +244,8 @@ function normalizeItemRow(raw: unknown): ClearanceItemRow | null {
         department_name_snapshot: toNullableText(raw.department_name_snapshot),
         sort_order: toId(raw.sort_order) ?? 0,
         status: typeof raw.status === "string" ? raw.status : "pending",
-        expected_signer_user_id: toNullableId(raw.expected_signer_user_id),
-        signed_by_user_id: toNullableId(raw.signed_by_user_id),
-        captured_by_user_id: toNullableId(raw.captured_by_user_id),
-        substitution_reason: toNullableText(raw.substitution_reason),
-        signature_strokes: toNullableText(raw.signature_strokes),
+        signatory_id: toNullableId(raw.signatory_id),
         remarks: toNullableText(raw.remarks),
-        signed_at: toNullableText(raw.signed_at),
         created_at: toNullableText(raw.created_at),
         created_by: toNullableId(raw.created_by),
         updated_at: toNullableText(raw.updated_at),
@@ -639,13 +629,8 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
                 category.department_id === null ? null : (namesByDepartment.get(category.department_id) ?? null),
             sort_order: category.sort_order,
             status: "pending",
-            expected_signer_user_id: null,
-            signed_by_user_id: null,
-            captured_by_user_id: null,
-            substitution_reason: null,
-            signature_strokes: null,
+            signatory_id: null,
             remarks: null,
-            signed_at: null,
             created_at: now,
             created_by: input.actorId,
         }))
@@ -853,57 +838,6 @@ export async function confirmClearanceRequest(id: number, actorId: number | null
         payload: { confirmed_by: actorId },
     });
     return toDetail(updated, await listItemRows(id));
-}
-
-export async function unlockClearanceItem(
-    id: number,
-    reason: string,
-    actorId: number | null
-): Promise<ClearanceItemRow> {
-    if (reason.trim() === "") {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.invalidInput, "reason is required");
-    }
-    const current = await readItemRow(id);
-    if (!current) {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.itemNotFound, `clearance_item ${id} does not exist`);
-    }
-    const request = await readRequestRow(current.request_id);
-    if (!request) {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.requestNotFound, `clearance_request ${current.request_id} does not exist`);
-    }
-    if (request.status === "completed") {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.requestCompleted, `clearance_request ${request.id} is completed`);
-    }
-    if (current.status !== "signed") {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.itemNotSigned, `clearance_item ${id} is not signed`);
-    }
-    const now = nowUTC();
-    const updated = await patchItemRow(id, {
-        status: "pending",
-        expected_signer_user_id: null,
-        signed_by_user_id: null,
-        captured_by_user_id: null,
-        substitution_reason: null,
-        signature_strokes: null,
-        signed_at: null,
-        updated_at: now,
-        updated_by: actorId,
-    });
-    await appendEvent({
-        request_id: current.request_id,
-        item_id: id,
-        event_type: "unlocked",
-        actor_id: actorId,
-        reason,
-        payload: {
-            signed_by_user_id: current.signed_by_user_id,
-            expected_signer_user_id: current.expected_signer_user_id,
-            captured_by_user_id: current.captured_by_user_id,
-            signature_strokes: current.signature_strokes,
-            signed_at: current.signed_at,
-        },
-    });
-    return updated;
 }
 
 export async function resolveCandidateSet(itemId: number): Promise<ClearanceCandidate[]> {

@@ -41,7 +41,7 @@ interface KpiFigure {
 
 export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceDashboardKpis }) {
     const total = kpis.total;
-    const stale = kpis.stale_unsigned_count;
+    const stale = kpis.stale_open_count;
     const bottleneckClear = stale <= 0;
     const figures: readonly KpiFigure[] = [
         {
@@ -81,9 +81,9 @@ export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceD
             key: "stale",
             label: "Stalled clearances",
             value: String(stale),
-            sub: bottleneckClear ? "All clear" : "Unsigned and aging",
+            sub: bottleneckClear ? "All clear" : "Open and aging",
             deltaIcon: bottleneckClear ? CircleCheck : TriangleAlert,
-            deltaText: bottleneckClear ? "No stalled clearances" : "Open with unsigned items",
+            deltaText: bottleneckClear ? "No stalled clearances" : "Open past 14 days",
             caption: bottleneckClear ? "Nothing stalled right now" : "Review the longest-open list below",
             icon: bottleneckClear ? CircleCheck : TriangleAlert,
             tint: bottleneckClear ? TINT_EMERALD : TINT_ROSE,

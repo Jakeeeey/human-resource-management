@@ -1,13 +1,22 @@
 "use client";
 
 import type { JSX } from "react";
+import { useState } from "react";
 import { Settings2 } from "lucide-react";
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { SoaTemplateCatalogue } from "./components/SoaTemplateCatalogue";
 import { TemplateCatalogue } from "./components/TemplateCatalogue";
 import { ClearanceTemplatesFetchProvider } from "./providers/clearanceTemplatesProvider";
+import { SoaTemplatesFetchProvider } from "./providers/soaTemplatesProvider";
+
+type TemplatesTab = "clearance" | "soa";
 
 export function ClearanceTemplatesModule(props: { selectedId?: number | null }): JSX.Element {
     const { selectedId = null } = props;
+    const [tab, setTab] = useState<TemplatesTab>("clearance");
+
     return (
         <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
             <div className="flex items-center gap-4">
@@ -24,9 +33,29 @@ export function ClearanceTemplatesModule(props: { selectedId?: number | null }):
                 </div>
             </div>
 
-            <ClearanceTemplatesFetchProvider>
-                <TemplateCatalogue selectedId={selectedId} />
-            </ClearanceTemplatesFetchProvider>
+            <Tabs
+                value={tab}
+                onValueChange={(next) => {
+                    if (next === "clearance" || next === "soa") {
+                        setTab(next);
+                    }
+                }}
+            >
+                <TabsList>
+                    <TabsTrigger value="clearance">Clearance Form</TabsTrigger>
+                    <TabsTrigger value="soa">SOA</TabsTrigger>
+                </TabsList>
+                <TabsContent value="clearance">
+                    <ClearanceTemplatesFetchProvider>
+                        <TemplateCatalogue selectedId={selectedId} />
+                    </ClearanceTemplatesFetchProvider>
+                </TabsContent>
+                <TabsContent value="soa">
+                    <SoaTemplatesFetchProvider>
+                        <SoaTemplateCatalogue />
+                    </SoaTemplatesFetchProvider>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

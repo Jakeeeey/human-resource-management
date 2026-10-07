@@ -6,6 +6,8 @@ import {
     listClearanceRequests,
     mapClearanceRequestError,
 } from "@/modules/human-resource-management/clearance/hub/services/ClearanceRequestService";
+import { ensureClearanceForm } from "@/modules/human-resource-management/clearance/form/services/ClearanceFormService";
+import { ensureSoa } from "@/modules/human-resource-management/clearance/soa/services/ClearanceSoaService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
@@ -68,6 +70,16 @@ export async function POST(req: NextRequest) {
                 templateId: parsed.data.template_id,
                 actorId: auth.cap.actorId,
             });
+            try {
+                await ensureClearanceForm(result.request.id, auth.cap.actorId);
+            } catch (error) {
+                console.error("[clearance-requests] ensure form failed:", error);
+            }
+            try {
+                await ensureSoa(result.request.id, auth.cap.actorId);
+            } catch (error) {
+                console.error("[clearance-requests] ensure soa failed:", error);
+            }
             return NextResponse.json(
                 { success: true, data: result.request },
                 { status: result.created ? 201 : 200 }

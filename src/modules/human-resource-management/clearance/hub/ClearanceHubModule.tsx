@@ -18,7 +18,7 @@ import {
 } from "./providers/ClearanceHubProvider";
 import { ClearanceHubTable } from "./components/ClearanceHubTable";
 import { AssignClearanceDialog } from "./components/AssignClearanceDialog";
-import {
+import { useDocumentCompletionIndex } from "./hooks/useDocumentChecklist";import {
     CLEARANCE_REQUEST_STATUS_LABELS,
     CLEARANCE_REQUEST_STATUSES,
     type ClearanceRequestStatus,
@@ -29,6 +29,7 @@ type StatusFilter = "all" | ClearanceRequestStatus;
 
 function ClearanceHubContent() {
     const { requests, resignations, isLoading, error, refresh } = useClearanceHubContext();
+    const completion = useDocumentCompletionIndex();
     const searchParams = useSearchParams();
 
     const [searchQuery, setSearchQuery] = useState("");
@@ -74,6 +75,7 @@ function ClearanceHubContent() {
 
     const handleRetry = async () => {
         await refresh();
+        await completion.refresh();
     };
 
     const resetFilters = () => {
@@ -156,6 +158,7 @@ function ClearanceHubContent() {
                 data={filteredRequests}
                 resignations={resignations}
                 selectedId={effectiveSelectedId}
+                completionByRequest={completion.index}
                 onRetry={handleRetry}
                 onClearFilters={resetFilters}
                 canClearFilters={hasActiveFilters}

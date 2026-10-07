@@ -24,12 +24,6 @@ const DashboardRequestSchema = z.object({
     created_at: z.string().nullable(),
 });
 
-const DashboardItemSchema = z.object({
-    id: z.number(),
-    request_id: z.number(),
-    status: z.enum(["pending", "signed"]),
-});
-
 const DashboardTemplateSchema = z.object({
     id: z.number(),
     title: z.string(),
@@ -43,7 +37,6 @@ const DashboardUserSchema = z.object({
 });
 
 type DashboardRequest = z.infer<typeof DashboardRequestSchema>;
-type DashboardItem = z.infer<typeof DashboardItemSchema>;
 
 const TREND_PERIOD_LIMIT = 12;
 const OLDEST_OPEN_LIMIT = 5;
@@ -125,16 +118,14 @@ function templateTitleFor(
 export async function getClearanceDashboard(
     cap: ClearanceCapability
 ): Promise<ClearanceDashboardBundle> {
-    const [requestBody, itemBody, templateBody, userBody] = await Promise.all([
+    const [requestBody, templateBody, userBody] = await Promise.all([
         dFetch(
             "/items/clearance_request?fields=id,resignation_id,user_id,template_id,template_title_snapshot,status,confirmed_at,created_at&limit=-1"
         ),
-        dFetch("/items/clearance_item?fields=id,request_id,status&limit=-1"),
         dFetch("/items/clearance_template?fields=id,title&limit=-1"),
         dFetch("/items/user?fields=user_id,user_fname,user_mname,user_lname&limit=-1"),
     ]);
     const requests = parseRowList(DashboardRequestSchema, requestBody, "clearance_request");
-    const items = parseRowList(DashboardItemSchema, itemBody, "clearance_item");
     const templates = parseRowList(DashboardTemplateSchema, templateBody, "clearance_template");
     const users = parseRowList(DashboardUserSchema, userBody, "user");
 
@@ -155,13 +146,6 @@ export async function getClearanceDashboard(
         titlesByTemplate.set(template.id, template.title);
     }
 
-    const itemsByRequest = new Map<number, DashboardItem[]>();
-    for (const item of items) {
-        const bucket = itemsByRequest.get(item.request_id);
-        if (bucket === undefined) itemsByRequest.set(item.request_id, [item]);
-        else bucket.push(item);
-    }
-
     const snapshotsByTemplate = new Map<number, (string | null)[]>();
     for (const request of requests) {
         const bucket = snapshotsByTemplate.get(request.template_id);
@@ -173,7 +157,7 @@ export async function getClearanceDashboard(
     let inProgressCount = 0;
     let notStartedCount = 0;
     const confirmDays: number[] = [];
-    let staleUnsignedCount = 0;
+    let staleOpenCount = 0;
 
     const trendGroups = new Map<string, number>();
 
@@ -202,9 +186,7 @@ export async function getClearanceDashboard(
         } else if (createdMs !== null) {
             const daysOpen = Math.max(0, Math.floor((nowMs - createdMs) / DAY_MS));
             openAges.push({ request, daysOpen });
-            const requestItems = itemsByRequest.get(request.id) ?? [];
-            const unsigned = requestItems.filter((item) => item.status !== "signed").length;
-            if (unsigned > 0 && daysOpen > STALE_AFTER_DAYS) staleUnsignedCount += 1;
+            if (daysOpen > STALE_AFTER_DAYS) staleOpenCount += 1;
         }
     }
 
@@ -269,8 +251,6 @@ export async function getClearanceDashboard(
         })
         .slice(0, OLDEST_OPEN_LIMIT)
         .map((open) => {
-            const requestItems = itemsByRequest.get(open.request.id) ?? [];
-            const signed = requestItems.filter((item) => item.status === "signed").length;
             return {
                 request_id: open.request.id,
                 employee_name: namesByUser.get(open.request.user_id) ?? "Unknown employee",
@@ -281,8 +261,7 @@ export async function getClearanceDashboard(
                         snapshotsByTemplate.get(open.request.template_id) ?? []
                     ),
                 days_open: open.daysOpen,
-                signed_count: signed,
-                total_count: requestItems.length,
+                status: open.request.status,
                 created_at: open.request.created_at,
             };
         });
@@ -298,7 +277,7 @@ export async function getClearanceDashboard(
             not_started_count: notStartedCount,
             completion_rate: total === 0 ? null : round1((completedCount / total) * 100),
             avg_days_to_confirm: avgConfirm === null ? null : round1(avgConfirm),
-            stale_unsigned_count: staleUnsignedCount,
+            stale_open_count: staleOpenCount,
         },
         trend,
         trend_avg: completionAvg === null ? null : round1(completionAvg),

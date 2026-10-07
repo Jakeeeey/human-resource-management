@@ -13,18 +13,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { CLEARANCE_REQUEST_STATUS_LABELS, type ClearanceRequestStatus } from "../types";
+import { CLEARANCE_REQUEST_STATUS_LABELS, toClearanceDocumentChecklist, type ClearanceDocumentChecklist, type ClearanceRequestStatus } from "../types";
 import type { ApprovableResignation, ClearanceHubRequest } from "../hooks/useClearanceHub";
+import { DocumentCompletionBadge } from "./DocumentChecklist";
 import styles from "./hub-status.module.css";
 
 interface ClearanceHubTableProps {
     data: ClearanceHubRequest[];
     resignations: ApprovableResignation[];
     selectedId: number | null;
+    completionByRequest: Map<number, ClearanceDocumentChecklist>;
     onRetry: () => Promise<void>;
     onClearFilters: () => void;
     canClearFilters: boolean;
@@ -42,15 +43,11 @@ function statusClassName(status: ClearanceRequestStatus): string {
     return status === "completed" ? styles.signed : styles.pending;
 }
 
-function progressPercent(row: ClearanceHubRequest): number {
-    if (row.total_count <= 0) return 0;
-    return Math.round((row.signed_count / row.total_count) * 100);
-}
-
 export function ClearanceHubTable({
     data,
     resignations,
     selectedId,
+    completionByRequest,
     onRetry,
     onClearFilters,
     canClearFilters,
@@ -141,7 +138,7 @@ export function ClearanceHubTable({
                     <colgroup>
                         <col />
                         <col />
-                        <col className="w-52" />
+                        <col className="w-36" />
                         <col className="w-32" />
                     </colgroup>
                     <TableHeader className="sticky top-0 z-10 bg-card shadow-sm">
@@ -165,7 +162,7 @@ export function ClearanceHubTable({
                                 </button>
                             </TableHead>
                             <TableHead className="h-12 bg-card px-4">Template</TableHead>
-                            <TableHead className="h-12 bg-card px-4 text-right">Progress</TableHead>
+                            <TableHead className="h-12 bg-card px-4">Documents</TableHead>
                             <TableHead className="h-12 bg-card px-4">Status</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -173,6 +170,7 @@ export function ClearanceHubTable({
                         {displayedData.map((request) => {
                             const employeeName = namesByResignation.get(request.resignation_id) ?? "Unknown employee";
                             const isActive = selectedId === request.id;
+                            const checklist = completionByRequest.get(request.id) ?? toClearanceDocumentChecklist(request.id);
                             return (
                                 <TableRow
                                     key={request.id}
@@ -202,13 +200,8 @@ export function ClearanceHubTable({
                                     <TableCell className="truncate px-4 py-4" title={request.template_title_snapshot ?? "Unknown template"}>
                                         {request.template_title_snapshot ?? "Unknown template"}
                                     </TableCell>
-                                    <TableCell className="px-4 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Progress value={progressPercent(request)} className="h-2 w-20" />
-                                            <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-                                                {request.signed_count} of {request.total_count} signed
-                                            </span>
-                                        </div>
+                                    <TableCell className="px-4 py-4">
+                                        <DocumentCompletionBadge checklist={checklist} />
                                     </TableCell>
                                     <TableCell className="px-4 py-4">
                                         <StatusBadge tone={statusTone(request.status)} className={statusClassName(request.status)}>

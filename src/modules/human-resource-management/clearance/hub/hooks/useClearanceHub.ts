@@ -19,12 +19,8 @@ export interface ClearanceHubItem {
     department_name_snapshot: string | null;
     sort_order: number;
     status: string;
-    expected_signer_user_id: number | null;
-    signed_by_user_id: number | null;
-    captured_by_user_id: number | null;
-    substitution_reason: string | null;
+    signatory_id: number | null;
     remarks: string | null;
-    signed_at: string | null;
 }
 
 export interface ClearanceHubRequest {
@@ -147,12 +143,8 @@ function parseHubItem(value: unknown): ClearanceHubItem | null {
         department_name_snapshot: toNullableText(value.department_name_snapshot),
         sort_order: toId(value.sort_order) ?? 0,
         status: typeof value.status === "string" ? value.status : "pending",
-        expected_signer_user_id: toNullableId(value.expected_signer_user_id),
-        signed_by_user_id: toNullableId(value.signed_by_user_id),
-        captured_by_user_id: toNullableId(value.captured_by_user_id),
-        substitution_reason: toNullableText(value.substitution_reason),
+        signatory_id: toNullableId(value.signatory_id),
         remarks: toNullableText(value.remarks),
-        signed_at: toNullableText(value.signed_at),
     };
 }
 
@@ -384,21 +376,6 @@ export function useClearanceHub() {
         [refresh]
     );
 
-    const unlockItem = useCallback(
-        async (id: number, reason: string): Promise<void> => {
-            const response = await fetch(`${ITEMS_API}/${id}/unlock`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ reason }),
-            });
-            if (!response.ok) {
-                throw new Error(await readErrorMessage(response, "Failed to unlock clearance item"));
-            }
-            await refresh();
-        },
-        [refresh]
-    );
-
     const updateItem = useCallback(
         async (id: number, input: UpdateClearanceItemInput): Promise<void> => {
             const body: Record<string, unknown> = {};
@@ -447,7 +424,6 @@ export function useClearanceHub() {
         fetchDetail,
         fetchCandidates,
         confirmRequest,
-        unlockItem,
         updateItem,
         replacePool,
     };

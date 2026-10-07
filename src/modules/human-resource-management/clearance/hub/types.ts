@@ -185,13 +185,8 @@ export const ClearanceItemSchema = z.object({
     department_name_snapshot: z.string().nullable(),
     sort_order: z.number(),
     status: z.enum(CLEARANCE_ITEM_STATUSES),
-    expected_signer_user_id: z.number().nullable(),
-    signed_by_user_id: z.number().nullable(),
-    captured_by_user_id: z.number().nullable(),
-    substitution_reason: z.string().nullable(),
-    signature_strokes: z.string().nullable(),
+    signatory_id: z.number().nullable(),
     remarks: z.string().nullable(),
-    signed_at: z.string().nullable(),
     created_at: z.string().nullable(),
     created_by: z.number().nullable(),
     updated_at: z.string().nullable(),
@@ -225,3 +220,64 @@ export const ClearanceEventSchema = z.object({
 });
 
 export type ClearanceEvent = z.infer<typeof ClearanceEventSchema>;
+
+export const CLEARANCE_DOCUMENT_KEYS = ["form", "soa", "quit_claim"] as const;
+
+export type ClearanceDocumentKey = (typeof CLEARANCE_DOCUMENT_KEYS)[number];
+
+export const CLEARANCE_DOCUMENT_LABELS: Record<ClearanceDocumentKey, string> = {
+    form: "Clearance Form",
+    soa: "SOA",
+    quit_claim: "Quit Claims",
+};
+
+export const CLEARANCE_DOCUMENT_STATES = ["missing", "draft", "issued"] as const;
+
+export type ClearanceDocumentState = (typeof CLEARANCE_DOCUMENT_STATES)[number];
+
+export const CLEARANCE_DOCUMENT_STATE_LABELS: Record<ClearanceDocumentState, string> = {
+    missing: "Not started",
+    draft: "Draft",
+    issued: "Issued",
+};
+
+export interface ClearanceDocumentEntry {
+    key: ClearanceDocumentKey;
+    state: ClearanceDocumentState;
+    refNo: string | null;
+}
+
+export interface ClearanceDocumentChecklist {
+    requestId: number;
+    form: ClearanceDocumentEntry;
+    soa: ClearanceDocumentEntry;
+    quitClaim: ClearanceDocumentEntry;
+    issuedCount: number;
+    complete: boolean;
+}
+
+export type ClearanceDocumentSnapshot = Pick<ClearanceDocumentEntry, "state" | "refNo">;
+
+const MISSING_DOCUMENT_SNAPSHOT: ClearanceDocumentSnapshot = { state: "missing", refNo: null };
+
+export function toClearanceDocumentChecklist(
+    requestId: number,
+    form?: ClearanceDocumentSnapshot,
+    soa?: ClearanceDocumentSnapshot,
+    quitClaim?: ClearanceDocumentSnapshot
+): ClearanceDocumentChecklist {
+    const resolvedForm = form ?? MISSING_DOCUMENT_SNAPSHOT;
+    const resolvedSoa = soa ?? MISSING_DOCUMENT_SNAPSHOT;
+    const resolvedQuitClaim = quitClaim ?? MISSING_DOCUMENT_SNAPSHOT;
+    const issuedCount = [resolvedForm, resolvedSoa, resolvedQuitClaim].filter(
+        (entry) => entry.state === "issued"
+    ).length;
+    return {
+        requestId,
+        form: { key: "form", state: resolvedForm.state, refNo: resolvedForm.refNo },
+        soa: { key: "soa", state: resolvedSoa.state, refNo: resolvedSoa.refNo },
+        quitClaim: { key: "quit_claim", state: resolvedQuitClaim.state, refNo: resolvedQuitClaim.refNo },
+        issuedCount,
+        complete: issuedCount === 3,
+    };
+}

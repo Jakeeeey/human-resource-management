@@ -70,7 +70,6 @@ export function ClearanceOldestOpenPanel({
                                     <th scope="col" className="px-3 py-2 font-semibold text-muted-foreground">Employee</th>
                                     <th scope="col" className="px-3 py-2 font-semibold text-muted-foreground">Template</th>
                                     <th scope="col" className="px-3 py-2 text-right font-semibold tabular-nums text-muted-foreground">Open</th>
-                                    <th scope="col" className="px-3 py-2 text-right font-semibold tabular-nums text-muted-foreground">Signed</th>
                                     <th scope="col" className="px-3 py-2 font-semibold text-muted-foreground">Status</th>
                                 </tr>
                             </thead>
@@ -89,12 +88,9 @@ export function ClearanceOldestOpenPanel({
                                         <td className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
                                             {formatDaysOpen(row.days_open)}
                                         </td>
-                                        <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                                            {row.signed_count} of {row.total_count} signed
-                                        </td>
                                         <td className="px-3 py-2">
-                                            <StatusBadge tone="info">
-                                                {CLEARANCE_REQUEST_STATUS_LABELS[row.total_count > 0 && row.signed_count > 0 ? "in_progress" : "pending"]}
+                                            <StatusBadge tone={row.status === "in_progress" ? "info" : "neutral"}>
+                                                {CLEARANCE_REQUEST_STATUS_LABELS[row.status]}
                                             </StatusBadge>
                                         </td>
                                     </tr>
