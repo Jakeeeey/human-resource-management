@@ -1,0 +1,11 @@
+.signed {
+    background-color: hsl(var(--success-bg));
+    color: hsl(var(--success));
+    border-color: transparent;
+}
+
+.pending {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--foreground));
+    border-color: transparent;
+}
