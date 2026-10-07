@@ -143,9 +143,36 @@ export async function fetchTotalHoursReport(params: TotalHoursServiceParams) {
     }
   }
 
-  // 4. Fetch all active users (only essential fields)
+  // Helpers to identify active employees in Directus (supporting boolean, number, bit, buffer)
+  const isDeletedUser = (val: unknown): boolean => {
+    if (typeof val === "boolean") return val;
+    if (typeof val === "number") return val !== 0;
+    if (typeof val === "string") return val === "1" || val.toLowerCase() === "true";
+    if (val && typeof val === "object") {
+      const buf = val as { type?: string; data?: number[] };
+      if (buf.type === "Buffer" && Array.isArray(buf.data)) {
+        return buf.data[0] === 1;
+      }
+    }
+    return false;
+  };
+
+  const isEmployeeUser = (val: unknown): boolean => {
+    if (typeof val === "boolean") return val;
+    if (typeof val === "number") return val === 1;
+    if (typeof val === "string") return val === "1" || val.toLowerCase() === "true";
+    if (val && typeof val === "object") {
+      const buf = val as { type?: string; data?: number[] };
+      if (buf.type === "Buffer" && Array.isArray(buf.data)) {
+        return buf.data[0] === 1;
+      }
+    }
+    return false;
+  };
+
+  // 4. Fetch users with employee and deleted flags
   const usersResponse = await directusFetch(
-    `/items/user?limit=-1&fields=user_id,user_fname,user_lname,user_mname,user_department,biometric_id,user_position`
+    `/items/user?limit=-1&fields=user_id,user_fname,user_lname,user_mname,user_department,biometric_id,user_position,is_employee,is_deleted`
   ).catch(() => ({ data: [] }));
 
   interface RawUser {
@@ -156,9 +183,17 @@ export async function fetchTotalHoursReport(params: TotalHoursServiceParams) {
     user_department: number | null;
     biometric_id?: string | null;
     user_position?: string;
+    is_employee?: unknown;
+    is_deleted?: unknown;
   }
 
-  const allUsers: RawUser[] = usersResponse.data || [];
+  const fetchedUsers: RawUser[] = usersResponse.data || [];
+
+  // Filter strictly to ACTIVE EMPLOYEES only
+  const allUsers: RawUser[] = fetchedUsers.filter(
+    (u) => !isDeletedUser(u.is_deleted) && isEmployeeUser(u.is_employee)
+  );
+
   const usersMap = new Map<number, RawUser>(
     allUsers.map((u) => [u.user_id, u])
   );
