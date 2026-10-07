@@ -8,6 +8,7 @@ export const CLEARANCE_REQUEST_ERROR_CODES = {
     invalidInput: "CLEARANCE_INVALID_INPUT",
     resignationNotFound: "RESIGNATION_NOT_FOUND",
     templateNotFound: "CLEARANCE_TEMPLATE_NOT_FOUND",
+    soaTemplateNotFound: "SOA_TEMPLATE_NOT_FOUND",
     requestNotFound: "CLEARANCE_REQUEST_NOT_FOUND",
     itemNotFound: "CLEARANCE_ITEM_NOT_FOUND",
     resignationNotApproved: "RESIGNATION_NOT_APPROVED",
@@ -28,6 +29,9 @@ export interface ClearanceRequestRow {
     template_id: number;
     template_code_snapshot: string | null;
     template_title_snapshot: string | null;
+    soa_template_id: number | null;
+    soa_template_code_snapshot: string | null;
+    soa_template_title_snapshot: string | null;
     status: string;
     confirmed_by: number | null;
     confirmed_at: string | null;
@@ -96,6 +100,7 @@ export interface ApprovedResignationOption {
 export interface AssignClearanceRequestInput {
     resignationId: number;
     templateId: number;
+    soaTemplateId: number | null;
     actorId: number | null;
 }
 
@@ -215,6 +220,9 @@ function normalizeRequestRow(raw: unknown): ClearanceRequestRow | null {
         template_id: templateId,
         template_code_snapshot: toNullableText(raw.template_code_snapshot),
         template_title_snapshot: toNullableText(raw.template_title_snapshot),
+        soa_template_id: toNullableId(raw.soa_template_id),
+        soa_template_code_snapshot: toNullableText(raw.soa_template_code_snapshot),
+        soa_template_title_snapshot: toNullableText(raw.soa_template_title_snapshot),
         status: typeof raw.status === "string" ? raw.status : "pending",
         confirmed_by: toNullableId(raw.confirmed_by),
         confirmed_at: toNullableText(raw.confirmed_at),
@@ -283,6 +291,16 @@ async function readResignationRef(id: number): Promise<ResignationRef | null> {
 
 async function readTemplateRef(id: number): Promise<{ id: number; code: string; title: string } | null> {
     const row = await readSingleOrNull(`/items/clearance_template/${id}?fields=id,code,title`);
+    if (!row) return null;
+    const rowId = toId(row.id);
+    const code = toNullableText(row.code);
+    const title = toNullableText(row.title);
+    if (rowId === null || code === null || title === null) return null;
+    return { id: rowId, code, title };
+}
+
+async function readSoaTemplateRef(id: number): Promise<{ id: number; code: string; title: string } | null> {
+    const row = await readSingleOrNull(`/items/clearance_soa_template/${id}?fields=id,code,title`);
     if (!row) return null;
     const rowId = toId(row.id);
     const code = toNullableText(row.code);
@@ -582,6 +600,12 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
     if (!template) {
         fail(CLEARANCE_REQUEST_ERROR_CODES.templateNotFound, `clearance_template ${input.templateId} does not exist`);
     }
+    const soaTemplate = input.soaTemplateId === null || input.soaTemplateId === undefined
+        ? null
+        : await readSoaTemplateRef(input.soaTemplateId);
+    if (input.soaTemplateId !== null && input.soaTemplateId !== undefined && !soaTemplate) {
+        fail(CLEARANCE_REQUEST_ERROR_CODES.soaTemplateNotFound, `clearance_soa_template ${input.soaTemplateId} does not exist`);
+    }
     const categories = await listActiveCategories(input.templateId);
     if (categories.length === 0) {
         fail(
@@ -598,6 +622,9 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
             template_id: input.templateId,
             template_code_snapshot: template.code,
             template_title_snapshot: template.title,
+            soa_template_id: soaTemplate ? soaTemplate.id : null,
+            soa_template_code_snapshot: soaTemplate ? soaTemplate.code : null,
+            soa_template_title_snapshot: soaTemplate ? soaTemplate.title : null,
             status: "pending",
             confirmed_by: null,
             confirmed_at: null,
@@ -673,7 +700,7 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
         event_type: "assigned",
         actor_id: input.actorId,
         reason: null,
-        payload: { template_id: input.templateId, item_count: items.length },
+        payload: { template_id: input.templateId, soa_template_id: soaTemplate ? soaTemplate.id : null, item_count: items.length },
     });
     return { request: toDetail(request, items), created: true };
 }
@@ -973,6 +1000,11 @@ export function mapClearanceRequestError(error: unknown): NextResponse | null {
         case CLEARANCE_REQUEST_ERROR_CODES.templateNotFound:
             return NextResponse.json(
                 { success: false, code, message: "Clearance template not found" },
+                { status: 404 }
+            );
+        case CLEARANCE_REQUEST_ERROR_CODES.soaTemplateNotFound:
+            return NextResponse.json(
+                { success: false, code, message: "SOA template not found" },
                 { status: 404 }
             );
         case CLEARANCE_REQUEST_ERROR_CODES.requestNotFound:

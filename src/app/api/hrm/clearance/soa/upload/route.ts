@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { uploadIssuedSoaPdf } from "@/modules/human-resource-management/clearance/soa/utils/issuedPdfUpload";
+import { uploadIssuedSoaPdf } from "@/modules/human-resource-management/clearance/hub/soa/utils/issuedPdfUpload";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/soa/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

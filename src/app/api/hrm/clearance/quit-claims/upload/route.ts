@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { uploadIssuedQuitClaimPdf } from "@/modules/human-resource-management/clearance/quit-claims/utils/issuedPdfUpload";
+import { uploadIssuedQuitClaimPdf } from "@/modules/human-resource-management/clearance/hub/quit-claims/utils/issuedPdfUpload";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/quit-claims/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { uploadIssuedFormPdf } from "@/modules/human-resource-management/clearance/form/utils/issuedPdfUpload";
+import { uploadIssuedFormPdf } from "@/modules/human-resource-management/clearance/hub/form/utils/issuedPdfUpload";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/form/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

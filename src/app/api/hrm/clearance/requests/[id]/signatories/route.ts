@@ -5,11 +5,11 @@ import {
     getRequestSignatories,
     mapClearanceSignatoryError,
     saveRequestSignatories,
-} from "@/modules/human-resource-management/clearance/form/services/ClearanceSignatoryService";
+} from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceSignatoryService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/form/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

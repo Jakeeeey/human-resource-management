@@ -4,11 +4,11 @@ import { z } from "zod";
 import {
     ensureClearanceForm,
     mapClearanceFormError,
-} from "@/modules/human-resource-management/clearance/form/services/ClearanceFormService";
+} from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceFormService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/form/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

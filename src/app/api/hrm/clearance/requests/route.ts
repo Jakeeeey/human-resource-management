@@ -6,8 +6,8 @@ import {
     listClearanceRequests,
     mapClearanceRequestError,
 } from "@/modules/human-resource-management/clearance/hub/services/ClearanceRequestService";
-import { ensureClearanceForm } from "@/modules/human-resource-management/clearance/form/services/ClearanceFormService";
-import { ensureSoa } from "@/modules/human-resource-management/clearance/soa/services/ClearanceSoaService";
+import { ensureClearanceForm } from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceFormService";
+import { ensureSoa } from "@/modules/human-resource-management/clearance/hub/soa/services/ClearanceSoaService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
@@ -20,6 +20,7 @@ const AssignClearanceRequestSchema = z
     .object({
         resignation_id: z.number().int().positive(),
         template_id: z.number().int().positive(),
+        soa_template_id: z.number().int().positive().nullish(),
     })
     .strict();
 
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
             const result = await assignClearanceRequest({
                 resignationId: parsed.data.resignation_id,
                 templateId: parsed.data.template_id,
+                soaTemplateId: parsed.data.soa_template_id ?? null,
                 actorId: auth.cap.actorId,
             });
             try {

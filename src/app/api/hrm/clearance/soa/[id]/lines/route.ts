@@ -4,12 +4,12 @@ import { z } from "zod";
 import {
     mapClearanceSoaError,
     saveSoaLines,
-} from "@/modules/human-resource-management/clearance/soa/services/ClearanceSoaService";
+} from "@/modules/human-resource-management/clearance/hub/soa/services/ClearanceSoaService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/soa/server/capability";
-import { SoaLineInputSchema } from "@/modules/human-resource-management/clearance/soa/types";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
+import { SoaLineInputSchema } from "@/modules/human-resource-management/clearance/hub/soa/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

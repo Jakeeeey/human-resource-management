@@ -4,11 +4,11 @@ import { z } from "zod";
 import {
     buildSoaRenderModel,
     mapClearanceSoaError,
-} from "@/modules/human-resource-management/clearance/soa/services/ClearanceSoaService";
+} from "@/modules/human-resource-management/clearance/hub/soa/services/ClearanceSoaService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/soa/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

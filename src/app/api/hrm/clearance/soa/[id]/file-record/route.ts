@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     fileClearanceSoaPdf,
     mapClearanceSoaFilingError,
-} from "@/modules/human-resource-management/clearance/soa/server/clearanceSoaFiling";
+} from "@/modules/human-resource-management/clearance/hub/soa/server/clearanceSoaFiling";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/soa/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

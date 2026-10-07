@@ -4,12 +4,12 @@ import {
     getQuitClaimValues,
     mapClearanceQuitClaimError,
     updateQuitClaimValues,
-} from "@/modules/human-resource-management/clearance/quit-claims/services/ClearanceQuitClaimService";
+} from "@/modules/human-resource-management/clearance/hub/quit-claims/services/ClearanceQuitClaimService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/quit-claims/server/capability";
-import { QuitClaimValuesSchema } from "@/modules/human-resource-management/clearance/quit-claims/types";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
+import { QuitClaimValuesSchema } from "@/modules/human-resource-management/clearance/hub/quit-claims/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

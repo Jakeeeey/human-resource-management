@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     fileClearanceFormPdf,
     mapClearanceFormFilingError,
-} from "@/modules/human-resource-management/clearance/form/server/clearanceFormFiling";
+} from "@/modules/human-resource-management/clearance/hub/form/server/clearanceFormFiling";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/form/server/capability";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

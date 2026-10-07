@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { OptionCombobox } from "./OptionCombobox";
+import { SearchableCombobox as HubCombobox } from "@/modules/human-resource-management/clearance/hub/utils/SearchableCombobox";
 import { toast } from "sonner";
 import { formatPHT } from "../utils/time";
 import { useClearanceHubContext } from "../providers/ClearanceHubProvider";
@@ -41,6 +42,8 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
     const {
         templates,
         templatesError,
+        soaTemplates,
+        soaTemplatesError,
         resignations,
         resignationsError,
         assignClearance,
@@ -48,6 +51,7 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
 
     const [resignationValue, setResignationValue] = useState("");
     const [templateValue, setTemplateValue] = useState("");
+    const [soaTemplateValue, setSoaTemplateValue] = useState("");
     const [manualTemplate, setManualTemplate] = useState(false);
     const [suggestedId, setSuggestedId] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,6 +61,7 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
         if (isOpen) {
             setResignationValue("");
             setTemplateValue("");
+            setSoaTemplateValue("");
             setManualTemplate(false);
             setSuggestedId(null);
             setSubmitError(null);
@@ -90,6 +95,15 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
         [templates]
     );
 
+    const soaTemplateOptions = useMemo(
+        () =>
+            soaTemplates.map((template) => ({
+                value: String(template.id),
+                label: template.title,
+            })),
+        [soaTemplates]
+    );
+
     const selectedResignation = useMemo(
         () => eligibleResignations.find((resignation) => String(resignation.id) === resignationValue) ?? null,
         [eligibleResignations, resignationValue]
@@ -116,6 +130,11 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
         setSubmitError(null);
     };
 
+    const handleSoaTemplateChange = (value: string) => {
+        setSoaTemplateValue(value);
+        setSubmitError(null);
+    };
+
     const handleSubmit = async () => {
         const resignationId = Number(resignationValue);
         const templateId = Number(templateValue);
@@ -127,10 +146,15 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
             setSubmitError("Choose a template to continue");
             return;
         }
+        const soaTemplateId = soaTemplateValue === "" ? null : Number(soaTemplateValue);
+        if (soaTemplateValue !== "" && (!Number.isInteger(soaTemplateId) || (soaTemplateId as number) <= 0)) {
+            setSubmitError("Choose an SOA template to continue");
+            return;
+        }
         setIsSubmitting(true);
         setSubmitError(null);
         try {
-            const message = await assignClearance(resignationId, templateId);
+            const message = await assignClearance(resignationId, templateId, soaTemplateId);
             toast.success(message);
             onClose();
         } catch (err) {
@@ -205,6 +229,27 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                         {suggestedId !== null && !manualTemplate && templateValue === String(suggestedId) && (
                             <p className="text-xs text-muted-foreground">
                                 Auto-suggested from the employee&apos;s department. You may choose a different template.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label>SOA template</Label>
+                        <HubCombobox
+                            options={soaTemplateOptions}
+                            value={soaTemplateValue}
+                            onValueChange={handleSoaTemplateChange}
+                            placeholder="Select SOA template..."
+                            disabled={isSubmitting || soaTemplates.length === 0}
+                        />
+                        {soaTemplatesError && (
+                            <p className="text-xs text-muted-foreground">
+                                {soaTemplatesError} You may assign without one.
+                            </p>
+                        )}
+                        {!soaTemplatesError && soaTemplates.length === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                                No SOA templates are available. You may assign without one.
                             </p>
                         )}
                     </div>

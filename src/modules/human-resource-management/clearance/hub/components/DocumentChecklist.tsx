@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { JSX } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -14,9 +14,9 @@ import {
     CLEARANCE_DOCUMENT_STATE_LABELS,
     type ClearanceDocumentChecklist,
     type ClearanceDocumentEntry,
-    type ClearanceDocumentKey,
     type ClearanceDocumentState,
 } from "../types";
+import { clearanceHubTabForDocument, clearanceHubTabHref } from "../utils/documentTabs";
 import styles from "./hub-status.module.css";
 
 function entryTone(state: ClearanceDocumentState): StatusTone {
@@ -48,22 +48,9 @@ export function DocumentCompletionBadge({
     );
 }
 
-function documentBasePath(key: ClearanceDocumentKey): string {
-    if (key === "soa") return "/hrm/clearance/soa";
-    if (key === "quit_claim") return "/hrm/clearance/quit-claims";
-    return "/hrm/clearance/clearance-form";
-}
-
-function documentHrefs(key: ClearanceDocumentKey, requestId: number): { openHref: string; printHref: string } {
-    const base = documentBasePath(key);
-    return {
-        openHref: `${base}?request=${requestId}`,
-        printHref: `${base}?request=${requestId}&print=1`,
-    };
-}
-
 function ChecklistRow({ entry, requestId }: { entry: ClearanceDocumentEntry; requestId: number }): JSX.Element {
-    const { openHref, printHref } = documentHrefs(entry.key, requestId);
+    const router = useRouter();
+    const tab = clearanceHubTabForDocument(entry.key);
     return (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
             <div className="min-w-0">
@@ -80,12 +67,24 @@ function ChecklistRow({ entry, requestId }: { entry: ClearanceDocumentEntry; req
                 <StatusBadge tone={entryTone(entry.state)} className={entryClassName(entry.state)}>
                     {CLEARANCE_DOCUMENT_STATE_LABELS[entry.state]}
                 </StatusBadge>
-                <Button asChild size="sm" variant="outline">
-                    <Link href={openHref}>Open</Link>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                        router.push(clearanceHubTabHref(tab, requestId));
+                    }}
+                >
+                    Open
                 </Button>
                 {entry.state === "issued" ? (
-                    <Button asChild size="sm" variant="outline">
-                        <Link href={printHref}>Print</Link>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                            router.push(clearanceHubTabHref(tab, requestId, true));
+                        }}
+                    >
+                        Print
                     </Button>
                 ) : null}
             </div>

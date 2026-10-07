@@ -5,12 +5,12 @@ import {
     ensureClearanceForm,
     listClearanceFormOverview,
     mapClearanceFormError,
-} from "@/modules/human-resource-management/clearance/form/services/ClearanceFormService";
+} from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceFormService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
-} from "@/modules/human-resource-management/clearance/form/server/capability";
-import { CLEARANCE_FORM_OVERVIEW_STATUSES } from "@/modules/human-resource-management/clearance/form/types";
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
+import { CLEARANCE_FORM_OVERVIEW_STATUSES } from "@/modules/human-resource-management/clearance/hub/form/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
