@@ -34,6 +34,13 @@ export class TAApprovalService {
     };
   }
 
+  private static getFetchOptions(): RequestInit {
+    return {
+      headers: this.getHeaders(),
+      cache: "no-store",
+    };
+  }
+
   private static getCollection(type: RequestType): string {
     switch (type) {
       case "leave": return "leave_request";
@@ -60,7 +67,7 @@ export class TAApprovalService {
   static async fetchAllDepartments(): Promise<Department[]> {
     const url = `${this.API_BASE}/items/department?fields=department_id,department_name&sort=department_name`;
     try {
-      const res = await fetch(url, { headers: this.getHeaders() });
+      const res = await fetch(url, { ...this.getFetchOptions() });
       if (!res.ok) return [];
       const { data } = await res.json();
 
@@ -85,7 +92,7 @@ export class TAApprovalService {
         `?filter[department_id][_in]=${uniqueDeptIds.join(",")}` +
         `&fields=department_id,department_name&sort=department_name`;
 
-      const res = await fetch(url, { headers: this.getHeaders() });
+      const res = await fetch(url, { ...this.getFetchOptions() });
       if (!res.ok) return [];
       const { data } = await res.json();
       return Array.isArray(data) ? data : [];
@@ -127,7 +134,7 @@ export class TAApprovalService {
         if (filters?.endDate)   search.set("filter[filed_at][_lte]", filters.endDate);
 
         const url = `${this.API_BASE}/items/${collection}?${search.toString()}`;
-        const res = await fetch(url, { headers: this.getHeaders() });
+        const res = await fetch(url, { ...this.getFetchOptions() });
         if (!res.ok) continue;
         const { data } = await res.json();
         if (!Array.isArray(data)) continue;
@@ -177,7 +184,7 @@ export class TAApprovalService {
         if (filters?.endDate)   search.set("filter[filed_at][_lte]", filters.endDate);
 
         const url = `${this.API_BASE}/items/${collection}?${search.toString()}`;
-        const res = await fetch(url, { headers: this.getHeaders() });
+        const res = await fetch(url, { ...this.getFetchOptions() });
         if (!res.ok) continue;
         const { data } = await res.json();
         if (!Array.isArray(data)) continue;
@@ -217,7 +224,7 @@ export class TAApprovalService {
     if (uniqueUserIds.length > 0) {
       const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueUserIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department`;
       try {
-        const userRes = await fetch(userUrl, { headers: this.getHeaders() });
+        const userRes = await fetch(userUrl, { ...this.getFetchOptions() });
         if (userRes.ok) {
           const { data: userData } = await userRes.json();
           const userMap = new Map();
@@ -252,7 +259,7 @@ export class TAApprovalService {
     if (uniqueDeptIds.length > 0) {
       const deptUrl = `${this.API_BASE}/items/department?filter[department_id][_in]=${uniqueDeptIds.join(",")}&fields=department_id,department_name`;
       try {
-        const deptRes = await fetch(deptUrl, { headers: this.getHeaders() });
+        const deptRes = await fetch(deptUrl, { ...this.getFetchOptions() });
         if (deptRes.ok) {
           const { data: deptData } = await deptRes.json();
           const deptMap = new Map();
@@ -312,7 +319,7 @@ export class TAApprovalService {
       if (filters?.startDate) url += `&filter[filed_at][_gte]=${filters.startDate}`;
       if (filters?.endDate)   url += `&filter[filed_at][_lte]=${filters.endDate}`;
 
-      const res = await fetch(url, { headers: this.getHeaders() });
+      const res = await fetch(url, { ...this.getFetchOptions() });
 
 
       if (!res.ok) continue;
@@ -355,7 +362,7 @@ export class TAApprovalService {
       `&fields=history_id,request_id,request_type,approver_id,status_after,remarks,created_at` +
       `&sort=created_at`;
 
-    const res = await fetch(url, { headers: this.getHeaders() });
+    const res = await fetch(url, { ...this.getFetchOptions() });
     if (!res.ok) return [];
     const { data } = await res.json();
     if (!Array.isArray(data) || data.length === 0) return [];
@@ -368,7 +375,7 @@ export class TAApprovalService {
     if (uniqueIds.length > 0) {
       const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department.department_name`;
       try {
-        const uRes = await fetch(userUrl, { headers: this.getHeaders() });
+        const uRes = await fetch(userUrl, { ...this.getFetchOptions() });
         if (uRes.ok) {
           const { data: users } = await uRes.json();
           if (Array.isArray(users)) {
@@ -412,7 +419,7 @@ export class TAApprovalService {
 
     const url = `${this.API_BASE}/items/ta_approval_history?${search.toString()}`;
 
-    const res = await fetch(url, { headers: this.getHeaders() });
+    const res = await fetch(url, { ...this.getFetchOptions() });
     if (!res.ok) {
       console.error("[TAService] Failed to fetch approver logs:", res.status);
       return [];
@@ -430,7 +437,7 @@ export class TAApprovalService {
           const reqRes = await fetch(
             `${this.API_BASE}/items/${collection}/${log.request_id}` +
             `?fields=*,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_position,user_id.user_department.department_name`,
-            { headers: this.getHeaders() }
+            { ...this.getFetchOptions() }
           );
           if (!reqRes.ok) return { ...log, requester: null, current_status: null, request_details: null };
           const { data: req } = await reqRes.json();
@@ -463,7 +470,7 @@ export class TAApprovalService {
     if (uniqueUserIds.length > 0) {
       const userUrl = `${this.API_BASE}/items/user?filter[user_id][_in]=${uniqueUserIds.join(",")}&fields=user_id,user_fname,user_lname,user_position,user_department`;
       try {
-        const userRes = await fetch(userUrl, { headers: this.getHeaders() });
+        const userRes = await fetch(userUrl, { ...this.getFetchOptions() });
         if (userRes.ok) {
           const { data: userData } = await userRes.json();
           if (Array.isArray(userData)) {
@@ -491,7 +498,7 @@ export class TAApprovalService {
     if (uniqueDeptIds.length > 0) {
       const deptUrl = `${this.API_BASE}/items/department?filter[department_id][_in]=${uniqueDeptIds.join(",")}&fields=department_id,department_name`;
       try {
-        const deptRes = await fetch(deptUrl, { headers: this.getHeaders() });
+        const deptRes = await fetch(deptUrl, { ...this.getFetchOptions() });
         if (deptRes.ok) {
           const { data: deptData } = await deptRes.json();
           if (Array.isArray(deptData)) {
@@ -583,7 +590,7 @@ export class TAApprovalService {
       `&filter[is_deleted][_eq]=0` +
       `&fields=department_id,level`;
 
-    const res = await fetch(url, { headers: this.getHeaders() });
+    const res = await fetch(url, { ...this.getFetchOptions() });
     if (!res.ok) {
       console.error("[TAService] Failed to fetch approver assignments:", res.status);
       return [];
@@ -609,7 +616,7 @@ export class TAApprovalService {
       `&filter[is_deleted][_eq]=0` +
       `&aggregate[max]=level`;
 
-    const res = await fetch(url, { headers: this.getHeaders() });
+    const res = await fetch(url, { ...this.getFetchOptions() });
     if (!res.ok) return 1;
     const { data } = await res.json();
     const maxLevel = Number(data[0]?.max?.level ?? 0);
@@ -622,7 +629,7 @@ export class TAApprovalService {
   static async isHRDepartmentHead(userId: number): Promise<boolean> {
     const url = `${this.API_BASE}/items/department?filter[department_name][_eq]=Human Resource&fields=department_head_id`;
     try {
-      const res = await fetch(url, { headers: this.getHeaders() });
+      const res = await fetch(url, { ...this.getFetchOptions() });
       if (!res.ok) return false;
       const { data } = await res.json();
       if (!Array.isArray(data) || data.length === 0) return false;
@@ -653,7 +660,7 @@ export class TAApprovalService {
 
     // 1. Fetch current request state
     const reqUrl = `${this.API_BASE}/items/${collection}/${requestId}`;
-    const reqRes = await fetch(reqUrl, { headers: this.getHeaders() });
+    const reqRes = await fetch(reqUrl, { ...this.getFetchOptions() });
     if (!reqRes.ok) throw new Error("Request not found");
     const { data: request } = await reqRes.json();
 
@@ -694,7 +701,7 @@ export class TAApprovalService {
         `&filter[level][_eq]=${nextLevelNum}` +
         `&filter[is_deleted][_eq]=0`;
 
-      const appRes = await fetch(approverUrl, { headers: this.getHeaders() });
+      const appRes = await fetch(approverUrl, { ...this.getFetchOptions() });
       const { data: approvers } = await appRes.json();
 
       if (approvers && approvers.length > 0) {
@@ -719,7 +726,7 @@ export class TAApprovalService {
         `?filter[department_id][_eq]=${request.department_id}` +
         `&filter[level][_eq]=1` +
         `&filter[is_deleted][_eq]=0`;
-      const l1Res = await fetch(l1Url, { headers: this.getHeaders() });
+      const l1Res = await fetch(l1Url, { ...this.getFetchOptions() });
       const { data: l1Apps } = await l1Res.json();
       nextApproverId =
         l1Apps && l1Apps.length > 0 ? l1Apps[0].approver_id : null;

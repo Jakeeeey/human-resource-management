@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { TAApprovalService } from "@/modules/human-resource-management/employee-admin/approval/time-attendance/services/time-attendance.service";
 
 const DIRECTUS_URL =process.env.NEXT_PUBLIC_API_BASE_URL;
 const COOKIE_NAME = "vos_access_token";
@@ -80,7 +81,7 @@ export async function GET() {
 
     // Fetch TA draft approvers
     const taApproversRes = await directusFetch(
-      `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id`
+      `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id,level`
     ).catch(() => ({ data: [] }));
     
     const taApprovers = taApproversRes.data || [];
@@ -117,12 +118,18 @@ export async function GET() {
         .map((u) => [u.data.user_id, u.data])
     );
 
-    // Filter requests in JS based on the actual user's department
+    // Filter requests in JS based on the actual user's department and level
     if (!skipFilter) {
-      requests = requests.filter((req: { user_id: number }) => {
+      requests = requests.filter((req: { user_id: number; department_id?: number; current_approval_level?: number }) => {
         const user = usersMap.get(req.user_id);
         if (!user) return false;
-        return assignedDepartmentIds.includes(user.user_department);
+        
+        const actualDeptId = req.department_id || user.user_department;
+        const reqLevel = req.current_approval_level || 1;
+        
+        return taApprovers.some((ta: { department_id: number; level: number }) => 
+          Number(ta.department_id) === Number(actualDeptId) && Number(ta.level) === Number(reqLevel)
+        );
       });
     }
 
@@ -202,18 +209,33 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // Update the overtime request
-    const updateData: Record<string, unknown> = {
-      status,
-      remarks: remarks || null,
-      approver_id: userId,
-      approved_at: new Date().toISOString(),
-    };
+    const action = status === 'approved' ? 'approve' : 'reject';
 
-    await directusFetch(`/items/overtime_request`, {
-      method: "PATCH",
-      body: JSON.stringify({ keys: overtime_ids, data: updateData }),
-    });
+    // Process each overtime request using the TAApprovalService
+    const results = await Promise.allSettled(
+      overtime_ids.map((id) =>
+        TAApprovalService.processAction(
+          {
+            requestId: Number(id),
+            type: "overtime",
+            action,
+            remarks: remarks || "",
+          },
+          Number(userId)
+        )
+      )
+    );
+
+    const failed = results.filter((r) => r.status === "rejected");
+    if (failed.length > 0) {
+      console.error("Some overtime requests failed to process:", failed);
+      // We still return 200 but maybe indicate partial success if some passed
+      return NextResponse.json({
+        success: false,
+        message: `Failed to process some overtime requests.`,
+        error: "Partial or full failure during approval.",
+      }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,

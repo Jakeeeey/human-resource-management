@@ -10,6 +10,7 @@ import {
   SalesmanPerSupervisor,
   ReviewCommittee,
   ExpenseReviewCommittee,
+  ExpenseApprover,
   TAApprover,
   SystemUser,
   Division,
@@ -22,6 +23,7 @@ export function useRoleManagement() {
   const [reviewCommittee, setReviewCommittee] = useState<ReviewCommittee[]>([]);
   const [divisionHeads, setDivisionHeads] = useState<DivisionSalesHead[]>([]);
   const [expenseReviewCommittee, setExpenseReviewCommittee] = useState<ExpenseReviewCommittee[]>([]);
+  const [expenseApprovers, setExpenseApprovers] = useState<ExpenseApprover[]>([]);
   const [taApprovers, setTaApprovers] = useState<TAApprover[]>([]);
   const [supervisors, setSupervisors] = useState<SupervisorPerDivision[]>([]);
   const [salesmanAssignments, setSalesmanAssignments] = useState<SalesmanPerSupervisor[]>([]);
@@ -30,6 +32,7 @@ export function useRoleManagement() {
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisionNameSetting, setDivisionNameSetting] = useState("Division");
 
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
@@ -56,6 +59,11 @@ export function useRoleManagement() {
     setExpenseReviewCommittee(erc);
   }, []);
 
+  const fetchExpenseApprovers = useCallback(async () => {
+    const ea = await provider.listExpenseApprovers();
+    setExpenseApprovers(ea);
+  }, []);
+
   const fetchSupervisors = useCallback(async () => {
     const sup = await provider.listSupervisors();
     setSupervisors(sup);
@@ -75,16 +83,18 @@ export function useRoleManagement() {
 
   const fetchReferenceData = useCallback(async () => {
     try {
-      const [u, d, s, depts] = await Promise.all([
+      const [u, d, s, depts, dName] = await Promise.all([
         provider.listUsers(),
         provider.listDivisions(),
         provider.listSalesmen(),
         provider.listDepartments(),
+        provider.getDivisionNameSetting(),
       ]);
       setUsers(u);
       setDivisions(d);
       setSalesmen(s);
       setDepartments(depts);
+      setDivisionNameSetting(dName);
     } catch (err) {
       console.error("Failed to fetch reference data", err);
     }
@@ -99,6 +109,7 @@ export function useRoleManagement() {
         fetchExecutives(),
         fetchReviewCommittee(),
         fetchExpenseReviewCommittee(),
+        fetchExpenseApprovers(),
         fetchDivisionHeads(),
         fetchSupervisors(),
         fetchSalesmanAssignments(),
@@ -111,7 +122,7 @@ export function useRoleManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchExecutives, fetchReviewCommittee, fetchExpenseReviewCommittee, fetchDivisionHeads, fetchSupervisors, fetchSalesmanAssignments, fetchTAApprovers, fetchReferenceData]);
+  }, [fetchExecutives, fetchReviewCommittee, fetchExpenseReviewCommittee, fetchExpenseApprovers, fetchDivisionHeads, fetchSupervisors, fetchSalesmanAssignments, fetchTAApprovers, fetchReferenceData]);
 
   useEffect(() => {
     fetchData();
@@ -310,10 +321,45 @@ export function useRoleManagement() {
     }
   };
 
+  const createExpenseApprover = async (divisionId: number, userId: number, hierarchy: number) => {
+    setIsLoading(true);
+    try {
+      await provider.createExpenseApprover({ division_id: divisionId, approver_id: userId, approver_hierarchy: hierarchy });
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await fetchExpenseApprovers();
+      toast.success("Expense approver assigned successfully");
+    } catch (e) {
+      const err = e as Error;
+      console.error(err);
+      toast.error(err.message || "Failed to assign expense approver");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteExpenseApprover = async (id: number) => {
+    setIsLoading(true);
+    try {
+      await provider.deleteExpenseApprover(id);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await fetchExpenseApprovers();
+      toast.success("Expense approver removed successfully");
+    } catch (e) {
+      const err = e as Error;
+      console.error(err);
+      toast.error(err.message || "Failed to remove expense approver");
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     executives,
     reviewCommittee,
     expenseReviewCommittee,
+    expenseApprovers,
     divisionHeads,
     supervisors,
     salesmanAssignments,
@@ -322,6 +368,7 @@ export function useRoleManagement() {
     divisions,
     salesmen,
     departments,
+    divisionNameSetting,
     isLoading,
     isError,
     error,
@@ -332,6 +379,8 @@ export function useRoleManagement() {
     deleteReviewCommittee,
     createExpenseReviewCommittee,
     deleteExpenseReviewCommittee,
+    createExpenseApprover,
+    deleteExpenseApprover,
     createDivisionHead,
     deleteDivisionHead,
     createSupervisor,

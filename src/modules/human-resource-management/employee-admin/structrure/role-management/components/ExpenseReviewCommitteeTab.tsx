@@ -31,9 +31,10 @@ interface ExpenseReviewCommitteeTabProps {
   onCreate: (divisionId: number, userId: number, hierarchy: number) => Promise<void>;
   users: SystemUser[];
   divisions: Division[];
+  divisionNameSetting?: string;
 }
 
-export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users, divisions }: ExpenseReviewCommitteeTabProps) {
+export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate, users, divisions, divisionNameSetting = "Division" }: ExpenseReviewCommitteeTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
   const [filterDivision, setFilterDivision] = React.useState<string>("all");
@@ -49,9 +50,9 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
   const pagination = usePagination(filteredData, 5);
 
   const divisionOptions = React.useMemo(() => [
-    { value: "all", label: "All Business Units" },
+    { value: "all", label: `All ${divisionNameSetting}s` },
     ...divisions.map(d => ({ value: d.division_id.toString(), label: d.division_name }))
-  ], [divisions]);
+  ], [divisions, divisionNameSetting]);
 
   const getHierarchyColor = (level: number) => {
     switch (level) {
@@ -98,7 +99,7 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
             options={divisionOptions}
             value={filterDivision}
             onValueChange={setFilterDivision}
-            placeholder="Filter by Business Unit"
+            placeholder={`Filter by ${divisionNameSetting}`}
             className="border-none bg-transparent h-7 focus:ring-0 shadow-none font-bold text-xs"
           />
           {filterDivision !== "all" && (
@@ -143,7 +144,7 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-muted-foreground/10">
-              <TableHead className="font-semibold py-4 px-6 text-foreground/80">Managing Unit</TableHead>
+              <TableHead className="font-semibold py-4 px-6 text-foreground/80">{divisionNameSetting}</TableHead>
               <TableHead className="font-semibold py-4 text-foreground/80">Committee Member Name</TableHead>
               <TableHead className="font-semibold py-4 text-foreground/80">Contact</TableHead>
               <TableHead className="font-semibold py-4 text-center text-foreground/80">Hierarchy Level</TableHead>
@@ -159,10 +160,10 @@ export function ExpenseReviewCommitteeTab({ data, isLoading, onDelete, onCreate,
                       <LayoutDashboard className="h-10 w-10" />
                     </div>
                     <p className="text-base font-medium">
-                      {filterDivision !== "all" ? "No members for this business unit" : "No expense review committee members assigned"}
+                      {filterDivision !== "all" ? `No members for this ${divisionNameSetting.toLowerCase()}` : "No expense review committee members assigned"}
                     </p>
                     <p className="text-sm">
-                      {filterDivision !== "all" ? "Try adjusting your filter or assign a new member." : "Start by assigning an approver to a business unit."}
+                      {filterDivision !== "all" ? "Try adjusting your filter or assign a new member." : `Start by assigning an approver to a ${divisionNameSetting.toLowerCase()}.`}
                     </p>
                   </div>
                 </TableCell>

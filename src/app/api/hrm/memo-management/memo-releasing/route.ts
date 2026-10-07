@@ -241,18 +241,25 @@ export async function PATCH(req: NextRequest) {
                 return NextResponse.json({ error: "Missing success_count or status parameters" }, { status: 400 });
             }
 
+            const patchBody: Record<string, unknown> = {
+                status: status,
+                synced_companies_count: success_count,
+                updated_by: userId,
+                updated_at: phTime
+            };
+
+            if (status === "Released" || status === "Partially Released") {
+                patchBody.released_by = userId;
+                patchBody.released_at = phTime;
+            }
+
             const patchRes = await fetch(`${UPSTREAM_BASE.replace(/\/+$/, "")}/items/company_memo/${memo.id}`, {
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${process.env.DIRECTUS_STATIC_TOKEN}`
                 },
-                body: JSON.stringify({
-                    status: status,
-                    synced_companies_count: success_count,
-                    updated_by: userId,
-                    updated_at: phTime
-                })
+                body: JSON.stringify(patchBody)
             });
 
             if (!patchRes.ok) {

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
+import { ensureOnboardingProfile } from "./ensureOnboardingProfile";
 
 export const runtime = "nodejs";
 
@@ -36,6 +38,36 @@ export async function POST(req: NextRequest) {
     });
 
     const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      // Onboarding hook (todo 2): idempotent ensure-call on Spring-create
+      // success ONLY — void-style, never awaited, never alters this response.
+      // The id resolves ONLY via the springProvider response shapes below;
+      // any other shape is an explicit no-op with a redacted orphan alert.
+      const record =
+        data !== null && typeof data === "object" && !Array.isArray(data)
+          ? (data as Record<string, unknown>)
+          : null;
+      const nested = (key: string): Record<string, unknown> | null => {
+        const value = record?.[key];
+        return value !== null && typeof value === "object" && !Array.isArray(value)
+          ? (value as Record<string, unknown>)
+          : null;
+      };
+      const rawId =
+        record?.["id"] ?? nested("data")?.["id"] ?? nested("user")?.["id"];
+      const employeeId =
+        typeof rawId === "number"
+          ? rawId
+          : Number.parseInt(String(rawId ?? ""), 10);
+      if (!Number.isInteger(employeeId) || employeeId <= 0) {
+        logRedacted(
+          "[create employee] hire ok but employee id absent — onboarding ensure skipped"
+        );
+      } else {
+        void ensureOnboardingProfile(employeeId).catch(logRedacted);
+      }
+    }
 
     return NextResponse.json(data, { status: response.status });
   } catch (error: unknown) {

@@ -203,16 +203,16 @@ export default function EmployeeMasterlistModule() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-6 relative gap-0.5">
-        <TabsList className="bg-transparent h-11 w-fit p-0 gap-1 flex relative pl-6" style={{ marginBottom: "-1px" }}>
+        <TabsList className="bg-transparent h-11 w-fit p-0 gap-1 flex relative pl-6 group-data-[orientation=horizontal]/tabs:h-auto" style={{ marginBottom: "-1px" }}>
           <TabsTrigger
             value="list"
-            className="bg-muted/20 border-border/40 data-[state=active]:bg-card data-[state=active]:border-border data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-b-transparent data-[state=active]:!shadow-none border rounded-t-xl rounded-b-none h-11 px-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground data-[state=active]:text-foreground transition-all hover:bg-muted/30 relative z-0 data-[state=active]:z-30 flex-none"
+            className="bg-muted/20 border-border/40 data-[state=active]:bg-card data-[state=active]:border-border data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-b-transparent data-[state=active]:!shadow-none border rounded-t-xl rounded-b-none h-11 px-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground data-[state=active]:text-foreground transition-all hover:bg-muted/30 relative z-0 data-[state=active]:z-30 flex-none text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
           >
             <Users className="h-4 w-4" /> Master List
           </TabsTrigger>
           <TabsTrigger
             value="analytics"
-            className="bg-muted/20 border-border/40 data-[state=active]:bg-card data-[state=active]:border-border data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-b-transparent data-[state=active]:!shadow-none border rounded-t-xl rounded-b-none h-11 px-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground data-[state=active]:text-foreground transition-all hover:bg-muted/30 relative z-0 data-[state=active]:z-30 flex-none"
+            className="bg-muted/20 border-border/40 data-[state=active]:bg-card data-[state=active]:border-border data-[state=active]:border-t data-[state=active]:border-x data-[state=active]:border-b-transparent data-[state=active]:!shadow-none border rounded-t-xl rounded-b-none h-11 px-5 flex items-center gap-2 text-sm font-semibold text-muted-foreground data-[state=active]:text-foreground transition-all hover:bg-muted/30 relative z-0 data-[state=active]:z-30 flex-none text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
           >
             <BarChart3 className="h-4 w-4" /> HR Analytics
           </TabsTrigger>

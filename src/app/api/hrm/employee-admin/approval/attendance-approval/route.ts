@@ -144,6 +144,7 @@ export async function GET(req: NextRequest) {
     // Department filtering logic:
     // 1. If a specific department is selected, use it.
     // 2. Otherwise, if the user is NOT an admin, restrict to their authorized departments.
+    let assignedDepartmentIds: number[] = [];
     if (selectedDepartmentId && selectedDepartmentId !== "all") {
       filterParts.push(`filter[department_id][_eq]=${selectedDepartmentId}`);
     } else {
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
       ).catch(() => ({ data: [] }));
       
       const taApprovers = taApproversRes.data || [];
-      const assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
+      assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
 
       const skipFilter = isAdmin && assignedDepartmentIds.length === 0;
 
@@ -166,28 +167,31 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const isDailyApproval = Boolean(startDate && endDate && startDate === endDate);
+    const targetDate = startDate || "";
+
     const filter = filterParts.join("&");
     // Only include fields that actually exist in the attendance_log table.
     // Calculations like work_minutes, late_minutes etc. are done in the mapping function.
     const logFields = "log_id,user_id,department_id,log_date,time_in,time_out,approve_status,status";
     const finalUrl = `/items/attendance_log?${filter}${filter ? "&" : ""}sort=-log_date&limit=1000&fields=${logFields}`;
 
-
     // Fetch attendance logs
-    const attendanceResponse = await directusFetch(finalUrl);
-
-
+    const attendanceResponse = await directusFetch(finalUrl).catch(() => ({ data: [] }));
     const logs = attendanceResponse.data || [];
 
-    if (logs.length === 0) {
-      return NextResponse.json({ data: [], total: 0 });
-    }
-
-    // Fetch user details for all logs in one batch request
-    const userIds = [...new Set(logs.map((l: AttendanceLog) => l.user_id))] as number[];
-    const usersResponse = await directusFetch(
-      `/items/user?filter[user_id][_in]=${userIds.join(",")}&fields=user_id,user_fname,user_lname,user_mname,user_department`
-    ).catch(() => ({ data: [] }));
+    // Helper to check soft-deleted users in Directus
+    const isDeletedUser = (val: unknown): boolean => {
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'number') return val !== 0;
+      if (val && typeof val === 'object') {
+        const buf = val as { type?: string; data?: number[] };
+        if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+          return buf.data[0] === 1;
+        }
+      }
+      return false;
+    };
 
     interface UserDetails {
       user_id: number;
@@ -195,36 +199,79 @@ export async function GET(req: NextRequest) {
       user_lname: string;
       user_mname: string | null;
       user_department: number | null;
+      is_employee?: unknown;
+      is_deleted?: unknown;
     }
 
-    const usersMap = new Map<number, UserDetails>(
-      (usersResponse.data || []).map((u: UserDetails) => [u.user_id, u])
-    );
-
-    // Fetch department details in one batch request
-    const deptIds = [...new Set(logs.map((l: AttendanceLog) => l.department_id).filter(Boolean))] as number[];
-    const deptsResponse = await directusFetch(
-      `/items/department?filter[department_id][_in]=${deptIds.join(",")}&fields=department_id,department_name`
+    // Fetch all users to have details and identify absent active employees
+    const usersResponse = await directusFetch(
+      `/items/user?limit=-1&fields=user_id,user_fname,user_lname,user_mname,user_department,is_employee,is_deleted`
     ).catch(() => ({ data: [] }));
 
+    const allUsers: UserDetails[] = usersResponse.data || [];
+
+    const usersMap = new Map<number, UserDetails>(
+      allUsers.map((u: UserDetails) => [u.user_id, u])
+    );
+
+    // Filter active employees
+    const activeEmployees = allUsers.filter((u: UserDetails) =>
+      !isDeletedUser(u.is_deleted) && (u.is_employee === 1 || u.is_employee === true)
+    );
+
+    // Filter active employees by selected/authorized department
+    let eligibleEmployees = activeEmployees;
+    if (selectedDepartmentId && selectedDepartmentId !== "all") {
+      eligibleEmployees = eligibleEmployees.filter((u: UserDetails) =>
+        String(u.user_department) === String(selectedDepartmentId)
+      );
+    } else if (!isAdmin || assignedDepartmentIds.length > 0) {
+      if (assignedDepartmentIds.length > 0) {
+        const allowedDeptSet = new Set(assignedDepartmentIds.map(String));
+        eligibleEmployees = eligibleEmployees.filter((u: UserDetails) =>
+          u.user_department && allowedDeptSet.has(String(u.user_department))
+        );
+      } else {
+        eligibleEmployees = [];
+      }
+    }
+
+    if (logs.length === 0 && (!isDailyApproval || eligibleEmployees.length === 0)) {
+      return NextResponse.json({ data: [], total: 0 });
+    }
+
+    // Fetch department details in one batch request
     interface DeptDetails {
       department_id: number;
       department_name: string;
     }
 
+    const deptsResponse = await directusFetch(
+      `/items/department?limit=-1&fields=department_id,department_name`
+    ).catch(() => ({ data: [] }));
+
     const deptsMap = new Map<number, DeptDetails>(
       (deptsResponse.data || []).map((d: DeptDetails) => [d.department_id, d])
     );
 
-    // Optimized metadata fetches with specific fields and filtered by userIds/deptIds where possible
-    // Only perform filtered fetches if we have IDs, otherwise fetch with default limit
-    const userIdsFilter = userIds.length > 0 ? `filter[user_id][_in]=${userIds.join(",")}` : "";
+    // Relevant user IDs for metadata lookups (both logged and eligible absent employees)
+    const allRelevantUserIds = Array.from(new Set([
+      ...logs.map((l: AttendanceLog) => l.user_id),
+      ...(isDailyApproval ? eligibleEmployees.map((e: UserDetails) => e.user_id) : [])
+    ]));
+
+    const userIdsFilter = allRelevantUserIds.length > 0 ? `filter[user_id][_in]=${allRelevantUserIds.join(",")}` : "";
+    const approvalFilter = allRelevantUserIds.length > 0
+      ? (isDailyApproval
+          ? `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&filter[date_schedule][_eq]=${targetDate}&limit=1000`
+          : `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&limit=1000`)
+      : (isDailyApproval ? `filter[date_schedule][_eq]=${targetDate}&limit=1000` : `limit=1000`);
 
     const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes] = await Promise.all([
       directusFetch(`/items/department_schedule?limit=1000&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
       directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,schedule_date,workdays`),
-      directusFetch(`/items/attendance_approval?${userIds.length > 0 ? `filter[employee_id][_in]=${userIds.join(",")}` : ""}&limit=1000&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
+      directusFetch(`/items/attendance_approval?${approvalFilter}&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
       directusFetch(`/items/overtime_request?${userIdsFilter}&filter[status][_eq]=approved&limit=1000&fields=user_id,request_date,status`)
     ]);
 
@@ -266,59 +313,53 @@ export async function GET(req: NextRequest) {
       otRequestsMap.set(key, req);
     });
 
-    // Combine data
-    const enrichedLogs = logs.map((log: AttendanceLog) => {
-      const user = usersMap.get(log.user_id);
-      const dept = log.department_id ? deptsMap.get(log.department_id) : null;
+    interface OncallScheduleRecord {
+      id: number;
+      department_id: number;
+      group: string;
+      work_start: string;
+      work_end: string;
+      lunch_start: string;
+      lunch_end: string;
+      break_start: string;
+      break_end: string;
+      grace_period: number;
+      schedule_date: string | null;
+      workdays: string | null;
+    }
 
-      // const dayOfWeek = format(new Date(log.log_date), "EEEE");
-      const userDeptId = user?.user_department;
+    interface DepartmentScheduleRecord {
+      department_id: number;
+      work_start: string;
+      work_end: string;
+      lunch_start: string;
+      lunch_end: string;
+      break_start: string;
+      break_end: string;
+      grace_period: number;
+    }
 
-
-
-      // 1. Check Oncall Priority
+    const getEmployeeSchedule = (userIdParam: number, userDeptIdParam: number | null | undefined, dateStr: string): Sched | null => {
       const userOncallEntries = oncallList.filter((entry: { user_id: number; dept_sched_id: number }) =>
-        String(entry.user_id) === String(log.user_id)
+        String(entry.user_id) === String(userIdParam)
       );
 
-      let schedule: Sched | null = null;
-
       if (userOncallEntries.length > 0) {
-
         for (const entry of userOncallEntries) {
-          // As verified by user example (Turn 446): oncall_list.dept_sched_id connects to oncall_schedule.id
-          // The oncall schedule must only apply if its schedule_date matches the log's date
-          interface OncallScheduleRecord {
-            id: number;
-            department_id: number;
-            group: string;
-            work_start: string;
-            work_end: string;
-            lunch_start: string;
-            lunch_end: string;
-            break_start: string;
-            break_end: string;
-            grace_period: number;
-            schedule_date: string | null;
-            workdays: string | null;
-          }
           const ocSched = oncallSchedules.find((s: OncallScheduleRecord) => {
             if (String(s.id) !== String(entry.dept_sched_id)) return false;
-            
-            if (s.schedule_date && log.log_date) {
+
+            if (s.schedule_date && dateStr) {
               const schedDateOnly = s.schedule_date.split('T')[0];
-              const logDateOnly = log.log_date.split('T')[0];
-              
-              // 1. Strict Date Match: If exactly the same date, it applies.
+              const logDateOnly = dateStr.split('T')[0];
+
               if (schedDateOnly === logDateOnly) return true;
 
-              // 2. Weekly Catchment Logic (User example: March 25 Start + Thu/Fri selected)
-              // Match if in the same ISO week AND the specific day is checked in the record.
               const schedDate = parseISO(schedDateOnly);
               const logDate = parseISO(logDateOnly);
 
               if (isSameISOWeek(schedDate, logDate)) {
-                const dayOfWeek = format(logDate, "EEEE"); // e.g., "Thursday"
+                const dayOfWeek = format(logDate, "EEEE");
                 return s.workdays?.includes(dayOfWeek);
               }
             }
@@ -326,48 +367,39 @@ export async function GET(req: NextRequest) {
           });
 
           if (ocSched) {
-
-            schedule = {
+            return {
               time_in: ocSched.work_start,
               time_out: ocSched.work_end,
               grace_period: Number(ocSched.grace_period ?? 5)
             };
-
-            break;
           }
         }
       }
 
-      // 2. Fallback to Department Schedule
-      if (!schedule && userDeptId) {
-        interface DepartmentScheduleRecord {
-          department_id: number;
-          work_start: string;
-          work_end: string;
-          lunch_start: string;
-          lunch_end: string;
-          break_start: string;
-          break_end: string;
-          grace_period: number;
-        }
+      if (userDeptIdParam) {
         const deptSched = deptSchedules.find((s: DepartmentScheduleRecord) =>
-          String(s.department_id) === String(userDeptId)
+          String(s.department_id) === String(userDeptIdParam)
         );
 
         if (deptSched) {
-
-          schedule = {
+          return {
             time_in: deptSched.work_start,
             time_out: deptSched.work_end,
             grace_period: Number(deptSched.grace_period ?? 5)
           };
-
         }
       }
 
-      if (!schedule) {
+      return null;
+    };
 
-      }
+    // Combine data for logged employees
+    const enrichedLogs = logs.map((log: AttendanceLog) => {
+      const user = usersMap.get(log.user_id);
+      const dept = log.department_id ? deptsMap.get(log.department_id) : (user?.user_department ? deptsMap.get(user.user_department) : null);
+      const userDeptId = user?.user_department || log.department_id;
+
+      const schedule = getEmployeeSchedule(log.user_id, userDeptId, log.log_date);
 
       let work_minutes = 0;
       let late_minutes = 0;
@@ -439,11 +471,6 @@ export async function GET(req: NextRequest) {
       const manualAdjustments = approvalsMap.get(approvalKey);
 
       if (manualAdjustments) {
-
-
-        // If it's a pending log, we might want to favor calculation if the manual record
-        // looks like it was saved with 'stale' values due to the previous calculation bug.
-        // If calculation shows more minutes and there are no manual remarks, we favor calculation.
         const isStaleManualRecord =
           log.approve_status === "pending" &&
           manualAdjustments.work_minutes < work_minutes &&
@@ -454,8 +481,6 @@ export async function GET(req: NextRequest) {
           late_minutes = manualAdjustments.late_minutes ?? late_minutes;
           undertime_minutes = manualAdjustments.undertime_minutes ?? undertime_minutes;
           overtime_minutes = manualAdjustments.overtime_minutes ?? overtime_minutes;
-        } else {
-
         }
       }
 
@@ -474,13 +499,75 @@ export async function GET(req: NextRequest) {
         overtime_minutes,
         sched_time_in: schedule?.time_in || null,
         sched_time_out: schedule?.time_out || null,
-        status: manualAdjustments?.remarks || log.status // Use manual remarks if available
+        status: manualAdjustments?.remarks || log.status || (log.time_in ? "On Time" : "Absent")
       };
     });
 
-    let finalLogs = enrichedLogs;
+    // Synthesize records for absent active employees (0 0 0 0 minutes) in Daily Approval
+    const loggedUserIds = new Set(logs.map((l: AttendanceLog) => l.user_id));
+    const absentLogs: typeof enrichedLogs = [];
+
+    if (isDailyApproval) {
+      for (const emp of eligibleEmployees) {
+        if (loggedUserIds.has(emp.user_id)) continue;
+
+        const schedule = getEmployeeSchedule(emp.user_id, emp.user_department, targetDate);
+        const dept = emp.user_department ? deptsMap.get(emp.user_department) : null;
+
+        const approvalKey = `${emp.user_id}_${targetDate.split('T')[0]}`;
+        const manualAdjustments = approvalsMap.get(approvalKey);
+
+        let work_minutes = 0;
+        let late_minutes = 0;
+        let undertime_minutes = 0;
+        let overtime_minutes = 0;
+        let derivedStatus = "pending";
+        let statusRemarks = "Absent";
+
+        if (manualAdjustments) {
+          work_minutes = manualAdjustments.work_minutes ?? 0;
+          late_minutes = manualAdjustments.late_minutes ?? 0;
+          undertime_minutes = manualAdjustments.undertime_minutes ?? 0;
+          overtime_minutes = manualAdjustments.overtime_minutes ?? 0;
+          derivedStatus = manualAdjustments.status || "pending";
+          statusRemarks = manualAdjustments.remarks || "Absent";
+        }
+
+        absentLogs.push({
+          log_id: -(emp.user_id),
+          user_id: emp.user_id,
+          department_id: emp.user_department ?? 0,
+          log_date: targetDate,
+          time_in: null,
+          time_out: null,
+          lunch_start: null,
+          lunch_end: null,
+          break_start: null,
+          break_end: null,
+          status: statusRemarks,
+          approval_status: derivedStatus.toLowerCase(),
+          approve_status: derivedStatus.toLowerCase(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_fname: emp.user_fname || "Unknown",
+          user_lname: emp.user_lname || "",
+          user_mname: emp.user_mname || null,
+          department_name: dept?.department_name || null,
+          work_minutes,
+          late_minutes,
+          undertime_minutes,
+          overtime_minutes,
+          sched_time_in: schedule?.time_in || null,
+          sched_time_out: schedule?.time_out || null,
+        });
+      }
+    }
+
+    const allEnrichedLogs = [...enrichedLogs, ...absentLogs];
+
+    let finalLogs = allEnrichedLogs;
     if (approvalStatus && approvalStatus !== "all") {
-      finalLogs = enrichedLogs.filter((log: { approval_status?: string; [key: string]: unknown }) => log.approval_status === approvalStatus.toLowerCase());
+      finalLogs = allEnrichedLogs.filter((log: { approval_status?: string; [key: string]: unknown }) => log.approval_status === approvalStatus.toLowerCase());
     }
 
     return NextResponse.json({
@@ -533,22 +620,55 @@ export async function PATCH(req: NextRequest) {
 
     const results = [];
 
-    // For large batches, we could optimize this further with Directus batch endpoints,
-    // but for now, we'll process them in the most stable way.
+    // Process items safely
     for (const item of items) {
       const { log_id, employee_id, date_schedule, status, remarks, work_minutes, late_minutes, undertime_minutes, overtime_minutes } = item;
       const cleanDate = date_schedule ? date_schedule.split('T')[0] : null;
 
-      if (!log_id || !status || !['approved', 'rejected', 'pending'].includes(status) || !employee_id || !cleanDate) {
+      if (!status || !['approved', 'rejected', 'pending'].includes(status) || !employee_id || !cleanDate) {
         results.push({ log_id, success: false, error: "Missing required fields" });
         continue;
       }
 
-      // 1. Update the attendance log status
-      await directusFetch(`/items/attendance_log/${log_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ approve_status: status }),
-      });
+      // 1. Update or create the attendance log
+      if (log_id && log_id > 0) {
+        await directusFetch(`/items/attendance_log/${log_id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ approve_status: status }),
+        }).catch((err) => {
+          console.warn(`[Attendance Approval] Failed to update attendance_log ${log_id}:`, err);
+        });
+      } else {
+        // Employee was absent/had no attendance_log initially.
+        // Check if an attendance_log was already created for this user and date
+        const existingLogRes = await directusFetch(
+          `/items/attendance_log?filter[user_id][_eq]=${employee_id}&filter[log_date][_eq]=${cleanDate}&limit=1&fields=log_id`
+        ).catch(() => ({ data: [] }));
+
+        const existingLog = existingLogRes.data?.[0];
+        if (existingLog) {
+          await directusFetch(`/items/attendance_log/${existingLog.log_id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ approve_status: status, status: remarks || 'Absent' }),
+          }).catch((err) => console.warn(`[Attendance Approval] Update log error:`, err));
+        } else {
+          // Fetch employee's department_id
+          const empRes = await directusFetch(`/items/user/${employee_id}?fields=user_department`).catch(() => ({ data: {} }));
+          const deptId = empRes.data?.user_department || 1;
+          await directusFetch(`/items/attendance_log`, {
+            method: "POST",
+            body: JSON.stringify({
+              user_id: employee_id,
+              department_id: deptId,
+              log_date: cleanDate,
+              time_in: null,
+              time_out: null,
+              status: remarks || 'Absent',
+              approve_status: status
+            }),
+          }).catch((err) => console.warn(`[Attendance Approval] Create absent log error:`, err));
+        }
+      }
 
       // 2. Upsert the approval record
       const filter = `filter[employee_id][_eq]=${employee_id}&filter[date_schedule][_eq]=${cleanDate}`;
@@ -577,7 +697,7 @@ export async function PATCH(req: NextRequest) {
         late_minutes: late_minutes ?? 0,
         undertime_minutes: undertime_minutes ?? 0,
         overtime_minutes: overtime_minutes ?? 0,
-        remarks: remarks || null,
+        remarks: remarks || "Absent",
       };
 
       if (status !== 'pending') approvalData.status = status;

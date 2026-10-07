@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { FileText } from "lucide-react";
+import { Eye, FileText } from "lucide-react";
+import { AttachmentPreviewDialog, type ApplicationAttachmentFile } from "./AttachmentPreviewDialog";
+import { formatPHT, parseUtcInstant } from "../utils/time";
 
 import { Form } from "@/components/ui/form";
 import {
@@ -19,17 +21,18 @@ import { Button } from "@/components/ui/button";
 import {
     DEFAULT_APPLICATION_FORM,
     type ApplicationFormValues,
-} from "@/modules/human-resource-management/application-form/types";
-import { ApplicationDetailsSection } from "@/modules/human-resource-management/application-form/components/sections/ApplicationDetailsSection";
-import { PersonalInfoSection } from "@/modules/human-resource-management/application-form/components/sections/PersonalInfoSection";
-import { FamilyBackgroundSection } from "@/modules/human-resource-management/application-form/components/sections/FamilyBackgroundSection";
-import { CompanyRelativesSection } from "@/modules/human-resource-management/application-form/components/sections/CompanyRelativesSection";
-import { EducationSection } from "@/modules/human-resource-management/application-form/components/sections/EducationSection";
-import { LicensureExamSection } from "@/modules/human-resource-management/application-form/components/sections/LicensureExamSection";
-import { SkillsSection } from "@/modules/human-resource-management/application-form/components/sections/SkillsSection";
-import { WorkExperienceSection } from "@/modules/human-resource-management/application-form/components/sections/WorkExperienceSection";
-import { ReferencesSection } from "@/modules/human-resource-management/application-form/components/sections/ReferencesSection";
-import { TrainingsSection } from "@/modules/human-resource-management/application-form/components/sections/TrainingsSection";
+} from "@/modules/human-resource-management/recruitment/application-form/types";
+import { ApplicationDetailsSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/ApplicationDetailsSection";
+import { PhotoCapture } from "@/modules/human-resource-management/recruitment/application-form/components/PhotoCapture";
+import { PersonalInfoSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/PersonalInfoSection";
+import { FamilyBackgroundSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/FamilyBackgroundSection";
+import { CompanyRelativesSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/CompanyRelativesSection";
+import { EducationSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/EducationSection";
+import { LicensureExamSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/LicensureExamSection";
+import { SkillsSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/SkillsSection";
+import { WorkExperienceSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/WorkExperienceSection";
+import { ReferencesSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/ReferencesSection";
+import { TrainingsSection } from "@/modules/human-resource-management/recruitment/application-form/components/sections/TrainingsSection";
 import {
     mapApplicationToFormValues,
     type ApplicationBundle,
@@ -57,14 +60,16 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
     const [loadError, setLoadError] = useState<string | null>(null);
     const [submittedAt, setSubmittedAt] = useState<string>("");
     const [signatureImage, setSignatureImage] = useState<string | null>(null);
-    const [attachmentFiles, setAttachmentFiles] = useState<{ type: string; label: string; filename: string; file_url: string | null }[]>([]);
+    const [photoImage, setPhotoImage] = useState<string | null>(null);
+    const [attachmentFiles, setAttachmentFiles] = useState<ApplicationAttachmentFile[]>([]);
+    const [previewFile, setPreviewFile] = useState<ApplicationAttachmentFile | null>(null);
 
     useEffect(() => {
         if (!open || applicantId === null) return;
         let cancelled = false;
         setIsLoading(true);
         setLoadError(null);
-        fetch(`/api/hrm/applications/by-applicant?applicant_id=${applicantId}`)
+        fetch(`/api/hrm/recruitment/applicants/applications/by-applicant?applicant_id=${applicantId}`)
             .then(async (res) => {
                 const body = (await res.json()) as {
                     data?: ApplicationBundle & { application: Record<string, unknown> };
@@ -74,14 +79,7 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                 if (!body.data || cancelled) return;
                 form.reset(mapApplicationToFormValues(body.data));
                 const photoUrl = (body.data as { photo_image?: unknown }).photo_image;
-                if (typeof photoUrl === "string" && photoUrl.startsWith("data:")) {
-                    try {
-                        const blob = (await (await fetch(photoUrl)).blob()) as Blob;
-                        form.setValue("photo_selected", new File([blob], "photo", { type: blob.type || "image/jpeg" }));
-                    } catch {
-                        form.setValue("photo_selected", null);
-                    }
-                }
+                setPhotoImage(typeof photoUrl === "string" && photoUrl.startsWith("data:") ? photoUrl : null);
                 const sigUrl = (body.data as { signature_image?: unknown }).signature_image;
                 setSignatureImage(typeof sigUrl === "string" && sigUrl.startsWith("data:") ? sigUrl : null);
                 const files = (body.data as { attachment_files?: unknown }).attachment_files;
@@ -98,7 +96,9 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         : []
                 );
                 const raw = body.data.application["submitted_at"];
-                setSubmittedAt(typeof raw === "string" ? raw.slice(0, 10) : "");
+                setSubmittedAt(
+                    typeof raw === "string" && parseUtcInstant(raw) ? formatPHT(raw) : ""
+                );
             })
             .catch((err: unknown) => {
                 if (cancelled) return;
@@ -116,11 +116,12 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
     }, [open, applicantId]);
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <>
+        <Dialog open={open} onOpenChange={(o) => { if (!o) setPreviewFile(null); onOpenChange(o); }}>
             <DialogContent className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-border/40 bg-card">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3">
+                        <DialogTitle className="text-xl font-extrabold flex items-center gap-3 pr-8">
                             <FileText className="h-5 w-5 text-muted-foreground" />
                             <span className="truncate" title={applicantName}>
                                 {applicantName} — Application
@@ -129,6 +130,9 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         {submittedAt ? (
                             <DialogDescription className="text-sm mt-2">Submitted {submittedAt}</DialogDescription>
                         ) : null}
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Read-only view — nothing you touch here is saved.
+                        </p>
                     </DialogHeader>
                 </div>
 
@@ -142,9 +146,12 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                         <p className="text-sm text-destructive text-center py-16">{loadError}</p>
                     ) : (
                         <Form {...form}>
-                            <fieldset disabled inert className="space-y-8">
+                            <div className="mb-8">
+                                <PhotoCapture value={null} readOnly imageUrl={photoImage} />
+                            </div>
+                            <fieldset disabled inert aria-readonly="true" className="space-y-8 select-none opacity-90">
                                 <ApplicationDetailsSection form={form} />
-                                <PersonalInfoSection form={form} />
+                                <PersonalInfoSection form={form} readOnly />
                                 <FamilyBackgroundSection form={form} />
                                 <CompanyRelativesSection form={form} />
                                 <EducationSection form={form} />
@@ -177,9 +184,21 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                                                     <p className="text-xs text-muted-foreground truncate">{f.type}{f.label ? ` — ${f.label}` : ""}</p>
                                                 </div>
                                                 {f.file_url ? (
-                                                    <a href={f.file_url} download={f.filename} className="text-sm font-medium text-primary hover:underline shrink-0">
-                                                        Download
-                                                    </a>
+                                                    <>
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => setPreviewFile(f)}
+                                                            className="shrink-0 rounded-lg h-7 px-2 sm:px-3"
+                                                        >
+                                                            <Eye className="mr-1 h-3 w-3 sm:mr-1.5 sm:h-3.5 sm:w-3.5" />
+                                                            Preview
+                                                        </Button>
+                                                        <a href={f.file_url} download={f.filename} className="text-sm font-medium text-primary hover:underline shrink-0">
+                                                            Download
+                                                        </a>
+                                                    </>
                                                 ) : (
                                                     <span className="text-xs text-muted-foreground shrink-0">Unavailable</span>
                                                 )}
@@ -203,5 +222,11 @@ export function ApplicationViewDialog({ applicantId, applicantName, open, onOpen
                 </div>
             </DialogContent>
         </Dialog>
+        <AttachmentPreviewDialog
+            open={previewFile !== null}
+            onOpenChange={(o) => { if (!o) setPreviewFile(null); }}
+            file={previewFile}
+        />
+        </>
     );
 }

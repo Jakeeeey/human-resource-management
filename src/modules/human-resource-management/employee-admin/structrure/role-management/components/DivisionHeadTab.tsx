@@ -30,9 +30,18 @@ interface DivisionHeadTabProps {
   onCreate: (divisionId: number, userId: number) => Promise<void>;
   users: SystemUser[];
   divisions: Division[];
+  divisionNameSetting?: string;
 }
 
-export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, divisions }: DivisionHeadTabProps) {
+export function DivisionHeadTab({ 
+  data, 
+  isLoading, 
+  onDelete, 
+  onCreate, 
+  users, 
+  divisions, 
+  divisionNameSetting = "Division" 
+}: DivisionHeadTabProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<number | null>(null);
   const pagination = usePagination(data, 5);
@@ -54,8 +63,8 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-muted-foreground/10 shadow-sm">
         <div>
-          <h3 className="text-lg font-semibold tracking-tight text-foreground/90">Division Leaders</h3>
-          <p className="text-sm text-muted-foreground font-medium">Strategic heads for business units.</p>
+          <h3 className="text-lg font-semibold tracking-tight text-foreground/90">{divisionNameSetting} Leaders</h3>
+          <p className="text-sm text-muted-foreground font-medium">Strategic heads for {divisionNameSetting.toLowerCase()} units.</p>
         </div>
         <Button
           onClick={() => setIsDialogOpen(true)}
@@ -63,14 +72,14 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
           className="rounded-full px-5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95 disabled:grayscale"
         >
           <Plus className="mr-2 h-4 w-4" />
-          {availableDivisions.length === 0 ? "All Units Managed" : "Assign Unit Head"}
+          {availableDivisions.length === 0 ? `All ${divisionNameSetting}s Managed` : `Assign ${divisionNameSetting} Head`}
         </Button>
       </div>
 
       <RoleAssignmentDialog
         isOpen={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        title="Assign Division Head"
+        title={`Assign ${divisionNameSetting} Head`}
         type="division-head"
         users={users}
         divisions={availableDivisions}
@@ -83,16 +92,16 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
         onConfirm={async () => {
           if (deleteTarget) await onDelete(deleteTarget);
         }}
-        title="Remove Division Head?"
-        description="Are you sure you want to remove this division head? This action cannot be undone."
+        title={`Remove ${divisionNameSetting} Head?`}
+        description={`Are you sure you want to remove this ${divisionNameSetting.toLowerCase()} head? This action cannot be undone.`}
       />
 
       <Card className="border-muted-foreground/10 shadow-sm overflow-hidden rounded-xl">
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-muted-foreground/10">
-              <TableHead className="font-semibold py-4 px-6 text-foreground/80">Managing Unit</TableHead>
-              <TableHead className="font-semibold py-4 text-foreground/80">Division Head</TableHead>
+              <TableHead className="font-semibold py-4 px-6 text-foreground/80">Managing {divisionNameSetting}</TableHead>
+              <TableHead className="font-semibold py-4 text-foreground/80">{divisionNameSetting} Head</TableHead>
               <TableHead className="font-semibold py-4 text-foreground/80">Contact</TableHead>
               <TableHead className="w-[80px] py-4"></TableHead>
             </TableRow>
@@ -105,8 +114,8 @@ export function DivisionHeadTab({ data, isLoading, onDelete, onCreate, users, di
                     <div className="p-4 bg-muted rounded-full">
                       <LayoutDashboard className="h-10 w-10" />
                     </div>
-                    <p className="text-base font-medium">No division heads assigned</p>
-                    <p className="text-sm">Start by assigning a head to a business unit.</p>
+                    <p className="text-base font-medium">No {divisionNameSetting.toLowerCase()} heads assigned</p>
+                    <p className="text-sm">Start by assigning a head to a {divisionNameSetting.toLowerCase()} unit.</p>
                   </div>
                 </TableCell>
               </TableRow>

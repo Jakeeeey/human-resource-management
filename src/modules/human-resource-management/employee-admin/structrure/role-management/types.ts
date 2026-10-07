@@ -88,6 +88,18 @@ export interface TAApprover {
     updated_by?: number;
 }
 
+export interface ExpenseApprover {
+    id: number;
+    approver_id: number | SystemUser;
+    division_id: number | Division;
+    approver_hierarchy: number;
+    is_deleted?: number;
+    created_by?: number;
+    created_at?: string;
+    deleted_by?: number;
+    deleted_at?: string;
+}
+
 export type RoleManagementCategory = "hierarchy" | "committee";
 
 export type RoleManagementTab =
@@ -97,4 +109,5 @@ export type RoleManagementTab =
     | "division-head"
     | "supervisor"
     | "salesman"
-    | "ta-committee";
+    | "ta-committee"
+    | "expense-approvers";

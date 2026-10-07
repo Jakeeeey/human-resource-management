@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { TAApprovalService } from "@/modules/human-resource-management/employee-admin/approval/time-attendance/services/time-attendance.service";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const COOKIE_NAME = "vos_access_token";
@@ -78,7 +79,7 @@ export async function GET() {
 
     // Fetch TA draft approvers to see which departments this user is authorized to approve
     const taApproversRes = await directusFetch(
-      `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id`
+      `/items/ta_draft_approvers?filter[approver_id][_eq]=${userId}&filter[is_deleted][_eq]=0&fields=department_id,level`
     ).catch(() => ({ data: [] }));
     
     const taApprovers = taApproversRes.data || [];
@@ -115,12 +116,18 @@ export async function GET() {
         .map((u) => [u.data.user_id, u.data])
     );
 
-    // Filter requests in JS based on the actual user's department
+    // Filter requests in JS based on the actual user's department and level
     if (!skipFilter) {
-      requests = requests.filter((req: { user_id: number }) => {
+      requests = requests.filter((req: { user_id: number; department_id?: number; current_approval_level?: number }) => {
         const user = usersMap.get(req.user_id);
         if (!user) return false;
-        return assignedDepartmentIds.includes(user.user_department);
+        
+        const actualDeptId = req.department_id || user.user_department;
+        const reqLevel = req.current_approval_level || 1;
+        
+        return taApprovers.some((ta: { department_id: number; level: number }) => 
+          Number(ta.department_id) === Number(actualDeptId) && Number(ta.level) === Number(reqLevel)
+        );
       });
     }
 
@@ -200,18 +207,18 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    // Update the undertime request
-    const updateData: Record<string, unknown> = {
-      status,
-      remarks: remarks || null,
-      approver_id: userId,
-      approved_at: new Date().toISOString(),
-    };
+    const action = status === 'approved' ? 'approve' : 'reject';
 
-    await directusFetch(`/items/undertime_request/${undertime_id}`, {
-      method: "PATCH",
-      body: JSON.stringify(updateData),
-    });
+    // Process the undertime request using the TAApprovalService
+    await TAApprovalService.processAction(
+      {
+        requestId: Number(undertime_id),
+        type: "undertime",
+        action,
+        remarks: remarks || "",
+      },
+      Number(userId)
+    );
 
     return NextResponse.json({
       success: true,

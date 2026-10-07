@@ -12,22 +12,24 @@ import { Button } from "@/components/ui/button";
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { SystemUser, Division, Salesman, SupervisorPerDivision, ExpenseReviewCommittee } from "../types";
+import { SystemUser, Division, Salesman, SupervisorPerDivision, ExpenseReviewCommittee, ExpenseApprover } from "../types";
 import { SearchableSelect } from "./SearchableSelect";
-import { Shield, Users, UserPlus, Settings, LayoutDashboard, Briefcase, Info, Loader2, CircleDollarSign, Layers } from "lucide-react";
+import { Shield, Users, UserPlus, Settings, LayoutDashboard, Briefcase, Info, Loader2, CircleDollarSign, Layers, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface RoleAssignmentDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  type: "executive" | "division-head" | "supervisor" | "salesman" | "review-committee" | "expense-review-committee";
+  type: "executive" | "division-head" | "supervisor" | "salesman" | "review-committee" | "expense-review-committee" | "expense-approvers";
   users: SystemUser[];
   divisions?: Division[];
   salesmen?: Salesman[];
   supervisors?: SupervisorPerDivision[];
   expenseReviewers?: ExpenseReviewCommittee[];
+  expenseApprovers?: ExpenseApprover[];
   onConfirm: (...args: number[]) => Promise<void>;
+  divisionNameSetting?: string;
 }
 
 const getUser = (val: number | SystemUser | undefined) => typeof val === 'object' ? val : null;
@@ -39,7 +41,8 @@ const typeConfig = {
   supervisor: { icon: Users, color: "text-emerald-500", bg: "bg-emerald-50/50" },
   salesman: { icon: UserPlus, color: "text-orange-500", bg: "bg-orange-50/50" },
   "review-committee": { icon: Settings, color: "text-violet-500", bg: "bg-violet-50/50" },
-  "expense-review-committee": { icon: CircleDollarSign, color: "text-rose-500", bg: "bg-rose-50/50" }
+  "expense-review-committee": { icon: CircleDollarSign, color: "text-rose-500", bg: "bg-rose-50/50" },
+  "expense-approvers": { icon: Wallet, color: "text-primary", bg: "bg-primary/10" }
 };
 
 export function RoleAssignmentDialog({
@@ -52,7 +55,9 @@ export function RoleAssignmentDialog({
   salesmen = [],
   supervisors = [],
   expenseReviewers = [],
-  onConfirm
+  expenseApprovers = [],
+  onConfirm,
+  divisionNameSetting = "Division"
 }: RoleAssignmentDialogProps) {
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedDivision, setSelectedDivision] = useState<string>("");
@@ -64,7 +69,7 @@ export function RoleAssignmentDialog({
   const config = typeConfig[type];
   const Icon = config.icon;
 
-  // Sequential Hierarchy Logic
+  // Sequential Hierarchy Logic for Expense Review Committee
   const existingLevels = React.useMemo(() => {
     if (selectedDivision && type === "expense-review-committee") {
       return expenseReviewers
@@ -87,6 +92,32 @@ export function RoleAssignmentDialog({
     return level;
   }, [existingLevels]);
 
+  // View-only Hierarchy level calculation for Expense Approvers
+  const expenseApproverNextHierarchy = React.useMemo(() => {
+    if (type === "expense-approvers" && selectedDivision) {
+      const activeApprovers = expenseApprovers.filter(ea => {
+        if (ea.is_deleted) return false;
+        const divId = typeof ea.division_id === 'object' ? ea.division_id.division_id : ea.division_id;
+        return divId.toString() === selectedDivision;
+      });
+      if (activeApprovers.length === 0) return 1;
+      const maxLevel = Math.max(...activeApprovers.map(ea => ea.approver_hierarchy || 0));
+      return maxLevel + 1;
+    }
+    return 1;
+  }, [type, selectedDivision, expenseApprovers]);
+
+  // Validation: Check if user is already an approver in the selected division
+  const isUserAlreadyApproverInDivision = React.useMemo(() => {
+    if (type !== "expense-approvers" || !selectedDivision || !selectedUser) return false;
+    return expenseApprovers.some(ea => {
+      if (ea.is_deleted) return false;
+      const divId = typeof ea.division_id === 'object' ? ea.division_id.division_id : ea.division_id;
+      const userId = typeof ea.approver_id === 'object' ? ea.approver_id.user_id : ea.approver_id;
+      return divId.toString() === selectedDivision && userId.toString() === selectedUser;
+    });
+  }, [type, selectedDivision, selectedUser, expenseApprovers]);
+
   // Auto-set hierarchy when division changes
   React.useEffect(() => {
     if (type === "expense-review-committee" && selectedDivision) {
@@ -96,9 +127,10 @@ export function RoleAssignmentDialog({
 
   const handleConfirm = async () => {
     if (!selectedUser && type !== "salesman") return;
-    if ((type === "division-head" || type === "expense-review-committee") && !selectedDivision) return;
+    if ((type === "division-head" || type === "expense-review-committee" || type === "expense-approvers") && !selectedDivision) return;
     if (type === "supervisor" && !selectedDivision) return;
     if (type === "salesman" && (!selectedSupervisorAsmt || !selectedSalesman)) return;
+    if (type === "expense-approvers" && isUserAlreadyApproverInDivision) return;
 
     setIsSubmitting(true);
     try {
@@ -108,6 +140,8 @@ export function RoleAssignmentDialog({
         await onConfirm(Number(selectedDivision), Number(selectedUser));
       } else if (type === "expense-review-committee") {
         await onConfirm(Number(selectedDivision), Number(selectedUser), Number(selectedHierarchy));
+      } else if (type === "expense-approvers") {
+        await onConfirm(Number(selectedDivision), Number(selectedUser), expenseApproverNextHierarchy);
       } else if (type === "salesman") {
         await onConfirm(Number(selectedSupervisorAsmt), Number(selectedSalesman));
       }
@@ -163,20 +197,63 @@ export function RoleAssignmentDialog({
 
         <div className="p-6 pt-2 space-y-6">
           <div className="space-y-4">
-            {(type === "division-head" || type === "supervisor" || type === "expense-review-committee") && (
+            {(type === "division-head" || type === "supervisor" || type === "expense-review-committee" || type === "expense-approvers") && (
               <div className="space-y-2">
                 <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
                   <LayoutDashboard className="h-3.5 w-3.5 opacity-40" />
-                  Business Unit
+                  {divisionNameSetting}
                 </Label>
                 <SearchableSelect
                   options={divisionOptions}
                   value={selectedDivision}
                   onValueChange={setSelectedDivision}
-                  placeholder="Select a business unit"
+                  placeholder={`Select a ${divisionNameSetting.toLowerCase()}`}
                   className="h-12 border-muted-foreground/10 bg-muted/5 font-medium"
                 />
                 <p className="text-[11px] text-muted-foreground ml-1">Assign this role to a specific vertical.</p>
+              </div>
+            )}
+
+            {(type === "executive" || type === "division-head" || type === "supervisor" || type === "review-committee" || type === "expense-review-committee" || type === "expense-approvers") && (
+              <div className="space-y-2">
+                <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
+                  <Briefcase className="h-3.5 w-3.5 opacity-40" />
+                  Personnel Selection
+                </Label>
+                <SearchableSelect
+                  options={userOptions}
+                  value={selectedUser}
+                  onValueChange={setSelectedUser}
+                  placeholder="Choose an employee"
+                  className="h-12 border-muted-foreground/10 bg-muted/5 font-medium"
+                />
+                <p className="text-[11px] text-muted-foreground ml-1">Only eligible employees are listed here.</p>
+                {isUserAlreadyApproverInDivision && (
+                  <p className="text-[11px] font-bold text-destructive ml-1 animate-in fade-in slide-in-from-top-1">
+                    This user is already registered as an approver for the selected division.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {type === "expense-approvers" && (
+              <div className="space-y-2">
+                <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 opacity-40" />
+                  Approver Hierarchy (View Only)
+                </Label>
+                <div className="flex flex-col gap-1.5">
+                  <Input 
+                    type="text" 
+                    readOnly 
+                    disabled 
+                    value={selectedDivision ? `Level ${expenseApproverNextHierarchy}` : "Select a Division first"} 
+                    className="h-12 border-muted-foreground/10 bg-muted/20 font-bold text-foreground cursor-not-allowed"
+                  />
+                  <p className="text-[11px] text-muted-foreground ml-1">
+                    1 is the lowest level. Higher level acts as final approver for this division.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -205,7 +282,7 @@ export function RoleAssignmentDialog({
                     </p>
                   ) : (
                     <p className="text-[11px] text-muted-foreground ml-1">
-                      Select a business unit first to calculate the next sequence.<br/>
+                      Select a {divisionNameSetting.toLowerCase()} first to calculate the next sequence.<br/>
                       <strong className="text-foreground/70">Note: As the level goes up, the approval authority is higher.</strong>
                     </p>
                   )}
@@ -232,23 +309,6 @@ export function RoleAssignmentDialog({
                   className="h-12 border-muted-foreground/10 bg-muted/5 font-medium"
                 />
                 <p className="text-[11px] text-muted-foreground ml-1">Determines the reporting hierarchy.</p>
-              </div>
-            )}
-
-            {(type === "executive" || type === "division-head" || type === "supervisor" || type === "review-committee" || type === "expense-review-committee") && (
-              <div className="space-y-2">
-                <Label className="text-[13px] font-bold text-foreground/70 ml-1 flex items-center gap-2">
-                  <Briefcase className="h-3.5 w-3.5 opacity-40" />
-                  Personnel Selection
-                </Label>
-                <SearchableSelect
-                  options={userOptions}
-                  value={selectedUser}
-                  onValueChange={setSelectedUser}
-                  placeholder="Choose an employee"
-                  className="h-12 border-muted-foreground/10 bg-muted/5 font-medium"
-                />
-                <p className="text-[11px] text-muted-foreground ml-1">Only eligible employees are listed here.</p>
               </div>
             )}
 
@@ -288,7 +348,7 @@ export function RoleAssignmentDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isSubmitting || isHierarchyInvalid}
+            disabled={isSubmitting || isHierarchyInvalid || isUserAlreadyApproverInDivision}
             className="rounded-full px-8 bg-foreground text-background hover:bg-foreground/90 shadow-xl transition-all active:scale-95 font-bold disabled:opacity-50 disabled:pointer-events-none"
           >
             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Finalize Assignment"}

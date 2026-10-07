@@ -2,14 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useManpowerRecommendationContext } from "../providers/ManpowerRecommendationProvider";
+import { countRequestApplicants, deriveRequestEffectiveStatus } from "../utils/requestStatus";
+import { RequestStatusPill } from "./RequestStatusPill";
+import type { ManpowerRecommendation } from "../types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Building2, FileText, UserCheck, Loader2, Pencil } from "lucide-react";
 import { ApplicationViewDialog } from "./ApplicationViewDialog";
+import { formatPHT } from "../utils/time";
 
 const STATUS_OPTIONS = ["Recommended", "Approved", "Hired", "Rejected", "Withdrawn"] as const;
+
+// Manual edit set only — Approved/Hired are written by other modules (final
+// selection flow) and surface here via refresh; they keep full badge styles.
+const EDITABLE_STATUSES = ["Recommended", "Rejected", "Withdrawn"] as const;
 
 type StatusOption = (typeof STATUS_OPTIONS)[number];
 
@@ -31,7 +39,7 @@ function getStatusColor(status: string) {
 }
 
 export function ManpowerRecommendationView() {
-    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests, users } = useManpowerRecommendationContext();
+    const { isViewOpen, setIsViewOpen, selectedRecommendation, updateRecommendation, applicants, openRequests, recommendations, users } = useManpowerRecommendationContext();
 
     const [newStatus, setNewStatus] = useState<StatusOption>("Recommended");
     const [decisionNotes, setDecisionNotes] = useState<string>("");
@@ -52,11 +60,35 @@ export function ManpowerRecommendationView() {
 
     if (!selectedRecommendation) return null;
 
-    // openRequests only holds Draft rows — a recommendation whose request later
-    // left Draft won't be in the list, so fall back to the raw id (never blank).
+    // openRequests only holds Approved rows — a recommendation whose request later
+    // changed status won't be in the list, so fall back to the raw id (never blank).
     const matchedRequest = openRequests.find(r => r.id === selectedRecommendation.manpower_request_id);
     const requestNo = matchedRequest?.request_no || String(selectedRecommendation.manpower_request_id);
     const position = matchedRequest?.position || `Request #${selectedRecommendation.manpower_request_id}`;
+    // Fully closed request (every slot hired): status is immutable here — a hired
+    // employee leaving goes through job exit, never by flipping this record back.
+    // The hire count follows the APPLICANT pipeline (todo 8 reconciliation):
+    // `applicant.status` is the truth; the rec row only links applicant->request.
+    const applicantStatusById = new Map(applicants.map((a) => [a.id, a.status]));
+    // Counts and the effective status come from the shared derivation
+    // (utils/requestStatus.ts) — the SAME source the open-requests list pill uses,
+    // so this view and the list can never disagree.
+    const requestCounts = countRequestApplicants(recommendations, selectedRecommendation.manpower_request_id, applicantStatusById);
+    const hiredForRequest = requestCounts.hired;
+    const requestNeed = matchedRequest?.no_manpower_needed ?? 0;
+    const effectiveStatus = deriveRequestEffectiveStatus(matchedRequest?.status, requestNeed, requestCounts);
+    const isRequestClosed = requestNeed > 0 && hiredForRequest >= requestNeed;
+    const isStatusEditable =
+        !isRequestClosed && toStatusOption(selectedRecommendation.status) === "Recommended";
+    const notesEditable = !isRequestClosed;
+    const notesDirty = decisionNotes !== (selectedRecommendation.decision_notes || "");
+    // Nothing is actionable when the status is terminal (Approved/Hired/Rejected/
+    // Withdrawn) AND the notes are untouched — the footer button stays disabled
+    // instead of firing a no-op PATCH that reports success (S4 finding #8).
+    const canSubmit = isStatusEditable || (notesEditable && notesDirty);
+    const submitLabel = isStatusEditable ? "Update Status" : "Save Notes";
+    // Status dropdown only on lower-stage (Recommended) records of open requests —
+    // Approved/Hired are selection outcomes owned by the interviews flow, never edited here.
     const applicantName = applicants.find(a => a.id === selectedRecommendation.applicant_id)?.full_name || `Applicant #${selectedRecommendation.applicant_id}`;
     // recommended_by/decision_by are plain INT (no Directus relation) — join full
     // names from the users lookup, falling back to the raw id (never blank).
@@ -69,13 +101,16 @@ export function ManpowerRecommendationView() {
         if (selectedRecommendation.id == null) return;
         setIsSubmitting(true);
         try {
-            // NOTE: send ONLY { status, decision_notes } — decision_by/decision_at
-            // are injected server-side by the Task 5 PATCH route (no userId exists
-            // in client scope; mirrors the updated_by injection pattern).
-            const ok = await updateRecommendation(selectedRecommendation.id, {
-                status: newStatus,
+            const payload: Partial<ManpowerRecommendation> = {
                 decision_notes: decisionNotes.trim() ? decisionNotes : null,
-            });
+            };
+            // Send `status` only for a real change: the PATCH route stamps
+            // decision_by/decision_at whenever status is present, so a notes-only
+            // save must never re-stamp the original decision.
+            if (isStatusEditable && newStatus !== toStatusOption(selectedRecommendation.status)) {
+                payload.status = newStatus;
+            }
+            const ok = await updateRecommendation(selectedRecommendation.id, payload);
             if (ok) setIsViewOpen(false);
         } finally {
             setIsSubmitting(false);
@@ -85,10 +120,10 @@ export function ManpowerRecommendationView() {
     return (
         <>
         <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-            <DialogContent className="sm:max-w-[85vw] lg:max-w-[1000px] w-full p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
+            <DialogContent showCloseButton={false} className="w-[95vw] sm:max-w-[85vw] lg:max-w-[1000px] p-0 overflow-hidden border border-border/40 shadow-2xl bg-background rounded-2xl flex flex-col max-h-[calc(100vh-3rem)]">
                 <div className="p-6 md:p-8 border-b border-border/40 bg-card">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl md:text-3xl font-extrabold flex items-center gap-3">
+                        <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-extrabold flex items-center gap-3">
                             <FileText className="w-8 h-8 text-primary" />
                             MANPOWER RECOMMENDATION DETAILS
                         </DialogTitle>
@@ -116,18 +151,24 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Applicant Name</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{applicantName}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50 truncate" title={applicantName}>{applicantName}</div>
                             </div>
-                            <div className="md:col-span-3">
+                            <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Status</label>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center p-1">
+                                    <RequestStatusPill status={effectiveStatus} />
+                                </div>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommendation status</label>
+                                <div className="flex flex-wrap items-center gap-2">
                                     {isEditingStatus ? (
                                         <Select value={newStatus} onValueChange={(v) => setNewStatus(toStatusOption(v))}>
                                             <SelectTrigger className="truncate">
                                                 <SelectValue placeholder="Select status" className="truncate" />
                                             </SelectTrigger>
                                             <SelectContent className="max-h-60">
-                                                {STATUS_OPTIONS.map((option) => (
+                                                {EDITABLE_STATUSES.map((option) => (
                                                     <SelectItem key={option} value={option}>
                                                         {option}
                                                     </SelectItem>
@@ -139,11 +180,12 @@ export function ManpowerRecommendationView() {
                                             {newStatus}
                                         </span>
                                     )}
-                                    <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit status">
-                                        <Pencil className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                    <Button variant="outline"               size="lg"
-              className="ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
+                                    {isStatusEditable && (
+                                        <Button variant="ghost" size="sm" onClick={() => setIsEditingStatus((v) => !v)} aria-label="Edit recommendation status">
+                                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" size="lg" className="w-full sm:w-auto sm:ml-auto" onClick={() => setIsResumeOpen(true)} aria-label={`View application of ${applicantName}`}>
                                         <FileText className="mr-2 h-4 w-4" />
                                         Application Form
                                     </Button>
@@ -169,7 +211,7 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Recommended At</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.recommended_at || "-"}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.recommended_at ? formatPHT(selectedRecommendation.recommended_at) : "-"}</div>
                             </div>
                         </div>
                     </div>
@@ -187,14 +229,14 @@ export function ManpowerRecommendationView() {
                             </div>
                             <div>
                                 <label className="text-xs font-bold uppercase text-muted-foreground mb-1 block">Decision At</label>
-                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.decision_at || "-"}</div>
+                                <div className="font-medium text-foreground p-3 bg-muted/30 rounded-md border border-border/50">{selectedRecommendation.decision_at ? formatPHT(selectedRecommendation.decision_at) : "-"}</div>
                             </div>
                             <div className="md:col-span-2">
                                 <div className="flex items-center gap-1 mb-1">
                                     <label className="text-xs font-bold uppercase text-muted-foreground block">Decision Notes</label>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIsEditingNotes((v) => !v)} aria-label="Edit decision notes">
+                                    {!isRequestClosed && (<Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setIsEditingNotes((v) => !v)} aria-label="Edit decision notes">
                                         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                                    </Button>
+                                    </Button>)}
                                 </div>
                                 {isEditingNotes ? (
                                     <Textarea
@@ -218,10 +260,12 @@ export function ManpowerRecommendationView() {
                             Close
                         </Button>
                     </DialogClose>
-                    <Button onClick={handleUpdateStatus} disabled={isSubmitting} className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm">
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Update Status
-                    </Button>
+                    {notesEditable && (
+                        <Button onClick={handleUpdateStatus} disabled={isSubmitting || !canSubmit} className="w-full sm:w-auto h-12 px-8 font-semibold shadow-sm">
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {submitLabel}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

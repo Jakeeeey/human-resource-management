@@ -27,6 +27,7 @@ function DivisionModuleContent() {
         createDivision,
         updateDivision,
         deleteDivision,
+        divisionNameSetting,
     } = useDivisions();
 
     const handleCreate = async (data: Record<string, unknown>) => {
@@ -86,9 +87,9 @@ function DivisionModuleContent() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Divisions</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">{divisionNameSetting}</h1>
                     <p className="text-muted-foreground">
-                        Manage and view all divisions with their departments
+                        Manage and view all {divisionNameSetting.toLowerCase()} with their departments
                     </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -106,6 +107,7 @@ function DivisionModuleContent() {
                 onCreateDivision={handleCreate}
                 onUpdateDivision={handleUpdate}
                 onDeleteDivision={handleDelete}
+                divisionNameSetting={divisionNameSetting}
             />
         </div>
     );

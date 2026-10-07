@@ -35,6 +35,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
     case "expense-review-committees":
       upstreamPath = "/items/disbursement_draft_approver?fields=id,approver_id.user_id,approver_id.user_fname,approver_id.user_lname,approver_id.user_email,approver_id.user_position,division_id.division_id,division_id.division_name,approver_heirarchy,is_deleted,created_at&limit=500&filter[is_deleted][_eq]=0";
       break;
+    case "expense-approvers":
+      upstreamPath = "/items/expense_approvers?fields=id,approver_id.user_id,approver_id.user_fname,approver_id.user_lname,approver_id.user_email,approver_id.user_position,division_id.division_id,division_id.division_name,approver_hierarchy,is_deleted,created_at,created_by&limit=500&filter[is_deleted][_eq]=0";
+      break;
     case "division-heads":
       upstreamPath = "/items/division_sales_head?fields=id,user_id.user_id,user_id.user_fname,user_id.user_lname,user_id.user_email,user_id.user_position,division_id.division_id,division_id.division_name,created_at,is_deleted&limit=200&filter[is_deleted][_eq]=0";
       break;
@@ -67,6 +70,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ segm
       else if (segment.startsWith("salesman-assignments/")) upstreamPath = `/items/salesman_per_supervisor/${segments[1]}`;
       else if (segment.startsWith("review-committees/")) upstreamPath = `/items/target_setting_approver/${segments[1]}`;
       else if (segment.startsWith("expense-review-committees/")) upstreamPath = `/items/disbursement_draft_approver/${segments[1]}`;
+      else if (segment.startsWith("expense-approvers/")) upstreamPath = `/items/expense_approvers/${segments[1]}`;
       else if (segment.startsWith("ta-draft-approvers/")) upstreamPath = `/items/ta_draft_approvers/${segments[1]}`;
       break;
   }
@@ -145,6 +149,7 @@ async function handleMutation(req: NextRequest, segments: string[], method: stri
     case "executives": upstreamPath = "/items/executive"; break;
     case "review-committees": upstreamPath = "/items/target_setting_approver"; break;
     case "expense-review-committees": upstreamPath = "/items/disbursement_draft_approver"; break;
+    case "expense-approvers": upstreamPath = "/items/expense_approvers"; break;
     case "division-heads": upstreamPath = "/items/division_sales_head"; break;
     case "supervisors": upstreamPath = "/items/supervisor_per_division"; break;
     case "salesman-assignments": upstreamPath = "/items/salesman_per_supervisor"; break;

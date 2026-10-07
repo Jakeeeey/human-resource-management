@@ -21,6 +21,7 @@ import {
   Layers,
   Settings2,
   Clock,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRoleManagement } from "./hooks/useRoleManagement";
@@ -31,6 +32,7 @@ import {
   SupervisorTab,
   SalesmanTab,
   ExpenseReviewCommitteeTab,
+  ExpenseApproverTab,
 } from "./components/index";
 import { TimeAndAttendanceCommitteeTab } from "./components/TimeAndAttendanceCommitteeTab";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,7 @@ export default function RoleManagementModule() {
     executives,
     reviewCommittee,
     expenseReviewCommittee,
+    expenseApprovers,
     divisionHeads,
     supervisors,
     salesmanAssignments,
@@ -59,6 +62,8 @@ export default function RoleManagementModule() {
     createReviewCommittee,
     deleteExpenseReviewCommittee,
     createExpenseReviewCommittee,
+    deleteExpenseApprover,
+    createExpenseApprover,
     deleteDivisionHead,
     createDivisionHead,
     deleteSupervisor,
@@ -67,7 +72,8 @@ export default function RoleManagementModule() {
     createSalesmanAssignment,
     createTAApprover,
     deleteTAApprover,
-    departments
+    departments,
+    divisionNameSetting
   } = useRoleManagement();
 
   if (isError) {
@@ -148,20 +154,20 @@ export default function RoleManagementModule() {
           <Tabs key="hierarchy-tabs" defaultValue="executive" className="w-full animate-in slide-in-from-left-4 duration-500">
             <div className="flex items-center gap-2 mb-6">
               <div className="h-5 w-1 bg-primary/20 rounded-full mr-2" />
-              <TabsList className="bg-transparent h-auto p-0 gap-6">
+              <TabsList className="bg-transparent h-auto p-0 gap-6 group-data-[orientation=horizontal]/tabs:h-auto">
                 {[
                   { value: "executive", label: "Executive", icon: Users },
-                  { value: "division-head", label: "Division Head", icon: Briefcase },
+                  { value: "division-head", label: `${divisionNameSetting} Head`, icon: Briefcase },
                   { value: "supervisor", label: "Supervisor", icon: UserPlus },
                   { value: "salesman", label: "Salesman", icon: UserCircle2 },
                 ].map((item) => (
                   <TabsTrigger
                     key={item.value}
                     value={item.value}
-                    className="p-0 bg-transparent data-[state=active]:bg-transparent shadow-none border-none group"
+                    className="p-0 bg-transparent data-[state=active]:bg-transparent shadow-none border-none group text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
                   >
                     <div className="flex flex-col items-center gap-1 w-max">
-                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-primary transition-colors whitespace-nowrap">
+                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-white transition-colors whitespace-nowrap">
                         <item.icon className="h-4 w-4 opacity-50 group-data-[state=active]:opacity-100" />
                         <span className="font-bold text-sm tracking-tight whitespace-nowrap">{item.label}</span>
                       </div>
@@ -176,32 +182,33 @@ export default function RoleManagementModule() {
               <ExecutiveTab data={executives} isLoading={isLoading} users={users} onDelete={deleteExecutive} onCreate={createExecutive} />
             </TabsContent>
             <TabsContent value="division-head" className="mt-0 outline-none">
-              <DivisionHeadTab data={divisionHeads} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteDivisionHead} onCreate={createDivisionHead} />
+              <DivisionHeadTab data={divisionHeads} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteDivisionHead} onCreate={createDivisionHead} divisionNameSetting={divisionNameSetting} />
             </TabsContent>
             <TabsContent value="supervisor" className="mt-0 outline-none">
-              <SupervisorTab data={supervisors} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteSupervisor} onCreate={createSupervisor} />
+              <SupervisorTab data={supervisors} isLoading={isLoading} users={users} divisions={divisions} onDelete={deleteSupervisor} onCreate={createSupervisor} divisionNameSetting={divisionNameSetting} />
             </TabsContent>
             <TabsContent value="salesman" className="mt-0 outline-none">
-              <SalesmanTab data={salesmanAssignments} isLoading={isLoading} users={users} salesmen={salesmen} supervisors={supervisors} onDelete={deleteSalesmanAssignment} onCreate={createSalesmanAssignment} />
+              <SalesmanTab data={salesmanAssignments} isLoading={isLoading} users={users} salesmen={salesmen} supervisors={supervisors} onDelete={deleteSalesmanAssignment} onCreate={createSalesmanAssignment} divisionNameSetting={divisionNameSetting} />
             </TabsContent>
           </Tabs>
         ) : (
           <Tabs key="committee-tabs" defaultValue="review-committee" className="w-full animate-in slide-in-from-right-4 duration-500">
             <div className="flex items-center gap-2 mb-6">
               <div className="h-5 w-1 bg-violet-500/20 rounded-full mr-2" />
-              <TabsList className="bg-transparent h-auto p-0 gap-6">
+              <TabsList className="bg-transparent h-auto p-0 gap-6 group-data-[orientation=horizontal]/tabs:h-auto">
                 {[
                   { value: "review-committee", label: "Target Review", icon: ShieldCheck },
                   { value: "expense-review-committee", label: "Expense Review", icon: CircleDollarSign },
+                  { value: "expense-approvers", label: "Expense Approvers", icon: Wallet },
                   { value: "ta-committee", label: "TA Committee", icon: Clock },
                 ].map((item) => (
                   <TabsTrigger
                     key={item.value}
                     value={item.value}
-                    className="p-0 bg-transparent data-[state=active]:bg-transparent shadow-none border-none group"
+                    className="p-0 bg-transparent data-[state=active]:bg-transparent shadow-none border-none group text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
                   >
                     <div className="flex flex-col items-center gap-1 w-max">
-                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-violet-600 transition-colors whitespace-nowrap">
+                      <div className="flex items-center gap-2 px-1 py-0.5 group-data-[state=active]:text-white transition-colors whitespace-nowrap">
                         <item.icon className="h-4 w-4 opacity-50 group-data-[state=active]:opacity-100" />
                         <span className="font-bold text-sm tracking-tight whitespace-nowrap">{item.label}</span>
                       </div>
@@ -229,6 +236,18 @@ export default function RoleManagementModule() {
                 divisions={divisions}
                 onDelete={deleteExpenseReviewCommittee}
                 onCreate={createExpenseReviewCommittee}
+                divisionNameSetting={divisionNameSetting}
+              />
+            </TabsContent>
+            <TabsContent value="expense-approvers" className="mt-0 outline-none">
+              <ExpenseApproverTab
+                data={expenseApprovers}
+                isLoading={isLoading}
+                users={users}
+                divisions={divisions}
+                onDelete={deleteExpenseApprover}
+                onCreate={createExpenseApprover}
+                divisionNameSetting={divisionNameSetting}
               />
             </TabsContent>
             <TabsContent value="ta-committee" className="mt-0 outline-none">

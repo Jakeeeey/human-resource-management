@@ -144,7 +144,7 @@ export function CompanyProfileForm({ onCancel }: CompanyProfileFormProps) {
 
                 {/* Tabbed Interface */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-5 bg-slate-100/50 p-1 rounded-xl h-auto mb-6">
+                    <TabsList className="grid w-full grid-cols-5 bg-slate-100/50 p-1 rounded-xl h-auto mb-6 group-data-[orientation=horizontal]/tabs:h-auto">
                         <TabTrigger value="basic" icon={<Building2 className="w-4 h-4" />} label="Basic" />
                         <TabTrigger value="registration" icon={<FileText className="w-4 h-4" />} label="Registration" />
                         <TabTrigger value="address" icon={<MapPin className="w-4 h-4" />} label="Address" />
@@ -344,7 +344,7 @@ function TabTrigger({ value, icon, label }: { value: string; icon: React.ReactNo
     return (
         <TabsTrigger
             value={value}
-            className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all flex items-center gap-2"
+            className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm rounded-lg py-2.5 transition-all flex items-center gap-2 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground"
         >
             {icon}
             <span className="hidden sm:inline font-medium">{label}</span>

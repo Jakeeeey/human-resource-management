@@ -1,5 +1,6 @@
 import {
     DEFAULT_APPLICATION_FORM,
+    EMPTY_FAMILY_MEMBER,
     type ApplicationFormValues,
     type AttachmentType,
     type CompanyRelativeRow,
@@ -10,12 +11,12 @@ import {
     type ReferenceRow,
     type TrainingRow,
     type WorkExperienceRow,
-} from "@/modules/human-resource-management/application-form/types";
+} from "@/modules/human-resource-management/recruitment/application-form/types";
 
 // ============================================================================
-// Directus row bundle (GET /api/hrm/applications/by-applicant) →
+// Directus row bundle (GET /api/hrm/recruitment/applicants/applications/by-applicant) →
 // ApplicationFormValues. Inverse of the submit mapping in
-// app/api/hrm/application-form/route.ts. Read-only viewer use only.
+// app/api/hrm/recruitment/application-form/route.ts. Read-only viewer use only.
 // ============================================================================
 
 type Row = Record<string, unknown>;
@@ -46,16 +47,20 @@ function d(v: unknown): string {
 }
 
 function emptyMember(): FamilyMemberFields {
-    return { name: "", age: "", occupation: "", company: "", education: "" };
+    return { ...EMPTY_FAMILY_MEMBER };
 }
 
 function toMember(r: Row): FamilyMemberFields {
     return {
         name: s(r["name"]),
-        age: s(r["age"]),
+        date_of_birth: d(r["date_of_birth"]),
+        is_deceased: r["is_deceased"] === true || r["is_deceased"] === 1,
         occupation: s(r["occupation"]),
         company: s(r["company"]),
         education: s(r["education"]),
+        contact_number: s(r["contact_number"]),
+        address: s(r["address"]),
+        age: s(r["age"]),
     };
 }
 
@@ -97,6 +102,7 @@ function toWorkExperience(r: Row): WorkExperienceRow {
         job_title: s(r["job_title"]),
         date_from: s(r["date_from"]),
         date_to: s(r["date_to"]),
+        currently_employed: r["currently_employed"] === true || r["currently_employed"] === 1,
         salary_rate_start: s(r["salary_rate_start"]),
         salary_rate_end: s(r["salary_rate_end"]),
         supervisor_name: s(r["supervisor_name"]),
@@ -155,7 +161,9 @@ export function mapApplicationToFormValues(bundle: ApplicationBundle): Applicati
         middle_name: s(a["middle_name"]),
         last_name: s(a["last_name"]),
         nickname: s(a["nickname"]),
-        address: s(a["address"]),
+        province: s(a["province"]),
+        city: s(a["city"]),
+        brgy: s(a["brgy"]),
         phone: s(a["phone"]),
         email: s(a["email"]),
         birthdate: d(a["birthdate"]),

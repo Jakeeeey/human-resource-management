@@ -90,31 +90,14 @@ export function useMemoReleasing() {
     const runSyncFlow = useCallback(async (memoNo: string) => {
         setActiveMemoNo(memoNo);
         setIsSyncModalOpen(true);
-        setLocalReleaseStatus("running");
+        setLocalReleaseStatus("idle");
         setSyncItems([]);
         syncItemsRef.current = [];
 
         const currentMemo = memos.find((m) => m.memo_no === memoNo);
-        const isPartiallyReleased = currentMemo?.status === "Partially Released";
+        const targetIds = currentMemo?.company_ids || [];
 
-        let targetIds: number[] = [];
-        if (isPartiallyReleased) {
-            setLocalReleaseStatus("success");
-            targetIds = currentMemo?.company_ids || [];
-        } else {
-            // 1. Release locally first
-            const localRes = await MemoReleasingService.releaseLocal(memoNo);
-            if (!localRes.success) {
-                setLocalReleaseStatus("failed");
-                toast.error(localRes.message || "Failed to update local status to Released");
-                return;
-            }
-            setLocalReleaseStatus("success");
-            toast.success("Memo status updated to Released locally");
-            targetIds = localRes.company_ids || [];
-        }
-
-        // 2. Resolve mapped target company IDs
+        // 1. Resolve mapped target company IDs
         const initialItems: SyncItem[] = targetIds.map((cId) => {
             const found = companies.find((c) => Number(c.company_id) === Number(cId));
             return {
@@ -128,7 +111,7 @@ export function useMemoReleasing() {
         syncItemsRef.current = initialItems;
         setSyncItems(initialItems);
 
-        // 3. Sync each target company remote database sequentially
+        // 2. Sync each target company remote database sequentially
         let successCount = 0;
         for (const item of initialItems) {
             updateSyncItemStatus(item.companyId, "syncing");
@@ -141,8 +124,21 @@ export function useMemoReleasing() {
             }
         }
 
-        const finalStatus = successCount === targetIds.length ? "Released" : "Partially Released";
-        await MemoReleasingService.updateSyncStatus(memoNo, successCount, finalStatus);
+        // 3. Update local database status based on sync results
+        setLocalReleaseStatus("running");
+        const finalStatus = successCount === targetIds.length 
+            ? "Released" 
+            : (successCount > 0 ? "Partially Released" : "Approved");
+            
+        const updateRes = await MemoReleasingService.updateSyncStatus(memoNo, successCount, finalStatus);
+        if (updateRes.success) {
+            setLocalReleaseStatus("success");
+            toast.success("Memo release process completed");
+        } else {
+            setLocalReleaseStatus("failed");
+            toast.error(updateRes.message || "Failed to update local status");
+        }
+        
         refreshMemos();
     }, [memos, companies, refreshMemos, updateSyncItemStatus]);
 
@@ -177,7 +173,9 @@ export function useMemoReleasing() {
         const currentItems = syncItemsRef.current;
         const successCount = currentItems.filter((item) => item.status === "success").length;
         const totalCount = currentItems.length;
-        const finalStatus = successCount === totalCount ? "Released" : "Partially Released";
+        const finalStatus = successCount === totalCount 
+            ? "Released" 
+            : (successCount > 0 ? "Partially Released" : "Approved");
 
         await MemoReleasingService.updateSyncStatus(activeMemoNo, successCount, finalStatus);
         refreshMemos();

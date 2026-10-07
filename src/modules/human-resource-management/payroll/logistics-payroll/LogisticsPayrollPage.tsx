@@ -25,9 +25,9 @@ function LogisticsPayrollContent() {
             <LogisticsPayrollHeader />
             
             <Tabs defaultValue="dispatch-view" className="w-full">
-                <TabsList className="mb-4">
-                    <TabsTrigger value="dispatch-view">Dispatch View</TabsTrigger>
-                    <TabsTrigger value="staff-view">Staff View</TabsTrigger>
+                <TabsList className="mb-4 group-data-[orientation=horizontal]/tabs:h-auto">
+                    <TabsTrigger value="dispatch-view" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Dispatch View</TabsTrigger>
+                    <TabsTrigger value="staff-view" className="text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Staff View</TabsTrigger>
                 </TabsList>
                 <TabsContent value="dispatch-view" className="m-0 border-none p-0 outline-none">
                     <DailyDispatchPayrollTable />

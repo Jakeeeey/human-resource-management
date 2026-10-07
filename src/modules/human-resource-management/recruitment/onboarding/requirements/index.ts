@@ -1,0 +1,1 @@
+export { RequirementsRegistryModule } from "./RequirementsRegistryModule";

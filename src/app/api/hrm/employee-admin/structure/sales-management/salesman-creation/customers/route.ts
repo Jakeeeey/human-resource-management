@@ -13,7 +13,7 @@ if (!DIRECTUS_URL) {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const LIMIT = 1000;
+const LIMIT = -1;
 
 async function dFetch(path: string, options: RequestInit = {}) {
   const url = `${DIRECTUS_URL}${path}`;
