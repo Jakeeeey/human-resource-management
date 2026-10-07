@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import type { JSX } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ClipboardCheck, RefreshCw } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useClearanceHubContext } from "../providers/ClearanceHubProvider";
 import type { ClearanceHubRequest } from "../hooks/useClearanceHub";
@@ -19,6 +23,10 @@ import {
 import { formatPHT } from "../utils/time";
 import { useDocumentChecklist } from "../hooks/useDocumentChecklist";
 import { DocumentChecklist } from "./DocumentChecklist";
+import ClearanceFormModule from "../form";
+import ClearanceSoaModule from "../soa";
+import ClearanceQuitClaimsModule from "../quit-claims";
+import { parseClearanceHubTab } from "../utils/documentTabs";
 import styles from "./hub-status.module.css";
 
 function statusTone(status: ClearanceRequestStatus): StatusTone {
@@ -37,12 +45,16 @@ function WorkspaceSkeletons() {
     );
 }
 
-export function ClearanceWorkspace({ requestId }: { requestId: number }) {
+function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Element {
     const {
         resignations,
         refresh,
         fetchDetail,
     } = useClearanceHubContext();
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const pathname = usePathname();
+    const tab = parseClearanceHubTab(searchParams.get("tab"));
 
     const [detail, setDetail] = useState<ClearanceHubRequest | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -73,15 +85,28 @@ export function ClearanceWorkspace({ requestId }: { requestId: number }) {
         return resignation ? resignation.employee_name : "Unknown employee";
     }, [detail, resignations]);
 
-    const templateTitle = detail?.template_title_snapshot ?? "Unknown template";
-
     const handleRefresh = async () => {
         await reloadDetail();
         await documents.refresh();
         await refresh();
     };
 
+    function handleTabChange(next: string): void {
+        const parsed = parseClearanceHubTab(next);
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("request", String(requestId));
+        if (parsed === "overview") {
+            params.delete("tab");
+        } else {
+            params.set("tab", parsed);
+        }
+        params.delete("print");
+        const query = params.toString();
+        router.replace(query === "" ? pathname : `${pathname}?${query}`, { scroll: false });
+    }
+
     const isCompleted = detail?.status === "completed";
+    const approvedCount = documents.checklist?.approvedCount ?? 0;
 
     return (
         <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
@@ -125,53 +150,94 @@ export function ClearanceWorkspace({ requestId }: { requestId: number }) {
                 </div>
             </div>
 
-            {isLoading && !detail ? (
-                <WorkspaceSkeletons />
-            ) : error || !detail ? (
-                <Alert variant="destructive">
-                    <AlertTitle>Workspace unavailable</AlertTitle>
-                    <AlertDescription className="space-y-3">
-                        <p>{error ?? "This workspace could not be loaded."}</p>
-                        <Button variant="outline" size="sm" onClick={() => void handleRefresh()} disabled={isLoading}>
-                            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-                            Retry
-                        </Button>
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <div className="space-y-6">
-                    <Card>
-                        <CardContent className="flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-start md:justify-between">
-                            <div className="min-w-0 flex-1 space-y-1">
-                                <h2 className="text-xl font-semibold sm:text-2xl">
-                                    {templateTitle}
-                                </h2>
-                                <dl className="space-y-1 pt-2 text-sm">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <dt className="text-muted-foreground">Filed</dt>
-                                        <dd className="font-medium tabular-nums">{formatPHT(detail.created_at)}</dd>
-                                    </div>
-                                </dl>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <DocumentChecklist
-                        checklist={documents.checklist}
-                        isLoading={documents.isLoading}
-                        error={documents.error}
-                        onRetry={() => void documents.refresh()}
-                    />
-
-                    {isCompleted ? (
-                        <Alert>
-                            <AlertDescription>
-                                This clearance is completed and read-only. Corrections are handled on paper.
+            <Tabs value={tab} onValueChange={handleTabChange} className="space-y-4">
+                <TabsList className="group-data-[orientation=horizontal]/tabs:h-auto w-full flex-wrap justify-start gap-1">
+                    <TabsTrigger value="overview" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Overview</TabsTrigger>
+                    <TabsTrigger value="form" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Clearance Form</TabsTrigger>
+                    <TabsTrigger value="soa" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">SOA</TabsTrigger>
+                    <TabsTrigger value="quit-claims" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Quit Claims</TabsTrigger>
+                </TabsList>
+                <TabsContent value="overview" className="m-0">
+                    {isLoading && !detail ? (
+                        <WorkspaceSkeletons />
+                    ) : error || !detail ? (
+                        <Alert variant="destructive">
+                            <AlertTitle>Workspace unavailable</AlertTitle>
+                            <AlertDescription className="space-y-3">
+                                <p>{error ?? "This workspace could not be loaded."}</p>
+                                <Button variant="outline" size="sm" onClick={() => void handleRefresh()} disabled={isLoading}>
+                                    <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                                    Retry
+                                </Button>
                             </AlertDescription>
                         </Alert>
-                    ) : null}
-                </div>
-            )}
+                    ) : (
+                        <div className="space-y-6">
+                            <Card>
+                                <CardContent className="flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-start md:justify-between">
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                        <dl className="space-y-1 pt-2 text-sm">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <dt className="text-muted-foreground">Filed</dt>
+                                                <dd className="font-medium tabular-nums">{formatPHT(detail.created_at)}</dd>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <dt className="text-muted-foreground">Confirmed</dt>
+                                                <dd className="font-medium tabular-nums">{formatPHT(detail.confirmed_at)}</dd>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <dt className="text-muted-foreground">Progress</dt>
+                                                <dd className="font-medium tabular-nums">
+                                                    {approvedCount} of 3 approved
+                                                </dd>
+                                            </div>
+                                        </dl>
+                                        <div className="pt-2">
+                                            <Progress
+                                                value={Math.round((approvedCount / 3) * 100)}
+                                                aria-label={`${approvedCount} of 3 approved`}
+                                            />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <DocumentChecklist
+                                checklist={documents.checklist}
+                                isLoading={documents.isLoading}
+                                error={documents.error}
+                                onRetry={() => void documents.refresh()}
+                                onApproved={() => void documents.refresh()}
+                            />
+
+                            {isCompleted ? (
+                                <Alert>
+                                    <AlertDescription>
+                                        This clearance is completed and read-only. Corrections are handled on paper.
+                                    </AlertDescription>
+                                </Alert>
+                            ) : null}
+                        </div>
+                    )}
+                </TabsContent>
+                <TabsContent value="form" className="m-0">
+                    <ClearanceFormModule />
+                </TabsContent>
+                <TabsContent value="soa" className="m-0">
+                    <ClearanceSoaModule />
+                </TabsContent>
+                <TabsContent value="quit-claims" className="m-0">
+                    <ClearanceQuitClaimsModule />
+                </TabsContent>
+            </Tabs>
         </div>
+    );
+}
+
+export function ClearanceWorkspace({ requestId }: { requestId: number }): JSX.Element {
+    return (
+        <Suspense>
+            <ClearanceWorkspaceInner requestId={requestId} />
+        </Suspense>
     );
 }

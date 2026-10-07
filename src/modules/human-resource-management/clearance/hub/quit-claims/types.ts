@@ -91,7 +91,7 @@ export const QuitClaimValuesSchema = z.object({
 
 export type QuitClaimValues = z.infer<typeof QuitClaimValuesSchema>;
 
-export const QUITCLAIM_STATUSES = ["draft", "issued"] as const;
+export const QUITCLAIM_STATUSES = ["pending", "approved"] as const;
 
 export type QuitClaimStatus = (typeof QUITCLAIM_STATUSES)[number];
 
@@ -105,8 +105,8 @@ export const ClearanceQuitclaimSchema = z.object({
     clearance_no: z.string().nullable(),
     company_code: z.string().nullable(),
     pdf_file: z.string().nullable(),
-    issued_at: z.string().nullable(),
-    issued_by: z.number().nullable(),
+    approved_at: z.string().nullable(),
+    approved_by: z.number().nullable(),
     created_at: z.string().nullable(),
     created_by: z.number().nullable(),
     updated_at: z.string().nullable(),

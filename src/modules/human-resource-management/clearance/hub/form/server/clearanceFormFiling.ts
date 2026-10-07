@@ -6,7 +6,7 @@ import { nowUTC } from "../../utils/audit";
 export const CLEARANCE_FORM_FILING_ERROR_CODES = {
     invalidInput: "CLEARANCE_FORM_FILING_INVALID_INPUT",
     formNotFound: "CLEARANCE_FORM_NOT_FOUND",
-    notIssued: "CLEARANCE_FORM_NOT_ISSUED",
+    notApproved: "CLEARANCE_FORM_NOT_APPROVED",
     notAttached: "CLEARANCE_FORM_PDF_NOT_ATTACHED",
     userNotFound: "CLEARANCE_USER_NOT_FOUND",
     writeFailed: "CLEARANCE_FORM_FILING_WRITE_FAILED",
@@ -17,9 +17,9 @@ export const CLEARANCE_DOCS_TYPE_NAME = "Employment & Contractual Documents";
 export const CLEARANCE_DOCS_LIST_NAME = "Clearance & Quit Claims";
 
 const CLEARANCE_DOCS_TYPE_DESCRIPTION =
-    "Employment and contractual documents auto-filed on clearance issuance — clearance forms, statements of account, and quit claims.";
+    "Employment and contractual documents auto-filed on clearance approval — clearance forms, statements of account, and quit claims.";
 const CLEARANCE_DOCS_LIST_DESCRIPTION =
-    "Issued clearance documents auto-filed on issue — one record per issued document.";
+    "Approved clearance documents auto-filed on approval — one record per approved document.";
 
 export interface FileClearanceFormPdfResult {
     recordId: number;
@@ -182,8 +182,8 @@ export async function fileClearanceFormPdf(
     if (!form) {
         fail(CLEARANCE_FORM_FILING_ERROR_CODES.formNotFound, `clearance_form ${formId} does not exist`);
     }
-    if (form.status !== "issued") {
-        fail(CLEARANCE_FORM_FILING_ERROR_CODES.notIssued, `clearance_form ${formId} is not issued`);
+    if (form.status !== "approved") {
+        fail(CLEARANCE_FORM_FILING_ERROR_CODES.notApproved, `clearance_form ${formId} is not approved`);
     }
     if (!form.pdf_file) {
         fail(CLEARANCE_FORM_FILING_ERROR_CODES.notAttached, `clearance_form ${formId} has no attached PDF`);
@@ -192,27 +192,29 @@ export async function fileClearanceFormPdf(
     if (userId === null || !(await readUserExists(userId))) {
         fail(CLEARANCE_FORM_FILING_ERROR_CODES.userNotFound, `user for clearance_form ${formId} does not exist`);
     }
-    const filed = await readFirstOrNull(
-        `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
-        `&filter[file_ref][_eq]=${encodeURIComponent(form.pdf_file)}&fields=id,list_id&limit=1`
-    );
-    if (filed) {
-        const recordId = toId(filed.id);
-        const listId = toId(filed.list_id);
-        if (recordId !== null && listId !== null) {
-            return { recordId, fileRef: form.pdf_file, listId, alreadyFiled: true };
-        }
-    }
     const listId = await ensureClearanceDocsListId();
     const now = nowUTC();
     const recordName = form.ref_no ? `Clearance Form — ${form.ref_no}` : `Clearance Form — #${form.id}`;
+    const filed = await readFirstOrNull(
+        `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
+    );
+    if (filed) {
+        const recordId = toId(filed.id);
+        const filedListId = toId(filed.list_id);
+        if (recordId !== null && filedListId !== null) {
+            const storedRef = toNullableText(filed.file_ref);
+            return { recordId, fileRef: storedRef ?? form.pdf_file, listId: filedListId, alreadyFiled: true };
+        }
+    }
     const created: unknown = await dFetch("/items/employee_file_records", {
         method: "POST",
         body: JSON.stringify({
             user_id: userId,
             list_id: listId,
             record_name: recordName,
-            description: `Issued clearance form filed on issue (clearance_form #${form.id}${form.ref_no ? `, REF ${form.ref_no}` : ""}).`,
+            description: `Approved clearance form filed on approval (clearance_form #${form.id}${form.ref_no ? `, REF ${form.ref_no}` : ""}).`,
             file_ref: form.pdf_file,
             is_deleted: 0,
             created_at: now,
@@ -228,12 +230,14 @@ export async function fileClearanceFormPdf(
     }
     const raced = await readFirstOrNull(
         `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
-        `&filter[file_ref][_eq]=${encodeURIComponent(form.pdf_file)}&fields=id,list_id&limit=1`
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
     );
     const racedId = raced ? toId(raced.id) : null;
     const racedList = raced ? toId(raced.list_id) : null;
     if (racedId !== null && racedList !== null) {
-        return { recordId: racedId, fileRef: form.pdf_file, listId: racedList, alreadyFiled: true };
+        const racedRef = raced ? toNullableText(raced.file_ref) : null;
+        return { recordId: racedId, fileRef: racedRef ?? form.pdf_file, listId: racedList, alreadyFiled: true };
     }
     fail(CLEARANCE_FORM_FILING_ERROR_CODES.writeFailed, "employee_file_records create returned no row");
 }
@@ -249,7 +253,7 @@ export function mapClearanceFormFilingError(error: unknown): NextResponse | null
             );
         case CLEARANCE_FORM_FILING_ERROR_CODES.invalidInput:
             return NextResponse.json({ success: false, code, message: "Invalid request" }, { status: 400 });
-        case CLEARANCE_FORM_FILING_ERROR_CODES.notIssued:
+        case CLEARANCE_FORM_FILING_ERROR_CODES.notApproved:
         case CLEARANCE_FORM_FILING_ERROR_CODES.notAttached:
         case CLEARANCE_FORM_FILING_ERROR_CODES.userNotFound:
             return NextResponse.json(

@@ -20,19 +20,16 @@ export function clearanceHubTabForDocument(key: ClearanceDocumentKey): Exclude<C
 }
 
 export function clearanceHubTabHref(tab: ClearanceHubTab, requestId?: number, print?: boolean): string {
+    if (requestId === undefined) {
+        return "/hrm/clearance/hub";
+    }
     const params = new URLSearchParams();
+    params.set("request", String(requestId));
     if (tab !== "overview") {
         params.set("tab", tab);
-    }
-    if (requestId !== undefined) {
-        params.set("request", String(requestId));
     }
     if (print === true) {
         params.set("print", "1");
     }
-    const query = params.toString();
-    if (query === "") {
-        return "/hrm/clearance/hub";
-    }
-    return `/hrm/clearance/hub?${query}`;
+    return `/hrm/clearance/hub/${requestId}?${params.toString()}`;
 }

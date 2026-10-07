@@ -24,11 +24,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ClearanceFormSchema, type ClearanceForm, type ClearanceFormRenderModel } from "../types";
+import { type ClearanceForm, type ClearanceFormRenderModel } from "../types";
 import { useCompanyOptions } from "../hooks/useCompanyOptions";
-import { companyLogoDataUrl, pickDefaultCompany } from "../../utils/company";
+import { companyLogoDataUrl, fetchEmployeeCompany, pickDefaultCompany, pickEmployeeCompany } from "../../utils/company";
 import { phToday } from "../../utils/time";
-import { freezeIssuedFormPdf } from "../utils/issuedPdfFreeze";
+import { freezeApprovedFormPdf } from "../utils/approvedPdfFreeze";
 import {
     buildClearancePdf,
     type ClearancePrintEntry,
@@ -38,7 +38,6 @@ interface ClearanceFormPrintDialogProps {
     form: ClearanceForm | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onIssued: (form: ClearanceForm) => void;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,7 +68,6 @@ export function ClearanceFormPrintDialog({
     form,
     open,
     onOpenChange,
-    onIssued,
 }: ClearanceFormPrintDialogProps): JSX.Element {
     const [model, setModel] = useState<ClearanceFormRenderModel | null>(null);
     const [modelLoading, setModelLoading] = useState(false);
@@ -80,8 +78,7 @@ export function ClearanceFormPrintDialog({
     const [error, setError] = useState<string | null>(null);
     const [dateValue, setDateValue] = useState(phToday());
     const [companyCode, setCompanyCode] = useState("");
-    const [issuing, setIssuing] = useState(false);
-    const [issueError, setIssueError] = useState<string | null>(null);
+    const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(undefined);
     const [freezeState, setFreezeState] = useState<"idle" | "freezing" | "done" | "error">("idle");
     const [freezeError, setFreezeError] = useState<string | null>(null);
     const urlRef = useRef<string | null>(null);
@@ -106,20 +103,51 @@ export function ClearanceFormPrintDialog({
             }
             setPreviewUrl(null);
             setModel(null);
-            setIssueError(null);
             setFreezeError(null);
             previewBlobRef.current = null;
             return;
         }
         setDateValue(phToday());
         setCompanyCode("");
-        setIssueError(null);
     }, [open, formId]);
 
     useEffect(() => {
+        if (!open) {
+            setEmployeeCompanyId(undefined);
+            return;
+        }
+        if (requestId === null) {
+            setEmployeeCompanyId(null);
+            return;
+        }
+        let cancelled = false;
+        setEmployeeCompanyId(undefined);
+        (async () => {
+            try {
+                const result = await fetchEmployeeCompany({ requestId });
+                if (!cancelled) setEmployeeCompanyId(result.company_id);
+            } catch {
+                if (!cancelled) setEmployeeCompanyId(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [open, requestId]);
+
+    const employeeCompany = typeof employeeCompanyId === "number" ? pickEmployeeCompany(companies, employeeCompanyId) : null;
+    const showCompanySelect = employeeCompanyId !== undefined
+        && (employeeCompanyId === null || (!companiesLoading && employeeCompany === null));
+
+    useEffect(() => {
+        if (employeeCompanyId === undefined || companiesLoading) return;
+        if (employeeCompany !== null) {
+            if (companyCode !== employeeCompany.company_code) setCompanyCode(employeeCompany.company_code);
+            return;
+        }
         const fallback = formCompanyCode ?? pickDefaultCompany(companies, undefined)?.company_code ?? "";
         if (companyCode === "" && fallback !== "") setCompanyCode(fallback);
-    }, [companies, formCompanyCode, companyCode]);
+    }, [companies, companiesLoading, formCompanyCode, companyCode, employeeCompanyId, employeeCompany]);
 
     useEffect(() => {
         if (!open || requestId === null) return;
@@ -131,7 +159,7 @@ export function ClearanceFormPrintDialog({
                 const params = new URLSearchParams({
                     request_id: String(requestId),
                     date: dateValue,
-                    ref_no: formStatus === "issued" ? (formRefNo ?? "") : "",
+                    ref_no: formStatus === "approved" ? (formRefNo ?? "") : "",
                 });
                 const res = await fetch(`/api/hrm/clearance/form/render-model?${params.toString()}`);
                 if (!res.ok) throw new Error("render-model failed");
@@ -197,7 +225,7 @@ export function ClearanceFormPrintDialog({
     }, [open, model, selectedCompany, letterheadLogo]);
 
     useEffect(() => {
-        if (!open || !form || form.status !== "issued" || form.pdf_file) return;
+        if (!open || !form || form.status !== "approved" || form.pdf_file) return;
         if (form.ref_no === null || model === null || model.refNo !== form.ref_no) return;
         if (!previewUrl || previewBlobRef.current === null) return;
         const key = `${form.id}:${form.ref_no}`;
@@ -210,12 +238,12 @@ export function ClearanceFormPrintDialog({
         (async () => {
             try {
                 const bytes = new Uint8Array(await blob.arrayBuffer());
-                await freezeIssuedFormPdf({ documentId: form.id, bytes, fileName: uploadName });
+                await freezeApprovedFormPdf({ documentId: form.id, bytes, fileName: uploadName });
                 setFreezeState("done");
             } catch {
                 freezeKeyRef.current = null;
                 setFreezeState("error");
-                setFreezeError("Could not store the issued PDF to the 201 file. Reopen this dialog to retry.");
+                setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
             }
         })();
     }, [open, form, model, previewUrl, fileName, freezeState]);
@@ -294,39 +322,6 @@ export function ClearanceFormPrintDialog({
         };
     }
 
-    async function handleIssue(): Promise<void> {
-        if (requestId === null || issuing) return;
-        const code = companyCode.trim();
-        if (code === "") {
-            setIssueError("Choose a company before issuing the form.");
-            return;
-        }
-        setIssuing(true);
-        setIssueError(null);
-        try {
-            const res = await fetch("/api/hrm/clearance/form/issue", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ request_id: requestId, company_code: code, date: dateValue }),
-            });
-            const body: unknown = await res.json().catch(() => null);
-            if (!res.ok || !isRecord(body) || body.success !== true || !isRecord(body.data)) {
-                throw new Error("issue failed");
-            }
-            const issued = ClearanceFormSchema.safeParse(
-                isRecord(body.data) && isRecord(body.data.form) ? body.data.form : body.data
-            );
-            if (!issued.success) throw new Error("issue failed");
-            onIssued(issued.data);
-        } catch {
-            setIssueError("Could not issue the clearance form. Please try again.");
-        } finally {
-            setIssuing(false);
-        }
-    }
-
-    const isDraft = formStatus === "draft";
-
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
@@ -346,6 +341,7 @@ export function ClearanceFormPrintDialog({
                 <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-3 sm:p-6">
                     <div className="mx-auto max-w-3xl space-y-3">
                         <div className="grid gap-3 rounded-[var(--radius)] border bg-card p-4 shadow-sm sm:grid-cols-2">
+                            {showCompanySelect && (
                             <div className="space-y-2">
                                 <Label htmlFor="clearance-form-company">Company letterhead</Label>
                                 <Select value={companyCode} onValueChange={setCompanyCode} disabled={companiesLoading}>
@@ -369,6 +365,7 @@ export function ClearanceFormPrintDialog({
                                     <p className="text-xs text-muted-foreground">{selectedCompany.company_address}</p>
                                 )}
                             </div>
+                            )}
                             <div className="space-y-2">
                                 <Label htmlFor="clearance-form-date">Date</Label>
                                 <Input
@@ -392,29 +389,14 @@ export function ClearanceFormPrintDialog({
                                     </p>
                                 </div>
                             )}
-                            {isDraft && (
-                                <div className="sm:col-span-2">
-                                    {issueError && (
-                                        <p className="mb-2 text-xs text-destructive">{issueError}</p>
-                                    )}
-                                    <Button
-                                        size="sm"
-                                        onClick={() => void handleIssue()}
-                                        disabled={issuing || companiesLoading || companyCode.trim() === ""}
-                                    >
-                                        {issuing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                                        {issuing ? "Issuing…" : "Issue form (allocate REF No.)"}
-                                    </Button>
-                                </div>
-                            )}
-                            {!isDraft && freezeState === "freezing" && (
+                            {freezeState === "freezing" && (
                                 <p className="text-xs text-muted-foreground sm:col-span-2">
-                                    Storing the issued PDF to the 201 file…
+                                    Storing the approved PDF to the 201 file…
                                 </p>
                             )}
-                            {!isDraft && freezeState === "done" && (
+                            {freezeState === "done" && (
                                 <p className="text-xs text-muted-foreground sm:col-span-2">
-                                    Issued PDF stored to the 201 file.
+                                    Approved PDF stored to the 201 file.
                                 </p>
                             )}
                             {freezeError && (

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { SoaStatus } from "../types";
+import type { SoaSignatory, SoaStatus } from "../types";
+import { SoaSignatoriesSchema } from "../types";
 import type { SoaPrintInput } from "../utils/soaPrintPdf";
 
 export interface SoaDetailLine {
@@ -29,8 +30,9 @@ export interface SoaDetail {
     ref_no: string | null;
     clearance_no: string | null;
     company_code: string | null;
+    signatories: SoaSignatory[] | null;
     pdf_file: string | null;
-    issued_at: string | null;
+    approved_at: string | null;
     lines: SoaDetailLine[];
     groups: SoaRowGroup[];
 }
@@ -58,7 +60,7 @@ export interface SoaCompanyPayload {
 
 const BY_REQUEST_API = "/api/hrm/clearance/soa/by-request";
 const RENDER_MODEL_API = "/api/hrm/clearance/soa/render-model";
-const ISSUE_API = "/api/hrm/clearance/soa/issue";
+const APPROVE_API = "/api/hrm/clearance/soa/approve";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
@@ -85,7 +87,7 @@ function toNullableAmount(value: unknown): number | null {
 }
 
 function toStatus(value: unknown): SoaStatus | null {
-    return value === "draft" || value === "issued" ? value : null;
+    return value === "pending" || value === "approved" ? value : null;
 }
 
 function normalizeLine(raw: unknown): SoaDetailLine | null {
@@ -106,6 +108,21 @@ function normalizeLine(raw: unknown): SoaDetailLine | null {
         remarks: toNullableText(raw.remarks),
         sort_order: toId(raw.sort_order) ?? 0,
     };
+}
+
+function normalizeSignatories(raw: unknown): SoaSignatory[] | null {
+    if (raw === null || raw === undefined) return null;
+    let parsed: unknown = raw;
+    if (typeof raw === "string") {
+        if (raw.trim() === "") return null;
+        try {
+            parsed = JSON.parse(raw) as unknown;
+        } catch {
+            return null;
+        }
+    }
+    const checked = SoaSignatoriesSchema.safeParse(parsed);
+    return checked.success ? checked.data : null;
 }
 
 function normalizeGroup(raw: unknown): SoaRowGroup | null {
@@ -144,8 +161,9 @@ function normalizeDetail(raw: unknown): SoaDetail | null {
         ref_no: toNullableText(raw.ref_no),
         clearance_no: toNullableText(raw.clearance_no),
         company_code: toNullableText(raw.company_code),
+        signatories: normalizeSignatories(raw.signatories),
         pdf_file: toNullableText(raw.pdf_file),
-        issued_at: toNullableText(raw.issued_at),
+        approved_at: toNullableText(raw.approved_at),
         lines,
         groups,
     };
@@ -238,11 +256,11 @@ export function useSoaDetail(requestId: number | null) {
         if (requestId !== null) void load(requestId);
     }, [load, requestId]);
 
-    const saveLines = useCallback(async (soaId: number, lines: SoaLinePayload[]): Promise<void> => {
+    const saveLines = useCallback(async (soaId: number, lines: SoaLinePayload[], signatories?: SoaSignatory[]): Promise<void> => {
         const res = await fetch(`/api/hrm/clearance/soa/${soaId}/lines`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lines }),
+            body: JSON.stringify(signatories === undefined ? { lines } : { lines, signatories }),
         });
         const json: unknown = await res.json().catch(() => null);
         if (!res.ok || !isRecord(json) || json.success !== true) {
@@ -250,15 +268,15 @@ export function useSoaDetail(requestId: number | null) {
         }
     }, []);
 
-    const issue = useCallback(async (id: number, companyCode: string): Promise<string> => {
-        const res = await fetch(ISSUE_API, {
+    const approve = useCallback(async (id: number, companyCode: string): Promise<string> => {
+        const res = await fetch(APPROVE_API, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ request_id: id, company_code: companyCode }),
         });
         const json: unknown = await res.json().catch(() => null);
         if (!res.ok || !isRecord(json) || json.success !== true) {
-            throw new Error(readErrorMessage(json, "The statement of account cannot be issued."));
+            throw new Error(readErrorMessage(json, "The statement of account cannot be approved."));
         }
         const ref = isRecord(json.data) && isRecord(json.data.ref)
             ? toNullableText((json.data.ref as Record<string, unknown>).ref_no)
@@ -284,5 +302,5 @@ export function useSoaDetail(requestId: number | null) {
         []
     );
 
-    return { detail, items, templateId, loading, error, reload, saveLines, issue, fetchRenderModel };
+    return { detail, items, templateId, loading, error, reload, saveLines, approve, fetchRenderModel };
 }

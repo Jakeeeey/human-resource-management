@@ -10,23 +10,23 @@ async function readBody(res: Response): Promise<unknown> {
     }
 }
 
-export const ISSUED_SOA_FROZEN_CODE = "CLEARANCE_SOA_FROZEN";
+export const APPROVED_QUITCLAIM_FROZEN_CODE = "CLEARANCE_QUITCLAIM_FROZEN";
 
-export interface FreezeIssuedSoaPdfInput {
+export interface FreezeApprovedQuitClaimPdfInput {
     documentId: number;
     bytes: Uint8Array;
     fileName: string;
 }
 
-export interface FreezeIssuedSoaPdfResult {
+export interface FreezeApprovedQuitClaimPdfResult {
     fileId: string;
     recordId: number;
     alreadyFiled: boolean;
 }
 
-export async function freezeIssuedSoaPdf(
-    input: FreezeIssuedSoaPdfInput
-): Promise<FreezeIssuedSoaPdfResult> {
+export async function freezeApprovedQuitClaimPdf(
+    input: FreezeApprovedQuitClaimPdfInput
+): Promise<FreezeApprovedQuitClaimPdfResult> {
     if (
         !Number.isInteger(input.documentId) ||
         input.documentId <= 0 ||
@@ -34,7 +34,26 @@ export async function freezeIssuedSoaPdf(
         input.bytes.byteLength === 0 ||
         input.fileName.trim() === ""
     ) {
-        throw new Error("Cannot store the issued PDF. Please try again.");
+        throw new Error("Cannot store the approved PDF. Please try again.");
+    }
+    const probeRes = await fetch(`/api/hrm/clearance/quit-claims/${input.documentId}/file-record`, {
+        method: "POST",
+    });
+    const probeBody = await readBody(probeRes);
+    if (probeRes.ok && isRecord(probeBody) && isRecord(probeBody.data)) {
+        const probeRecordId =
+            typeof probeBody.data.record_id === "number" ? probeBody.data.record_id : null;
+        const probeFileRef =
+            typeof probeBody.data.file_ref === "string" && probeBody.data.file_ref !== ""
+                ? probeBody.data.file_ref
+                : null;
+        if (probeRecordId !== null && probeFileRef !== null) {
+            return {
+                fileId: probeFileRef,
+                recordId: probeRecordId,
+                alreadyFiled: probeBody.data.already_filed === true,
+            };
+        }
     }
     const uploadForm = new FormData();
     uploadForm.append(
@@ -42,7 +61,7 @@ export async function freezeIssuedSoaPdf(
         new Blob([input.bytes as unknown as BlobPart], { type: "application/pdf" }),
         input.fileName
     );
-    const uploadRes = await fetch("/api/hrm/clearance/soa/upload", {
+    const uploadRes = await fetch("/api/hrm/clearance/quit-claims/upload", {
         method: "POST",
         body: uploadForm,
     });
@@ -52,9 +71,9 @@ export async function freezeIssuedSoaPdf(
             ? uploadBody.data.id
             : null;
     if (!uploadRes.ok || fileId === null || fileId === "") {
-        throw new Error("Could not store the issued PDF. Please try again.");
+        throw new Error("Could not store the approved PDF. Please try again.");
     }
-    const attachRes = await fetch(`/api/hrm/clearance/soa/${input.documentId}/attach-pdf`, {
+    const attachRes = await fetch(`/api/hrm/clearance/quit-claims/${input.documentId}/attach-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pdf_file_id: fileId }),
@@ -63,20 +82,20 @@ export async function freezeIssuedSoaPdf(
         const attachBody = await readBody(attachRes);
         const code =
             isRecord(attachBody) && typeof attachBody.code === "string" ? attachBody.code : null;
-        if (code !== ISSUED_SOA_FROZEN_CODE) {
-            throw new Error("Could not attach the issued PDF. Please try again.");
+        if (code !== APPROVED_QUITCLAIM_FROZEN_CODE) {
+            throw new Error("Could not attach the approved PDF. Please try again.");
         }
     }
-    const fileRes = await fetch(`/api/hrm/clearance/soa/${input.documentId}/file-record`, {
+    const fileRes = await fetch(`/api/hrm/clearance/quit-claims/${input.documentId}/file-record`, {
         method: "POST",
     });
     const fileBody = await readBody(fileRes);
     if (!fileRes.ok || !isRecord(fileBody) || !isRecord(fileBody.data)) {
-        throw new Error("Could not file the issued PDF to the 201 file. Please try again.");
+        throw new Error("Could not file the approved PDF to the 201 file. Please try again.");
     }
     const recordId = typeof fileBody.data.record_id === "number" ? fileBody.data.record_id : null;
     if (recordId === null) {
-        throw new Error("Could not file the issued PDF to the 201 file. Please try again.");
+        throw new Error("Could not file the approved PDF to the 201 file. Please try again.");
     }
     return {
         fileId,

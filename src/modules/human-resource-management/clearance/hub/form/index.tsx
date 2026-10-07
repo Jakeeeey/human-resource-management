@@ -72,7 +72,7 @@ function ClearanceFormModuleInner(): JSX.Element {
                         Clearance Form
                     </h1>
                     <p className="text-muted-foreground">
-                        Issue and print employee clearance forms
+                        Approve and print employee clearance forms
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -99,8 +99,8 @@ function ClearanceFormModuleInner(): JSX.Element {
                     <SelectContent>
                         <SelectItem value="all">All Statuses</SelectItem>
                         <SelectItem value="missing">Missing</SelectItem>
-                        <SelectItem value="draft">Draft</SelectItem>
-                        <SelectItem value="issued">Issued</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
                     </SelectContent>
                 </Select>
 

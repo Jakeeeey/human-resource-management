@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { uploadIssuedQuitClaimPdf } from "@/modules/human-resource-management/clearance/hub/quit-claims/utils/issuedPdfUpload";
+import { uploadApprovedQuitClaimPdf } from "@/modules/human-resource-management/clearance/hub/quit-claims/utils/approvedPdfUpload";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
@@ -29,9 +29,9 @@ export async function POST(req: NextRequest) {
             return fail(`Invalid file type "${mime}". Only ${PDF_MIME} is allowed`, 415);
         }
         const bytes = new Uint8Array(await file.arrayBuffer());
-        const name = file instanceof File && file.name.trim() !== "" ? file.name : "issued.pdf";
+        const name = file instanceof File && file.name.trim() !== "" ? file.name : "approved.pdf";
         try {
-            const fileId = await uploadIssuedQuitClaimPdf(bytes, name);
+            const fileId = await uploadApprovedQuitClaimPdf(bytes, name);
             return NextResponse.json({ success: true, data: { id: fileId } });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);

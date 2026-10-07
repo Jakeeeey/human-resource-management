@@ -2,22 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
-import { ArrowLeft, Loader2, Minus, Plus, Printer } from "lucide-react";
+import { Loader2, Minus, Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +27,6 @@ import { SoaPrintDialog } from "./SoaPrintDialog";
 
 interface SoaEditorProps {
     requestId: number;
-    onBack: () => void;
     autoPrint?: boolean;
 }
 
@@ -66,6 +55,22 @@ function isAmountValid(text: string): boolean {
     return Number.isFinite(parsed) && parsed >= 0;
 }
 
+function blankSignatoryDrafts(): SoaSignatory[] {
+    return [
+        { label: "Prepared By", name: "", title: "" },
+        { label: "Noted By", name: "", title: "" },
+        { label: "", name: "", title: "" },
+    ];
+}
+
+function applySignatoryOverrides(model: SoaPrintInput, drafts: SoaSignatory[] | null): SoaPrintInput {
+    if (drafts === null) return model;
+    const overridden = drafts.filter(
+        (draft) => draft.label.trim() !== "" || draft.name.trim() !== "" || draft.title.trim() !== ""
+    );
+    return { ...model, signatories: overridden };
+}
+
 function toFileName(employeeName: string, refNo: string): string {
     const cleaned = employeeName
         .split("")
@@ -75,23 +80,23 @@ function toFileName(employeeName: string, refNo: string): string {
         .trim()
         .slice(0, 80);
     const who = cleaned === "" ? "Employee" : cleaned;
-    const ref = refNo.trim() === "" ? "draft" : refNo.trim();
+    const ref = refNo.trim() === "" ? "pending" : refNo.trim();
     return `SOA - ${who} - ${ref}.pdf`;
 }
 
-export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorProps): JSX.Element {
-    const { detail, items, templateId, loading, error, reload, saveLines, issue, fetchRenderModel } =
+export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX.Element {
+    const { detail, items, templateId, loading, error, reload, saveLines, fetchRenderModel } =
         useSoaDetail(requestId);
-    const companies = useSoaCompanies();
+    const companies = useSoaCompanies(requestId);
     const [drafts, setDrafts] = useState<Record<number, DraftRow[]>>({});
     const [seededFor, setSeededFor] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
-    const [issuing, setIssuing] = useState(false);
-    const [issueOpen, setIssueOpen] = useState(false);
     const [previewing, setPreviewing] = useState(false);
     const [model, setModel] = useState<SoaPrintInput | null>(null);
     const [printOpen, setPrintOpen] = useState(false);
-    const [signatories, setSignatories] = useState<SoaSignatory[]>([]);
+    const [signatoryDrafts, setSignatoryDrafts] = useState<SoaSignatory[]>(() => blankSignatoryDrafts());
+    const [signatoriesReady, setSignatoriesReady] = useState(false);
+    const [signatorySeededFor, setSignatorySeededFor] = useState<string | null>(null);
     const autoPrintFiredRef = useRef<number | null>(null);
 
     const sections = useMemo(() => {
@@ -135,8 +140,22 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
     }, [detail, sections, seededFor]);
 
     useEffect(() => {
+        if (!detail) return;
+        const key = `${detail.id}:${templateId ?? 0}`;
+        if (signatorySeededFor === key) return;
+        if (detail.signatories !== null) {
+            const seeded = blankSignatoryDrafts();
+            detail.signatories.slice(0, 3).forEach((row, index) => {
+                seeded[index] = { label: row.label, name: row.name, title: row.title };
+            });
+            setSignatoryDrafts(seeded);
+            setSignatoriesReady(true);
+            setSignatorySeededFor(key);
+            return;
+        }
         if (templateId === null) {
-            setSignatories([]);
+            setSignatoryDrafts(blankSignatoryDrafts());
+            setSignatoriesReady(false);
             return;
         }
         let cancelled = false;
@@ -144,7 +163,12 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
             try {
                 const res = await fetch(`/api/hrm/clearance/soa/signatories?template_id=${templateId}`);
                 const json: unknown = await res.json().catch(() => null);
-                if (cancelled || !res.ok) return;
+                if (cancelled) return;
+                if (!res.ok) {
+                    setSignatoryDrafts(blankSignatoryDrafts());
+                    setSignatoriesReady(false);
+                    return;
+                }
                 if (
                     json !== null &&
                     typeof json === "object" &&
@@ -161,25 +185,38 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                             "name" in entry &&
                             "title" in entry
                     );
-                    setSignatories(rows);
+                    const seeded = blankSignatoryDrafts();
+                    rows.slice(0, 3).forEach((row, index) => {
+                        seeded[index] = { label: row.label, name: row.name, title: row.title };
+                    });
+                    setSignatoryDrafts(seeded);
+                    setSignatoriesReady(true);
+                    setSignatorySeededFor(key);
+                } else {
+                    setSignatoryDrafts(blankSignatoryDrafts());
+                    setSignatoriesReady(false);
                 }
             } catch {
-                if (!cancelled) setSignatories([]);
+                if (!cancelled) {
+                    setSignatoryDrafts(blankSignatoryDrafts());
+                    setSignatoriesReady(false);
+                }
             }
         })();
         return () => {
             cancelled = true;
         };
-    }, [templateId]);
+    }, [detail, templateId, signatorySeededFor]);
 
     useEffect(() => {
-        if (!autoPrint || detail === null || companies.loading) return;
+        if (!autoPrint || detail === null || companies.loading || companies.employeeCompanyLoading) return;
         if (autoPrintFiredRef.current === requestId) return;
         const selected = companies.selected;
         if (selected === null) {
             autoPrintFiredRef.current = requestId;
             return;
         }
+        if (companies.employeeCompany !== null && selected.id !== companies.employeeCompany.id) return;
         autoPrintFiredRef.current = requestId;
         const snapshot = {
             company_name: selected.company_name,
@@ -190,7 +227,7 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
         (async () => {
             try {
                 const renderModel = await fetchRenderModel(requestId, snapshot);
-                setModel(renderModel);
+                setModel(applySignatoryOverrides(renderModel, signatoriesReady ? signatoryDrafts : null));
                 setPrintOpen(true);
             } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Could not build the SOA preview.");
@@ -198,7 +235,7 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                 setPreviewing(false);
             }
         })();
-    }, [autoPrint, detail, companies.loading, companies.selected, companies.logoDataUrl, fetchRenderModel, requestId]);
+    }, [autoPrint, detail, companies.loading, companies.employeeCompanyLoading, companies.employeeCompany, companies.selected, companies.logoDataUrl, fetchRenderModel, requestId, signatoriesReady, signatoryDrafts]);
 
     const invalidCount = useMemo(() => {
         let count = 0;
@@ -210,7 +247,7 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
         return count;
     }, [drafts]);
 
-    const isIssued = detail?.status === "issued";
+    const isApproved = detail?.status === "approved";
 
     function updateRow(sectionKey: number, key: string, patch: Partial<DraftRow>): void {
         setDrafts((prev) => ({
@@ -231,6 +268,12 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
             ...prev,
             [sectionKey]: (prev[sectionKey] ?? []).filter((row) => row.key !== key),
         }));
+    }
+
+    function updateSignatory(index: number, field: "name" | "title", value: string): void {
+        setSignatoryDrafts((prev) =>
+            prev.map((draft, draftIndex) => (draftIndex === index ? { ...draft, [field]: value } : draft))
+        );
     }
 
     function buildPayload(): SoaLinePayload[] {
@@ -254,14 +297,19 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
     }
 
     async function handleSave(): Promise<void> {
-        if (!detail || isIssued) return;
+        if (!detail || isApproved) return;
         if (invalidCount > 0) {
             toast.error("Fix the highlighted amounts before saving. Amounts must be zero or more.");
             return;
         }
         setSaving(true);
         try {
-            await saveLines(detail.id, buildPayload());
+            const signatories = signatoriesReady
+                ? signatoryDrafts.filter(
+                    (draft) => draft.label.trim() !== "" || draft.name.trim() !== "" || draft.title.trim() !== ""
+                )
+                : undefined;
+            await saveLines(detail.id, buildPayload(), signatories);
             toast.success("SOA lines saved.");
             setSeededFor(null);
             reload();
@@ -282,6 +330,10 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
     }
 
     async function handlePreview(): Promise<void> {
+        if (companies.employeeCompanyLoading) {
+            toast.error("Resolving the employee company. Please try again.");
+            return;
+        }
         const snapshot = companySnapshot();
         if (!snapshot) {
             toast.error("Pick a company for the letterhead first.");
@@ -290,35 +342,12 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
         setPreviewing(true);
         try {
             const renderModel = await fetchRenderModel(requestId, snapshot);
-            setModel(renderModel);
+            setModel(applySignatoryOverrides(renderModel, signatoriesReady ? signatoryDrafts : null));
             setPrintOpen(true);
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Could not build the SOA preview.");
         } finally {
             setPreviewing(false);
-        }
-    }
-
-    async function handleIssue(): Promise<void> {
-        const snapshot = companySnapshot();
-        if (!detail || !snapshot || !companies.selected) {
-            toast.error("Pick a company for the letterhead first.");
-            return;
-        }
-        setIssuing(true);
-        try {
-            const ref = await issue(requestId, companies.selected.company_code);
-            toast.success(ref === "" ? "Statement of account issued." : `Issued ${ref}.`);
-            setIssueOpen(false);
-            setSeededFor(null);
-            reload();
-            const renderModel = await fetchRenderModel(requestId, snapshot);
-            setModel(renderModel);
-            setPrintOpen(true);
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "The statement of account cannot be issued.");
-        } finally {
-            setIssuing(false);
         }
     }
 
@@ -335,10 +364,6 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
     if (error || !detail) {
         return (
             <div className="space-y-3">
-                <Button variant="outline" size="sm" onClick={onBack}>
-                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                    Back to list
-                </Button>
                 <Alert variant="destructive">
                     <AlertDescription>{error ?? "Statement of account not found."}</AlertDescription>
                 </Alert>
@@ -351,19 +376,34 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" size="sm" onClick={onBack}>
-                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                    Back
-                </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="font-medium">Request #{detail.request_id}</span>
-                    <Badge variant={isIssued ? "default" : "secondary"}>{detail.status}</Badge>
+                    <Badge variant={isApproved ? "default" : "secondary"}>{detail.status}</Badge>
                     {detail.ref_no && <Badge variant="outline">REF {detail.ref_no}</Badge>}
                     {detail.clearance_no && <Badge variant="outline">Clearance {detail.clearance_no}</Badge>}
                 </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                    {!isApproved && (
+                        <Button onClick={() => void handleSave()} disabled={saving || invalidCount > 0}>
+                            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                            {saving ? "Saving…" : "Save lines"}
+                        </Button>
+                    )}
+                    <Button
+                        variant="outline"
+                        onClick={() => void handlePreview()}
+                        disabled={previewing}
+                    >
+                        {previewing
+                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <Printer className="h-4 w-4" aria-hidden="true" />}
+                        {previewing ? "Building…" : "Preview / Print"}
+                    </Button>
+                </div>
             </div>
 
+            {companies.employeeCompany === null && (
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base">Letterhead</CardTitle>
@@ -395,6 +435,7 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                     )}
                 </CardContent>
             </Card>
+            )}
 
             {sections.length === 0 && (
                 <Alert>
@@ -408,7 +449,7 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                 <Card key={section.key}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0">
                         <CardTitle className="text-sm">{section.label}</CardTitle>
-                        {!isIssued && (
+                        {!isApproved && (
                             <Button variant="outline" size="sm" onClick={() => addRow(section.key)}>
                                 <Plus className="h-4 w-4" aria-hidden="true" />
                                 Add line
@@ -427,7 +468,7 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                                         <Label>Description</Label>
                                         <Input
                                             value={row.description}
-                                            disabled={isIssued}
+                                            disabled={isApproved}
                                             placeholder="Description"
                                             onChange={(event) =>
                                                 updateRow(section.key, row.key, { description: event.target.value })
@@ -438,7 +479,7 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                                         <Label>Amount</Label>
                                         <Input
                                             value={row.amountText}
-                                            disabled={isIssued}
+                                            disabled={isApproved}
                                             inputMode="decimal"
                                             placeholder="0.00"
                                             aria-invalid={invalid}
@@ -457,14 +498,14 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                                         <Label>Remarks</Label>
                                         <Input
                                             value={row.remarks}
-                                            disabled={isIssued}
+                                            disabled={isApproved}
                                             placeholder="Remarks"
                                             onChange={(event) =>
                                                 updateRow(section.key, row.key, { remarks: event.target.value })
                                             }
                                         />
                                     </div>
-                                    {!isIssued && (
+                                    {!isApproved && (
                                         <div className="flex items-end">
                                             <Button
                                                 variant="ghost"
@@ -488,64 +529,38 @@ export function SoaEditor({ requestId, onBack, autoPrint = false }: SoaEditorPro
                 </Card>
             ))}
 
-            {signatories.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Signatories</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-2 sm:grid-cols-3">
-                        {signatories.map((signatory, index) => (
-                            <div key={`${signatory.label}-${index}`} className="rounded-md border p-3 text-sm">
-                                <p className="font-medium">{signatory.label}</p>
-                                <p>{signatory.name}</p>
-                                <p className="text-muted-foreground">{signatory.title}</p>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Signatories</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-2 sm:grid-cols-3">
+                    {signatoryDrafts.map((draft, index) => (
+                        <div key={`signatory-${index}`} className="grid gap-2 rounded-md border p-3">
+                            <p className="text-sm font-medium">
+                                {draft.label === "" ? "Additional Signatory" : draft.label}
+                            </p>
+                            <div className="grid gap-1.5">
+                                <Label>Name</Label>
+                                <Input
+                                    value={draft.name}
+                                    disabled={isApproved}
+                                    placeholder="Name"
+                                    onChange={(event) => updateSignatory(index, "name", event.target.value)}
+                                />
                             </div>
-                        ))}
-                    </CardContent>
-                </Card>
-            )}
-
-            <div className="flex flex-wrap items-center gap-2">
-                {!isIssued && (
-                    <Button onClick={() => void handleSave()} disabled={saving || invalidCount > 0}>
-                        {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                        {saving ? "Saving…" : "Save lines"}
-                    </Button>
-                )}
-                <Button
-                    variant="outline"
-                    onClick={() => void handlePreview()}
-                    disabled={previewing || issuing}
-                >
-                    {previewing
-                        ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                        : <Printer className="h-4 w-4" aria-hidden="true" />}
-                    {previewing ? "Building…" : "Preview / Print"}
-                </Button>
-                {!isIssued && (
-                    <Button variant="destructive" onClick={() => setIssueOpen(true)} disabled={issuing}>
-                        Issue SOA
-                    </Button>
-                )}
-            </div>
-
-            <AlertDialog open={issueOpen} onOpenChange={setIssueOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Issue this statement of account?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Issuing allocates the reference number and freezes the document. Saved lines can no
-                            longer be changed.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={issuing}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void handleIssue()} disabled={issuing}>
-                            {issuing ? "Issuing…" : "Issue"}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                            <div className="grid gap-1.5">
+                                <Label>Title</Label>
+                                <Input
+                                    value={draft.title}
+                                    disabled={isApproved}
+                                    placeholder="Title"
+                                    onChange={(event) => updateSignatory(index, "title", event.target.value)}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </CardContent>
+            </Card>
 
             <SoaPrintDialog
                 soaId={detail?.id ?? null}

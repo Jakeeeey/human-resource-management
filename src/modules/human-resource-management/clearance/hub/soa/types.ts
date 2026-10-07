@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SOA_STATUSES = ["draft", "issued"] as const;
+export const SOA_STATUSES = ["pending", "approved"] as const;
 
 export type SoaStatus = (typeof SOA_STATUSES)[number];
 
@@ -24,8 +24,8 @@ export const ClearanceSoaSchema = z.object({
     clearance_no: z.string().nullable(),
     company_code: z.string().nullable(),
     pdf_file: z.string().nullable(),
-    issued_at: z.string().nullable(),
-    issued_by: z.number().nullable(),
+    approved_at: z.string().nullable(),
+    approved_by: z.number().nullable(),
     created_at: z.string().nullable(),
     created_by: z.number().nullable(),
     updated_at: z.string().nullable(),
@@ -59,7 +59,7 @@ export const ClearanceSoaLineSchema = z.object({
 
 export type ClearanceSoaLine = z.infer<typeof ClearanceSoaLineSchema>;
 
-export const SOA_OVERVIEW_STATUSES = ["missing", "draft", "issued"] as const;
+export const SOA_OVERVIEW_STATUSES = ["missing", "pending", "approved"] as const;
 
 export type SoaOverviewStatus = (typeof SOA_OVERVIEW_STATUSES)[number];
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-    issueSoa,
+    approveSoa,
     mapClearanceSoaError,
 } from "@/modules/human-resource-management/clearance/hub/soa/services/ClearanceSoaService";
 import {
@@ -13,7 +13,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const IssueSoaSchema = z
+const ApproveSoaSchema = z
     .object({
         request_id: z.number().int().positive(),
         company_code: z.string().trim().min(1).max(16),
@@ -25,12 +25,12 @@ export async function POST(req: NextRequest) {
         const auth = await authorizeClearanceRoute(req, "canManageClearances");
         if ("failure" in auth) return auth.failure;
         const body: unknown = await req.json().catch(() => null);
-        const parsed = IssueSoaSchema.safeParse(body);
+        const parsed = ApproveSoaSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
         }
         try {
-            const result = await issueSoa({
+            const result = await approveSoa({
                 requestId: parsed.data.request_id,
                 actorId: auth.cap.actorId,
                 companyCode: parsed.data.company_code,
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         } catch (error) {
             return (
                 mapClearanceSoaError(error) ??
-                NextResponse.json({ success: false, message: "Failed to issue statement of account" }, { status: 500 })
+                NextResponse.json({ success: false, message: "Failed to approve statement of account" }, { status: 500 })
             );
         }
     } catch (error) {

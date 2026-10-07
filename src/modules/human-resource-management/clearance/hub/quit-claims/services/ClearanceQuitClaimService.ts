@@ -17,7 +17,7 @@ export const CLEARANCE_QUITCLAIM_ERROR_CODES = {
     userNotFound: "CLEARANCE_USER_NOT_FOUND",
     resignationNotFound: "RESIGNATION_NOT_FOUND",
     quitclaimNotFound: "CLEARANCE_QUITCLAIM_NOT_FOUND",
-    quitclaimIssued: "CLEARANCE_QUITCLAIM_ISSUED",
+    quitclaimApproved: "CLEARANCE_QUITCLAIM_APPROVED",
     quitclaimFrozen: "CLEARANCE_QUITCLAIM_FROZEN",
     ownerMismatch: "CLEARANCE_QUITCLAIM_OWNER_MISMATCH",
     refAllocFailed: "DOCUMENT_REF_ALLOC_FAILED",
@@ -35,8 +35,8 @@ export interface ClearanceQuitclaimRow {
     clearance_no: string | null;
     company_code: string | null;
     pdf_file: string | null;
-    issued_at: string | null;
-    issued_by: number | null;
+    approved_at: string | null;
+    approved_by: number | null;
     created_at: string | null;
     created_by: number | null;
     updated_at: string | null;
@@ -62,44 +62,16 @@ export interface CreateQuitClaimInput {
     actorId: number | null;
 }
 
-export interface IssueQuitClaimInput {
+export interface ApproveQuitClaimInput {
     id: number;
     actorId: number | null;
     companyCode: string;
 }
 
-export interface IssueQuitClaimResult {
+export interface ApproveQuitClaimResult {
     quitclaim: ClearanceQuitclaimRow;
     ref: DocumentRefRow;
     clearanceNo: string;
-}
-
-export interface EmployeeOption {
-    user_id: number;
-    full_name: string;
-    user_position: string | null;
-}
-
-export interface EmployeeOptionListResult {
-    data: EmployeeOption[];
-    total: number;
-    page: number;
-    limit: number;
-}
-
-export interface ResignationOption {
-    id: number;
-    user_id: number;
-    employee_name: string;
-    filed_at: string | null;
-    resignation_date: string | null;
-}
-
-export interface ResignationOptionListResult {
-    data: ResignationOption[];
-    total: number;
-    page: number;
-    limit: number;
 }
 
 interface RequestRef {
@@ -184,8 +156,8 @@ function normalizeQuitclaimRow(raw: unknown): ClearanceQuitclaimRow | null {
         clearance_no: toNullableText(raw.clearance_no),
         company_code: toNullableText(raw.company_code),
         pdf_file: toNullableText(raw.pdf_file),
-        issued_at: toNullableText(raw.issued_at),
-        issued_by: toNullableId(raw.issued_by),
+        approved_at: toNullableText(raw.approved_at),
+        approved_by: toNullableId(raw.approved_by),
         created_at: toNullableText(raw.created_at),
         created_by: toNullableId(raw.created_by),
         updated_at: toNullableText(raw.updated_at),
@@ -364,14 +336,14 @@ export async function createQuitClaim(input: CreateQuitClaimInput): Promise<Clea
             user_id: input.userId,
             resignation_id: resignationId,
             request_id: requestId,
-            status: "draft",
+            status: "pending",
             ref_no: null,
             clearance_no: null,
             company_code: null,
             values_json: values,
             pdf_file: null,
-            issued_at: null,
-            issued_by: null,
+            approved_at: null,
+            approved_by: null,
             created_at: now,
             created_by: input.actorId,
             updated_at: null,
@@ -383,6 +355,79 @@ export async function createQuitClaim(input: CreateQuitClaimInput): Promise<Clea
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.writeFailed, "clearance_quitclaim create failed");
     }
     return { ...row, values };
+}
+
+export async function getQuitClaimByRequest(requestId: number): Promise<ClearanceQuitclaimDetail | null> {
+    const body: unknown = await dFetch(
+        `/items/clearance_quitclaim?filter[request_id][_eq]=${requestId}&limit=1`
+    );
+    if (!isRecord(body) || !Array.isArray(body.data)) {
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.readFailed, "clearance_quitclaim read failed");
+    }
+    for (const entry of (body as { data: unknown[] }).data) {
+        const row = normalizeQuitclaimRow(entry);
+        if (!row) continue;
+        const values = normalizeValues(isRecord(entry) ? entry.values_json : null);
+        if (!values) {
+            fail(CLEARANCE_QUITCLAIM_ERROR_CODES.readFailed, `clearance_quitclaim ${row.id} values_json contract mismatch`);
+        }
+        return { ...row, values };
+    }
+    return null;
+}
+
+export async function ensureQuitClaim(requestId: number, actorId: number | null): Promise<ClearanceQuitclaimDetail> {
+    const request = await readRequestRef(requestId);
+    if (!request) {
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.requestNotFound, `clearance_request ${requestId} does not exist`);
+    }
+    const existing = await getQuitClaimByRequest(requestId);
+    if (existing) return existing;
+    const userRow = await readUserRecord(request.user_id);
+    if (!userRow) {
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.userNotFound, `user ${request.user_id} does not exist`);
+    }
+    const resignation = await readResignationRef(request.resignation_id);
+    const items = await listItemRefs(request.id);
+    const values = seedValues({
+        employeeName: toFullName(userRow),
+        position: toNullableText(userRow.user_position) ?? "",
+        separation: resignation ? resignation.resignation_date : "",
+        companyName: "",
+        items,
+    });
+    const now = nowUTC();
+    try {
+        const body: unknown = await dFetch("/items/clearance_quitclaim", {
+            method: "POST",
+            body: JSON.stringify({
+                user_id: request.user_id,
+                resignation_id: request.resignation_id,
+                request_id: requestId,
+                status: "pending",
+                ref_no: null,
+                clearance_no: null,
+                company_code: null,
+                values_json: values,
+                pdf_file: null,
+                approved_at: null,
+                approved_by: null,
+                created_at: now,
+                created_by: actorId,
+                updated_at: null,
+                updated_by: null,
+            }),
+        });
+        const payload: unknown = isRecord(body) && !Array.isArray(body.data) ? body.data : null;
+        const row = payload ? normalizeQuitclaimRow(payload) : null;
+        if (row) return { ...row, values };
+    } catch {
+        const raced = await getQuitClaimByRequest(requestId);
+        if (raced) return raced;
+    }
+    const raced = await getQuitClaimByRequest(requestId);
+    if (raced) return raced;
+    fail(CLEARANCE_QUITCLAIM_ERROR_CODES.writeFailed, "clearance_quitclaim create failed");
 }
 
 export async function getQuitClaim(id: number): Promise<ClearanceQuitclaimDetail> {
@@ -415,8 +460,8 @@ export async function updateQuitClaimValues(
         );
     }
     const current = await getQuitClaim(id);
-    if (current.status === "issued") {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimIssued, `clearance_quitclaim ${id} is already issued`);
+    if (current.status === "approved") {
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimApproved, `clearance_quitclaim ${id} is already approved`);
     }
     const now = nowUTC();
     const body: unknown = await dFetch(`/items/clearance_quitclaim/${id}`, {
@@ -432,14 +477,14 @@ export async function updateQuitClaimValues(
     return { ...row, values: nextValues };
 }
 
-export async function issueQuitClaim(input: IssueQuitClaimInput): Promise<IssueQuitClaimResult> {
+export async function approveQuitClaim(input: ApproveQuitClaimInput): Promise<ApproveQuitClaimResult> {
     const companyCode = input.companyCode.trim();
     if (!Number.isInteger(input.id) || input.id <= 0 || companyCode === "") {
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.invalidInput, "id and companyCode are required");
     }
     const current = await getQuitClaim(input.id);
-    if (current.status === "issued") {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimIssued, `clearance_quitclaim ${input.id} is already issued`);
+    if (current.status === "approved") {
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimApproved, `clearance_quitclaim ${input.id} is already approved`);
     }
     let ref: DocumentRefRow;
     try {
@@ -456,19 +501,19 @@ export async function issueQuitClaim(input: IssueQuitClaimInput): Promise<IssueQ
     const body: unknown = await dFetch(`/items/clearance_quitclaim/${input.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-            status: "issued",
+            status: "approved",
             ref_no: ref.ref_no,
             clearance_no: clearanceNo === "" ? null : clearanceNo,
             company_code: companyCode,
-            issued_at: now,
-            issued_by: input.actorId,
+            approved_at: now,
+            approved_by: input.actorId,
             updated_at: now,
             updated_by: input.actorId,
         }),
     });
     const row = isRecord(body) && !Array.isArray(body.data) ? normalizeQuitclaimRow(body.data) : null;
     if (!row) {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.writeFailed, `clearance_quitclaim/${input.id} issue failed`);
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.writeFailed, `clearance_quitclaim/${input.id} approve failed`);
     }
     return { quitclaim: row, ref, clearanceNo };
 }
@@ -482,8 +527,8 @@ export async function attachQuitClaimPdf(
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.invalidInput, "id and pdfFileId are required");
     }
     const current = await getQuitClaim(id);
-    if (current.status !== "issued") {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimNotFound, `clearance_quitclaim ${id} is not issued`);
+    if (current.status !== "approved") {
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimNotFound, `clearance_quitclaim ${id} is not approved`);
     }
     if (current.pdf_file !== null && current.pdf_file !== "") {
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimFrozen, `clearance_quitclaim ${id} pdf is frozen`);
@@ -522,7 +567,7 @@ export async function listQuitClaims(query: {
 }): Promise<ClearanceQuitclaimListResult> {
     const { page, limit } = readPageLimit(query);
     if (query.status !== undefined && !toQuitclaimStatus(query.status)) {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.invalidInput, "status must be draft or issued");
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.invalidInput, "status must be pending or approved");
     }
     if (query.userId !== undefined && (!Number.isInteger(query.userId) || query.userId <= 0)) {
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.invalidInput, "userId is invalid");
@@ -539,87 +584,6 @@ export async function listQuitClaims(query: {
     for (const entry of (body as { data: unknown[] }).data) {
         const row = normalizeQuitclaimRow(entry);
         if (row) rows.push(row);
-    }
-    return { data: rows, total: readTotal(body, rows.length), page, limit };
-}
-
-export async function listEmployeeOptions(query: {
-    page?: number;
-    limit?: number;
-    search?: string;
-}): Promise<EmployeeOptionListResult> {
-    const { page, limit } = readPageLimit(query);
-    const filters: string[] = [`fields=user_id,user_fname,user_mname,user_lname,user_position`];
-    const term = query.search?.trim() ?? "";
-    if (term !== "") {
-        const encoded = encodeURIComponent(term);
-        filters.push(
-            `filter[_or][0][user_fname][_icontains]=${encoded}`,
-            `filter[_or][1][user_lname][_icontains]=${encoded}`
-        );
-    }
-    filters.push("sort=user_lname,user_fname,user_id", `limit=${limit}`, `offset=${(page - 1) * limit}`, "meta=total_count");
-    const body: unknown = await dFetch(`/items/user?${filters.join("&")}`);
-    if (!isRecord(body) || !Array.isArray(body.data)) {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.readFailed, "user list failed");
-    }
-    const rows: EmployeeOption[] = [];
-    for (const entry of (body as { data: unknown[] }).data) {
-        if (!isRecord(entry)) continue;
-        const userId = toId(entry.user_id);
-        if (userId === null) continue;
-        rows.push({
-            user_id: userId,
-            full_name: toFullName(entry),
-            user_position: toNullableText(entry.user_position),
-        });
-    }
-    return { data: rows, total: readTotal(body, rows.length), page, limit };
-}
-
-export async function listResignationOptions(query: {
-    page?: number;
-    limit?: number;
-    userId?: number;
-}): Promise<ResignationOptionListResult> {
-    const { page, limit } = readPageLimit(query);
-    if (query.userId !== undefined && (!Number.isInteger(query.userId) || query.userId <= 0)) {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.invalidInput, "userId is invalid");
-    }
-    const filters: string[] = ["filter[status][_eq]=approved"];
-    if (query.userId !== undefined) filters.push(`filter[user_id][_eq]=${query.userId}`);
-    filters.push(
-        "fields=id,user_id,status,filed_at,resignation_date",
-        "sort=-filed_at",
-        `limit=${limit}`,
-        `offset=${(page - 1) * limit}`,
-        "meta=total_count"
-    );
-    const body: unknown = await dFetch(`/items/resignation_request?${filters.join("&")}`);
-    if (!isRecord(body) || !Array.isArray(body.data)) {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.readFailed, "resignation_request list failed");
-    }
-    const raws = (body as { data: unknown[] }).data.filter(isRecord);
-    const userIds = [...new Set(raws.map((raw) => toId(raw.user_id)).filter((id): id is number => id !== null))];
-    const userEntries = await Promise.all(
-        userIds.map(async (userId) => ({ userId, row: await readUserRecord(userId) }))
-    );
-    const names = new Map<number, string>();
-    for (const entry of userEntries) {
-        if (entry.row) names.set(entry.userId, toFullName(entry.row));
-    }
-    const rows: ResignationOption[] = [];
-    for (const raw of raws) {
-        const id = toId(raw.id);
-        const userId = toId(raw.user_id);
-        if (id === null || userId === null) continue;
-        rows.push({
-            id,
-            user_id: userId,
-            employee_name: names.get(userId) ?? "Unknown employee",
-            filed_at: toNullableText(raw.filed_at),
-            resignation_date: toNullableText(raw.resignation_date),
-        });
     }
     return { data: rows, total: readTotal(body, rows.length), page, limit };
 }
@@ -652,11 +616,11 @@ export function mapClearanceQuitClaimError(error: unknown): NextResponse | null 
         case CLEARANCE_QUITCLAIM_ERROR_CODES.ownerMismatch:
         case "DOCUMENT_REF_INVALID_INPUT":
             return NextResponse.json({ success: false, code, message: "Invalid request" }, { status: 400 });
-        case CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimIssued:
+        case CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimApproved:
         case CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimFrozen:
         case CLEARANCE_QUITCLAIM_ERROR_CODES.refAllocFailed:
         case "DOCUMENT_REF_ALLOC_FAILED":
-            return NextResponse.json({ success: false, code, message: "The quit claim cannot be issued" }, { status: 409 });
+            return NextResponse.json({ success: false, code, message: "The quit claim cannot be approved" }, { status: 409 });
         default:
             return null;
     }

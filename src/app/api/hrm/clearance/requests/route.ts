@@ -8,6 +8,7 @@ import {
 } from "@/modules/human-resource-management/clearance/hub/services/ClearanceRequestService";
 import { ensureClearanceForm } from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceFormService";
 import { ensureSoa } from "@/modules/human-resource-management/clearance/hub/soa/services/ClearanceSoaService";
+import { ensureQuitClaim } from "@/modules/human-resource-management/clearance/hub/quit-claims/services/ClearanceQuitClaimService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
@@ -81,6 +82,11 @@ export async function POST(req: NextRequest) {
                 await ensureSoa(result.request.id, auth.cap.actorId);
             } catch (error) {
                 console.error("[clearance-requests] ensure soa failed:", error);
+            }
+            try {
+                await ensureQuitClaim(result.request.id, auth.cap.actorId);
+            } catch (error) {
+                console.error("[clearance-requests] ensure quit claim failed:", error);
             }
             return NextResponse.json(
                 { success: true, data: result.request },

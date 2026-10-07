@@ -14,7 +14,7 @@ export const CLEARANCE_FORM_ERROR_CODES = {
     requestNotFound: "CLEARANCE_REQUEST_NOT_FOUND",
     userNotFound: "CLEARANCE_USER_NOT_FOUND",
     formNotFound: "CLEARANCE_FORM_NOT_FOUND",
-    formIssued: "CLEARANCE_FORM_ISSUED",
+    formApproved: "CLEARANCE_FORM_APPROVED",
     formFrozen: "CLEARANCE_FORM_FROZEN",
     refAllocFailed: "DOCUMENT_REF_ALLOC_FAILED",
     writeFailed: "CLEARANCE_FORM_WRITE_FAILED",
@@ -28,8 +28,8 @@ export interface ClearanceFormRow {
     ref_no: string | null;
     company_code: string | null;
     pdf_file: string | null;
-    issued_at: string | null;
-    issued_by: number | null;
+    approved_at: string | null;
+    approved_by: number | null;
     created_at: string | null;
     created_by: number | null;
     updated_at: string | null;
@@ -43,14 +43,14 @@ export interface ClearanceFormListResult {
     limit: number;
 }
 
-export interface IssueClearanceFormInput {
+export interface ApproveClearanceFormInput {
     requestId: number;
     actorId: number | null;
     companyCode: string;
     date?: string;
 }
 
-export interface IssueClearanceFormResult {
+export interface ApproveClearanceFormResult {
     form: ClearanceFormRow;
     ref: DocumentRefRow;
     renderModel: ClearanceFormRenderModel;
@@ -138,8 +138,8 @@ function normalizeFormRow(raw: unknown): ClearanceFormRow | null {
         ref_no: toNullableText(raw.ref_no),
         company_code: toNullableText(raw.company_code),
         pdf_file: toNullableText(raw.pdf_file),
-        issued_at: toNullableText(raw.issued_at),
-        issued_by: toNullableId(raw.issued_by),
+        approved_at: toNullableText(raw.approved_at),
+        approved_by: toNullableId(raw.approved_by),
         created_at: toNullableText(raw.created_at),
         created_by: toNullableId(raw.created_by),
         updated_at: toNullableText(raw.updated_at),
@@ -237,12 +237,12 @@ export async function ensureClearanceForm(requestId: number, actorId: number | n
             method: "POST",
             body: JSON.stringify({
                 request_id: requestId,
-                status: "draft",
+                status: "pending",
                 ref_no: null,
                 company_code: null,
                 pdf_file: null,
-                issued_at: null,
-                issued_by: null,
+                approved_at: null,
+                approved_by: null,
                 created_at: now,
                 created_by: actorId,
                 updated_at: null,
@@ -309,14 +309,14 @@ export async function buildClearanceFormRenderModel(
     };
 }
 
-export async function issueClearanceForm(input: IssueClearanceFormInput): Promise<IssueClearanceFormResult> {
+export async function approveClearanceForm(input: ApproveClearanceFormInput): Promise<ApproveClearanceFormResult> {
     const companyCode = input.companyCode.trim();
     if (!Number.isInteger(input.requestId) || input.requestId <= 0 || companyCode === "") {
         fail(CLEARANCE_FORM_ERROR_CODES.invalidInput, "requestId and companyCode are required");
     }
     const form = await ensureClearanceForm(input.requestId, input.actorId);
-    if (form.status === "issued") {
-        fail(CLEARANCE_FORM_ERROR_CODES.formIssued, `clearance_form ${form.id} is already issued`);
+    if (form.status === "approved") {
+        fail(CLEARANCE_FORM_ERROR_CODES.formApproved, `clearance_form ${form.id} is already approved`);
     }
     let ref: DocumentRefRow;
     try {
@@ -336,18 +336,18 @@ export async function issueClearanceForm(input: IssueClearanceFormInput): Promis
     const body: unknown = await dFetch(`/items/clearance_form/${form.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-            status: "issued",
+            status: "approved",
             ref_no: ref.ref_no,
             company_code: companyCode,
-            issued_at: now,
-            issued_by: input.actorId,
+            approved_at: now,
+            approved_by: input.actorId,
             updated_at: now,
             updated_by: input.actorId,
         }),
     });
     const updated = isRecord(body) && !Array.isArray(body.data) ? normalizeFormRow(body.data) : null;
     if (!updated) {
-        fail(CLEARANCE_FORM_ERROR_CODES.writeFailed, `clearance_form/${form.id} issue failed`);
+        fail(CLEARANCE_FORM_ERROR_CODES.writeFailed, `clearance_form/${form.id} approve failed`);
     }
     const renderModel = await buildClearanceFormRenderModel(input.requestId, {
         date: input.date ?? "",
@@ -368,8 +368,8 @@ export async function attachClearanceFormPdf(
     if (!current) {
         fail(CLEARANCE_FORM_ERROR_CODES.formNotFound, `clearance_form ${formId} does not exist`);
     }
-    if (current.status !== "issued") {
-        fail(CLEARANCE_FORM_ERROR_CODES.formNotFound, `clearance_form ${formId} is not issued`);
+    if (current.status !== "approved") {
+        fail(CLEARANCE_FORM_ERROR_CODES.formNotFound, `clearance_form ${formId} is not approved`);
     }
     if (current.pdf_file !== null && current.pdf_file !== "") {
         fail(CLEARANCE_FORM_ERROR_CODES.formFrozen, `clearance_form ${formId} pdf is frozen`);
@@ -396,7 +396,7 @@ export async function listClearanceForms(query: {
         ? Math.min(query.limit, 100)
         : 25;
     if (query.status !== undefined && !toFormStatus(query.status)) {
-        fail(CLEARANCE_FORM_ERROR_CODES.invalidInput, "status must be draft or issued");
+        fail(CLEARANCE_FORM_ERROR_CODES.invalidInput, "status must be pending or approved");
     }
     const filters: string[] = [];
     if (query.status !== undefined) filters.push(`filter[status][_eq]=${query.status}`);
@@ -566,7 +566,7 @@ export async function listClearanceFormOverview(query: {
         ? Math.min(query.limit, 100)
         : 25;
     if (query.status !== undefined && !toOverviewStatus(query.status)) {
-        fail(CLEARANCE_FORM_ERROR_CODES.invalidInput, "status must be missing, draft or issued");
+        fail(CLEARANCE_FORM_ERROR_CODES.invalidInput, "status must be missing, pending or approved");
     }
     if (query.status === undefined) {
         const { rows: requests, total } = await readOverviewRequestPage(page, limit);
@@ -625,11 +625,11 @@ export function mapClearanceFormError(error: unknown): NextResponse | null {
         case CLEARANCE_FORM_ERROR_CODES.invalidInput:
         case "DOCUMENT_REF_INVALID_INPUT":
             return NextResponse.json({ success: false, code, message: "Invalid request" }, { status: 400 });
-        case CLEARANCE_FORM_ERROR_CODES.formIssued:
+        case CLEARANCE_FORM_ERROR_CODES.formApproved:
         case CLEARANCE_FORM_ERROR_CODES.formFrozen:
         case CLEARANCE_FORM_ERROR_CODES.refAllocFailed:
         case "DOCUMENT_REF_ALLOC_FAILED":
-            return NextResponse.json({ success: false, code, message: "The clearance form cannot be issued" }, { status: 409 });
+            return NextResponse.json({ success: false, code, message: "The clearance form cannot be approved" }, { status: 409 });
         default:
             return null;
     }

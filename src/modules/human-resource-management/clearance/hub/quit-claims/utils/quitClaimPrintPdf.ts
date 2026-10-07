@@ -67,6 +67,8 @@ const CERTIFYING_SENTENCE =
     "This is to certify that the above name employee has been cleared of all money/ records/ equipment/ tools/ supplies accountabilities as date indicated.";
 
 const CC_LINE = "Cc: Employee / 201 file / DOLE";
+const CC_INDENT = 36;
+const CC_LEADING = 14;
 
 const REPUBLIC_LINE_1 = "REPUBLIC OF THE PHILIPPINES )";
 const REPUBLIC_LINE_2 = "CITY/MUNICIPALITY OF __________________ ) S.S.";
@@ -146,6 +148,23 @@ function drawCaption(doc: jsPDF, text: string, y: number): number {
     doc.setTextColor(0);
     doc.text(text, MARGIN, y);
     return y + 16;
+}
+
+function drawCcBlock(doc: jsPDF, y: number): number {
+    const segments = CC_LINE.split(/ \/ /).map((entry) => entry.trim());
+    const head = segments[0];
+    const mark = head.search(/:/);
+    const label = mark >= 0 ? head.slice(0, mark + 1) : head;
+    const first = mark >= 0 ? head.slice(mark + 1).trim() : head;
+    drawCaption(doc, label, y);
+    const indentX = MARGIN + CC_INDENT;
+    doc.text(first, indentX, y);
+    let cursor = y + CC_LEADING;
+    for (const entry of segments.slice(1)) {
+        doc.text(entry, indentX, cursor);
+        cursor += CC_LEADING;
+    }
+    return cursor + 2;
 }
 
 function drawField(doc: jsPDF, label: string, value: string, x: number, y: number, width: number): number {
@@ -400,8 +419,8 @@ function drawSection2Signatories(doc: jsPDF, values: QuitClaimValues, y: number)
     let cursor = y + 37;
     cursor = drawSection2Signatory(doc, MARGIN, cursor, 80, treasuryName, "Treasury Officer", false);
     cursor += 19;
-    drawSection2Signatory(doc, MARGIN, cursor, 105, managerName, "General Manager", true);
-    drawSection2Signatory(doc, 257, cursor, 100, financeName, "Chief Finance Officer", true);
+    drawSection2Signatory(doc, MARGIN, cursor, 105, managerName, "General Manager", false);
+    drawSection2Signatory(doc, 257, cursor, 100, financeName, "Chief Finance Officer", false);
     drawSection2Signatory(doc, 445, cursor, 95, executiveName, "Chief Executive Officer", true);
     return cursor + 54;
 }
@@ -573,7 +592,7 @@ export function buildQuitClaimPdf(values: QuitClaimValues, company: QuitClaimCom
     y += 4;
     y = drawField(doc, "Date Signed:", values.released_by.date, MARGIN, y, CONTENT_WIDTH);
     y += 4;
-    y = drawCaption(doc, CC_LINE, y);
+    y = drawCcBlock(doc, y);
     y += 2;
     if (y + 40 > BODY_BOTTOM) {
         doc.addPage();

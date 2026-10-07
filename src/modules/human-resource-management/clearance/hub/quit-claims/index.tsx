@@ -5,11 +5,8 @@ import type { JSX } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { QuitClaimCreateDialog } from "./components/QuitClaimCreateDialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { QuitClaimEditor } from "./components/QuitClaimEditor";
-import { QuitClaimList } from "./components/QuitClaimList";
 import { createQuitClaim } from "./providers/quitClaimClient";
 
 interface RequestOwner {
@@ -67,6 +64,27 @@ async function findClaimIdForRequest(userId: number, requestId: number): Promise
     }
 }
 
+function QuitClaimDetailSkeleton(): JSX.Element {
+    return (
+        <div className="space-y-2" aria-label="Loading quit claim">
+            {[...Array(5)].map((_, index) => (
+                <Skeleton key={index} className="h-12 w-full" />
+            ))}
+        </div>
+    );
+}
+
+function QuitClaimUnavailable(): JSX.Element {
+    return (
+        <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+            <p className="font-medium">No quit claim to display.</p>
+            <p className="text-sm text-muted-foreground">
+                Open this tab from a clearance request workspace to view its quit claim.
+            </p>
+        </div>
+    );
+}
+
 function ClearanceQuitClaimsModuleInner(): JSX.Element {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -77,21 +95,10 @@ function ClearanceQuitClaimsModuleInner(): JSX.Element {
     const activeRequestId = useMemo(() => parseRequestId(requestParam), [requestParam]);
     const printRequested = activeRequestId !== null && printParam === "1";
 
-    const [createOpen, setCreateOpen] = useState(false);
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [editorOpen, setEditorOpen] = useState(false);
-    const [refreshKey, setRefreshKey] = useState(0);
     const linkedForRef = useRef<number | null>(null);
     const resolvingRef = useRef<number | null>(null);
-
-    function handleOpen(id: number): void {
-        setSelectedId(id);
-        setEditorOpen(true);
-    }
-
-    function handleChanged(): void {
-        setRefreshKey((current) => current + 1);
-    }
 
     function handleEditorOpenChange(next: boolean): void {
         setEditorOpen(next);
@@ -130,7 +137,6 @@ function ClearanceQuitClaimsModuleInner(): JSX.Element {
                 });
                 if (cancelled) return;
                 linkedForRef.current = activeRequestId;
-                setRefreshKey((current) => current + 1);
                 setSelectedId(created.id);
                 setEditorOpen(true);
             } catch {
@@ -149,35 +155,19 @@ function ClearanceQuitClaimsModuleInner(): JSX.Element {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Quit Claims</h1>
-                    <p className="text-muted-foreground">
-                        Standalone fillable quit claims — all amounts are manual entry
-                    </p>
-                </div>
-                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    New quit claim
-                </Button>
-            </div>
-            <QuitClaimList refreshKey={refreshKey} onOpen={handleOpen} />
-            <QuitClaimCreateDialog
-                open={createOpen}
-                onOpenChange={setCreateOpen}
-                onCreated={(detail: { id: number }) => {
-                    setCreateOpen(false);
-                    handleChanged();
-                    handleOpen(detail.id);
-                }}
-            />
-            <QuitClaimEditor
-                quitclaimId={selectedId}
-                open={editorOpen}
-                onOpenChange={handleEditorOpenChange}
-                onChanged={handleChanged}
-                autoOpenPrint={printRequested}
-            />
+            {editorOpen ? (
+                <QuitClaimEditor
+                    quitclaimId={selectedId}
+                    open={editorOpen}
+                    onOpenChange={handleEditorOpenChange}
+                    onChanged={() => undefined}
+                    autoOpenPrint={printRequested}
+                />
+            ) : activeRequestId !== null ? (
+                <QuitClaimDetailSkeleton />
+            ) : (
+                <QuitClaimUnavailable />
+            )}
         </div>
     );
 }

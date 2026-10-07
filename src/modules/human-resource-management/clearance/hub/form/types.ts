@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const CLEARANCE_FORM_STATUSES = ["draft", "issued"] as const;
+export const CLEARANCE_FORM_STATUSES = ["pending", "approved"] as const;
 
 export type ClearanceFormStatus = (typeof CLEARANCE_FORM_STATUSES)[number];
 
@@ -11,8 +11,8 @@ export const ClearanceFormSchema = z.object({
     ref_no: z.string().nullable(),
     company_code: z.string().nullable(),
     pdf_file: z.string().nullable(),
-    issued_at: z.string().nullable(),
-    issued_by: z.number().nullable(),
+    approved_at: z.string().nullable(),
+    approved_by: z.number().nullable(),
     created_at: z.string().nullable(),
     created_by: z.number().nullable(),
     updated_at: z.string().nullable(),
@@ -21,7 +21,7 @@ export const ClearanceFormSchema = z.object({
 
 export type ClearanceForm = z.infer<typeof ClearanceFormSchema>;
 
-export const CLEARANCE_FORM_OVERVIEW_STATUSES = ["missing", "draft", "issued"] as const;
+export const CLEARANCE_FORM_OVERVIEW_STATUSES = ["missing", "pending", "approved"] as const;
 
 export type ClearanceFormOverviewStatus = (typeof CLEARANCE_FORM_OVERVIEW_STATUSES)[number];
 

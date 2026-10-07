@@ -9,7 +9,7 @@ const PAGE_LIMIT = 100;
 
 export type FormDocumentKey = "form" | "soa" | "quit_claim";
 
-export type FormDocumentState = "missing" | "draft" | "issued";
+export type FormDocumentState = "missing" | "pending" | "approved";
 
 export interface FormDocumentEntry {
     key: FormDocumentKey;
@@ -22,7 +22,7 @@ export interface FormDocumentChecklist {
     form: FormDocumentEntry;
     soa: FormDocumentEntry;
     quitClaim: FormDocumentEntry;
-    issuedCount: number;
+    approvedCount: number;
     complete: boolean;
 }
 
@@ -45,16 +45,16 @@ function toFormDocumentChecklist(
     const resolvedForm = form ?? MISSING_DOCUMENT_SNAPSHOT;
     const resolvedSoa = soa ?? MISSING_DOCUMENT_SNAPSHOT;
     const resolvedQuitClaim = quitClaim ?? MISSING_DOCUMENT_SNAPSHOT;
-    const issuedCount = [resolvedForm, resolvedSoa, resolvedQuitClaim].filter(
-        (entry) => entry.state === "issued"
+    const approvedCount = [resolvedForm, resolvedSoa, resolvedQuitClaim].filter(
+        (entry) => entry.state === "approved"
     ).length;
     return {
         requestId,
         form: { key: "form", state: resolvedForm.state, refNo: resolvedForm.refNo },
         soa: { key: "soa", state: resolvedSoa.state, refNo: resolvedSoa.refNo },
         quitClaim: { key: "quit_claim", state: resolvedQuitClaim.state, refNo: resolvedQuitClaim.refNo },
-        issuedCount,
-        complete: issuedCount === 3,
+        approvedCount,
+        complete: approvedCount === 3,
     };
 }
 
@@ -82,8 +82,8 @@ function toNullableText(value: unknown): string | null {
 }
 
 function toDocumentState(value: unknown): FormDocumentState | null {
-    if (value === "issued") return "issued";
-    if (value === "draft") return "draft";
+    if (value === "approved") return "approved";
+    if (value === "pending") return "pending";
     return null;
 }
 
@@ -103,9 +103,9 @@ function toSnapshot(row: DocumentRow | null): FormDocumentSnapshot | undefined {
     return { state: row.state, refNo: row.refNo };
 }
 
-function preferIssued(current: DocumentRow | null, next: DocumentRow): DocumentRow {
+function preferApproved(current: DocumentRow | null, next: DocumentRow): DocumentRow {
     if (!current) return next;
-    if (current.state !== "issued" && next.state === "issued") return next;
+    if (current.state !== "approved" && next.state === "approved") return next;
     return current;
 }
 
@@ -162,7 +162,7 @@ function matchRequestRow(rows: DocumentRow[], requestId: number): DocumentRow | 
     let matched: DocumentRow | null = null;
     for (const row of rows) {
         if (row.requestId !== requestId) continue;
-        matched = preferIssued(matched, row);
+        matched = preferApproved(matched, row);
     }
     return matched;
 }

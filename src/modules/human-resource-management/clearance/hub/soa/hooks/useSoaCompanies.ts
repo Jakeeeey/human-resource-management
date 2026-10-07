@@ -5,16 +5,21 @@ import { useCallback, useEffect, useState } from "react";
 import {
     COMPANY_LOGOS_PATH,
     companyLogoDataUrl,
+    fetchEmployeeCompany,
     pickDefaultCompany,
+    pickEmployeeCompany,
     readCompanyOptions,
     type CompanyOption,
 } from "../../utils/company";
 
-export function useSoaCompanies() {
+export function useSoaCompanies(requestId?: number | null) {
     const [options, setOptions] = useState<CompanyOption[]>([]);
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [unreachable, setUnreachable] = useState(false);
+    const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(
+        requestId === undefined || requestId === null ? null : undefined
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -56,7 +61,27 @@ export function useSoaCompanies() {
         setSelectedId(id);
     }, []);
 
-    const selected = options.find((option) => option.id === selectedId) ?? null;
+    useEffect(() => {
+        if (requestId === undefined || requestId === null) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const result = await fetchEmployeeCompany({ requestId });
+                if (!cancelled) setEmployeeCompanyId(result.company_id);
+            } catch {
+                if (!cancelled) setEmployeeCompanyId(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [requestId]);
+
+    const employeeCompany = typeof employeeCompanyId === "number"
+        ? pickEmployeeCompany(options, employeeCompanyId)
+        : null;
+
+    const selected = employeeCompany ?? options.find((option) => option.id === selectedId) ?? null;
 
     return {
         options,
@@ -66,5 +91,7 @@ export function useSoaCompanies() {
         loading,
         unreachable,
         logoDataUrl: companyLogoDataUrl(selected),
+        employeeCompany,
+        employeeCompanyLoading: employeeCompanyId === undefined,
     };
 }

@@ -16,13 +16,14 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import type { CompanyOption } from "../../utils/company";
-import { companyLogoDataUrl } from "../../utils/company";
+import { companyLogoDataUrl, fetchEmployeeCompany, pickEmployeeCompany } from "../../utils/company";
 import { buildQuitClaimPdf, type QuitClaimCompany } from "../utils/quitClaimPrintPdf";
-import { freezeIssuedQuitClaimPdf } from "../utils/issuedPdfFreeze";
+import { freezeApprovedQuitClaimPdf } from "../utils/approvedPdfFreeze";
 import { phToday } from "../../utils/time";
 import { QuitClaimCompanySelect } from "./QuitClaimCompanySelect";
 import {
     getQuitClaimValues,
+    loadCompanyOptions,
     quitClaimErrorMessage,
     type QuitClaimDetail,
 } from "../providers/quitClaimClient";
@@ -68,6 +69,8 @@ function toRendererCompany(valuesCompany: string, selected: CompanyOption | null
 
 export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClaimPrintDialogProps): JSX.Element {
     const [company, setCompany] = useState<CompanyOption | null>(null);
+    const [companyOptions, setCompanyOptions] = useState<CompanyOption[] | undefined>(undefined);
+    const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(undefined);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>("");
     const [building, setBuilding] = useState(false);
@@ -80,6 +83,48 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
     const printingRef = useRef(false);
     const printingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const viewUrl = previewUrl ? toFitWidthUrl(previewUrl) : null;
+    const employeeCompany = typeof employeeCompanyId === "number" && companyOptions !== undefined
+        ? pickEmployeeCompany(companyOptions, employeeCompanyId)
+        : null;
+    const letterheadReady = companyOptions !== undefined && employeeCompanyId !== undefined;
+    const showCompanySelect = letterheadReady && employeeCompany === null;
+
+    useEffect(() => {
+        if (!open || quitclaim === null) {
+            setCompanyOptions(undefined);
+            setEmployeeCompanyId(undefined);
+            return;
+        }
+        let cancelled = false;
+        setCompany(null);
+        setCompanyOptions(undefined);
+        setEmployeeCompanyId(undefined);
+        (async () => {
+            try {
+                const rows = await loadCompanyOptions();
+                if (!cancelled) setCompanyOptions(rows);
+            } catch {
+                if (!cancelled) setCompanyOptions([]);
+            }
+        })();
+        (async () => {
+            try {
+                const result = await fetchEmployeeCompany({ userId: quitclaim.user_id });
+                if (!cancelled) setEmployeeCompanyId(result.company_id);
+            } catch {
+                if (!cancelled) setEmployeeCompanyId(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [open, quitclaim]);
+
+    useEffect(() => {
+        if (employeeCompany !== null && employeeCompany.id !== company?.id) {
+            setCompany(employeeCompany);
+        }
+    }, [employeeCompany, company]);
 
     useEffect(() => {
         if (!open || quitclaim === null) {
@@ -136,7 +181,7 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
     }, [open, quitclaim, company]);
 
     useEffect(() => {
-        if (!open || quitclaim === null || quitclaim.status !== "issued" || quitclaim.pdf_file) return;
+        if (!open || quitclaim === null || quitclaim.status !== "approved" || quitclaim.pdf_file) return;
         if (previewUrl === null || pdfBytesRef.current === null) return;
         const key = `${quitclaim.id}:${quitclaim.ref_no ?? ""}`;
         if (freezeKeyRef.current === key || freezeState !== "idle") return;
@@ -147,12 +192,12 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
         const uploadName = fileName === "" ? `Quit Claim - ${quitclaim.ref_no ?? quitclaim.id}.pdf` : fileName;
         (async () => {
             try {
-                await freezeIssuedQuitClaimPdf({ documentId: quitclaim.id, bytes, fileName: uploadName });
+                await freezeApprovedQuitClaimPdf({ documentId: quitclaim.id, bytes, fileName: uploadName });
                 setFreezeState("done");
             } catch {
                 freezeKeyRef.current = null;
                 setFreezeState("error");
-                setFreezeError("Could not store the issued PDF to the 201 file. Reopen this dialog to retry.");
+                setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
             }
         })();
     }, [open, quitclaim, previewUrl, fileName, freezeState]);
@@ -243,19 +288,33 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                         Print quit claim
                     </DialogTitle>
                     <DialogDescription>
-                        {quitclaim?.ref_no ?? "Draft"} — choose the letterhead company, then print or download.
+                        {quitclaim?.ref_no ?? "Pending"} — {employeeCompany !== null
+                            ? "letterhead set from the employee's company."
+                            : "choose the letterhead company, then print or download."}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-3 sm:p-6">
                     <div className="mx-auto max-w-3xl space-y-3">
                         <div className="space-y-1 rounded-[var(--radius)] border bg-card p-3 shadow-sm">
                             <Label htmlFor="quitclaim-print-company">Letterhead company</Label>
+                            {showCompanySelect ? (
                             <QuitClaimCompanySelect
                                 id="quitclaim-print-company"
                                 value={company}
                                 onValueChange={setCompany}
                                 disabled={building}
+                                options={companyOptions ?? []}
                             />
+                            ) : employeeCompany !== null ? (
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium">{employeeCompany.company_name}</p>
+                                {employeeCompany.company_address && (
+                                    <p className="text-xs text-muted-foreground">{employeeCompany.company_address}</p>
+                                )}
+                            </div>
+                            ) : (
+                            <p className="text-xs text-muted-foreground">Loading letterhead…</p>
+                            )}
                         </div>
                         {error && (
                             <Alert variant="destructive" className="bg-card">
@@ -266,12 +325,12 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                         )}
                         {freezeState === "freezing" && (
                             <p className="text-xs text-muted-foreground">
-                                Storing the issued PDF to the 201 file…
+                                Storing the approved PDF to the 201 file…
                             </p>
                         )}
                         {freezeState === "done" && (
                             <p className="text-xs text-muted-foreground">
-                                Issued PDF stored to the 201 file.
+                                Approved PDF stored to the 201 file.
                             </p>
                         )}
                         {freezeError && (

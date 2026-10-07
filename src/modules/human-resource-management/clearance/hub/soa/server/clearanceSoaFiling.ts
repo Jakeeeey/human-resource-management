@@ -6,7 +6,7 @@ import { nowUTC } from "../../utils/audit";
 export const CLEARANCE_SOA_FILING_ERROR_CODES = {
     invalidInput: "CLEARANCE_SOA_FILING_INVALID_INPUT",
     soaNotFound: "CLEARANCE_SOA_NOT_FOUND",
-    notIssued: "CLEARANCE_SOA_NOT_ISSUED",
+    notApproved: "CLEARANCE_SOA_NOT_APPROVED",
     notAttached: "CLEARANCE_SOA_PDF_NOT_ATTACHED",
     userNotFound: "CLEARANCE_USER_NOT_FOUND",
     writeFailed: "CLEARANCE_SOA_FILING_WRITE_FAILED",
@@ -17,9 +17,9 @@ export const CLEARANCE_DOCS_TYPE_NAME = "Employment & Contractual Documents";
 export const CLEARANCE_DOCS_LIST_NAME = "Clearance & Quit Claims";
 
 const CLEARANCE_DOCS_TYPE_DESCRIPTION =
-    "Employment and contractual documents auto-filed on clearance issuance — clearance forms, statements of account, and quit claims.";
+    "Employment and contractual documents auto-filed on clearance approval — clearance forms, statements of account, and quit claims.";
 const CLEARANCE_DOCS_LIST_DESCRIPTION =
-    "Issued clearance documents auto-filed on issue — one record per issued document.";
+    "Approved clearance documents auto-filed on approval — one record per approved document.";
 
 export interface FileClearanceSoaPdfResult {
     recordId: number;
@@ -182,8 +182,8 @@ export async function fileClearanceSoaPdf(
     if (!soa) {
         fail(CLEARANCE_SOA_FILING_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} does not exist`);
     }
-    if (soa.status !== "issued") {
-        fail(CLEARANCE_SOA_FILING_ERROR_CODES.notIssued, `clearance_soa ${soaId} is not issued`);
+    if (soa.status !== "approved") {
+        fail(CLEARANCE_SOA_FILING_ERROR_CODES.notApproved, `clearance_soa ${soaId} is not approved`);
     }
     if (!soa.pdf_file) {
         fail(CLEARANCE_SOA_FILING_ERROR_CODES.notAttached, `clearance_soa ${soaId} has no attached PDF`);
@@ -192,27 +192,29 @@ export async function fileClearanceSoaPdf(
     if (userId === null || !(await readUserExists(userId))) {
         fail(CLEARANCE_SOA_FILING_ERROR_CODES.userNotFound, `user for clearance_soa ${soaId} does not exist`);
     }
-    const filed = await readFirstOrNull(
-        `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
-        `&filter[file_ref][_eq]=${encodeURIComponent(soa.pdf_file)}&fields=id,list_id&limit=1`
-    );
-    if (filed) {
-        const recordId = toId(filed.id);
-        const listId = toId(filed.list_id);
-        if (recordId !== null && listId !== null) {
-            return { recordId, fileRef: soa.pdf_file, listId, alreadyFiled: true };
-        }
-    }
     const listId = await ensureClearanceDocsListId();
     const now = nowUTC();
     const recordName = soa.ref_no ? `Statement of Account — ${soa.ref_no}` : `Statement of Account — #${soa.id}`;
+    const filed = await readFirstOrNull(
+        `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
+    );
+    if (filed) {
+        const recordId = toId(filed.id);
+        const filedListId = toId(filed.list_id);
+        if (recordId !== null && filedListId !== null) {
+            const storedRef = toNullableText(filed.file_ref);
+            return { recordId, fileRef: storedRef ?? soa.pdf_file, listId: filedListId, alreadyFiled: true };
+        }
+    }
     const created: unknown = await dFetch("/items/employee_file_records", {
         method: "POST",
         body: JSON.stringify({
             user_id: userId,
             list_id: listId,
             record_name: recordName,
-            description: `Issued statement of account filed on issue (clearance_soa #${soa.id}${soa.ref_no ? `, REF ${soa.ref_no}` : ""}).`,
+            description: `Approved statement of account filed on approval (clearance_soa #${soa.id}${soa.ref_no ? `, REF ${soa.ref_no}` : ""}).`,
             file_ref: soa.pdf_file,
             is_deleted: 0,
             created_at: now,
@@ -228,12 +230,14 @@ export async function fileClearanceSoaPdf(
     }
     const raced = await readFirstOrNull(
         `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
-        `&filter[file_ref][_eq]=${encodeURIComponent(soa.pdf_file)}&fields=id,list_id&limit=1`
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
     );
     const racedId = raced ? toId(raced.id) : null;
     const racedList = raced ? toId(raced.list_id) : null;
     if (racedId !== null && racedList !== null) {
-        return { recordId: racedId, fileRef: soa.pdf_file, listId: racedList, alreadyFiled: true };
+        const racedRef = raced ? toNullableText(raced.file_ref) : null;
+        return { recordId: racedId, fileRef: racedRef ?? soa.pdf_file, listId: racedList, alreadyFiled: true };
     }
     fail(CLEARANCE_SOA_FILING_ERROR_CODES.writeFailed, "employee_file_records create returned no row");
 }
@@ -249,7 +253,7 @@ export function mapClearanceSoaFilingError(error: unknown): NextResponse | null 
             );
         case CLEARANCE_SOA_FILING_ERROR_CODES.invalidInput:
             return NextResponse.json({ success: false, code, message: "Invalid request" }, { status: 400 });
-        case CLEARANCE_SOA_FILING_ERROR_CODES.notIssued:
+        case CLEARANCE_SOA_FILING_ERROR_CODES.notApproved:
         case CLEARANCE_SOA_FILING_ERROR_CODES.notAttached:
         case CLEARANCE_SOA_FILING_ERROR_CODES.userNotFound:
             return NextResponse.json(

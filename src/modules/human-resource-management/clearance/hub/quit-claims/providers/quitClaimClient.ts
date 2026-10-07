@@ -29,42 +29,7 @@ export interface QuitClaimDetail extends ClearanceQuitclaim {
     values: QuitClaimValues;
 }
 
-export interface QuitClaimListResult {
-    data: ClearanceQuitclaim[];
-    total: number;
-    page: number;
-    limit: number;
-}
-
-export interface EmployeeOption {
-    user_id: number;
-    full_name: string;
-    user_position: string | null;
-}
-
-export interface EmployeeOptionResult {
-    data: EmployeeOption[];
-    total: number;
-    page: number;
-    limit: number;
-}
-
-export interface ResignationOption {
-    id: number;
-    user_id: number;
-    employee_name: string;
-    filed_at: string | null;
-    resignation_date: string | null;
-}
-
-export interface ResignationOptionResult {
-    data: ResignationOption[];
-    total: number;
-    page: number;
-    limit: number;
-}
-
-export interface IssueQuitClaimResult {
+export interface ApproveQuitClaimResult {
     quitclaim: ClearanceQuitclaim;
     ref: { ref_no: string };
     clearanceNo: string;
@@ -85,44 +50,18 @@ function throwForStatus(res: Response, body: unknown, fallback: string): never {
     throw new QuitClaimClientError(res.status, message, code);
 }
 
-export function isAlreadyIssuedError(error: unknown): boolean {
+export function isAlreadyApprovedError(error: unknown): boolean {
     return error instanceof QuitClaimClientError && error.status === 409;
 }
 
 export function quitClaimErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof QuitClaimClientError) {
         if (error.status === 409) {
-            return "This quit claim is already issued. Issued documents are frozen and cannot be edited.";
+            return "This quit claim is already approved. Approved documents are frozen and cannot be edited.";
         }
         return error.message;
     }
     return fallback;
-}
-
-export async function listQuitClaims(query: {
-    page: number;
-    limit: number;
-    status?: string;
-}): Promise<QuitClaimListResult> {
-    const params = new URLSearchParams({
-        page: String(query.page),
-        limit: String(query.limit),
-    });
-    if (query.status !== undefined && query.status !== "all") {
-        params.set("status", query.status);
-    }
-    const res = await fetch(`/api/hrm/clearance/quit-claims?${params.toString()}`);
-    const body = await readJson(res);
-    if (!res.ok) {
-        throwForStatus(res, body, "Failed to load quit claims.");
-    }
-    const record = body as { data?: unknown; total?: unknown; page?: unknown; limit?: unknown };
-    return {
-        data: Array.isArray(record.data) ? (record.data as ClearanceQuitclaim[]) : [],
-        total: typeof record.total === "number" ? record.total : 0,
-        page: typeof record.page === "number" ? record.page : query.page,
-        limit: typeof record.limit === "number" ? record.limit : query.limit,
-    };
 }
 
 export async function getQuitClaim(id: number): Promise<QuitClaimDetail> {
@@ -174,69 +113,17 @@ export async function updateQuitClaimValues(id: number, values: QuitClaimValues)
     return (body as { data: QuitClaimDetail }).data;
 }
 
-export async function issueQuitClaim(id: number, companyCode: string): Promise<IssueQuitClaimResult> {
-    const res = await fetch(`/api/hrm/clearance/quit-claims/${id}/issue`, {
+export async function approveQuitClaim(id: number, companyCode: string): Promise<ApproveQuitClaimResult> {
+    const res = await fetch(`/api/hrm/clearance/quit-claims/${id}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ company_code: companyCode }),
     });
     const body = await readJson(res);
     if (!res.ok) {
-        throwForStatus(res, body, "Failed to issue the quit claim.");
+        throwForStatus(res, body, "Failed to approve the quit claim.");
     }
-    return (body as { data: IssueQuitClaimResult }).data;
-}
-
-export async function listEmployeeOptions(query: {
-    page: number;
-    limit: number;
-    search: string;
-}): Promise<EmployeeOptionResult> {
-    const params = new URLSearchParams({
-        page: String(query.page),
-        limit: String(query.limit),
-    });
-    if (query.search.trim() !== "") {
-        params.set("search", query.search.trim());
-    }
-    const res = await fetch(`/api/hrm/clearance/quit-claims/employees/options?${params.toString()}`);
-    const body = await readJson(res);
-    if (!res.ok) {
-        throwForStatus(res, body, "Failed to load employees.");
-    }
-    const record = body as { data?: unknown; total?: unknown; page?: unknown; limit?: unknown };
-    return {
-        data: Array.isArray(record.data) ? (record.data as EmployeeOption[]) : [],
-        total: typeof record.total === "number" ? record.total : 0,
-        page: typeof record.page === "number" ? record.page : query.page,
-        limit: typeof record.limit === "number" ? record.limit : query.limit,
-    };
-}
-
-export async function listResignationOptions(query: {
-    page: number;
-    limit: number;
-    userId?: number;
-}): Promise<ResignationOptionResult> {
-    const params = new URLSearchParams({
-        page: String(query.page),
-        limit: String(query.limit),
-    });
-    if (query.userId !== undefined) {
-        params.set("user_id", String(query.userId));
-    }
-    const res = await fetch(`/api/hrm/clearance/quit-claims/resignations/options?${params.toString()}`);
-    const body = await readJson(res);
-    if (!res.ok) {
-        throwForStatus(res, body, "Failed to load resignations.");
-    }
-    const record = body as { data?: unknown; total?: unknown; page?: unknown; limit?: unknown };
-    return {
-        data: Array.isArray(record.data) ? (record.data as ResignationOption[]) : [],
-        total: typeof record.total === "number" ? record.total : 0,
-        page: typeof record.page === "number" ? record.page : query.page,
-        limit: typeof record.limit === "number" ? record.limit : query.limit,
-    };
+    return (body as { data: ApproveQuitClaimResult }).data;
 }
 
 export async function loadCompanyOptions(): Promise<CompanyOption[]> {
@@ -250,20 +137,6 @@ export async function loadCompanyOptions(): Promise<CompanyOption[]> {
 
 export function defaultCompany(options: CompanyOption[], companyCode?: string): CompanyOption | null {
     return pickDefaultCompany(options, companyCode);
-}
-
-export async function findRequestIdForResignation(resignationId: number): Promise<number | null> {
-    try {
-        const res = await fetch(`/api/hrm/clearance/requests?resignation_id=${resignationId}`);
-        if (!res.ok) {
-            return null;
-        }
-        const body = (await readJson(res)) as { data?: Array<{ id?: unknown }> } | null;
-        const first = Array.isArray(body?.data) ? body?.data[0] : undefined;
-        return typeof first?.id === "number" && Number.isInteger(first.id) ? first.id : null;
-    } catch {
-        return null;
-    }
 }
 
 export function normalizeQuitClaimValues(raw: unknown): QuitClaimValues {

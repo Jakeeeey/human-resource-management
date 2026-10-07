@@ -31,14 +31,14 @@ interface ClearanceFormListProps {
 }
 
 function statusTone(status: ClearanceFormOverview["status"]): StatusTone {
-    if (status === "issued") return "success";
-    if (status === "draft") return "info";
+    if (status === "approved") return "success";
+    if (status === "pending") return "info";
     return "neutral";
 }
 
 function statusLabel(status: ClearanceFormOverview["status"]): string {
-    if (status === "issued") return "Issued";
-    if (status === "draft") return "Draft";
+    if (status === "approved") return "Approved";
+    if (status === "pending") return "Pending";
     return "Missing";
 }
 

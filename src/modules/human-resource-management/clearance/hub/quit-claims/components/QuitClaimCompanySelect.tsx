@@ -19,6 +19,7 @@ interface QuitClaimCompanySelectProps {
     preferredCompanyCode?: string;
     disabled?: boolean;
     id?: string;
+    options?: CompanyOption[];
 }
 
 export function QuitClaimCompanySelect({
@@ -27,12 +28,14 @@ export function QuitClaimCompanySelect({
     preferredCompanyCode,
     disabled = false,
     id,
+    options: providedOptions,
 }: QuitClaimCompanySelectProps): JSX.Element {
-    const [options, setOptions] = useState<CompanyOption[]>([]);
+    const [internalOptions, setInternalOptions] = useState<CompanyOption[]>([]);
     const [failed, setFailed] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(providedOptions === undefined);
 
     useEffect(() => {
+        if (providedOptions !== undefined) return;
         let cancelled = false;
         setLoading(true);
         (async () => {
@@ -41,7 +44,7 @@ export function QuitClaimCompanySelect({
                 if (cancelled) {
                     return;
                 }
-                setOptions(rows);
+                setInternalOptions(rows);
                 setFailed(rows.length === 0);
             } catch {
                 if (!cancelled) {
@@ -56,19 +59,23 @@ export function QuitClaimCompanySelect({
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [providedOptions]);
+
+    const resolvedOptions = providedOptions ?? internalOptions;
+    const resolvedLoading = providedOptions !== undefined ? false : loading;
+    const resolvedFailed = providedOptions !== undefined ? providedOptions.length === 0 : failed;
 
     useEffect(() => {
-        if (!loading && !failed && value === null && options.length > 0) {
-            onValueChange(defaultCompany(options, preferredCompanyCode));
+        if (!resolvedLoading && !resolvedFailed && value === null && resolvedOptions.length > 0) {
+            onValueChange(defaultCompany(resolvedOptions, preferredCompanyCode));
         }
-    }, [loading, failed, value, options, onValueChange, preferredCompanyCode]);
+    }, [resolvedLoading, resolvedFailed, value, resolvedOptions, onValueChange, preferredCompanyCode]);
 
-    if (loading) {
+    if (resolvedLoading) {
         return <p className="text-xs text-muted-foreground">Loading companies…</p>;
     }
 
-    if (failed || options.length === 0) {
+    if (resolvedFailed || resolvedOptions.length === 0) {
         return (
             <p className="text-xs text-muted-foreground">
                 The company list is unreachable. The letterhead will print without company details.
@@ -80,7 +87,7 @@ export function QuitClaimCompanySelect({
         <Select
             value={value ? String(value.id) : ""}
             onValueChange={(next) => {
-                const found = options.find((option) => String(option.id) === next) ?? null;
+                const found = resolvedOptions.find((option) => String(option.id) === next) ?? null;
                 onValueChange(found);
             }}
             disabled={disabled}
@@ -89,7 +96,7 @@ export function QuitClaimCompanySelect({
                 <SelectValue placeholder="Select a company" />
             </SelectTrigger>
             <SelectContent>
-                {options.map((option) => (
+                {resolvedOptions.map((option) => (
                     <SelectItem key={option.id} value={String(option.id)}>
                         {option.company_name}
                         {option.is_default ? " (default)" : ""}

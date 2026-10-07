@@ -231,20 +231,21 @@ export const CLEARANCE_DOCUMENT_LABELS: Record<ClearanceDocumentKey, string> = {
     quit_claim: "Quit Claims",
 };
 
-export const CLEARANCE_DOCUMENT_STATES = ["missing", "draft", "issued"] as const;
+export const CLEARANCE_DOCUMENT_STATES = ["missing", "pending", "approved"] as const;
 
 export type ClearanceDocumentState = (typeof CLEARANCE_DOCUMENT_STATES)[number];
 
 export const CLEARANCE_DOCUMENT_STATE_LABELS: Record<ClearanceDocumentState, string> = {
     missing: "Not started",
-    draft: "Draft",
-    issued: "Issued",
+    pending: "Pending",
+    approved: "Approved",
 };
 
 export interface ClearanceDocumentEntry {
     key: ClearanceDocumentKey;
     state: ClearanceDocumentState;
     refNo: string | null;
+    documentId: number | null;
 }
 
 export interface ClearanceDocumentChecklist {
@@ -252,13 +253,13 @@ export interface ClearanceDocumentChecklist {
     form: ClearanceDocumentEntry;
     soa: ClearanceDocumentEntry;
     quitClaim: ClearanceDocumentEntry;
-    issuedCount: number;
+    approvedCount: number;
     complete: boolean;
 }
 
-export type ClearanceDocumentSnapshot = Pick<ClearanceDocumentEntry, "state" | "refNo">;
+export type ClearanceDocumentSnapshot = Pick<ClearanceDocumentEntry, "state" | "refNo" | "documentId">;
 
-const MISSING_DOCUMENT_SNAPSHOT: ClearanceDocumentSnapshot = { state: "missing", refNo: null };
+const MISSING_DOCUMENT_SNAPSHOT: ClearanceDocumentSnapshot = { state: "missing", refNo: null, documentId: null };
 
 export function toClearanceDocumentChecklist(
     requestId: number,
@@ -269,15 +270,15 @@ export function toClearanceDocumentChecklist(
     const resolvedForm = form ?? MISSING_DOCUMENT_SNAPSHOT;
     const resolvedSoa = soa ?? MISSING_DOCUMENT_SNAPSHOT;
     const resolvedQuitClaim = quitClaim ?? MISSING_DOCUMENT_SNAPSHOT;
-    const issuedCount = [resolvedForm, resolvedSoa, resolvedQuitClaim].filter(
-        (entry) => entry.state === "issued"
+    const approvedCount = [resolvedForm, resolvedSoa, resolvedQuitClaim].filter(
+        (entry) => entry.state === "approved"
     ).length;
     return {
         requestId,
-        form: { key: "form", state: resolvedForm.state, refNo: resolvedForm.refNo },
-        soa: { key: "soa", state: resolvedSoa.state, refNo: resolvedSoa.refNo },
-        quitClaim: { key: "quit_claim", state: resolvedQuitClaim.state, refNo: resolvedQuitClaim.refNo },
-        issuedCount,
-        complete: issuedCount === 3,
+        form: { key: "form", state: resolvedForm.state, refNo: resolvedForm.refNo, documentId: resolvedForm.documentId },
+        soa: { key: "soa", state: resolvedSoa.state, refNo: resolvedSoa.refNo, documentId: resolvedSoa.documentId },
+        quitClaim: { key: "quit_claim", state: resolvedQuitClaim.state, refNo: resolvedQuitClaim.refNo, documentId: resolvedQuitClaim.documentId },
+        approvedCount,
+        complete: approvedCount === 3,
     };
 }

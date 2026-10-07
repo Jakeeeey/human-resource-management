@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import { __createTable, __drawTable } from "jspdf-autotable";
-import type { CellDef, RowInput } from "jspdf-autotable";
+import type { RowInput } from "jspdf-autotable";
 
 import type { SoaSignatory } from "../types";
 
@@ -29,7 +29,7 @@ const RED_R = 204;
 const RED_G = 0;
 const RED_B = 0;
 const GREY = 110;
-const HEADER_FILL: [number, number, number] = [51, 51, 51];
+const HEADER_FILL: [number, number, number] = [0, 0, 0];
 const MIN_ROWS_PER_DEPARTMENT = 3;
 const LOGO_HEIGHT = 40;
 const LOGO_MAX_WIDTH = 160;
@@ -124,22 +124,24 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
         ["Position:", input.position],
         ["Date of Separation:", input.dateOfSeparation],
     ];
+    doc.setFont("times", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    const fieldLabelWidth = Math.max(...fields.map(([label]) => doc.getTextWidth(label)));
+    const fieldX = MARGIN + fieldLabelWidth + 6;
+    const fieldEndX = fieldX + 115;
     for (const [label, value] of fields) {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.setTextColor(0);
         doc.text(label, MARGIN, y);
-        const valueX = MARGIN + doc.getTextWidth(label) + 6;
         if (value !== "") {
-            doc.text(value, valueX, y);
+            doc.text(value, fieldX, y);
         }
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
-        doc.line(MARGIN, y + 4, rightEdge, y + 4);
+        doc.line(fieldX, y + 4, fieldEndX, y + 4);
         y += 22;
     }
 
-    doc.setFont("helvetica", "bold");
+    doc.setFont("times", "bold");
     doc.setFontSize(14);
     doc.setTextColor(0);
     doc.text("STATEMENT OF ACCOUNT", pageWidth / 2, y + 6, { align: "center" });
@@ -155,27 +157,22 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
         }
     }
     const counts = groups.map((group) => Math.max(MIN_ROWS_PER_DEPARTMENT, group.rows.length));
-    const totalRows = counts.reduce((sum, count) => sum + count, 0);
 
     const body: RowInput[] = [];
+    const groupFirst: boolean[] = [];
+    const groupLast: boolean[] = [];
     groups.forEach((group, groupIndex) => {
         const count = counts[groupIndex];
+        const labelRow = Math.floor(count / 2);
         for (let row = 0; row < count; row += 1) {
             const line = group.rows[row];
             const description = line === undefined ? "" : line.description;
             const amount = line === undefined || line.amount === null ? "" : formatAmount(line.amount);
             const remarks = line === undefined ? "" : line.remarks;
-            if (row === 0) {
-                const departmentCell: CellDef = { content: group.department, rowSpan: count };
-                if (groupIndex === 0) {
-                    const verifyCell: CellDef = { content: "", rowSpan: totalRows };
-                    body.push([departmentCell, description, amount, remarks, verifyCell]);
-                } else {
-                    body.push([departmentCell, description, amount, remarks]);
-                }
-            } else {
-                body.push([description, amount, remarks]);
-            }
+            const department = row === labelRow ? group.department : "";
+            body.push([department, description, amount, remarks, ""]);
+            groupFirst.push(row === 0);
+            groupLast.push(row === count - 1);
         }
     });
 
@@ -186,7 +183,7 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
         body,
         theme: "grid",
         styles: {
-            font: "helvetica",
+            font: "times",
             fontSize: 9,
             cellPadding: 5,
             textColor: 0,
@@ -195,6 +192,7 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
             valign: "middle",
         },
         headStyles: {
+            font: "helvetica",
             fillColor: HEADER_FILL,
             textColor: 255,
             fontStyle: "bold",
@@ -205,7 +203,27 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
             0: { cellWidth: 96, halign: "center" },
             2: { cellWidth: 84, halign: "right" },
             3: { cellWidth: 108 },
-            4: { cellWidth: 96, halign: "center" },
+            4: { cellWidth: 124, halign: "center" },
+        },
+        rowPageBreak: "avoid",
+        willDrawCell: (data) => {
+            if (data.section !== "body") {
+                return;
+            }
+            if (data.column.index !== 0 && data.column.index !== 4) {
+                return;
+            }
+            const first = groupFirst[data.row.index];
+            const last = groupLast[data.row.index];
+            if (first === undefined || last === undefined) {
+                return;
+            }
+            data.cell.styles.lineWidth = {
+                top: first ? 0.5 : 0,
+                left: 0.5,
+                right: 0.5,
+                bottom: last ? 0.5 : 0,
+            };
         },
     });
     __drawTable(doc, table);
@@ -222,7 +240,7 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
             const x = MARGIN + index * columnWidth + 8;
             const width = columnWidth - 16;
             const centerX = x + width / 2;
-            doc.setFont("helvetica", "bold");
+            doc.setFont("times", "bold");
             doc.setFontSize(10);
             doc.setTextColor(0);
             if (signatory.label !== "") {
@@ -234,7 +252,7 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
             if (signatory.name !== "") {
                 doc.text(signatory.name, centerX, footerY + 58, { align: "center" });
             }
-            doc.setFont("helvetica", "normal");
+            doc.setFont("times", "normal");
             doc.setFontSize(9);
             doc.setTextColor(GREY);
             if (signatory.title !== "") {

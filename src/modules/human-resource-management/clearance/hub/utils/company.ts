@@ -76,3 +76,30 @@ export function companyLogoDataUrl(option: CompanyOption | null): string | null 
     if (!option || !option.logo_data_url) return null;
     return option.logo_data_url.startsWith("data:") ? option.logo_data_url : null;
 }
+
+export interface EmployeeCompanyResult {
+    user_id: number;
+    company_id: number | null;
+}
+
+export function pickEmployeeCompany(options: CompanyOption[], companyId: number | null | undefined): CompanyOption | null {
+    if (companyId === null || companyId === undefined) return null;
+    return options.find((option) => option.id === companyId) ?? null;
+}
+
+export async function fetchEmployeeCompany(query: { userId?: number; requestId?: number }): Promise<EmployeeCompanyResult> {
+    if (query.userId === undefined && query.requestId === undefined) {
+        throw new Error("Could not load the employee company.");
+    }
+    const params = new URLSearchParams();
+    if (query.userId !== undefined) params.set("user_id", String(query.userId));
+    if (query.requestId !== undefined) params.set("request_id", String(query.requestId));
+    const res = await fetch(`/api/hrm/clearance/employee-company?${params.toString()}`);
+    const body: unknown = await res.json().catch(() => null);
+    if (!res.ok || !isRecord(body) || body.success !== true || !isRecord(body.data)) {
+        throw new Error("Could not load the employee company.");
+    }
+    const userId = toId(body.data.user_id);
+    if (userId === null) throw new Error("Could not load the employee company.");
+    return { user_id: userId, company_id: toId(body.data.company_id) };
+}

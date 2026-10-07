@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-    issueClearanceForm,
+    approveClearanceForm,
     mapClearanceFormError,
 } from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceFormService";
 import {
@@ -13,7 +13,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const IssueClearanceFormSchema = z
+const ApproveClearanceFormSchema = z
     .object({
         request_id: z.number().int().positive(),
         company_code: z.string().trim().min(1).max(16),
@@ -26,12 +26,12 @@ export async function POST(req: NextRequest) {
         const auth = await authorizeClearanceRoute(req, "canManageClearances");
         if ("failure" in auth) return auth.failure;
         const body: unknown = await req.json().catch(() => null);
-        const parsed = IssueClearanceFormSchema.safeParse(body);
+        const parsed = ApproveClearanceFormSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
         }
         try {
-            const result = await issueClearanceForm({
+            const result = await approveClearanceForm({
                 requestId: parsed.data.request_id,
                 actorId: auth.cap.actorId,
                 companyCode: parsed.data.company_code,
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         } catch (error) {
             return (
                 mapClearanceFormError(error) ??
-                NextResponse.json({ success: false, message: "Failed to issue clearance form" }, { status: 500 })
+                NextResponse.json({ success: false, message: "Failed to approve clearance form" }, { status: 500 })
             );
         }
     } catch (error) {

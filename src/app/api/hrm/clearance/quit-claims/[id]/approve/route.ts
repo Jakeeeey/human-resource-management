@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-    issueQuitClaim,
+    approveQuitClaim,
     mapClearanceQuitClaimError,
 } from "@/modules/human-resource-management/clearance/hub/quit-claims/services/ClearanceQuitClaimService";
 import {
@@ -13,7 +13,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const IssueQuitClaimSchema = z
+const ApproveQuitClaimSchema = z
     .object({
         company_code: z.string().trim().min(1).max(16),
     })
@@ -29,12 +29,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
         }
         const body: unknown = await req.json().catch(() => null);
-        const parsed = IssueQuitClaimSchema.safeParse(body);
+        const parsed = ApproveQuitClaimSchema.safeParse(body);
         if (!parsed.success) {
             return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
         }
         try {
-            const result = await issueQuitClaim({
+            const result = await approveQuitClaim({
                 id,
                 actorId: auth.cap.actorId,
                 companyCode: parsed.data.company_code,
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         } catch (error) {
             return (
                 mapClearanceQuitClaimError(error) ??
-                NextResponse.json({ success: false, message: "Failed to issue quit claim" }, { status: 500 })
+                NextResponse.json({ success: false, message: "Failed to approve quit claim" }, { status: 500 })
             );
         }
     } catch (error) {

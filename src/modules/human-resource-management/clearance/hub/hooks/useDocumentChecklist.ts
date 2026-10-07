@@ -15,6 +15,7 @@ const QUIT_CLAIMS_API = "/api/hrm/clearance/quit-claims";
 const PAGE_LIMIT = 100;
 
 interface DocumentRow {
+    id: number | null;
     requestId: number | null;
     state: ClearanceDocumentState;
     refNo: string | null;
@@ -44,8 +45,8 @@ function toNullableText(value: unknown): string | null {
 }
 
 function toDocumentState(value: unknown): ClearanceDocumentState | null {
-    if (value === "issued") return "issued";
-    if (value === "draft") return "draft";
+    if (value === "approved") return "approved";
+    if (value === "pending") return "pending";
     return null;
 }
 
@@ -54,6 +55,7 @@ function parseDocumentRow(value: unknown): DocumentRow | null {
     const state = toDocumentState(value.status);
     if (state === null) return null;
     return {
+        id: toId(value.id),
         requestId: toNullableId(value.request_id),
         state,
         refNo: toNullableText(value.ref_no),
@@ -62,12 +64,12 @@ function parseDocumentRow(value: unknown): DocumentRow | null {
 
 function toSnapshot(row: DocumentRow | null): ClearanceDocumentSnapshot | undefined {
     if (!row) return undefined;
-    return { state: row.state, refNo: row.refNo };
+    return { state: row.state, refNo: row.refNo, documentId: row.id };
 }
 
-function preferIssued(current: DocumentRow | null, next: DocumentRow): DocumentRow {
+function preferApproved(current: DocumentRow | null, next: DocumentRow): DocumentRow {
     if (!current) return next;
-    if (current.state !== "issued" && next.state === "issued") return next;
+    if (current.state !== "approved" && next.state === "approved") return next;
     return current;
 }
 
@@ -124,7 +126,7 @@ function matchRequestRow(rows: DocumentRow[], requestId: number): DocumentRow | 
     let matched: DocumentRow | null = null;
     for (const row of rows) {
         if (row.requestId !== requestId) continue;
-        matched = preferIssued(matched, row);
+        matched = preferApproved(matched, row);
     }
     return matched;
 }
@@ -134,8 +136,8 @@ function indexByRequest(rows: DocumentRow[]): Map<number, ClearanceDocumentSnaps
     for (const row of rows) {
         if (row.requestId === null) continue;
         const current = map.get(row.requestId);
-        if (!current || (current.state !== "issued" && row.state === "issued")) {
-            map.set(row.requestId, { state: row.state, refNo: row.refNo });
+        if (!current || (current.state !== "approved" && row.state === "approved")) {
+            map.set(row.requestId, { state: row.state, refNo: row.refNo, documentId: row.id });
         }
     }
     return map;

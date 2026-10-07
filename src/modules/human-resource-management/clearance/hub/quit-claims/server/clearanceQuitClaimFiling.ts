@@ -6,7 +6,7 @@ import { nowUTC } from "../../utils/audit";
 export const CLEARANCE_QUITCLAIM_FILING_ERROR_CODES = {
     invalidInput: "CLEARANCE_QUITCLAIM_FILING_INVALID_INPUT",
     quitclaimNotFound: "CLEARANCE_QUITCLAIM_NOT_FOUND",
-    notIssued: "CLEARANCE_QUITCLAIM_NOT_ISSUED",
+    notApproved: "CLEARANCE_QUITCLAIM_NOT_APPROVED",
     notAttached: "CLEARANCE_QUITCLAIM_PDF_NOT_ATTACHED",
     userNotFound: "CLEARANCE_USER_NOT_FOUND",
     writeFailed: "CLEARANCE_QUITCLAIM_FILING_WRITE_FAILED",
@@ -17,9 +17,9 @@ export const CLEARANCE_DOCS_TYPE_NAME = "Employment & Contractual Documents";
 export const CLEARANCE_DOCS_LIST_NAME = "Clearance & Quit Claims";
 
 const CLEARANCE_DOCS_TYPE_DESCRIPTION =
-    "Employment and contractual documents auto-filed on clearance issuance — clearance forms, statements of account, and quit claims.";
+    "Employment and contractual documents auto-filed on clearance approval — clearance forms, statements of account, and quit claims.";
 const CLEARANCE_DOCS_LIST_DESCRIPTION =
-    "Issued clearance documents auto-filed on issue — one record per issued document.";
+    "Approved clearance documents auto-filed on approval — one record per approved document.";
 
 export interface FileClearanceQuitClaimPdfResult {
     recordId: number;
@@ -174,8 +174,8 @@ export async function fileClearanceQuitClaimPdf(
     if (!quitclaim) {
         fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.quitclaimNotFound, `clearance_quitclaim ${id} does not exist`);
     }
-    if (quitclaim.status !== "issued") {
-        fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notIssued, `clearance_quitclaim ${id} is not issued`);
+    if (quitclaim.status !== "approved") {
+        fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notApproved, `clearance_quitclaim ${id} is not approved`);
     }
     if (!quitclaim.pdf_file) {
         fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notAttached, `clearance_quitclaim ${id} has no attached PDF`);
@@ -183,27 +183,29 @@ export async function fileClearanceQuitClaimPdf(
     if (!(await readUserExists(quitclaim.user_id))) {
         fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.userNotFound, `user ${quitclaim.user_id} does not exist`);
     }
-    const filed = await readFirstOrNull(
-        `/items/employee_file_records?filter[user_id][_eq]=${quitclaim.user_id}` +
-        `&filter[file_ref][_eq]=${encodeURIComponent(quitclaim.pdf_file)}&fields=id,list_id&limit=1`
-    );
-    if (filed) {
-        const recordId = toId(filed.id);
-        const listId = toId(filed.list_id);
-        if (recordId !== null && listId !== null) {
-            return { recordId, fileRef: quitclaim.pdf_file, listId, alreadyFiled: true };
-        }
-    }
     const listId = await ensureClearanceDocsListId();
     const now = nowUTC();
     const recordName = quitclaim.ref_no ? `Quit Claim — ${quitclaim.ref_no}` : `Quit Claim — #${quitclaim.id}`;
+    const filed = await readFirstOrNull(
+        `/items/employee_file_records?filter[user_id][_eq]=${quitclaim.user_id}` +
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
+    );
+    if (filed) {
+        const recordId = toId(filed.id);
+        const filedListId = toId(filed.list_id);
+        if (recordId !== null && filedListId !== null) {
+            const storedRef = toNullableText(filed.file_ref);
+            return { recordId, fileRef: storedRef ?? quitclaim.pdf_file, listId: filedListId, alreadyFiled: true };
+        }
+    }
     const created: unknown = await dFetch("/items/employee_file_records", {
         method: "POST",
         body: JSON.stringify({
             user_id: quitclaim.user_id,
             list_id: listId,
             record_name: recordName,
-            description: `Issued quit claim filed on issue (clearance_quitclaim #${quitclaim.id}${quitclaim.ref_no ? `, REF ${quitclaim.ref_no}` : ""}).`,
+            description: `Approved quit claim filed on approval (clearance_quitclaim #${quitclaim.id}${quitclaim.ref_no ? `, REF ${quitclaim.ref_no}` : ""}).`,
             file_ref: quitclaim.pdf_file,
             is_deleted: 0,
             created_at: now,
@@ -219,12 +221,14 @@ export async function fileClearanceQuitClaimPdf(
     }
     const raced = await readFirstOrNull(
         `/items/employee_file_records?filter[user_id][_eq]=${quitclaim.user_id}` +
-        `&filter[file_ref][_eq]=${encodeURIComponent(quitclaim.pdf_file)}&fields=id,list_id&limit=1`
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
     );
     const racedId = raced ? toId(raced.id) : null;
     const racedList = raced ? toId(raced.list_id) : null;
     if (racedId !== null && racedList !== null) {
-        return { recordId: racedId, fileRef: quitclaim.pdf_file, listId: racedList, alreadyFiled: true };
+        const racedRef = raced ? toNullableText(raced.file_ref) : null;
+        return { recordId: racedId, fileRef: racedRef ?? quitclaim.pdf_file, listId: racedList, alreadyFiled: true };
     }
     fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.writeFailed, "employee_file_records create returned no row");
 }
@@ -240,7 +244,7 @@ export function mapClearanceQuitClaimFilingError(error: unknown): NextResponse |
             );
         case CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.invalidInput:
             return NextResponse.json({ success: false, code, message: "Invalid request" }, { status: 400 });
-        case CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notIssued:
+        case CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notApproved:
         case CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notAttached:
         case CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.userNotFound:
             return NextResponse.json(

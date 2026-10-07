@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-    listEmployeeOptions,
+    ensureQuitClaim,
     mapClearanceQuitClaimError,
 } from "@/modules/human-resource-management/clearance/hub/quit-claims/services/ClearanceQuitClaimService";
 import {
@@ -13,11 +13,9 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const EmployeeOptionsQuerySchema = z
+const QuitClaimByRequestQuerySchema = z
     .object({
-        page: z.coerce.number().int().positive().optional(),
-        limit: z.coerce.number().int().positive().max(100).optional(),
-        search: z.string().max(120).optional(),
+        request_id: z.coerce.number().int().positive(),
     })
     .strict();
 
@@ -25,29 +23,19 @@ export async function GET(req: NextRequest) {
     try {
         const auth = await authorizeClearanceRoute(req, "canViewAllClearances");
         if ("failure" in auth) return auth.failure;
-        const parsed = EmployeeOptionsQuerySchema.safeParse(
+        const parsed = QuitClaimByRequestQuerySchema.safeParse(
             Object.fromEntries(req.nextUrl.searchParams.entries())
         );
         if (!parsed.success) {
             return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
         }
         try {
-            const result = await listEmployeeOptions({
-                page: parsed.data.page,
-                limit: parsed.data.limit,
-                search: parsed.data.search,
-            });
-            return NextResponse.json({
-                success: true,
-                data: result.data,
-                total: result.total,
-                page: result.page,
-                limit: result.limit,
-            });
+            const quitclaim = await ensureQuitClaim(parsed.data.request_id, auth.cap.actorId);
+            return NextResponse.json({ success: true, data: quitclaim });
         } catch (error) {
             return (
                 mapClearanceQuitClaimError(error) ??
-                NextResponse.json({ success: false, message: "Failed to load employees" }, { status: 500 })
+                NextResponse.json({ success: false, message: "Failed to load quit claim" }, { status: 500 })
             );
         }
     } catch (error) {

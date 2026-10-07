@@ -1,5 +1,6 @@
 export { ClearanceTemplatesModule } from "./ClearanceTemplatesModule";
 export { TemplateWorkspace } from "./components/TemplateWorkspace";
+export { SoaTemplateWorkspace } from "./components/SoaTemplateWorkspace";
 export { SoaTemplateCatalogue } from "./components/SoaTemplateCatalogue";
 export { SoaTemplateRowsCard } from "./components/SoaTemplateRowsCard";
 export {

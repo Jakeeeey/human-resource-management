@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ClearanceFormOverviewSchema, type ClearanceFormOverview } from "../types";
 
-export type ClearanceFormStatusFilter = "all" | "missing" | "draft" | "issued";
+export type ClearanceFormStatusFilter = "all" | "missing" | "pending" | "approved";
 
 const PAGE_SIZE = 10;
 

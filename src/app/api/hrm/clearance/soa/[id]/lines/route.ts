@@ -9,7 +9,7 @@ import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
 } from "@/modules/human-resource-management/clearance/hub/server/capability";
-import { SoaLineInputSchema } from "@/modules/human-resource-management/clearance/hub/soa/types";
+import { SoaLineInputSchema, SoaSignatoriesSchema } from "@/modules/human-resource-management/clearance/hub/soa/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 const SaveSoaLinesSchema = z
     .object({
         lines: z.array(SoaLineInputSchema),
+        signatories: SoaSignatoriesSchema.optional(),
     })
     .strict();
 
@@ -35,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
         }
         try {
-            const lines = await saveSoaLines(id, parsed.data.lines, auth.cap.actorId);
+            const lines = await saveSoaLines(id, parsed.data.lines, auth.cap.actorId, parsed.data.signatories);
             return NextResponse.json({ success: true, data: lines });
         } catch (error) {
             return (

@@ -15,7 +15,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { buildSoaPdf, type SoaPrintInput } from "../utils/soaPrintPdf";
-import { freezeIssuedSoaPdf } from "../utils/issuedPdfFreeze";
+import { freezeApprovedSoaPdf } from "../utils/approvedPdfFreeze";
 
 interface SoaPrintDialogProps {
     soaId: number | null;
@@ -98,12 +98,12 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
         (async () => {
             try {
                 const bytes = buildSoaPdf(snapshot);
-                await freezeIssuedSoaPdf({ documentId: soaId, bytes, fileName: uploadName });
+                await freezeApprovedSoaPdf({ documentId: soaId, bytes, fileName: uploadName });
                 setFreezeState("done");
             } catch {
                 freezeKeyRef.current = null;
                 setFreezeState("error");
-                setFreezeError("Could not store the issued PDF to the 201 file. Reopen this dialog to retry.");
+                setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
             }
         })();
     }, [open, soaId, model, pdfFile, building, previewUrl, fileName, freezeState]);
@@ -194,7 +194,7 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
                         Print statement of account
                     </DialogTitle>
                     <DialogDescription>
-                        {model ? `${model.employeeName} — ${model.refNo || "unissued"}` : "Statement of account"}
+                        {model ? `${model.employeeName} — ${model.refNo || "unapproved"}` : "Statement of account"}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-3 sm:p-6">
@@ -208,12 +208,12 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
                         )}
                         {freezeState === "freezing" && (
                             <p className="text-xs text-muted-foreground">
-                                Storing the issued PDF to the 201 file…
+                                Storing the approved PDF to the 201 file…
                             </p>
                         )}
                         {freezeState === "done" && (
                             <p className="text-xs text-muted-foreground">
-                                Issued PDF stored to the 201 file.
+                                Approved PDF stored to the 201 file.
                             </p>
                         )}
                         {freezeError && (

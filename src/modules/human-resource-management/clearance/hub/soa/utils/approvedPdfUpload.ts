@@ -1,4 +1,4 @@
-export const ISSUED_SOA_UPLOAD_ERROR_CODES = {
+export const APPROVED_SOA_UPLOAD_ERROR_CODES = {
     invalidInput: "CLEARANCE_SOA_UPLOAD_INVALID_INPUT",
     uploadFailed: "CLEARANCE_SOA_UPLOAD_FAILED",
     configMissing: "CLEARANCE_SOA_UPLOAD_NOT_CONFIGURED",
@@ -60,20 +60,20 @@ async function resolveEmployeeFolderId(base: string, headers: Record<string, str
     return readFileId(created);
 }
 
-export async function uploadIssuedSoaPdf(bytes: Uint8Array, fileName: string): Promise<string> {
+export async function uploadApprovedSoaPdf(bytes: Uint8Array, fileName: string): Promise<string> {
     if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 || fileName.trim() === "") {
-        fail(ISSUED_SOA_UPLOAD_ERROR_CODES.invalidInput, "bytes and fileName are required");
+        fail(APPROVED_SOA_UPLOAD_ERROR_CODES.invalidInput, "bytes and fileName are required");
     }
     if (bytes.byteLength > MAX_FILE_BYTES) {
-        fail(ISSUED_SOA_UPLOAD_ERROR_CODES.uploadFailed, "File too large (Max 10MB)");
+        fail(APPROVED_SOA_UPLOAD_ERROR_CODES.uploadFailed, "File too large (Max 10MB)");
     }
     const magic = new TextDecoder().decode(bytes.slice(0, PDF_MAGIC.length));
     if (magic !== PDF_MAGIC) {
-        fail(ISSUED_SOA_UPLOAD_ERROR_CODES.uploadFailed, "File content is not a PDF document");
+        fail(APPROVED_SOA_UPLOAD_ERROR_CODES.uploadFailed, "File content is not a PDF document");
     }
     const base = process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!base || base.trim() === "") {
-        fail(ISSUED_SOA_UPLOAD_ERROR_CODES.configMissing, "Directus base URL is not configured");
+        fail(APPROVED_SOA_UPLOAD_ERROR_CODES.configMissing, "Directus base URL is not configured");
     }
     const token = process.env.DIRECTUS_STATIC_TOKEN;
     const headers: Record<string, string> =
@@ -97,11 +97,11 @@ export async function uploadIssuedSoaPdf(bytes: Uint8Array, fileName: string): P
         .catch(() => null);
     const uploadError = directusErrorText(uploadBody);
     if (uploadError) {
-        fail(ISSUED_SOA_UPLOAD_ERROR_CODES.uploadFailed, `filing upload rejected (${uploadError})`);
+        fail(APPROVED_SOA_UPLOAD_ERROR_CODES.uploadFailed, `filing upload rejected (${uploadError})`);
     }
     const fileId = readFileId(uploadBody);
     if (fileId === null) {
-        fail(ISSUED_SOA_UPLOAD_ERROR_CODES.uploadFailed, "upload returned no Directus file id");
+        fail(APPROVED_SOA_UPLOAD_ERROR_CODES.uploadFailed, "upload returned no Directus file id");
     }
     return fileId;
 }

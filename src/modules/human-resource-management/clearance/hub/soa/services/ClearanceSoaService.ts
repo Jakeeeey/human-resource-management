@@ -18,7 +18,7 @@ export const CLEARANCE_SOA_ERROR_CODES = {
     requestNotFound: "CLEARANCE_REQUEST_NOT_FOUND",
     userNotFound: "CLEARANCE_USER_NOT_FOUND",
     soaNotFound: "CLEARANCE_SOA_NOT_FOUND",
-    soaIssued: "CLEARANCE_SOA_ISSUED",
+    soaApproved: "CLEARANCE_SOA_APPROVED",
     soaFrozen: "CLEARANCE_SOA_FROZEN",
     itemMismatch: "CLEARANCE_SOA_ITEM_MISMATCH",
     refAllocFailed: "DOCUMENT_REF_ALLOC_FAILED",
@@ -33,9 +33,10 @@ export interface ClearanceSoaRow {
     ref_no: string | null;
     clearance_no: string | null;
     company_code: string | null;
+    signatories: SoaSignatory[] | null;
     pdf_file: string | null;
-    issued_at: string | null;
-    issued_by: number | null;
+    approved_at: string | null;
+    approved_by: number | null;
     created_at: string | null;
     created_by: number | null;
     updated_at: string | null;
@@ -81,13 +82,13 @@ export interface BuildSoaRenderModelCompany {
     logo_data_url: string | null;
 }
 
-export interface IssueSoaInput {
+export interface ApproveSoaInput {
     requestId: number;
     actorId: number | null;
     companyCode: string;
 }
 
-export interface IssueSoaResult {
+export interface ApproveSoaResult {
     soa: ClearanceSoaRow;
     ref: DocumentRefRow;
     clearanceNo: string;
@@ -147,6 +148,21 @@ function toNullableAmount(value: unknown): number | null {
     return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : null;
 }
 
+function toStoredSoaSignatories(value: unknown): SoaSignatory[] | null {
+    if (value === null || value === undefined) return null;
+    let parsed: unknown = value;
+    if (typeof value === "string") {
+        if (value.trim() === "") return null;
+        try {
+            parsed = JSON.parse(value) as unknown;
+        } catch {
+            return null;
+        }
+    }
+    const checked = SoaSignatoriesSchema.safeParse(parsed);
+    return checked.success ? checked.data : null;
+}
+
 function toSoaStatus(value: unknown): SoaStatus | null {
     if (typeof value !== "string") return null;
     return (SOA_STATUSES as readonly string[]).includes(value) ? (value as SoaStatus) : null;
@@ -173,9 +189,10 @@ function normalizeSoaRow(raw: unknown): ClearanceSoaRow | null {
         ref_no: toNullableText(raw.ref_no),
         clearance_no: toNullableText(raw.clearance_no),
         company_code: toNullableText(raw.company_code),
+        signatories: toStoredSoaSignatories(raw.signatories),
         pdf_file: toNullableText(raw.pdf_file),
-        issued_at: toNullableText(raw.issued_at),
-        issued_by: toNullableId(raw.issued_by),
+        approved_at: toNullableText(raw.approved_at),
+        approved_by: toNullableId(raw.approved_by),
         created_at: toNullableText(raw.created_at),
         created_by: toNullableId(raw.created_by),
         updated_at: toNullableText(raw.updated_at),
@@ -365,13 +382,13 @@ export async function ensureSoa(requestId: number, actorId: number | null): Prom
             method: "POST",
             body: JSON.stringify({
                 request_id: requestId,
-                status: "draft",
+                status: "pending",
                 ref_no: null,
                 clearance_no: null,
                 company_code: null,
                 pdf_file: null,
-                issued_at: null,
-                issued_by: null,
+                approved_at: null,
+                approved_by: null,
                 created_at: now,
                 created_by: actorId,
                 updated_at: null,
@@ -392,7 +409,8 @@ export async function ensureSoa(requestId: number, actorId: number | null): Prom
 export async function saveSoaLines(
     soaId: number,
     lines: SoaLineInput[],
-    actorId: number | null
+    actorId: number | null,
+    signatories?: SoaSignatory[]
 ): Promise<ClearanceSoaLineRow[]> {
     if (!Number.isInteger(soaId) || soaId <= 0 || !Array.isArray(lines)) {
         fail(CLEARANCE_SOA_ERROR_CODES.invalidInput, "soaId and lines are required");
@@ -405,12 +423,20 @@ export async function saveSoaLines(
         }
         checked.push(parsed.data);
     }
+    let checkedSignatories: SoaSignatory[] | undefined;
+    if (signatories !== undefined) {
+        const parsedSignatories = SoaSignatoriesSchema.safeParse(signatories);
+        if (!parsedSignatories.success) {
+            fail(CLEARANCE_SOA_ERROR_CODES.invalidInput, "soa signatories are invalid");
+        }
+        checkedSignatories = parsedSignatories.data;
+    }
     const soa = await readSoaRow(soaId);
     if (!soa) {
         fail(CLEARANCE_SOA_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} does not exist`);
     }
-    if (soa.status === "issued") {
-        fail(CLEARANCE_SOA_ERROR_CODES.soaIssued, `clearance_soa ${soaId} is already issued`);
+    if (soa.status === "approved") {
+        fail(CLEARANCE_SOA_ERROR_CODES.soaApproved, `clearance_soa ${soaId} is already approved`);
     }
     const groups = await readSoaGroupsForRequest(soa.request_id);
     if (groups.length > 0) {
@@ -437,6 +463,16 @@ export async function saveSoaLines(
         });
     }
     const now = nowUTC();
+    if (checkedSignatories !== undefined) {
+        await dFetch(`/items/clearance_soa/${soaId}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                signatories: checkedSignatories,
+                updated_at: now,
+                updated_by: actorId,
+            }),
+        });
+    }
     if (checked.length === 0) return [];
     const body: unknown = await dFetch("/items/clearance_soa_line", {
         method: "POST",
@@ -474,13 +510,13 @@ export async function saveSoaLines(
 export async function buildSoaRenderModel(
     requestId: number,
     company: BuildSoaRenderModelCompany,
-    overrides?: { refNo?: string; clearanceNo?: string }
+    overrides?: { refNo?: string; clearanceNo?: string; signatories?: SoaSignatory[] }
 ): Promise<SoaPrintInput> {
     const request = await readRequestRef(requestId);
     if (!request) {
         fail(CLEARANCE_SOA_ERROR_CODES.requestNotFound, `clearance_request ${requestId} does not exist`);
     }
-    const [userRow, items, header, signatories] = await Promise.all([
+    const [userRow, items, header, templateSignatories] = await Promise.all([
         readUserRecord(request.user_id),
         listItemRefs(requestId),
         getSoaByRequest(requestId),
@@ -540,6 +576,8 @@ export async function buildSoaRenderModel(
         }));
     }
     const separation = await readResignationDate(request.resignation_id);
+    const storedSignatories = header?.signatories ?? null;
+    const signatories = overrides?.signatories ?? storedSignatories ?? templateSignatories;
     const clearanceNo = overrides?.clearanceNo
         ?? header?.clearance_no
         ?? (await readClearanceRefNo(requestId));
@@ -557,14 +595,14 @@ export async function buildSoaRenderModel(
     };
 }
 
-export async function issueSoa(input: IssueSoaInput): Promise<IssueSoaResult> {
+export async function approveSoa(input: ApproveSoaInput): Promise<ApproveSoaResult> {
     const companyCode = input.companyCode.trim();
     if (!Number.isInteger(input.requestId) || input.requestId <= 0 || companyCode === "") {
         fail(CLEARANCE_SOA_ERROR_CODES.invalidInput, "requestId and companyCode are required");
     }
     const header = await ensureSoa(input.requestId, input.actorId);
-    if (header.status === "issued") {
-        fail(CLEARANCE_SOA_ERROR_CODES.soaIssued, `clearance_soa ${header.id} is already issued`);
+    if (header.status === "approved") {
+        fail(CLEARANCE_SOA_ERROR_CODES.soaApproved, `clearance_soa ${header.id} is already approved`);
     }
     let ref: DocumentRefRow;
     try {
@@ -581,19 +619,19 @@ export async function issueSoa(input: IssueSoaInput): Promise<IssueSoaResult> {
     const body: unknown = await dFetch(`/items/clearance_soa/${header.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-            status: "issued",
+            status: "approved",
             ref_no: ref.ref_no,
             clearance_no: clearanceNo === "" ? null : clearanceNo,
             company_code: companyCode,
-            issued_at: now,
-            issued_by: input.actorId,
+            approved_at: now,
+            approved_by: input.actorId,
             updated_at: now,
             updated_by: input.actorId,
         }),
     });
     const updated = isRecord(body) && !Array.isArray(body.data) ? normalizeSoaRow(body.data) : null;
     if (!updated) {
-        fail(CLEARANCE_SOA_ERROR_CODES.writeFailed, `clearance_soa/${header.id} issue failed`);
+        fail(CLEARANCE_SOA_ERROR_CODES.writeFailed, `clearance_soa/${header.id} approve failed`);
     }
     return { soa: updated, ref, clearanceNo };
 }
@@ -610,8 +648,8 @@ export async function attachSoaPdf(
     if (!current) {
         fail(CLEARANCE_SOA_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} does not exist`);
     }
-    if (current.status !== "issued") {
-        fail(CLEARANCE_SOA_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} is not issued`);
+    if (current.status !== "approved") {
+        fail(CLEARANCE_SOA_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} is not approved`);
     }
     if (current.pdf_file !== null && current.pdf_file !== "") {
         fail(CLEARANCE_SOA_ERROR_CODES.soaFrozen, `clearance_soa ${soaId} pdf is frozen`);
@@ -638,7 +676,7 @@ export async function listSoas(query: {
         ? Math.min(query.limit, 100)
         : 25;
     if (query.status !== undefined && !toSoaStatus(query.status)) {
-        fail(CLEARANCE_SOA_ERROR_CODES.invalidInput, "status must be draft or issued");
+        fail(CLEARANCE_SOA_ERROR_CODES.invalidInput, "status must be pending or approved");
     }
     const filters: string[] = [];
     if (query.status !== undefined) filters.push(`filter[status][_eq]=${query.status}`);
@@ -810,7 +848,7 @@ export async function listSoaOverview(query: {
         ? Math.min(query.limit, 100)
         : 25;
     if (query.status !== undefined && !toOverviewStatus(query.status)) {
-        fail(CLEARANCE_SOA_ERROR_CODES.invalidInput, "status must be missing, draft or issued");
+        fail(CLEARANCE_SOA_ERROR_CODES.invalidInput, "status must be missing, pending or approved");
     }
     if (query.status === undefined) {
         const { rows: requests, total } = await readOverviewRequestPage(page, limit);
@@ -861,11 +899,11 @@ export function mapClearanceSoaError(error: unknown): NextResponse | null {
         case CLEARANCE_SOA_ERROR_CODES.itemMismatch:
         case "DOCUMENT_REF_INVALID_INPUT":
             return NextResponse.json({ success: false, code, message: "Invalid request" }, { status: 400 });
-        case CLEARANCE_SOA_ERROR_CODES.soaIssued:
+        case CLEARANCE_SOA_ERROR_CODES.soaApproved:
         case CLEARANCE_SOA_ERROR_CODES.soaFrozen:
         case CLEARANCE_SOA_ERROR_CODES.refAllocFailed:
         case "DOCUMENT_REF_ALLOC_FAILED":
-            return NextResponse.json({ success: false, code, message: "The statement of account cannot be issued" }, { status: 409 });
+            return NextResponse.json({ success: false, code, message: "The statement of account cannot be approved" }, { status: 409 });
         default:
             return null;
     }

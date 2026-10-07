@@ -40,19 +40,20 @@ export function ClearanceTemplatesModule(props: { selectedId?: number | null }):
                         setTab(next);
                     }
                 }}
+                className="space-y-4"
             >
-                <TabsList>
-                    <TabsTrigger value="clearance">Clearance Form</TabsTrigger>
-                    <TabsTrigger value="soa">SOA</TabsTrigger>
+                <TabsList className="group-data-[orientation=horizontal]/tabs:h-auto w-full flex-wrap justify-start gap-1">
+                    <TabsTrigger value="clearance" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Clearance Form</TabsTrigger>
+                    <TabsTrigger value="soa" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">SOA</TabsTrigger>
                 </TabsList>
-                <TabsContent value="clearance">
+                <TabsContent value="clearance" className="m-0">
                     <ClearanceTemplatesFetchProvider>
                         <TemplateCatalogue selectedId={selectedId} />
                     </ClearanceTemplatesFetchProvider>
                 </TabsContent>
-                <TabsContent value="soa">
+                <TabsContent value="soa" className="m-0">
                     <SoaTemplatesFetchProvider>
-                        <SoaTemplateCatalogue />
+                        <SoaTemplateCatalogue selectedId={selectedId} />
                     </SoaTemplatesFetchProvider>
                 </TabsContent>
             </Tabs>
