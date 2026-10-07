@@ -7,6 +7,8 @@ import { TotalHoursSummaryCards } from "./components/TotalHoursSummaryCards";
 import { TotalHoursReportFilters } from "./components/TotalHoursReportFilters";
 import { DepartmentSummaryTable } from "./components/DepartmentSummaryTable";
 import { TotalHoursReportTable } from "./components/TotalHoursReportTable";
+import { PrintOptionsModal } from "./components/PrintOptionsModal";
+import { PrintableSummaryReport } from "./components/PrintableSummaryReport";
 import {
   Alert,
   AlertDescription,
@@ -62,12 +64,14 @@ function TotalHoursReportModuleContent() {
     setNameFilter,
     setApprovalStatus,
     resetFilters,
+    navigateWeek,
     pagination,
     setCurrentPage,
     setPageSize,
   } = useTotalHoursReport();
 
   const [activeTab, setActiveTab] = useState<"summary" | "detailed">("summary");
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // Export Matrix or Logs to CSV
   const handleExportCSV = useCallback(() => {
@@ -80,7 +84,7 @@ function TotalHoursReportModuleContent() {
         const dateVals = matrix.dates.map((d) => {
           const day = emp.days[d.date];
           if (!day || day.isAbsent) {
-            return `"Absent","Absent","Absent","Absent"`;
+            return `"A","A","A","A"`;
           }
           return `"${day.work_formatted}","${day.late_formatted}","${day.overtime_formatted}","${day.undertime_formatted}"`;
         }).join(",");
@@ -157,7 +161,7 @@ function TotalHoursReportModuleContent() {
 
   // Handle Print
   const handlePrint = useCallback(() => {
-    window.print();
+    setIsPrintModalOpen(true);
   }, []);
 
   if (isError) {
@@ -182,124 +186,147 @@ function TotalHoursReportModuleContent() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Total Hours Report
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Department-wide approved working hours (T), lateness (L), overtime (O), and undertime (U) with actual biometric punch times.
-          </p>
+    <>
+      <div className="space-y-6 print:hidden">
+        {/* Header section */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              Total Hours Report
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Department-wide approved working hours (T), lateness (L), overtime (O), and undertime (U) with actual biometric punch times.
+            </p>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              disabled={isLoading}
+              className="h-9 text-xs"
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              Export CSV
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              disabled={isLoading}
+              className="h-9 text-xs"
+            >
+              <Printer className="mr-1.5 h-3.5 w-3.5" />
+              Print
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isLoading}
+              className="h-9 text-xs"
+            >
+              <RefreshCw
+                className={`mr-1.5 h-3.5 w-3.5 ${
+                  isLoading ? "animate-spin" : ""
+                }`}
+              />
+              Refresh
+            </Button>
+          </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            disabled={isLoading}
-            className="h-9 text-xs"
-          >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            Export CSV
-          </Button>
+        {/* Summary KPI Cards */}
+        <TotalHoursSummaryCards summary={summary} isLoading={isLoading} />
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrint}
-            disabled={isLoading}
-            className="h-9 text-xs"
-          >
-            <Printer className="mr-1.5 h-3.5 w-3.5" />
-            Print
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
-            className="h-9 text-xs"
-          >
-            <RefreshCw
-              className={`mr-1.5 h-3.5 w-3.5 ${
-                isLoading ? "animate-spin" : ""
-              }`}
+        {/* Filters Card */}
+        <Card>
+          <CardContent className="pt-5 pb-5">
+            <TotalHoursReportFilters
+              filters={filters}
+              departments={departments}
+              employeeNames={employeeNames}
+              isHRAdmin={isHRAdmin}
+              onSearchChange={setSearchQuery}
+              onDateFromChange={setDateFrom}
+              onDateToChange={setDateTo}
+              onDateRangePreset={setDateRangePreset}
+              onNavigateWeek={navigateWeek}
+              onDepartmentChange={setDepartmentId}
+              onNameFilterChange={setNameFilter}
+              onApprovalStatusChange={setApprovalStatus}
+              onResetFilters={resetFilters}
             />
-            Refresh
-          </Button>
-        </div>
+          </CardContent>
+        </Card>
+
+        {/* View Mode Tabs: Department Summary Matrix vs Detailed Daily Logs */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => setActiveTab(val as "summary" | "detailed")}
+          className="space-y-4"
+        >
+          <div className="flex items-center justify-between">
+            <TabsList className="bg-muted/60 p-1">
+              <TabsTrigger
+                value="summary"
+                className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background"
+              >
+                <TableIcon className="h-3.5 w-3.5 text-primary" />
+                Department Matrix Summary
+              </TabsTrigger>
+              <TabsTrigger
+                value="detailed"
+                className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background"
+              >
+                <ListFilter className="h-3.5 w-3.5 text-muted-foreground" />
+                Detailed Daily Logs
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Tab 1: Department Matrix Table (Matching user's sample table!) */}
+          <TabsContent value="summary" className="m-0 focus-visible:outline-none">
+            <DepartmentSummaryTable
+              matrix={matrix}
+              isLoading={isLoading}
+              onPrint={() => setIsPrintModalOpen(true)}
+            />
+          </TabsContent>
+
+          {/* Tab 2: Detailed Daily Logs Table */}
+          <TabsContent value="detailed" className="m-0 focus-visible:outline-none">
+            <TotalHoursReportTable
+              data={records}
+              isLoading={isLoading}
+              pagination={pagination}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Summary KPI Cards */}
-      <TotalHoursSummaryCards summary={summary} isLoading={isLoading} />
+      {/* Dedicated In-DOM media-print report layout matching sample screenshot */}
+      <PrintableSummaryReport
+        matrix={matrix}
+        filters={filters}
+        departments={departments}
+      />
 
-      {/* Filters Card */}
-      <Card>
-        <CardContent className="pt-5 pb-5">
-          <TotalHoursReportFilters
-            filters={filters}
-            departments={departments}
-            employeeNames={employeeNames}
-            isHRAdmin={isHRAdmin}
-            onSearchChange={setSearchQuery}
-            onDateFromChange={setDateFrom}
-            onDateToChange={setDateTo}
-            onDateRangePreset={setDateRangePreset}
-            onDepartmentChange={setDepartmentId}
-            onNameFilterChange={setNameFilter}
-            onApprovalStatusChange={setApprovalStatus}
-            onResetFilters={resetFilters}
-          />
-        </CardContent>
-      </Card>
-
-      {/* View Mode Tabs: Department Summary Matrix vs Detailed Daily Logs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={(val) => setActiveTab(val as "summary" | "detailed")}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <TabsList className="bg-muted/60 p-1">
-            <TabsTrigger
-              value="summary"
-              className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background"
-            >
-              <TableIcon className="h-3.5 w-3.5 text-primary" />
-              Department Matrix Summary
-            </TabsTrigger>
-            <TabsTrigger
-              value="detailed"
-              className="text-xs font-semibold gap-1.5 data-[state=active]:bg-background"
-            >
-              <ListFilter className="h-3.5 w-3.5 text-muted-foreground" />
-              Detailed Daily Logs
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        {/* Tab 1: Department Matrix Table (Matching user's sample table!) */}
-        <TabsContent value="summary" className="m-0 focus-visible:outline-none">
-          <DepartmentSummaryTable matrix={matrix} isLoading={isLoading} />
-        </TabsContent>
-
-        {/* Tab 2: Detailed Daily Logs Table */}
-        <TabsContent value="detailed" className="m-0 focus-visible:outline-none">
-          <TotalHoursReportTable
-            data={records}
-            isLoading={isLoading}
-            pagination={pagination}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={setPageSize}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
+      {/* Print Configuration Dialog */}
+      <PrintOptionsModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        matrix={matrix}
+        filters={filters}
+        departments={departments}
+      />
+    </>
   );
 }
 

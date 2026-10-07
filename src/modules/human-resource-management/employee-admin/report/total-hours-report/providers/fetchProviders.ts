@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import type {
   TotalHoursRecord,
   TotalHoursSummary,
@@ -28,10 +29,10 @@ export async function fetchTotalHoursReportData(
       query.set("search", filters.searchQuery.trim());
     }
     if (filters.dateFrom) {
-      query.set("dateFrom", filters.dateFrom.toISOString().split("T")[0]);
+      query.set("dateFrom", format(filters.dateFrom, "yyyy-MM-dd"));
     }
     if (filters.dateTo) {
-      query.set("dateTo", filters.dateTo.toISOString().split("T")[0]);
+      query.set("dateTo", format(filters.dateTo, "yyyy-MM-dd"));
     }
     if (filters.departmentId !== null) {
       query.set("departmentId", String(filters.departmentId));

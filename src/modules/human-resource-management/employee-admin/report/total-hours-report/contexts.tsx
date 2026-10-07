@@ -5,6 +5,7 @@ import {
   startOfToday,
   endOfToday,
   subDays,
+  addDays,
   startOfWeek,
   endOfWeek,
   startOfMonth,
@@ -25,6 +26,7 @@ import type {
   TotalHoursReportFilterContextType,
   TotalHoursReportPaginationContextType,
   DepartmentMatrixData,
+  DateRangePreset,
 } from "./type";
 
 // ============================================================================
@@ -45,7 +47,7 @@ export const TotalHoursReportPaginationContext = createContext<
 
 const DEFAULT_PAGE_SIZE = 10;
 
-// Default to past 7 days for rich matrix viewing immediately
+// Default to past 7 days (exactly 1 week) for rich matrix viewing immediately
 const defaultDateFrom = subDays(new Date(), 6);
 const defaultDateTo = new Date();
 
@@ -183,6 +185,9 @@ export function TotalHoursReportProvider({
   const setDateFrom = useCallback(
     (date: Date | undefined) => {
       const next = { ...filters, dateFrom: date };
+      if (date && filters.dateTo && filters.dateTo < date) {
+        next.dateTo = date;
+      }
       setFilters(next);
       setCurrentPageState(1);
       fetchData(1, pageSize, next);
@@ -193,6 +198,24 @@ export function TotalHoursReportProvider({
   const setDateTo = useCallback(
     (date: Date | undefined) => {
       const next = { ...filters, dateTo: date };
+      if (date && filters.dateFrom && filters.dateFrom > date) {
+        next.dateFrom = date;
+      }
+      setFilters(next);
+      setCurrentPageState(1);
+      fetchData(1, pageSize, next);
+    },
+    [filters, fetchData, pageSize]
+  );
+
+  const navigateWeek = useCallback(
+    (direction: "prev" | "next") => {
+      const currentFrom = filters.dateFrom || new Date();
+      const currentTo = filters.dateTo || new Date();
+      const deltaDays = direction === "next" ? 7 : -7;
+      const newFrom = addDays(currentFrom, deltaDays);
+      const newTo = addDays(currentTo, deltaDays);
+      const next = { ...filters, dateFrom: newFrom, dateTo: newTo };
       setFilters(next);
       setCurrentPageState(1);
       fetchData(1, pageSize, next);
@@ -201,30 +224,27 @@ export function TotalHoursReportProvider({
   );
 
   const setDateRangePreset = useCallback(
-    (
-      preset:
-        | "today"
-        | "yesterday"
-        | "this_week"
-        | "last_week"
-        | "this_month"
-        | "last_month"
-        | "cutoff_26_10"
-        | "cutoff_11_25"
-    ) => {
+    (preset: DateRangePreset) => {
       const now = new Date();
       let from: Date | undefined;
       let to: Date | undefined;
 
       switch (preset) {
-        case "today":
-          from = startOfToday();
-          to = endOfToday();
+        case "cutoff_26_10": {
+          const currentDay = now.getDate();
+          if (currentDay <= 10) {
+            const prevMonth = subMonths(now, 1);
+            from = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 26);
+            to = new Date(now.getFullYear(), now.getMonth(), 10);
+          } else {
+            from = new Date(now.getFullYear(), now.getMonth(), 26);
+            to = new Date(now.getFullYear(), now.getMonth() + 1, 10);
+          }
           break;
-        case "yesterday": {
-          const y = subDays(now, 1);
-          from = y;
-          to = y;
+        }
+        case "cutoff_11_25": {
+          from = new Date(now.getFullYear(), now.getMonth(), 11);
+          to = new Date(now.getFullYear(), now.getMonth(), 25);
           break;
         }
         case "this_week":
@@ -237,6 +257,18 @@ export function TotalHoursReportProvider({
           to = endOfWeek(prevWeek, { weekStartsOn: 1 });
           break;
         }
+        case "two_weeks_ago": {
+          const twoAgo = subWeeks(now, 2);
+          from = startOfWeek(twoAgo, { weekStartsOn: 1 });
+          to = endOfWeek(twoAgo, { weekStartsOn: 1 });
+          break;
+        }
+        case "three_weeks_ago": {
+          const threeAgo = subWeeks(now, 3);
+          from = startOfWeek(threeAgo, { weekStartsOn: 1 });
+          to = endOfWeek(threeAgo, { weekStartsOn: 1 });
+          break;
+        }
         case "this_month":
           from = startOfMonth(now);
           to = endOfMonth(now);
@@ -247,23 +279,14 @@ export function TotalHoursReportProvider({
           to = endOfMonth(prevMonth);
           break;
         }
-        case "cutoff_26_10": {
-          // If current date is between 1st and 10th, start is 26th of prev month to 10th of this month
-          // If after 10th, start is 26th of this month to 10th of next month
-          const currentDay = now.getDate();
-          if (currentDay <= 10) {
-            from = setDate(subMonths(now, 1), 26);
-            to = setDate(now, 10);
-          } else {
-            from = setDate(now, 26);
-            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 10);
-            to = nextMonth;
-          }
+        case "today":
+          from = startOfToday();
+          to = endOfToday();
           break;
-        }
-        case "cutoff_11_25": {
-          from = setDate(now, 11);
-          to = setDate(now, 25);
+        case "past_7_days":
+        default: {
+          from = subDays(now, 6);
+          to = now;
           break;
         }
       }
@@ -335,6 +358,7 @@ export function TotalHoursReportProvider({
           setDateFrom,
           setDateTo,
           setDateRangePreset,
+          navigateWeek,
           setDepartmentId,
           setNameFilter,
           setApprovalStatus,

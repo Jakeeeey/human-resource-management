@@ -51,6 +51,7 @@ export function useTotalHoursReport() {
     setNameFilter,
     setApprovalStatus,
     resetFilters,
+    navigateWeek,
   } = filterContext;
 
   const { pagination, setCurrentPage, setPageSize } = paginationContext;
@@ -77,6 +78,7 @@ export function useTotalHoursReport() {
     setNameFilter,
     setApprovalStatus,
     resetFilters,
+    navigateWeek,
 
     pagination,
     setCurrentPage,

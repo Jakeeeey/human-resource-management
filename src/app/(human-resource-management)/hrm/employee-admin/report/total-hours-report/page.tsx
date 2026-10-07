@@ -81,7 +81,7 @@ export default async function Page() {
     return (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {/* Topbar */}
-            <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-xs bg-background sm:h-16 overflow-hidden">
+            <header className="relative z-10 flex h-14 shrink-0 items-center justify-between border-b shadow-xs bg-background sm:h-16 overflow-hidden print:hidden">
                 <div className="flex h-full min-w-0 items-center gap-2 px-3 sm:px-4 overflow-hidden">
                     <SidebarTrigger className="-ml-1 shrink-0" />
 
@@ -113,7 +113,7 @@ export default async function Page() {
             </header>
 
             {/* Main Content */}
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
+            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4 print:p-0 print:overflow-visible">
                 <TotalHoursReportModule />
             </main>
         </div>

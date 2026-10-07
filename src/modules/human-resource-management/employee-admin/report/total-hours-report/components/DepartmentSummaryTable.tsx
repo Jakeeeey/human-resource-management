@@ -25,6 +25,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Printer,
 } from "lucide-react";
 import type {
   DepartmentMatrixData,
@@ -36,11 +37,13 @@ import { TotalHoursDetailModal } from "./TotalHoursDetailModal";
 interface DepartmentSummaryTableProps {
   matrix: DepartmentMatrixData | null;
   isLoading: boolean;
+  onPrint?: () => void;
 }
 
 export function DepartmentSummaryTable({
   matrix,
   isLoading,
+  onPrint,
 }: DepartmentSummaryTableProps) {
   const [showClockTimes, setShowClockTimes] = useState(true);
   const [pageSize, setPageSize] = useState<number>(15);
@@ -136,8 +139,8 @@ export function DepartmentSummaryTable({
           </span>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-3 font-medium text-[11px]">
+        {/* Legend & Print Button */}
+        <div className="flex items-center gap-3 font-medium text-[11px] flex-wrap">
           <span className="flex items-center gap-1">
             <strong className="text-primary font-bold">T:</strong> Total Work
           </span>
@@ -150,6 +153,18 @@ export function DepartmentSummaryTable({
           <span className="flex items-center gap-1">
             <strong className="text-rose-600 dark:text-rose-400 font-bold">U:</strong> Undertime
           </span>
+
+          {onPrint && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onPrint}
+              className="h-7 text-xs px-2.5 ml-2 font-medium gap-1 text-foreground"
+            >
+              <Printer className="h-3.5 w-3.5 text-primary" />
+              <span>Print Summary</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -256,8 +271,8 @@ export function DepartmentSummaryTable({
                           onClick={() => handleCellClick(emp, d.date)}
                         >
                           {isAbsent ? (
-                            <span className="inline-flex px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
-                              Absent
+                            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
+                              A
                             </span>
                           ) : (
                             <div className="text-xs font-semibold text-foreground">
@@ -274,8 +289,8 @@ export function DepartmentSummaryTable({
                           onClick={() => handleCellClick(emp, d.date)}
                         >
                           {isAbsent ? (
-                            <span className="inline-flex px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
-                              Absent
+                            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
+                              A
                             </span>
                           ) : (
                             <div
@@ -298,8 +313,8 @@ export function DepartmentSummaryTable({
                           onClick={() => handleCellClick(emp, d.date)}
                         >
                           {isAbsent ? (
-                            <span className="inline-flex px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
-                              Absent
+                            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
+                              A
                             </span>
                           ) : (
                             <div
@@ -322,8 +337,8 @@ export function DepartmentSummaryTable({
                           onClick={() => handleCellClick(emp, d.date)}
                         >
                           {isAbsent ? (
-                            <span className="inline-flex px-1.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
-                              Absent
+                            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800">
+                              A
                             </span>
                           ) : (
                             <div

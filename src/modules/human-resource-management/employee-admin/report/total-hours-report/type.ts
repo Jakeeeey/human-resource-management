@@ -178,22 +178,26 @@ export interface TotalHoursReportFetchContextType {
   refetch: () => Promise<void>;
 }
 
+export type DateRangePreset =
+  | "this_week"
+  | "last_week"
+  | "two_weeks_ago"
+  | "three_weeks_ago"
+  | "past_7_days"
+  | "today"
+  | "yesterday"
+  | "this_month"
+  | "last_month"
+  | "cutoff_26_10"
+  | "cutoff_11_25";
+
 export interface TotalHoursReportFilterContextType {
   filters: TotalHoursReportFilters;
   setSearchQuery: (query: string) => void;
   setDateFrom: (date: Date | undefined) => void;
   setDateTo: (date: Date | undefined) => void;
-  setDateRangePreset: (
-    preset:
-      | "today"
-      | "yesterday"
-      | "this_week"
-      | "last_week"
-      | "this_month"
-      | "last_month"
-      | "cutoff_26_10"
-      | "cutoff_11_25"
-  ) => void;
+  navigateWeek?: (direction: "prev" | "next") => void;
+  setDateRangePreset: (preset: DateRangePreset) => void;
   setDepartmentId: (id: number | null) => void;
   setNameFilter: (name: string | null) => void;
   setApprovalStatus: (status: string) => void;
