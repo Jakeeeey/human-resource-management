@@ -12,7 +12,6 @@ import {
   endOfMonth,
   subMonths,
   subWeeks,
-  setDate,
 } from "date-fns";
 import { fetchTotalHoursReportData } from "./providers/fetchProviders";
 import type {

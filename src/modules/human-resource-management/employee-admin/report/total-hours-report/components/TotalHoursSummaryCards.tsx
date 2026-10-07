@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, AlertTriangle, ArrowDownRight, Flame, Users, CalendarDays } from "lucide-react";
+import { Clock, AlertTriangle, ArrowDownRight, Flame, Users } from "lucide-react";
 import type { TotalHoursSummary } from "../type";
 
 interface TotalHoursSummaryCardsProps {

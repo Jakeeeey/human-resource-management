@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Printer, FileSpreadsheet, Eye, Info, X } from "lucide-react";
+import { Printer, X } from "lucide-react";
 import type { DepartmentMatrixData, TotalHoursReportFilters } from "../type";
 import {
   formatReportDate,

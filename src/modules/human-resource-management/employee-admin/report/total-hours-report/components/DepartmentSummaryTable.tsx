@@ -51,8 +51,8 @@ export function DepartmentSummaryTable({
   const [selectedRecordForModal, setSelectedRecordForModal] =
     useState<TotalHoursRecord | null>(null);
 
-  const employees = matrix?.employees || [];
-  const dates = matrix?.dates || [];
+  const employees = useMemo(() => matrix?.employees || [], [matrix?.employees]);
+  const dates = useMemo(() => matrix?.dates || [], [matrix?.dates]);
 
   // Client-side pagination for matrix to prevent DOM overload
   const totalPages = Math.max(1, Math.ceil(employees.length / pageSize));

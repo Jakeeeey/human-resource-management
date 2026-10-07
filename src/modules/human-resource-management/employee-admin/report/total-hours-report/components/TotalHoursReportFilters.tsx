@@ -253,6 +253,32 @@ export function TotalHoursReportFilters({
           </PopoverContent>
         </Popover>
 
+        {/* Quick Week Steppers */}
+        {onNavigateWeek && (
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:text-foreground shadow-2xs"
+              onClick={() => onNavigateWeek("prev")}
+              title="Previous Week (-7 days)"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:text-foreground shadow-2xs"
+              onClick={() => onNavigateWeek("next")}
+              title="Next Week (+7 days)"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         {/* Department Searchable Dropdown */}
         <div className="min-w-[190px] max-w-[240px]">
           <SearchableDropdown

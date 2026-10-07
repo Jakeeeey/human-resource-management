@@ -7,6 +7,7 @@ import type {
   TotalHoursReportFilters,
   PaginationState,
   TotalHoursReportApiResponse,
+  DepartmentMatrixData,
 } from "../type";
 
 export interface FetchTotalHoursParams {
@@ -58,7 +59,7 @@ export async function fetchTotalHoursReportData(
 
     return {
       data: (data.data || []) as TotalHoursRecord[],
-      matrix: (data.matrix || { dates: [], employees: [], departmentTotals: {} }) as any,
+      matrix: (data.matrix || { dates: [], employees: [], departmentTotals: {} }) as DepartmentMatrixData,
       summary: (data.summary || {
         totalWorkMinutes: 0,
         totalLateMinutes: 0,

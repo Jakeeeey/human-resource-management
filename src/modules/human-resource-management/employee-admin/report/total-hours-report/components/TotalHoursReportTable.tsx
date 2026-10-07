@@ -21,15 +21,12 @@ import {
 } from "@/components/ui/select";
 import {
   Clock,
-  Calendar,
   LogIn,
   LogOut,
   ChevronLeft,
   ChevronRight,
   Eye,
   AlertCircle,
-  CheckCircle2,
-  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { TotalHoursRecord, PaginationState } from "../type";

@@ -14,13 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   Clock,
   Calendar,
-  User,
-  Building,
   CheckCircle2,
-  AlertTriangle,
-  ArrowDownRight,
-  Flame,
-  Info,
   LogIn,
   LogOut,
   Coffee,

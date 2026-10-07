@@ -48,7 +48,6 @@ function TotalHoursReportModuleContent() {
     matrix,
     summary,
     departments,
-    currentUser,
     employeeNames,
     isHRAdmin,
     isLoading,
