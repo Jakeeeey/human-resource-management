@@ -1,3 +1,5 @@
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import type { DepartmentMatrixData, TotalHoursReportFilters } from "../type";
 
 export function formatReportDate(dateVal: Date | string | undefined): string {
@@ -473,14 +475,6 @@ export function generateSummaryReportPrintHtml({
   </div>
 
   <script>
-    function closeAfterPrint() {
-      setTimeout(function() {
-        try {
-          window.close();
-        } catch (e) {}
-      }, 50);
-    }
-
     // Explicit click listeners
     var btnClose = document.getElementById("btnCloseTab");
     if (btnClose) {
@@ -495,18 +489,6 @@ export function generateSummaryReportPrintHtml({
       btnPrint.addEventListener("click", function(e) {
         e.preventDefault();
         window.print();
-      });
-    }
-
-    // Automatically close tab when print preview is closed (Print or Cancel)
-    window.addEventListener("afterprint", closeAfterPrint);
-
-    if (window.matchMedia) {
-      var mediaQuery = window.matchMedia("print");
-      mediaQuery.addEventListener("change", function(mql) {
-        if (!mql.matches) {
-          closeAfterPrint();
-        }
       });
     }
   </script>
@@ -528,23 +510,424 @@ export function openSummaryReportPrintWindow(options: PrintReportOptions) {
   printWindow.document.write(htmlContent);
   printWindow.document.close();
 
-  const handleClose = () => {
-    try {
-      if (printWindow && !printWindow.closed) {
-        printWindow.close();
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  printWindow.addEventListener("afterprint", handleClose);
-
-  // Give a small tick for browser to finish rendering styles
+  // Allow styles to finish rendering before print preview opens.
+  // Note: We DO NOT aggressively auto-close the window with a timer,
+  // as closing the window prematurely while the browser spooler is rasterizing
+  // will corrupt or cancel the PDF generation.
   setTimeout(() => {
     printWindow.focus();
     printWindow.print();
-    // For browsers where print() is blocking, close once the dialog returns
-    setTimeout(handleClose, 100);
-  }, 250);
+  }, 400);
+}
+
+/**
+ * Generates and automatically downloads the Total Hours Report as a clean,
+ * vector PDF document using jsPDF and jspdf-autotable.
+ * Does NOT trigger any browser print preview dialog.
+ */
+export async function downloadTotalHoursPdf({
+  matrix,
+  filters,
+  departments,
+  hoursOnly = false,
+  includeTotals = false,
+}: PrintReportOptions): Promise<void> {
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "pt",
+    format: "a4",
+  });
+
+  const rangeStr = `${formatReportDate(filters.dateFrom)} — ${formatReportDate(filters.dateTo)}`;
+  const searchStr = filters.searchQuery ? filters.searchQuery : "—";
+  const hoursOnlyStr = hoursOnly ? "Yes" : "No";
+  const perDayStr = hoursOnly ? "T" : "T, L, O, U";
+  const printedStr = formatPrintTimestamp();
+
+  const selectedDept = filters.departmentId
+    ? departments.find((d) => d.department_id === filters.departmentId)
+    : null;
+  const departmentStr = selectedDept ? selectedDept.department_name : "All";
+
+  const dates = matrix.dates;
+  const employees = matrix.employees;
+
+  // Chunk dates into weeks (max 7 days per chunk/page)
+  const CHUNK_SIZE = 7;
+  const dateChunks: Array<typeof matrix.dates> = [];
+  if (dates.length === 0) {
+    dateChunks.push([]);
+  } else {
+    for (let i = 0; i < dates.length; i += CHUNK_SIZE) {
+      dateChunks.push(dates.slice(i, i + CHUNK_SIZE));
+    }
+  }
+
+  const totalChunks = dateChunks.length;
+  const PW = doc.internal.pageSize.getWidth(); // ~841.89 pt
+  const margin = 24;
+
+  dateChunks.forEach((chunkDates, chunkIndex) => {
+    if (chunkIndex > 0) {
+      doc.addPage("a4", "landscape");
+    }
+
+    const isLastChunk = chunkIndex === totalChunks - 1;
+    const chunkRangeStr =
+      chunkDates.length > 0
+        ? `${formatReportDate(chunkDates[0]?.date)} — ${formatReportDate(chunkDates[chunkDates.length - 1]?.date)}`
+        : rangeStr;
+
+    // Draw Chunk Page Header
+    let currentY = margin + 14;
+
+    // Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(17, 24, 39);
+    doc.text("Summary Reports", margin, currentY);
+
+    currentY += 14;
+
+    // Metadata Grid
+    doc.setFontSize(8.5);
+    const leftColX = margin;
+    const rightColX = PW - margin - 220;
+
+    // Row 1: Range & Department
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(17, 24, 39);
+    doc.text("Range:", leftColX, currentY);
+    doc.setFont("helvetica", "normal");
+    const weekSuffix =
+      totalChunks > 1
+        ? ` (Week ${chunkIndex + 1} of ${totalChunks}: ${chunkRangeStr})`
+        : "";
+    doc.text(`${rangeStr}${weekSuffix}`, leftColX + 50, currentY);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Department:", rightColX, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(departmentStr, rightColX + 65, currentY);
+
+    currentY += 12;
+
+    // Row 2: Search & Per Day
+    doc.setFont("helvetica", "bold");
+    doc.text("Search:", leftColX, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(searchStr, leftColX + 50, currentY);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Per Day:", rightColX, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(perDayStr, rightColX + 65, currentY);
+
+    currentY += 12;
+
+    // Row 3: Hours only & Page
+    doc.setFont("helvetica", "bold");
+    doc.text("Hours only:", leftColX, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(hoursOnlyStr, leftColX + 50, currentY);
+
+    if (totalChunks > 1) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Page:", rightColX, currentY);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${chunkIndex + 1} of ${totalChunks}`, rightColX + 65, currentY);
+    }
+
+    currentY += 12;
+
+    // Row 4: Printed timestamp
+    doc.setFont("helvetica", "bold");
+    doc.text("Printed:", leftColX, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(printedStr, leftColX + 50, currentY);
+
+    currentY += 14;
+
+    // Build Table Head & Body for autoTable
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let tableHead: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let tableBody: any[] = [];
+
+    if (hoursOnly) {
+      tableHead = [
+        [
+          {
+            content: "Name",
+            styles: { halign: "center", fontStyle: "bold", valign: "middle" },
+          },
+          ...chunkDates.map((d) => ({
+            content: d.displayHeader,
+            styles: { halign: "center", fontStyle: "bold" },
+          })),
+          ...(isLastChunk && includeTotals
+            ? [
+                {
+                  content: "Total Work",
+                  styles: {
+                    halign: "center",
+                    fontStyle: "bold",
+                    fillColor: [243, 244, 246],
+                  },
+                },
+              ]
+            : []),
+        ],
+      ];
+
+      tableBody = employees.map((emp) => {
+        const empNameAndPos = emp.employee_position
+          ? `${emp.employee_name}\n${emp.employee_position}`
+          : emp.employee_name;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rowCells: any[] = [
+          { content: empNameAndPos, styles: { halign: "left" } },
+        ];
+
+        chunkDates.forEach((d) => {
+          const day = emp.days[d.date];
+          if (!day || day.isAbsent) {
+            rowCells.push({
+              content: "A",
+              styles: { halign: "center", textColor: [107, 114, 128] },
+            });
+          } else {
+            rowCells.push({
+              content: day.work_formatted,
+              styles: { halign: "center" },
+            });
+          }
+        });
+
+        if (isLastChunk && includeTotals) {
+          const totWorkH = Math.floor(emp.totals.total_work_minutes / 60);
+          const totWorkM = emp.totals.total_work_minutes % 60;
+          rowCells.push({
+            content: `${totWorkH}h ${totWorkM}m`,
+            styles: {
+              halign: "center",
+              fontStyle: "bold",
+              fillColor: [249, 250, 251],
+            },
+          });
+        }
+
+        return rowCells;
+      });
+    } else {
+      // Full metrics: 2-row header
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const headRow1: any[] = [
+        {
+          content: "Name",
+          rowSpan: 2,
+          styles: { halign: "center", valign: "middle", fontStyle: "bold" },
+        },
+        ...chunkDates.map((d) => ({
+          content: d.displayHeader,
+          colSpan: 4,
+          styles: { halign: "center", fontStyle: "bold" },
+        })),
+        ...(isLastChunk && includeTotals
+          ? [
+              {
+                content: "Period Summary",
+                colSpan: 4,
+                styles: {
+                  halign: "center",
+                  fontStyle: "bold",
+                  fillColor: [243, 244, 246],
+                },
+              },
+            ]
+          : []),
+      ];
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const headRow2: any[] = [
+        ...chunkDates.flatMap(() => [
+          { content: "T", styles: { halign: "center", fontStyle: "bold" } },
+          { content: "L", styles: { halign: "center", fontStyle: "bold" } },
+          { content: "O", styles: { halign: "center", fontStyle: "bold" } },
+          { content: "U", styles: { halign: "center", fontStyle: "bold" } },
+        ]),
+        ...(isLastChunk && includeTotals
+          ? [
+              {
+                content: "Total",
+                styles: {
+                  halign: "center",
+                  fontStyle: "bold",
+                  fillColor: [243, 244, 246],
+                },
+              },
+              {
+                content: "Late",
+                styles: {
+                  halign: "center",
+                  fontStyle: "bold",
+                  fillColor: [243, 244, 246],
+                },
+              },
+              {
+                content: "OT",
+                styles: {
+                  halign: "center",
+                  fontStyle: "bold",
+                  fillColor: [243, 244, 246],
+                },
+              },
+              {
+                content: "UT",
+                styles: {
+                  halign: "center",
+                  fontStyle: "bold",
+                  fillColor: [243, 244, 246],
+                },
+              },
+            ]
+          : []),
+      ];
+
+      tableHead = [headRow1, headRow2];
+
+      tableBody = employees.map((emp) => {
+        const empNameAndPos = emp.employee_position
+          ? `${emp.employee_name}\n${emp.employee_position}`
+          : emp.employee_name;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rowCells: any[] = [
+          { content: empNameAndPos, styles: { halign: "left" } },
+        ];
+
+        chunkDates.forEach((d) => {
+          const day = emp.days[d.date];
+          if (!day || day.isAbsent) {
+            rowCells.push(
+              {
+                content: "A",
+                styles: { halign: "center", textColor: [107, 114, 128] },
+              },
+              {
+                content: "A",
+                styles: { halign: "center", textColor: [107, 114, 128] },
+              },
+              {
+                content: "A",
+                styles: { halign: "center", textColor: [107, 114, 128] },
+              },
+              {
+                content: "A",
+                styles: { halign: "center", textColor: [107, 114, 128] },
+              }
+            );
+          } else {
+            rowCells.push(
+              { content: day.work_formatted, styles: { halign: "center" } },
+              { content: day.late_formatted, styles: { halign: "center" } },
+              { content: day.overtime_formatted, styles: { halign: "center" } },
+              { content: day.undertime_formatted, styles: { halign: "center" } }
+            );
+          }
+        });
+
+        if (isLastChunk && includeTotals) {
+          const totWorkH = Math.floor(emp.totals.total_work_minutes / 60);
+          const totWorkM = emp.totals.total_work_minutes % 60;
+          const totLateH = Math.floor(emp.totals.total_late_minutes / 60);
+          const totLateM = emp.totals.total_late_minutes % 60;
+          const totOTH = Math.floor(emp.totals.total_overtime_minutes / 60);
+          const totOTM = emp.totals.total_overtime_minutes % 60;
+          const totUTH = Math.floor(emp.totals.total_undertime_minutes / 60);
+          const totUTM = emp.totals.total_undertime_minutes % 60;
+
+          rowCells.push(
+            {
+              content: `${totWorkH}h ${totWorkM}m`,
+              styles: {
+                halign: "center",
+                fontStyle: "bold",
+                fillColor: [249, 250, 251],
+              },
+            },
+            {
+              content: `${totLateH}h ${totLateM}m`,
+              styles: { halign: "center", fillColor: [249, 250, 251] },
+            },
+            {
+              content: `${totOTH}h ${totOTM}m`,
+              styles: { halign: "center", fillColor: [249, 250, 251] },
+            },
+            {
+              content: `${totUTH}h ${totUTM}m`,
+              styles: { halign: "center", fillColor: [249, 250, 251] },
+            }
+          );
+        }
+
+        return rowCells;
+      });
+    }
+
+    autoTable(doc, {
+      startY: currentY,
+      head: tableHead,
+      body: tableBody,
+      theme: "grid",
+      styles: {
+        fontSize: hoursOnly ? 7.5 : 6.5,
+        cellPadding: hoursOnly ? 3 : 2,
+        textColor: [17, 24, 39],
+        lineColor: [209, 213, 219],
+        lineWidth: 0.5,
+        font: "helvetica",
+        overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+        lineWidth: 0.5,
+        lineColor: [209, 213, 219],
+        halign: "center",
+      },
+      alternateRowStyles: {
+        fillColor: [253, 253, 254],
+      },
+      columnStyles: {
+        0: {
+          cellWidth: hoursOnly ? 130 : 105,
+          halign: "left",
+        },
+      },
+      margin: { left: margin, right: margin, top: margin, bottom: margin },
+      pageBreak: "auto",
+      showHead: "everyPage",
+    });
+  });
+
+  // Generate safe filename and trigger direct download
+  const fromClean = filters.dateFrom
+    ? filters.dateFrom instanceof Date
+      ? filters.dateFrom.toISOString().slice(0, 10)
+      : String(filters.dateFrom).slice(0, 10)
+    : "start";
+  const toClean = filters.dateTo
+    ? filters.dateTo instanceof Date
+      ? filters.dateTo.toISOString().slice(0, 10)
+      : String(filters.dateTo).slice(0, 10)
+    : "end";
+  const deptClean = selectedDept
+    ? selectedDept.department_name.replace(/[^a-zA-Z0-9_-]/g, "_")
+    : "All_Departments";
+
+  const fileName = `Total_Hours_Report_${deptClean}_${fromClean}_to_${toClean}.pdf`;
+  doc.save(fileName);
 }

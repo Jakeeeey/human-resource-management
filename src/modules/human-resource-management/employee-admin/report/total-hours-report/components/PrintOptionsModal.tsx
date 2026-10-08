@@ -14,10 +14,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Printer, X } from "lucide-react";
+import { FileDown, Download, Loader2, Printer, X } from "lucide-react";
+import { toast } from "sonner";
 import type { DepartmentMatrixData, TotalHoursReportFilters } from "../type";
 import {
   formatReportDate,
+  downloadTotalHoursPdf,
   openSummaryReportPrintWindow,
 } from "./printSummaryReport";
 
@@ -38,6 +40,7 @@ export function PrintOptionsModal({
 }: PrintOptionsModalProps) {
   const [hoursOnly, setHoursOnly] = useState(false);
   const [includeTotals, setIncludeTotals] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   if (!matrix) return null;
 
@@ -48,7 +51,27 @@ export function PrintOptionsModal({
 
   const rangeLabel = `${formatReportDate(filters.dateFrom)} — ${formatReportDate(filters.dateTo)}`;
 
-  const handlePrint = () => {
+  const handleDownloadPdf = async () => {
+    try {
+      setIsDownloading(true);
+      await downloadTotalHoursPdf({
+        matrix,
+        filters,
+        departments,
+        hoursOnly,
+        includeTotals,
+      });
+      toast.success("Total Hours Report PDF downloaded successfully");
+      onClose();
+    } catch (err) {
+      console.error("PDF download error:", err);
+      toast.error("Failed to generate PDF. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handlePrintPreview = () => {
     openSummaryReportPrintWindow({
       matrix,
       filters,
@@ -87,14 +110,14 @@ export function PrintOptionsModal({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="rounded-md bg-primary/10 p-2 text-primary">
-              <Printer className="h-5 w-5" />
+              <FileDown className="h-5 w-5" />
             </div>
             <div>
               <DialogTitle className="text-lg font-bold">
-                Print Summary Report
+                Export Total Hours Report
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Configure your printable output matching official executive format.
+                Download your executive summary report as a clean PDF directly to your device.
               </DialogDescription>
             </div>
           </div>
@@ -191,26 +214,51 @@ export function PrintOptionsModal({
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <DialogClose asChild>
+        <DialogFooter className="gap-2 sm:gap-0 sm:justify-between items-center w-full">
+          <div className="flex items-center gap-2">
+            <DialogClose asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                disabled={isDownloading}
+                className="text-xs cursor-pointer"
+              >
+                Cancel
+              </Button>
+            </DialogClose>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={onClose}
-              className="text-xs cursor-pointer"
+              onClick={handlePrintPreview}
+              disabled={isDownloading}
+              className="text-xs gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground"
             >
-              Cancel
+              <Printer className="h-3.5 w-3.5" />
+              Print Preview
             </Button>
-          </DialogClose>
+          </div>
+
           <Button
             type="button"
             size="sm"
-            onClick={handlePrint}
+            onClick={handleDownloadPdf}
+            disabled={isDownloading}
             className="text-xs font-semibold gap-1.5 cursor-pointer"
           >
-            <Printer className="h-3.5 w-3.5" />
-            Print Report
+            {isDownloading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Generating PDF...
+              </>
+            ) : (
+              <>
+                <Download className="h-3.5 w-3.5" />
+                Download PDF
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

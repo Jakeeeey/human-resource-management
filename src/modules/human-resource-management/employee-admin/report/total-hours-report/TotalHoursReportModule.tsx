@@ -21,7 +21,7 @@ import {
   AlertCircle,
   RefreshCw,
   Download,
-  Printer,
+  FileDown,
   Table as TableIcon,
   ListFilter,
 } from "lucide-react";
@@ -215,11 +215,11 @@ function TotalHoursReportModuleContent() {
               variant="outline"
               size="sm"
               onClick={handlePrint}
-              disabled={isLoading}
+              disabled={isLoading || !matrix}
               className="h-9 text-xs"
             >
-              <Printer className="mr-1.5 h-3.5 w-3.5" />
-              Print
+              <FileDown className="mr-1.5 h-3.5 w-3.5" />
+              Export PDF
             </Button>
 
             <Button
