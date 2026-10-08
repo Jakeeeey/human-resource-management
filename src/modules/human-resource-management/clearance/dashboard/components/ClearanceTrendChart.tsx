@@ -18,6 +18,11 @@ import type { ClearanceDashboardTrendPoint } from "../types/clearance-dashboard.
 const CARD_SHELL =
     "rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,40,0.05)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.45)]";
 
+const CHART_TICK_FILL = "hsl(var(--muted-foreground))";
+const CHART_GRID_STROKE = "hsl(var(--border))";
+const CHART_SERIES_FILL = "hsl(var(--primary))";
+const CHART_CURSOR_FILL = "hsl(var(--primary))";
+
 const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatPeriod(period: string): string {
@@ -83,19 +88,22 @@ export function ClearanceTrendChart({
                 ) : (
                     <div className="mt-3 h-[220px] min-h-[220px] flex-1 sm:h-[300px]" role="img" aria-label={ariaSummary}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: -12 }}>
-                                <CartesianGrid stroke="#94a3b8" strokeOpacity={0.12} vertical={false} />
+                            <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 8, left: -12 }}>
+                                <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
                                 <XAxis
                                     dataKey="label"
-                                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                    tick={{ fontSize: 11, fill: CHART_TICK_FILL }}
                                     tickLine={false}
                                     axisLine={false}
-                                    interval="preserveStartEnd"
+                                    interval={0}
+                                    angle={-20}
+                                    dy={8}
+                                    height={52}
                                 />
                                 <YAxis
                                     allowDecimals={false}
                                     domain={[0, "dataMax"]}
-                                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                    tick={{ fontSize: 11, fill: CHART_TICK_FILL }}
                                     tickLine={false}
                                     axisLine={false}
                                     width={36}
@@ -114,26 +122,26 @@ export function ClearanceTrendChart({
                                     }}
                                     labelStyle={{ color: "hsl(var(--popover-foreground))" }}
                                     itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                                    cursor={{ fill: "#7c3aed", fillOpacity: 0.1 }}
+                                    cursor={{ fill: CHART_CURSOR_FILL, fillOpacity: 0.1 }}
                                 />
                                 {showReference && (
                                     <ReferenceLine
                                         y={referenceAvg}
-                                        stroke="#94a3b8"
+                                        stroke={CHART_TICK_FILL}
                                         strokeDasharray="4 4"
                                         strokeOpacity={0.7}
                                         label={{
                                             value: `Avg ${Number(referenceAvg).toFixed(1)}`,
                                             position: "insideTopRight",
                                             fontSize: 11,
-                                            fill: "#94a3b8",
+                                            fill: CHART_TICK_FILL,
                                         }}
                                     />
                                 )}
                                 <Bar
                                     dataKey="count"
                                     name="Clearances"
-                                    fill="#8b5cf6"
+                                    fill={CHART_SERIES_FILL}
                                     radius={[6, 6, 0, 0]}
                                     maxBarSize={44}
                                     isAnimationActive={false}

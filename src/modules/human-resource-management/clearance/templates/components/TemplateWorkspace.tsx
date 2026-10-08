@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Empty,
     EmptyContent,
@@ -52,9 +52,18 @@ import {
 import { ClearanceTemplatesFetchProvider, useClearanceTemplatesFetch } from "../providers/clearanceTemplatesProvider";
 import { CLEARANCE_SIGNER_TYPE_LABELS, type ClearanceCategory } from "../types";
 import { CategoryDialog } from "./CategoryDialog";
+import { ListPager, SortSelect } from "./ListControls";
 import { SignerPoolDialog } from "./SignerPoolDialog";
 import { TemplateDialog } from "./TemplateDialog";
 import { TemplateToggleDialog } from "./TemplateToggleDialog";
+
+type CategorySort = "position" | "label" | "status";
+
+const CATEGORY_SORT_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+    { value: "position", label: "Position" },
+    { value: "label", label: "Label (A–Z)" },
+    { value: "status", label: "Status" },
+];
 
 const ICON_FOCUS_RING =
     "focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -112,6 +121,9 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
     const template = templates.data.find((row) => row.id === templateId) ?? null;
 
     const [categorySearch, setCategorySearch] = useState("");
+    const [categorySort, setCategorySort] = useState<CategorySort>("position");
+    const [categoryPage, setCategoryPage] = useState(0);
+    const [categoryPageSize, setCategoryPageSize] = useState(10);
     const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
     const [templateSaving, setTemplateSaving] = useState(false);
     const [toggleOpen, setToggleOpen] = useState(false);
@@ -138,12 +150,68 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
     );
 
     const categoryQuery = categorySearch.trim().toLowerCase();
-    const visibleCategories = useMemo(() => {
+    const filteredCategories = useMemo(() => {
         if (categoryQuery === "") {
             return categories.data;
         }
-        return categories.data.filter((row) => row.label.toLowerCase().includes(categoryQuery));
-    }, [categories.data, categoryQuery]);
+        return categories.data.filter((row) => {
+            const department =
+                row.department_id === null ? "global" : directory.departmentName(row.department_id);
+            return (
+                row.label.toLowerCase().includes(categoryQuery) ||
+                CLEARANCE_SIGNER_TYPE_LABELS[row.signer_type].toLowerCase().includes(categoryQuery) ||
+                department.toLowerCase().includes(categoryQuery)
+            );
+        });
+    }, [categories.data, categoryQuery, directory]);
+
+    const sortedCategories = useMemo(() => {
+        const next = [...filteredCategories];
+        if (categorySort === "label") {
+            next.sort((a, b) => a.label.localeCompare(b.label));
+        } else if (categorySort === "status") {
+            next.sort(
+                (a, b) => Number(b.is_active) - Number(a.is_active) || a.label.localeCompare(b.label)
+            );
+        }
+        return next;
+    }, [filteredCategories, categorySort]);
+
+    const canReorderCategories = categorySort === "position";
+
+    const categoryPageCount = Math.max(1, Math.ceil(sortedCategories.length / categoryPageSize));
+    const safeCategoryPage = Math.min(categoryPage, categoryPageCount - 1);
+    const visibleCategoryRows = sortedCategories.slice(
+        safeCategoryPage * categoryPageSize,
+        safeCategoryPage * categoryPageSize + categoryPageSize
+    );
+    const categoryRangeStart =
+        sortedCategories.length === 0 ? 0 : safeCategoryPage * categoryPageSize + 1;
+    const categoryRangeEnd = Math.min(
+        sortedCategories.length,
+        safeCategoryPage * categoryPageSize + categoryPageSize
+    );
+
+    const handleCategorySearchChange = (value: string) => {
+        setCategorySearch(value);
+        setCategoryPage(0);
+    };
+
+    const handleCategorySortChange = (value: string) => {
+        if (value === "position" || value === "label" || value === "status") {
+            setCategorySort(value);
+            setCategoryPage(0);
+        }
+    };
+
+    const handleCategoryPageSizeChange = (size: number) => {
+        setCategoryPageSize(size);
+        setCategoryPage(0);
+    };
+
+    const handleRetryDirectory = () => {
+        void directory.refresh();
+    };
 
     const refreshing = templates.isLoading || categories.isLoading;
 
@@ -319,14 +387,14 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                     </div>
                 </div>
 
-                <div className="flex shrink-0 gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Button
                         asChild
                         variant="outline"
                         size="sm"
                         className="min-h-11 w-full sm:w-auto md:min-h-0"
                     >
-                        <Link href={`/hrm/clearance/templates?selected=${templateId}`}>Back to templates</Link>
+                        <Link href={`/hrm/clearance/templates?tab=clearance&selected=${templateId}`}>Back to templates</Link>
                     </Button>
                     <Button
                         variant="outline"
@@ -357,7 +425,7 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                 Retry
                             </Button>
                             <Button asChild variant="outline" size="sm">
-                                <Link href="/hrm/clearance/templates">Back to templates</Link>
+                                <Link href="/hrm/clearance/templates?tab=clearance">Back to templates</Link>
                             </Button>
                         </span>
                     </AlertDescription>
@@ -368,7 +436,7 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                     <AlertDescription className="space-y-3">
                         <p>This template could not be found. It may have been deleted.</p>
                         <Button asChild variant="outline" size="sm">
-                            <Link href="/hrm/clearance/templates">Back to templates</Link>
+                            <Link href="/hrm/clearance/templates?tab=clearance">Back to templates</Link>
                         </Button>
                     </AlertDescription>
                 </Alert>
@@ -376,12 +444,18 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                 <div className="space-y-6">
                     <Card>
                         <CardContent className="space-y-6 p-4 sm:p-6">
-                            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                                <div className="min-w-0">
-                                    {template.description ? (
+                            <div
+                                className={
+                                    template.description
+                                        ? "flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
+                                        : "flex flex-wrap items-center justify-end gap-2"
+                                }
+                            >
+                                {template.description ? (
+                                    <div className="min-w-0">
                                         <p className="text-sm text-muted-foreground">{template.description}</p>
-                                    ) : null}
-                                </div>
+                                    </div>
+                                ) : null}
                                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                                     <Button variant="outline" size="sm" onClick={openTemplateEdit}>
                                         <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -437,14 +511,14 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                     </Card>
 
                     <Card className="min-w-0">
-                        <CardHeader className="shrink-0 flex-row items-start justify-between gap-2">
+                        <CardHeader className="shrink-0">
                             <div className="min-w-0">
                                 <CardTitle>Categories</CardTitle>
                                 <p className="text-sm text-muted-foreground" aria-live="polite">
                                     {categories.data.length} {categories.data.length === 1 ? "category" : "categories"}
                                 </p>
                             </div>
-                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                            <CardAction className="flex flex-wrap items-center justify-end gap-2">
                                 <Button
                                     variant="outline"
                                     size="icon-lg"
@@ -463,7 +537,7 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                     <Plus className="h-4 w-4" />
                                     New category
                                 </Button>
-                            </div>
+                            </CardAction>
                         </CardHeader>
                         <CardContent className="min-w-0 space-y-4">
                             <div className="flex flex-col gap-3">
@@ -471,21 +545,29 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         value={categorySearch}
-                                        onChange={(event) => setCategorySearch(event.target.value)}
+                                        onChange={(event) => handleCategorySearchChange(event.target.value)}
                                         placeholder="Search categories…"
                                         aria-label="Search categories"
                                         className="h-10 pl-9"
                                     />
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Label htmlFor="clearance-workspace-show-inactive" className="cursor-pointer text-sm">
-                                        Show inactive
-                                    </Label>
-                                    <Switch
-                                        id="clearance-workspace-show-inactive"
-                                        checked={showInactive}
-                                        onCheckedChange={setShowInactive}
-                                        className={ICON_FOCUS_RING}
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="clearance-workspace-show-inactive" className="cursor-pointer text-sm">
+                                            Show inactive
+                                        </Label>
+                                        <Switch
+                                            id="clearance-workspace-show-inactive"
+                                            checked={showInactive}
+                                            onCheckedChange={setShowInactive}
+                                            className={ICON_FOCUS_RING}
+                                        />
+                                    </div>
+                                    <SortSelect
+                                        label="Sort"
+                                        value={categorySort}
+                                        options={CATEGORY_SORT_OPTIONS}
+                                        onChange={handleCategorySortChange}
                                     />
                                 </div>
                             </div>
@@ -523,7 +605,7 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                         </Button>
                                     </EmptyContent>
                                 </Empty>
-                            ) : visibleCategories.length === 0 ? (
+                            ) : sortedCategories.length === 0 ? (
                                 <Empty>
                                     <EmptyHeader>
                                         <EmptyMedia variant="icon">
@@ -535,15 +617,17 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                         </EmptyDescription>
                                     </EmptyHeader>
                                     <EmptyContent>
-                                        <Button variant="outline" size="sm" onClick={() => setCategorySearch("")}>
+                                        <Button variant="outline" size="sm" onClick={() => handleCategorySearchChange("")}>
                                             Clear search
                                         </Button>
                                     </EmptyContent>
                                 </Empty>
                             ) : (
+                                <div className="min-w-0 space-y-4">
                                 <ol className="grid min-w-0 grid-cols-1 gap-2 lg:grid-cols-2">
-                                    {visibleCategories.map((row, index) => {
+                                    {visibleCategoryRows.map((row) => {
                                         const busy = busyCategoryId === row.id;
+                                        const orderIndex = categories.data.findIndex((entry) => entry.id === row.id);
                                         const members = poolMembers[row.id];
                                         const count = poolCounts[row.id];
                                         const detail = signerDetail(row, directory.departmentName, count);
@@ -552,7 +636,7 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                             <li key={row.id} className="min-w-0 rounded-xl border p-4 transition-colors hover:bg-muted/40">
                                                 <div className="flex min-w-0 items-start gap-3">
                                                     <span className="mt-0.5 w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground" aria-hidden="true">
-                                                        {index + 1}
+                                                        {orderIndex + 1}
                                                     </span>
                                                     <div className="min-w-0 flex-1 space-y-1.5">
                                                         <p className="flex min-w-0 items-center gap-1.5 overflow-hidden">
@@ -613,7 +697,8 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                                             variant="ghost"
                                                             size="icon-lg"
                                                             aria-label={`Move ${row.label} up`}
-                                                            disabled={busy || index === 0}
+                                                            title={canReorderCategories ? undefined : "Reset sort to Position to reorder"}
+                                                            disabled={busy || !canReorderCategories || orderIndex <= 0}
                                                             onClick={() => handleCategoryMove(row, -1)}
                                                             className={ICON_FOCUS_RING}
                                                         >
@@ -623,7 +708,8 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                                             variant="ghost"
                                                             size="icon-lg"
                                                             aria-label={`Move ${row.label} down`}
-                                                            disabled={busy || index === visibleCategories.length - 1}
+                                                            title={canReorderCategories ? undefined : "Reset sort to Position to reorder"}
+                                                            disabled={busy || !canReorderCategories || orderIndex < 0 || orderIndex >= categories.data.length - 1}
                                                             onClick={() => handleCategoryMove(row, 1)}
                                                             className={ICON_FOCUS_RING}
                                                         >
@@ -669,6 +755,19 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                                         );
                                     })}
                                 </ol>
+                                {sortedCategories.length > categoryPageSize && (
+                                    <ListPager
+                                        page={safeCategoryPage}
+                                        pageCount={categoryPageCount}
+                                        rangeStart={categoryRangeStart}
+                                        rangeEnd={categoryRangeEnd}
+                                        total={sortedCategories.length}
+                                        pageSize={categoryPageSize}
+                                        onPageChange={setCategoryPage}
+                                        onPageSizeChange={handleCategoryPageSizeChange}
+                                    />
+                                )}
+                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -697,6 +796,9 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                         departments={directory.departments}
                         employees={directory.employees}
                         employeeName={directory.employeeName}
+                        directoryIsError={directory.isError}
+                        directoryError={directory.error?.message ?? null}
+                        onRetryDirectory={handleRetryDirectory}
                         saving={categorySaving}
                         onClose={() => setCategoryDialogOpen(false)}
                         onCreate={handleCategoryCreate}
@@ -709,6 +811,9 @@ function TemplateWorkspaceContent(props: { templateId: number }): JSX.Element {
                         employees={directory.employees}
                         initialUserIds={pool.userIds}
                         loadingPool={pool.isLoading}
+                        directoryIsError={directory.isError}
+                        directoryError={directory.error?.message ?? null}
+                        onRetryDirectory={handleRetryDirectory}
                         saving={poolSaving}
                         onClose={() => setPoolOpen(false)}
                         onSave={handleSavePool}

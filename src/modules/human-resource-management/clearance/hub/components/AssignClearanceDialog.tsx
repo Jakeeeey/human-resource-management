@@ -16,7 +16,7 @@ import { OptionCombobox } from "./OptionCombobox";
 import { toast } from "sonner";
 import { formatPHT } from "../utils/time";
 import { useClearanceHubContext } from "../providers/ClearanceHubProvider";
-import type { ApprovableResignation, ClearanceHubTemplate } from "../hooks/useClearanceHub";
+import type { ApprovableResignation, ClearanceHubSoaTemplate, ClearanceHubTemplate } from "../hooks/useClearanceHub";
 
 interface AssignClearanceDialogProps {
     isOpen: boolean;
@@ -37,10 +37,29 @@ function suggestTemplateId(
     return globalFallback ? globalFallback.id : null;
 }
 
+function suggestSoaTemplateId(
+    resignation: ApprovableResignation,
+    templates: ClearanceHubSoaTemplate[]
+): number | null {
+    const ordered = [...templates].sort(
+        (left, right) => left.sort_order - right.sort_order || left.id - right.id
+    );
+    if (resignation.department_id !== null) {
+        const departmentMatch = ordered.find(
+            (template) => template.department_id === resignation.department_id
+        );
+        if (departmentMatch) return departmentMatch.id;
+    }
+    const globalFallback = ordered.find((template) => template.department_id === null);
+    return globalFallback ? globalFallback.id : null;
+}
+
 export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialogProps) {
     const {
         templates,
         templatesError,
+        soaTemplates,
+        soaTemplatesError,
         resignations,
         resignationsError,
         assignClearance,
@@ -48,8 +67,9 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
 
     const [resignationValue, setResignationValue] = useState("");
     const [templateValue, setTemplateValue] = useState("");
+    const [soaTemplateValue, setSoaTemplateValue] = useState("");
     const [manualTemplate, setManualTemplate] = useState(false);
-    const [suggestedId, setSuggestedId] = useState<number | null>(null);
+    const [manualSoaTemplate, setManualSoaTemplate] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -57,8 +77,9 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
         if (isOpen) {
             setResignationValue("");
             setTemplateValue("");
+            setSoaTemplateValue("");
             setManualTemplate(false);
-            setSuggestedId(null);
+            setManualSoaTemplate(false);
             setSubmitError(null);
             setIsSubmitting(false);
         }
@@ -90,6 +111,15 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
         [templates]
     );
 
+    const soaTemplateOptions = useMemo(
+        () =>
+            soaTemplates.map((template) => ({
+                value: String(template.id),
+                label: template.title,
+            })),
+        [soaTemplates]
+    );
+
     const selectedResignation = useMemo(
         () => eligibleResignations.find((resignation) => String(resignation.id) === resignationValue) ?? null,
         [eligibleResignations, resignationValue]
@@ -100,19 +130,27 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
         setSubmitError(null);
         const resignation = eligibleResignations.find((entry) => String(entry.id) === value) ?? null;
         if (!resignation) {
-            setSuggestedId(null);
             return;
         }
         const suggestion = suggestTemplateId(resignation, templates);
-        setSuggestedId(suggestion);
         if (!manualTemplate && suggestion !== null) {
             setTemplateValue(String(suggestion));
+        }
+        const soaSuggestion = suggestSoaTemplateId(resignation, soaTemplates);
+        if (!manualSoaTemplate && soaSuggestion !== null) {
+            setSoaTemplateValue(String(soaSuggestion));
         }
     };
 
     const handleTemplateChange = (value: string) => {
         setTemplateValue(value);
         setManualTemplate(true);
+        setSubmitError(null);
+    };
+
+    const handleSoaTemplateChange = (value: string) => {
+        setSoaTemplateValue(value);
+        setManualSoaTemplate(true);
         setSubmitError(null);
     };
 
@@ -127,10 +165,15 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
             setSubmitError("Choose a template to continue");
             return;
         }
+        const soaTemplateId = soaTemplateValue === "" ? null : Number(soaTemplateValue);
+        if (soaTemplateValue !== "" && (!Number.isInteger(soaTemplateId) || (soaTemplateId as number) <= 0)) {
+            setSubmitError("Choose an SOA template to continue");
+            return;
+        }
         setIsSubmitting(true);
         setSubmitError(null);
         try {
-            const message = await assignClearance(resignationId, templateId);
+            const message = await assignClearance(resignationId, templateId, soaTemplateId);
             toast.success(message);
             onClose();
         } catch (err) {
@@ -168,6 +211,7 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                             value={resignationValue}
                             onValueChange={handleResignationChange}
                             placeholder="Select resignation..."
+                            searchPlaceholder="Search resignations…"
                             disabled={isSubmitting || eligibleResignations.length === 0}
                         />
                         {selectedResignation && (
@@ -184,12 +228,13 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Template</Label>
+                        <Label>Clearance Form Template</Label>
                         <OptionCombobox
                             options={templateOptions}
                             value={templateValue}
                             onValueChange={handleTemplateChange}
                             placeholder="Select template..."
+                            searchPlaceholder="Search templates…"
                             disabled={isSubmitting || templates.length === 0}
                         />
                         {!loadError && templates.length === 0 && (
@@ -197,14 +242,31 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                                 No templates are available. Create one in Clearance Templates first.
                             </p>
                         )}
-                        {selectedResignation && suggestedId === null && templates.length > 0 && (
+                        {selectedResignation && suggestTemplateId(selectedResignation, templates) === null && templates.length > 0 && (
                             <p className="text-xs text-muted-foreground">
                                 No department match for this resignation. Choose a template manually.
                             </p>
                         )}
-                        {suggestedId !== null && !manualTemplate && templateValue === String(suggestedId) && (
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label>SOA template</Label>
+                        <OptionCombobox
+                            options={soaTemplateOptions}
+                            value={soaTemplateValue}
+                            onValueChange={handleSoaTemplateChange}
+                            placeholder="Select SOA template..."
+                            searchPlaceholder="Search SOA templates…"
+                            disabled={isSubmitting || soaTemplates.length === 0}
+                        />
+                        {soaTemplatesError && (
                             <p className="text-xs text-muted-foreground">
-                                Auto-suggested from the employee&apos;s department. You may choose a different template.
+                                {soaTemplatesError} You may assign without one.
+                            </p>
+                        )}
+                        {!soaTemplatesError && soaTemplates.length === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                                No SOA templates are available. You may assign without one.
                             </p>
                         )}
                     </div>
@@ -216,14 +278,21 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                     )}
                 </div>
 
-                <DialogFooter>
-                    <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                <DialogFooter className="flex-col gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onClose}
+                        disabled={isSubmitting}
+                        className="w-full sm:w-auto"
+                    >
                         Cancel
                     </Button>
                     <Button
                         type="button"
                         onClick={handleSubmit}
                         disabled={isSubmitting || resignationValue === "" || templateValue === ""}
+                        className="w-full sm:w-auto"
                     >
                         {isSubmitting ? "Assigning..." : "Assign"}
                     </Button>
