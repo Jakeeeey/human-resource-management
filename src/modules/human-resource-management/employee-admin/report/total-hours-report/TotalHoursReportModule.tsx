@@ -21,6 +21,7 @@ import {
   AlertCircle,
   RefreshCw,
   Download,
+  FileDown,
   Printer,
   Table as TableIcon,
   ListFilter,
@@ -215,11 +216,11 @@ function TotalHoursReportModuleContent() {
               variant="outline"
               size="sm"
               onClick={handlePrint}
-              disabled={isLoading}
+              disabled={isLoading || !matrix}
               className="h-9 text-xs"
             >
-              <Printer className="mr-1.5 h-3.5 w-3.5" />
-              Print
+              <FileDown className="mr-1.5 h-3.5 w-3.5" />
+              Export PDF
             </Button>
 
             <Button
