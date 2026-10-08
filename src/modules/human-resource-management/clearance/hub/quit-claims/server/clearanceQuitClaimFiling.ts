@@ -174,9 +174,6 @@ export async function fileClearanceQuitClaimPdf(
     if (!quitclaim) {
         fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.quitclaimNotFound, `clearance_quitclaim ${id} does not exist`);
     }
-    if (quitclaim.status !== "approved") {
-        fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notApproved, `clearance_quitclaim ${id} is not approved`);
-    }
     if (!quitclaim.pdf_file) {
         fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.notAttached, `clearance_quitclaim ${id} has no attached PDF`);
     }
@@ -186,26 +183,44 @@ export async function fileClearanceQuitClaimPdf(
     const listId = await ensureClearanceDocsListId();
     const now = nowUTC();
     const recordName = quitclaim.ref_no ? `Quit Claim — ${quitclaim.ref_no}` : `Quit Claim — #${quitclaim.id}`;
+    const legacyName = `Quit Claim — #${quitclaim.id}`;
     const filed = await readFirstOrNull(
         `/items/employee_file_records?filter[user_id][_eq]=${quitclaim.user_id}` +
         `&filter[list_id][_eq]=${listId}` +
-        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
-    );
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,record_name,file_ref&limit=1`
+    ) ?? (recordName === legacyName ? null : await readFirstOrNull(
+        `/items/employee_file_records?filter[user_id][_eq]=${quitclaim.user_id}` +
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(legacyName)}&fields=id,list_id,record_name,file_ref&limit=1`
+    ));
     if (filed) {
         const recordId = toId(filed.id);
         const filedListId = toId(filed.list_id);
         if (recordId !== null && filedListId !== null) {
-            const storedRef = toNullableText(filed.file_ref);
-            return { recordId, fileRef: storedRef ?? quitclaim.pdf_file, listId: filedListId, alreadyFiled: true };
+            const patch: Record<string, unknown> = { file_ref: quitclaim.pdf_file, updated_at: now };
+            if (toNullableText(filed.record_name) !== recordName) {
+                patch.record_name = recordName;
+            }
+            const patched: unknown = await dFetch(`/items/employee_file_records/${recordId}`, {
+                method: "PATCH",
+                body: JSON.stringify(patch),
+            });
+            if (!isRecord(patched) || hasErrors(patched)) {
+                fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.writeFailed, "employee_file_records update failed");
+            }
+            return { recordId, fileRef: quitclaim.pdf_file, listId: filedListId, alreadyFiled: true };
         }
     }
+    const description = quitclaim.status === "approved"
+        ? `Approved quit claim filed on approval (clearance_quitclaim #${quitclaim.id}${quitclaim.ref_no ? `, REF ${quitclaim.ref_no}` : ""}).`
+        : `Quit claim uploaded to the 201 file before approval (clearance_quitclaim #${quitclaim.id}${quitclaim.ref_no ? `, REF ${quitclaim.ref_no}` : ""}).`;
     const created: unknown = await dFetch("/items/employee_file_records", {
         method: "POST",
         body: JSON.stringify({
             user_id: quitclaim.user_id,
             list_id: listId,
             record_name: recordName,
-            description: `Approved quit claim filed on approval (clearance_quitclaim #${quitclaim.id}${quitclaim.ref_no ? `, REF ${quitclaim.ref_no}` : ""}).`,
+            description,
             file_ref: quitclaim.pdf_file,
             is_deleted: 0,
             created_at: now,

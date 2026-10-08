@@ -36,25 +36,6 @@ export async function freezeApprovedQuitClaimPdf(
     ) {
         throw new Error("Cannot store the approved PDF. Please try again.");
     }
-    const probeRes = await fetch(`/api/hrm/clearance/quit-claims/${input.documentId}/file-record`, {
-        method: "POST",
-    });
-    const probeBody = await readBody(probeRes);
-    if (probeRes.ok && isRecord(probeBody) && isRecord(probeBody.data)) {
-        const probeRecordId =
-            typeof probeBody.data.record_id === "number" ? probeBody.data.record_id : null;
-        const probeFileRef =
-            typeof probeBody.data.file_ref === "string" && probeBody.data.file_ref !== ""
-                ? probeBody.data.file_ref
-                : null;
-        if (probeRecordId !== null && probeFileRef !== null) {
-            return {
-                fileId: probeFileRef,
-                recordId: probeRecordId,
-                alreadyFiled: probeBody.data.already_filed === true,
-            };
-        }
-    }
     const uploadForm = new FormData();
     uploadForm.append(
         "file",

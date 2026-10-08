@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import type { JSX } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ClipboardCheck, RefreshCw } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
@@ -50,6 +50,7 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
         resignations,
         refresh,
         fetchDetail,
+        isLoading: hubLoading,
     } = useClearanceHubContext();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -79,11 +80,13 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
         void reloadDetail();
     }, [reloadDetail]);
 
-    const employeeName = useMemo(() => {
-        if (!detail) return "Unknown employee";
-        const resignation = resignations.find((entry) => entry.id === detail.resignation_id);
-        return resignation ? resignation.employee_name : "Unknown employee";
-    }, [detail, resignations]);
+    const resignationMatch = detail
+        ? resignations.find((entry) => entry.id === detail.resignation_id) ?? null
+        : null;
+    const employeeName = !detail
+        ? ""
+        : (resignationMatch ? resignationMatch.employee_name : "Unknown employee");
+    const nameLoading = detail !== null && resignationMatch === null && hubLoading;
 
     const handleRefresh = async () => {
         await reloadDetail();
@@ -107,6 +110,10 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
 
     const isCompleted = detail?.status === "completed";
     const approvedCount = documents.checklist?.approvedCount ?? 0;
+    const filedLabel = formatPHT(detail?.created_at);
+    const confirmedLabel = formatPHT(detail?.confirmed_at);
+    const progressLabel = `${approvedCount} of 3 approved`;
+    const progressValue = Math.round((approvedCount / 3) * 100);
 
     return (
         <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
@@ -117,9 +124,13 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
                     </div>
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            <h1 className="line-clamp-2 text-2xl font-bold sm:text-4xl" title={employeeName}>
-                                {isLoading && !detail ? "Loading…" : employeeName}
-                            </h1>
+                            {detail && nameLoading ? (
+                                <Skeleton className="h-9 w-56" aria-label="Loading employee name" />
+                            ) : (
+                                <h1 className="line-clamp-2 text-2xl font-bold sm:text-4xl" title={employeeName}>
+                                    {isLoading && !detail ? "Loading…" : employeeName}
+                                </h1>
+                            )}
                             {detail ? (
                                 <StatusBadge tone={statusTone(detail.status)} className={detail.status === "completed" ? styles.signed : styles.pending}>
                                     {CLEARANCE_REQUEST_STATUS_LABELS[detail.status]}
@@ -131,7 +142,7 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
                         </p>
                     </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Button asChild variant="outline" size="sm" className="min-h-11 w-full sm:w-auto md:min-h-0">
                         <Link href={`/hrm/clearance/hub?selected=${requestId}`}>Back to hub</Link>
                     </Button>
@@ -151,7 +162,7 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
             </div>
 
             <Tabs value={tab} onValueChange={handleTabChange} className="space-y-4">
-                <TabsList className="group-data-[orientation=horizontal]/tabs:h-auto w-full flex-wrap justify-start gap-1">
+                <TabsList className="group-data-[orientation=horizontal]/tabs:h-auto w-fit max-w-full flex-wrap justify-start gap-1">
                     <TabsTrigger value="overview" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Overview</TabsTrigger>
                     <TabsTrigger value="form" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Clearance Form</TabsTrigger>
                     <TabsTrigger value="soa" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">SOA</TabsTrigger>
@@ -174,30 +185,32 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
                     ) : (
                         <div className="space-y-6">
                             <Card>
-                                <CardContent className="flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-start md:justify-between">
-                                    <div className="min-w-0 flex-1 space-y-1">
-                                        <dl className="space-y-1 pt-2 text-sm">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <dt className="text-muted-foreground">Filed</dt>
-                                                <dd className="font-medium tabular-nums">{formatPHT(detail.created_at)}</dd>
+                                <CardHeader className="px-4 sm:px-6">
+                                    <CardTitle className="font-mono text-lg font-semibold tracking-tight">Clearance Request</CardTitle>
+                                </CardHeader>
+                                <CardContent className="px-4 sm:px-6">
+                                    <div className="w-full space-y-3">
+                                        <dl className="w-full space-y-2 text-sm">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <dt className="shrink-0 text-muted-foreground">Filed</dt>
+                                                <dd className="min-w-0 truncate text-right font-medium tabular-nums" title={filedLabel}>{filedLabel}</dd>
                                             </div>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <dt className="text-muted-foreground">Confirmed</dt>
-                                                <dd className="font-medium tabular-nums">{formatPHT(detail.confirmed_at)}</dd>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <dt className="shrink-0 text-muted-foreground">Confirmed</dt>
+                                                <dd className="min-w-0 truncate text-right font-medium tabular-nums" title={confirmedLabel}>{confirmedLabel}</dd>
                                             </div>
-                                            <div className="flex items-center justify-between gap-2">
-                                                <dt className="text-muted-foreground">Progress</dt>
-                                                <dd className="font-medium tabular-nums">
-                                                    {approvedCount} of 3 approved
+                                            <div className="flex items-center justify-between gap-4">
+                                                <dt className="shrink-0 text-muted-foreground">Progress</dt>
+                                                <dd className="min-w-0 truncate text-right font-medium tabular-nums" title={progressLabel}>
+                                                    {progressLabel}
                                                 </dd>
                                             </div>
                                         </dl>
-                                        <div className="pt-2">
-                                            <Progress
-                                                value={Math.round((approvedCount / 3) * 100)}
-                                                aria-label={`${approvedCount} of 3 approved`}
-                                            />
-                                        </div>
+                                        <Progress
+                                            value={progressValue}
+                                            className="w-full"
+                                            aria-label={progressLabel}
+                                        />
                                     </div>
                                 </CardContent>
                             </Card>

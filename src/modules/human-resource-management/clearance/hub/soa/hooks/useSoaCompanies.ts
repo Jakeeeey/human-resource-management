@@ -61,6 +61,16 @@ export function useSoaCompanies(requestId?: number | null) {
         setSelectedId(id);
     }, []);
 
+    const refreshEmployeeCompany = useCallback(async () => {
+        if (requestId === undefined || requestId === null) return;
+        try {
+            const result = await fetchEmployeeCompany({ requestId });
+            setEmployeeCompanyId(result.company_id);
+        } catch {
+            setEmployeeCompanyId(null);
+        }
+    }, [requestId]);
+
     useEffect(() => {
         if (requestId === undefined || requestId === null) return;
         let cancelled = false;
@@ -93,5 +103,6 @@ export function useSoaCompanies(requestId?: number | null) {
         logoDataUrl: companyLogoDataUrl(selected),
         employeeCompany,
         employeeCompanyLoading: employeeCompanyId === undefined,
+        refreshEmployeeCompany,
     };
 }

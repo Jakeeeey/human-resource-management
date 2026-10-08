@@ -90,7 +90,7 @@ export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceD
         },
     ];
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" role="list" aria-label="Clearance key figures">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4" role="list" aria-label="Clearance key figures">
             {figures.map((figure) => {
                 const Icon = figure.icon;
                 const DeltaIcon = figure.deltaIcon;
@@ -104,17 +104,17 @@ export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceD
                                 <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
                                     {figure.label}
                                 </span>
-                                <span className="mt-1 block truncate text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl">
+                                <span className="mt-1 block truncate text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl" title={figure.value}>
                                     {figure.value}
                                 </span>
-                                <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground sm:text-sm">
+                                <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground sm:text-sm" title={figure.sub}>
                                     {figure.sub}
                                 </span>
                                 <span className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
                                     <DeltaIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    <span className="truncate">{figure.deltaText}</span>
+                                    <span className="truncate" title={figure.deltaText}>{figure.deltaText}</span>
                                 </span>
-                                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                <span className="mt-0.5 block truncate text-xs text-muted-foreground" title={figure.caption}>
                                     {figure.caption}
                                 </span>
                             </span>
@@ -128,7 +128,7 @@ export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceD
 
 export function ClearanceDashboardKpiSkeleton() {
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Loading key figures">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4" aria-label="Loading key figures">
             {[0, 1, 2, 3].map((index) => (
                 <div key={index} className={`${CARD_SHELL} flex items-start gap-4 p-5 sm:p-6`}>
                     <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-muted" />

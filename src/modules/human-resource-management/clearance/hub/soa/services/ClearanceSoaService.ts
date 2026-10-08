@@ -12,6 +12,8 @@ import type { SoaPrintInput, SoaPrintLine } from "../utils/soaPrintPdf";
 import { dFetch } from "../../utils/directus";
 import { nowUTC } from "../../utils/audit";
 import { allocateDocumentRef, type DocumentRefRow } from "./DocumentRefService";
+import { resolveCompanyCodeForUser } from "../../services/EmployeeCompanyService";
+import { syncClearanceRequestCompletion } from "../../services/ClearanceRequestService";
 
 export const CLEARANCE_SOA_ERROR_CODES = {
     invalidInput: "CLEARANCE_SOA_INVALID_INPUT",
@@ -20,6 +22,7 @@ export const CLEARANCE_SOA_ERROR_CODES = {
     soaNotFound: "CLEARANCE_SOA_NOT_FOUND",
     soaApproved: "CLEARANCE_SOA_APPROVED",
     soaFrozen: "CLEARANCE_SOA_FROZEN",
+    pdfMissing: "CLEARANCE_SOA_PDF_NOT_ATTACHED",
     itemMismatch: "CLEARANCE_SOA_ITEM_MISMATCH",
     refAllocFailed: "DOCUMENT_REF_ALLOC_FAILED",
     writeFailed: "CLEARANCE_SOA_WRITE_FAILED",
@@ -174,6 +177,32 @@ function toFullName(row: Record<string, unknown>): string {
     );
     const name = parts.join(" ").trim();
     return name === "" ? "Unnamed team member" : name;
+}
+
+const LONG_MONTHS = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+function toLongDate(value: string): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+    if (match) {
+        const month = Number(match[2]);
+        if (month >= 1 && month <= 12 && match[1] !== undefined && match[3] !== undefined) {
+            return `${LONG_MONTHS[month - 1]} ${match[3]}, ${match[1]}`;
+        }
+    }
+    return value;
 }
 
 function normalizeSoaRow(raw: unknown): ClearanceSoaRow | null {
@@ -375,7 +404,7 @@ export async function ensureSoa(requestId: number, actorId: number | null): Prom
         fail(CLEARANCE_SOA_ERROR_CODES.requestNotFound, `clearance_request ${requestId} does not exist`);
     }
     const existing = await getSoaByRequest(requestId);
-    if (existing) return existing;
+    if (existing) return backfillCreationRef(existing, request.user_id, actorId);
     const now = nowUTC();
     try {
         const body: unknown = await dFetch("/items/clearance_soa", {
@@ -396,7 +425,10 @@ export async function ensureSoa(requestId: number, actorId: number | null): Prom
             }),
         });
         const row = isRecord(body) && !Array.isArray(body.data) ? normalizeSoaRow(body.data) : null;
-        if (row) return { ...row, lines: [], groups: await readSoaGroupsForRequest(requestId) };
+        if (row) {
+            const created: ClearanceSoaDetail = { ...row, lines: [], groups: await readSoaGroupsForRequest(requestId) };
+            return backfillCreationRef(created, request.user_id, actorId);
+        }
     } catch {
         const raced = await getSoaByRequest(requestId);
         if (raced) return raced;
@@ -404,6 +436,34 @@ export async function ensureSoa(requestId: number, actorId: number | null): Prom
     const raced = await getSoaByRequest(requestId);
     if (raced) return raced;
     fail(CLEARANCE_SOA_ERROR_CODES.writeFailed, "clearance_soa create failed");
+}
+
+async function backfillCreationRef(
+    detail: ClearanceSoaDetail,
+    userId: number,
+    actorId: number | null
+): Promise<ClearanceSoaDetail> {
+    if (detail.ref_no !== null && detail.ref_no !== "") return detail;
+    const companyCode = await resolveCompanyCodeForUser(userId);
+    if (companyCode === null) return detail;
+    try {
+        const ref = await allocateDocumentRef({ documentId: detail.id, companyCode, actorId });
+        const now = nowUTC();
+        const body: unknown = await dFetch(`/items/clearance_soa/${detail.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                ref_no: ref.ref_no,
+                company_code: companyCode,
+                updated_at: now,
+                updated_by: actorId,
+            }),
+        });
+        const updated = isRecord(body) && !Array.isArray(body.data) ? normalizeSoaRow(body.data) : null;
+        if (updated) return { ...detail, ...updated };
+        return { ...detail, ref_no: ref.ref_no, company_code: companyCode };
+    } catch {
+        return detail;
+    }
 }
 
 export async function saveSoaLines(
@@ -586,7 +646,7 @@ export async function buildSoaRenderModel(
         clearanceNo,
         employeeName: toFullName(userRow),
         position: toNullableText(userRow.user_position) ?? "",
-        dateOfSeparation: separation,
+        dateOfSeparation: toLongDate(separation),
         companyName: company.company_name,
         companyAddress: company.company_address,
         logoDataUrl: company.logo_data_url,
@@ -603,6 +663,9 @@ export async function approveSoa(input: ApproveSoaInput): Promise<ApproveSoaResu
     const header = await ensureSoa(input.requestId, input.actorId);
     if (header.status === "approved") {
         fail(CLEARANCE_SOA_ERROR_CODES.soaApproved, `clearance_soa ${header.id} is already approved`);
+    }
+    if (header.pdf_file === null || header.pdf_file === "") {
+        fail(CLEARANCE_SOA_ERROR_CODES.pdfMissing, `clearance_soa ${header.id} has no uploaded PDF`);
     }
     let ref: DocumentRefRow;
     try {
@@ -633,6 +696,7 @@ export async function approveSoa(input: ApproveSoaInput): Promise<ApproveSoaResu
     if (!updated) {
         fail(CLEARANCE_SOA_ERROR_CODES.writeFailed, `clearance_soa/${header.id} approve failed`);
     }
+    await syncClearanceRequestCompletion(input.requestId, input.actorId).catch(() => undefined);
     return { soa: updated, ref, clearanceNo };
 }
 
@@ -648,10 +712,7 @@ export async function attachSoaPdf(
     if (!current) {
         fail(CLEARANCE_SOA_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} does not exist`);
     }
-    if (current.status !== "approved") {
-        fail(CLEARANCE_SOA_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} is not approved`);
-    }
-    if (current.pdf_file !== null && current.pdf_file !== "") {
+    if (current.status === "approved" && current.pdf_file !== null && current.pdf_file !== "") {
         fail(CLEARANCE_SOA_ERROR_CODES.soaFrozen, `clearance_soa ${soaId} pdf is frozen`);
     }
     const now = nowUTC();
@@ -904,6 +965,8 @@ export function mapClearanceSoaError(error: unknown): NextResponse | null {
         case CLEARANCE_SOA_ERROR_CODES.refAllocFailed:
         case "DOCUMENT_REF_ALLOC_FAILED":
             return NextResponse.json({ success: false, code, message: "The statement of account cannot be approved" }, { status: 409 });
+        case CLEARANCE_SOA_ERROR_CODES.pdfMissing:
+            return NextResponse.json({ success: false, code, message: "Upload the statement of account PDF to the 201 file before approving" }, { status: 409 });
         default:
             return null;
     }

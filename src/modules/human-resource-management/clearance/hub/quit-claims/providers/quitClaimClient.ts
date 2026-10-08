@@ -139,6 +139,12 @@ export function defaultCompany(options: CompanyOption[], companyCode?: string): 
     return pickDefaultCompany(options, companyCode);
 }
 
+export function findCompanyByCode(options: CompanyOption[], code: string | undefined): CompanyOption | null {
+    if (code === undefined || code.trim() === "") return null;
+    const wanted = code.trim().toLowerCase();
+    return options.find((option) => option.company_code.toLowerCase() === wanted) ?? null;
+}
+
 export function normalizeQuitClaimValues(raw: unknown): QuitClaimValues {
     const checked = QuitClaimValuesSchema.safeParse(raw);
     if (checked.success) {
@@ -146,7 +152,7 @@ export function normalizeQuitClaimValues(raw: unknown): QuitClaimValues {
             const found = checked.data.section2_signatories.find((entry) => entry.label === label);
             return { label, name: found?.name ?? "", date: found?.date ?? "" };
         });
-        return { ...checked.data, section2_signatories: signatories };
+        return { ...checked.data, letterhead_company_code: checked.data.letterhead_company_code ?? "", section2_signatories: signatories };
     }
     return {
         identity: { date: "", name: "", position: "", separation: "", company: "" },
@@ -157,6 +163,7 @@ export function normalizeQuitClaimValues(raw: unknown): QuitClaimValues {
         payment: { amount: "", check_no: "", date: "" },
         released_by: { name: "", title: "", date: "" },
         manager_signature_date: "",
+        letterhead_company_code: "",
         section2_signatories: QUITCLAIM_SECTION2_SIGNATORY_LABELS.map((label) => ({ label, name: "", date: "" })),
     };
 }

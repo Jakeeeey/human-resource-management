@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import {
     CLEARANCE_REQUEST_STATUSES,
@@ -279,8 +279,37 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
     return fallback;
 }
 
+export interface ClearanceHubListQuery {
+    page?: number;
+    limit?: number;
+    sort?: string;
+    search?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+}
+
+const DEFAULT_LIST_PAGE = 1;
+const DEFAULT_LIST_LIMIT = 10;
+
+const DEFAULT_LIST_QUERY: ClearanceHubListQuery = { page: DEFAULT_LIST_PAGE, limit: DEFAULT_LIST_LIMIT };
+
+function toListSearchParams(query: ClearanceHubListQuery): string {
+    const params = new URLSearchParams();
+    params.set("page", String(query.page ?? DEFAULT_LIST_PAGE));
+    params.set("limit", String(query.limit ?? DEFAULT_LIST_LIMIT));
+    if (query.sort !== undefined && query.sort !== "") params.set("sort", query.sort);
+    if (query.search !== undefined && query.search !== "") params.set("search", query.search);
+    if (query.status !== undefined && query.status !== "") params.set("status", query.status);
+    if (query.dateFrom !== undefined && query.dateFrom !== "") params.set("date_from", query.dateFrom);
+    if (query.dateTo !== undefined && query.dateTo !== "") params.set("date_to", query.dateTo);
+    const encoded = params.toString();
+    return encoded === "" ? "" : `?${encoded}`;
+}
+
 export function useClearanceHub() {
     const [requests, setRequests] = useState<ClearanceHubRequest[]>([]);
+    const [total, setTotal] = useState<number>(0);
     const [counts, setCounts] = useState<ClearanceHubCounts>({ total: 0, pending: 0, in_progress: 0, completed: 0 });
     const [templates, setTemplates] = useState<ClearanceHubTemplate[]>([]);
     const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -290,27 +319,9 @@ export function useClearanceHub() {
     const [resignationsError, setResignationsError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const lastQuery = useRef<ClearanceHubListQuery>({ ...DEFAULT_LIST_QUERY });
 
-    const refresh = useCallback(async (): Promise<void> => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await fetch(REQUESTS_API, { cache: "no-store" });
-            if (!response.ok) {
-                throw new Error(await readErrorMessage(response, "Failed to load clearance requests"));
-            }
-            const payload = (await response.json()) as { data?: unknown; counts?: unknown };
-            const rows = Array.isArray(payload.data) ? payload.data : [];
-            const parsed = rows
-                .map(parseHubRequest)
-                .filter((row): row is ClearanceHubRequest => row !== null);
-            setRequests(parsed);
-            setCounts(parseHubCounts(payload.counts, parsed));
-        } catch (err) {
-            setRequests([]);
-            setCounts({ total: 0, pending: 0, in_progress: 0, completed: 0 });
-            setError(err instanceof Error ? err.message : "Failed to load clearance requests");
-        }
+    const loadLookups = useCallback(async (): Promise<void> => {
         try {
             const response = await fetch(TEMPLATES_API, { cache: "no-store" });
             if (!response.ok) {
@@ -363,10 +374,48 @@ export function useClearanceHub() {
         } catch (err) {
             setResignations([]);
             setResignationsError(err instanceof Error ? err.message : "Failed to load approved resignations");
+        }
+    }, []);
+
+    const refreshLookups = useCallback(async (): Promise<void> => {
+        setIsLoading(true);
+        try {
+            await loadLookups();
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [loadLookups]);
+
+    const refresh = useCallback(async (query?: ClearanceHubListQuery): Promise<void> => {
+        const effective = query ?? lastQuery.current;
+        if (query !== undefined) lastQuery.current = query;
+        setIsLoading(true);
+        setError(null);
+        try {
+            try {
+                const response = await fetch(`${REQUESTS_API}${toListSearchParams(effective)}`, { cache: "no-store" });
+                if (!response.ok) {
+                    throw new Error(await readErrorMessage(response, "Failed to load clearance requests"));
+                }
+                const payload = (await response.json()) as { data?: unknown; counts?: unknown; total?: unknown };
+                const rows = Array.isArray(payload.data) ? payload.data : [];
+                const parsed = rows
+                    .map(parseHubRequest)
+                    .filter((row): row is ClearanceHubRequest => row !== null);
+                setRequests(parsed);
+                setTotal(typeof payload.total === "number" && Number.isInteger(payload.total) ? payload.total : parsed.length);
+                setCounts(parseHubCounts(payload.counts, parsed));
+            } catch (err) {
+                setRequests([]);
+                setTotal(0);
+                setCounts({ total: 0, pending: 0, in_progress: 0, completed: 0 });
+                setError(err instanceof Error ? err.message : "Failed to load clearance requests");
+            }
+            await loadLookups();
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loadLookups]);
 
     const assignClearance = useCallback(
         async (resignationId: number, templateId: number, soaTemplateId?: number | null): Promise<string> => {
@@ -464,6 +513,7 @@ export function useClearanceHub() {
 
     return {
         requests,
+        total,
         counts,
         templates,
         templatesError,
@@ -474,6 +524,7 @@ export function useClearanceHub() {
         isLoading,
         error,
         refresh,
+        refreshLookups,
         assignClearance,
         fetchDetail,
         fetchCandidates,

@@ -8,14 +8,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, Loader2, Lock, Minus, Plus, Printer } from "lucide-react";
+import { AlertCircle, Check, Loader2, Lock, Minus, Plus, Printer, Upload } from "lucide-react";
 import { QuitClaimPrintDialog } from "./QuitClaimPrintDialog";
 import { QuitClaimCompanySelect } from "./QuitClaimCompanySelect";
 import { QuitClaimLivePreview } from "./QuitClaimLivePreview";
 import type { CompanyOption } from "../../utils/company";
+import { companyLogoDataUrl, fetchEmployeeCompany, pickEmployeeCompany } from "../../utils/company";
+import { phToday } from "../../utils/time";
+import { buildQuitClaimPdf, type QuitClaimCompany } from "../utils/quitClaimPrintPdf";
+import { freezeApprovedQuitClaimPdf } from "../utils/approvedPdfFreeze";
 import {
+    approveQuitClaim,
+    findCompanyByCode,
     getQuitClaim,
     isAlreadyApprovedError,
+    loadCompanyOptions,
     normalizeQuitClaimValues,
     quitClaimErrorMessage,
     updateQuitClaimValues,
@@ -66,6 +73,42 @@ function Field({
     );
 }
 
+function RowPager({
+    navLabel,
+    page,
+    totalPages,
+    start,
+    end,
+    total,
+    onPageChange,
+}: {
+    navLabel: string;
+    page: number;
+    totalPages: number;
+    start: number;
+    end: number;
+    total: number;
+    onPageChange: (page: number) => void;
+}): JSX.Element | null {
+    if (totalPages <= 1) {
+        return null;
+    }
+    return (
+        <nav aria-label={navLabel} className="flex flex-wrap items-center justify-between gap-2 py-1">
+            <p className="text-xs text-muted-foreground">Showing {start}–{end} of {total}</p>
+            <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+                    Previous
+                </Button>
+                <p className="text-xs text-muted-foreground">Page {page} of {totalPages}</p>
+                <Button type="button" variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+                    Next
+                </Button>
+            </div>
+        </nav>
+    );
+}
+
 function blankAccountability(): QuitClaimAccountability {
     return { outlet: "", name: "", date: "", remarks: "" };
 }
@@ -78,19 +121,81 @@ function blankDueToEmployee(): QuitClaimDueToEmployee {
     return { item: "", days: "", amount: "" };
 }
 
-export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, autoOpenPrint = false }: QuitClaimEditorProps): JSX.Element {
+function toUploadFileName(employeeName: string): string {
+    const cleaned = employeeName
+        .split("")
+        .filter((ch) => ch >= " " && !"<>:\"/\\|?*".includes(ch))
+        .join("")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+    const who = cleaned === "" ? "Employee" : cleaned;
+    return `Quit Claim - ${who} - ${phToday()}.pdf`;
+}
+
+function toRendererCompany(selected: CompanyOption | null): QuitClaimCompany {
+    if (selected === null) {
+        return { company_name: "" };
+    }
+    return {
+        company_name: selected.company_name,
+        company_address: selected.company_address,
+        company_contact: selected.company_contact,
+        company_email: selected.company_email,
+        logo_data_url: companyLogoDataUrl(selected),
+    };
+}
+
+const ROW_PAGE_SIZE = 10;
+
+function matchesRowFilter(entry: unknown, query: string): boolean {
+    const needle = query.trim().toLowerCase();
+    if (needle === "") return true;
+    return JSON.stringify(entry).toLowerCase().includes(needle);
+}
+
+function pageSlice<T>(rows: T[], page: number): { pageRows: T[]; totalPages: number; safePage: number; start: number; end: number } {
+    const totalPages = Math.max(1, Math.ceil(rows.length / ROW_PAGE_SIZE));
+    const safePage = Math.min(Math.max(1, page), totalPages);
+    const start = (safePage - 1) * ROW_PAGE_SIZE;
+    const pageRows = rows.slice(start, start + ROW_PAGE_SIZE);
+    return {
+        pageRows,
+        totalPages,
+        safePage,
+        start: rows.length === 0 ? 0 : start + 1,
+        end: Math.min(start + ROW_PAGE_SIZE, rows.length),
+    };
+}
+
+export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = false }: QuitClaimEditorProps): JSX.Element {
     const [row, setRow] = useState<ClearanceQuitclaim | null>(null);
     const [values, setValues] = useState<QuitClaimValues | null>(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [approving, setApproving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [printOpen, setPrintOpen] = useState(false);
     const [detail, setDetail] = useState<QuitClaimDetail | null>(null);
     const [company, setCompany] = useState<CompanyOption | null>(null);
+    const [editCount, setEditCount] = useState(0);
+    const baselineRef = useRef<string | null>(null);
+    const [accountabilityFilter, setAccountabilityFilter] = useState("");
+    const [accountabilityPage, setAccountabilityPage] = useState(1);
+    const [deductionFilter, setDeductionFilter] = useState("");
+    const [deductionPage, setDeductionPage] = useState(1);
+    const [dueFilter, setDueFilter] = useState("");
+    const [duePage, setDuePage] = useState(1);
     const autoPrintFiredRef = useRef<number | null>(null);
 
     const frozen = row?.status === "approved";
+    const dirty = values !== null && baselineRef.current !== null && JSON.stringify(values) !== baselineRef.current;
+    const hasUpload = (row?.pdf_file ?? "") !== "";
+    const approveBlockedReason = hasUpload
+        ? null
+        : "Upload the quit claim PDF to the 201 file before approving.";
 
     useEffect(() => {
         if (!open || quitclaimId === null) {
@@ -104,15 +209,53 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
         setValues(null);
         setDetail(null);
         setCompany(null);
+        setEditCount(0);
+        setAccountabilityFilter("");
+        setAccountabilityPage(1);
+        setDeductionFilter("");
+        setDeductionPage(1);
+        setDueFilter("");
+        setDuePage(1);
+        baselineRef.current = null;
         (async () => {
             try {
                 const loaded = await getQuitClaim(quitclaimId);
                 if (cancelled) {
                     return;
                 }
-                setRow(loaded);
-                setValues(normalizeQuitClaimValues(loaded.values));
-                setDetail({ ...loaded, values: normalizeQuitClaimValues(loaded.values) });
+                const normalized = normalizeQuitClaimValues(loaded.values);
+                let letterhead: CompanyOption | null = null;
+                try {
+                    const [options, employee] = await Promise.all([
+                        loadCompanyOptions(),
+                        fetchEmployeeCompany({ userId: loaded.user_id }),
+                    ]);
+                    if (cancelled) {
+                        return;
+                    }
+                    letterhead = findCompanyByCode(options, normalized.letterhead_company_code)
+                        ?? pickEmployeeCompany(options, employee.company_id);
+                } catch {
+                    letterhead = null;
+                }
+                if (cancelled) {
+                    return;
+                }
+                let seeded = normalized;
+                if (seeded.identity.company.trim() === "" && letterhead !== null) {
+                    seeded = { ...seeded, identity: { ...seeded.identity, company: letterhead.company_name } };
+                }
+                if (letterhead !== null && seeded.letterhead_company_code !== letterhead.company_code) {
+                    seeded = { ...seeded, letterhead_company_code: letterhead.company_code };
+                }
+                if (!cancelled) {
+                    setRow(loaded);
+                    setValues(seeded);
+                    setDetail({ ...loaded, values: seeded });
+                    setCompany(letterhead);
+                    baselineRef.current = JSON.stringify(seeded);
+                    setEditCount(0);
+                }
             } catch (loadError) {
                 if (!cancelled) {
                     setError(quitClaimErrorMessage(loadError, "Failed to load the quit claim."));
@@ -137,7 +280,15 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
 
     function patch(patchValues: Partial<QuitClaimValues>): void {
         setValues((current) => (current === null ? current : { ...current, ...patchValues }));
+        setEditCount((count) => count + 1);
         setSaved(false);
+    }
+
+    function handleCompanyChange(next: CompanyOption | null): void {
+        setCompany(next);
+        if (next === null || values === null || frozen) return;
+        if (values.letterhead_company_code === next.company_code) return;
+        patch({ letterhead_company_code: next.company_code });
     }
 
     async function handleSave(): Promise<void> {
@@ -153,6 +304,8 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
             const normalized = normalizeQuitClaimValues(updated.values);
             setValues(normalized);
             setDetail({ ...updated, values: normalized });
+            baselineRef.current = JSON.stringify(normalized);
+            setEditCount(0);
             setSaved(true);
             onChanged(updated);
         } catch (saveError) {
@@ -161,7 +314,10 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                 try {
                     const reloaded = await getQuitClaim(row.id);
                     setRow(reloaded);
-                    setValues(normalizeQuitClaimValues(reloaded.values));
+                    const reloadedValues = normalizeQuitClaimValues(reloaded.values);
+                    setValues(reloadedValues);
+                    baselineRef.current = JSON.stringify(reloadedValues);
+                    setEditCount(0);
                     onChanged(reloaded);
                 } catch {
                     setRow({ ...row, status: "approved" });
@@ -173,6 +329,72 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
             setSaving(false);
         }
     }
+
+    async function handleUpload(): Promise<void> {
+        if (row === null || values === null || uploading || frozen) {
+            return;
+        }
+        setUploading(true);
+        setError(null);
+        try {
+            const bytes = buildQuitClaimPdf(values, toRendererCompany(company));
+            await freezeApprovedQuitClaimPdf({
+                documentId: row.id,
+                bytes,
+                fileName: toUploadFileName(values.identity.name),
+            });
+            const reloaded = await getQuitClaim(row.id);
+            setRow(reloaded);
+            setDetail({ ...reloaded, values });
+            onChanged(reloaded);
+        } catch (uploadError) {
+            setError(quitClaimErrorMessage(uploadError, "Could not upload the quit claim PDF to the 201 file."));
+        } finally {
+            setUploading(false);
+        }
+    }
+
+    async function handleApprove(): Promise<void> {
+        if (row === null || values === null || approving || frozen) {
+            return;
+        }
+        if (!hasUpload) {
+            setError(approveBlockedReason ?? "Upload the quit claim PDF to the 201 file before approving.");
+            return;
+        }
+        const companyCode = company?.company_code ?? row.company_code ?? "";
+        if (companyCode === "") {
+            setError("Choose a letterhead company before approving.");
+            return;
+        }
+        setApproving(true);
+        setError(null);
+        try {
+            const result = await approveQuitClaim(row.id, companyCode);
+            setRow(result.quitclaim);
+            setDetail({ ...result.quitclaim, values });
+            onChanged(result.quitclaim);
+        } catch (approveError) {
+            setError(quitClaimErrorMessage(approveError, "Failed to approve the quit claim."));
+        } finally {
+            setApproving(false);
+        }
+    }
+
+    const accountabilityRows = (values?.accountabilities ?? [])
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry }) => matchesRowFilter(entry, accountabilityFilter));
+    const accountabilityView = pageSlice(accountabilityRows, accountabilityPage);
+    const deductionRows = (values?.deductions ?? [])
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry }) => matchesRowFilter(entry, deductionFilter));
+    const deductionView = pageSlice(deductionRows, deductionPage);
+    const dueRows = (values?.due_to_employee ?? [])
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry }) => matchesRowFilter(entry, dueFilter));
+    const dueView = pageSlice(dueRows, duePage);
+    const visibleSignatories = (values?.section2_signatories ?? [])
+        .filter((entry) => entry.label !== "Amount Verified By");
 
     if (quitclaimId === null || !open) {
         return <></>;
@@ -192,12 +414,9 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                     </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-                        Close
-                    </Button>
                     <Button
                         variant="outline"
-                        className="w-full sm:w-auto"
+                        className="min-h-11 w-full sm:w-auto md:min-h-0"
                         disabled={detail === null || loading}
                         onClick={() => setPrintOpen(true)}
                     >
@@ -206,16 +425,53 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                     </Button>
                     {!frozen && (
                         <Button
-                            className="w-full sm:w-auto"
-                            disabled={values === null || loading || saving || frozen}
+                            variant="outline"
+                            className="min-h-11 w-full sm:w-auto md:min-h-0"
+                            disabled={values === null || loading || uploading}
+                            onClick={() => void handleUpload()}
+                        >
+                            {uploading
+                                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                : <Upload className="h-4 w-4" aria-hidden="true" />}
+                            {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
+                        </Button>
+                    )}
+                    {!frozen && (
+                        <span title={approveBlockedReason ?? undefined}>
+                            <Button
+                                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                disabled={values === null || loading || approving || !hasUpload}
+                                onClick={() => void handleApprove()}
+                            >
+                                {approving
+                                    ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                    : <Check className="h-4 w-4" aria-hidden="true" />}
+                                {approving ? "Approving…" : "Approve"}
+                            </Button>
+                        </span>
+                    )}
+                    {!frozen && (
+                        <Button
+                            className="min-h-11 w-full sm:w-auto md:min-h-0"
+                            disabled={values === null || loading || saving || frozen || !dirty}
                             onClick={() => void handleSave()}
                         >
                             {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                            {saving ? "Saving…" : "Save"}
+                            {saving ? "Saving…" : dirty && editCount > 0 ? `Save (${editCount})` : "Save"}
                         </Button>
                     )}
                 </div>
             </div>
+            {!frozen && !hasUpload && (
+                <p className="text-xs text-muted-foreground">
+                    Upload the quit claim PDF to the 201 file to enable approval.
+                </p>
+            )}
+            {!frozen && hasUpload && (
+                <p className="text-xs text-muted-foreground">
+                    Quit claim PDF filed to the 201 file. Re-upload replaces the filed copy.
+                </p>
+            )}
             {error && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" aria-hidden="true" />
@@ -243,14 +499,14 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                     <p className="text-sm text-muted-foreground">Loading quit claim…</p>
                 </div>
             ) : (
-                <div className="grid gap-6 lg:grid-cols-[400px_1fr] items-start">
+                <div className="grid gap-6 lg:grid-cols-[520px_minmax(0,1fr)] xl:grid-cols-[560px_minmax(0,1fr)] items-start">
                     <div className="bg-card shadow-sm border rounded-xl p-6 space-y-4">
                         <div className="space-y-1">
                             <Label htmlFor="quitclaim-editor-company">Letterhead company</Label>
                             <QuitClaimCompanySelect
                                 id="quitclaim-editor-company"
                                 value={company}
-                                onValueChange={setCompany}
+                                onValueChange={handleCompanyChange}
                                 disabled={loading || saving}
                             />
                         </div>
@@ -280,7 +536,7 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                 />
                                 <Field
                                     id="qc-separation"
-                                    label="Separation"
+                                    label="Date of separation"
                                     value={values.identity.separation}
                                     disabled={frozen || saving}
                                     onChange={(next) => patch({ identity: { ...values.identity, separation: next } })}
@@ -304,7 +560,7 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                         <section className="space-y-4 rounded-md border p-4" aria-label="Section 2 accountabilities">
                             <h3 className="text-sm font-semibold">Section 2 — Accountabilities</h3>
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                     <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         Accountabilities
                                     </h4>
@@ -314,13 +570,27 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                             variant="outline"
                                             size="sm"
                                             disabled={saving}
-                                            onClick={() => patch({ accountabilities: [...values.accountabilities, blankAccountability()] })}
+                                            onClick={() => {
+                                                setAccountabilityFilter("");
+                                                setAccountabilityPage(1);
+                                                patch({ accountabilities: [...values.accountabilities, blankAccountability()] });
+                                            }}
                                         >
                                             <Plus className="h-4 w-4" aria-hidden="true" />
                                             Add row
                                         </Button>
                                     )}
                                 </div>
+                                <Input
+                                    value={accountabilityFilter}
+                                    disabled={frozen || saving}
+                                    placeholder="Filter rows…"
+                                    aria-label="Filter accountability rows"
+                                    onChange={(event) => {
+                                        setAccountabilityFilter(event.target.value);
+                                        setAccountabilityPage(1);
+                                    }}
+                                />
                                 <div className="overflow-x-auto rounded-md border">
                                     <table className="w-full min-w-[640px] text-sm">
                                         <thead>
@@ -334,7 +604,7 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {values.accountabilities.map((entry, index) => (
+                                            {accountabilityView.pageRows.map(({ entry, index }) => (
                                                 <tr key={index} className="border-b last:border-0">
                                                     <td className="px-2 py-1">
                                                         <Input
@@ -410,12 +680,28 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                                     </td>
                                                 </tr>
                                             )}
+                                            {values.accountabilities.length > 0 && accountabilityRows.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={frozen ? 5 : 6} className="px-2 py-4 text-center text-xs text-muted-foreground">
+                                                        No rows match this filter.
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
+                                <RowPager
+                                    navLabel="Accountability rows pagination"
+                                    page={accountabilityView.safePage}
+                                    totalPages={accountabilityView.totalPages}
+                                    start={accountabilityView.start}
+                                    end={accountabilityView.end}
+                                    total={accountabilityRows.length}
+                                    onPageChange={setAccountabilityPage}
+                                />
                             </div>
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                     <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         Deductions
                                     </h4>
@@ -425,13 +711,27 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                             variant="outline"
                                             size="sm"
                                             disabled={saving}
-                                            onClick={() => patch({ deductions: [...values.deductions, blankDeduction()] })}
+                                            onClick={() => {
+                                                setDeductionFilter("");
+                                                setDeductionPage(1);
+                                                patch({ deductions: [...values.deductions, blankDeduction()] });
+                                            }}
                                         >
                                             <Plus className="h-4 w-4" aria-hidden="true" />
                                             Add row
                                         </Button>
                                     )}
                                 </div>
+                                <Input
+                                    value={deductionFilter}
+                                    disabled={frozen || saving}
+                                    placeholder="Filter rows…"
+                                    aria-label="Filter deduction rows"
+                                    onChange={(event) => {
+                                        setDeductionFilter(event.target.value);
+                                        setDeductionPage(1);
+                                    }}
+                                />
                                 <div className="overflow-x-auto rounded-md border">
                                     <table className="w-full min-w-[480px] text-sm">
                                         <thead>
@@ -443,7 +743,7 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {values.deductions.map((entry, index) => (
+                                            {deductionView.pageRows.map(({ entry, index }) => (
                                                 <tr key={index} className="border-b last:border-0">
                                                     <td className="px-2 py-1">
                                                         <Input
@@ -495,12 +795,28 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                                     </td>
                                                 </tr>
                                             )}
+                                            {values.deductions.length > 0 && deductionRows.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={frozen ? 3 : 4} className="px-2 py-4 text-center text-xs text-muted-foreground">
+                                                        No rows match this filter.
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
+                                <RowPager
+                                    navLabel="Deduction rows pagination"
+                                    page={deductionView.safePage}
+                                    totalPages={deductionView.totalPages}
+                                    start={deductionView.start}
+                                    end={deductionView.end}
+                                    total={deductionRows.length}
+                                    onPageChange={setDeductionPage}
+                                />
                             </div>
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between gap-2">
                                     <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         Due to employee
                                     </h4>
@@ -510,13 +826,27 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                             variant="outline"
                                             size="sm"
                                             disabled={saving}
-                                            onClick={() => patch({ due_to_employee: [...values.due_to_employee, blankDueToEmployee()] })}
+                                            onClick={() => {
+                                                setDueFilter("");
+                                                setDuePage(1);
+                                                patch({ due_to_employee: [...values.due_to_employee, blankDueToEmployee()] });
+                                            }}
                                         >
                                             <Plus className="h-4 w-4" aria-hidden="true" />
                                             Add row
                                         </Button>
                                     )}
                                 </div>
+                                <Input
+                                    value={dueFilter}
+                                    disabled={frozen || saving}
+                                    placeholder="Filter rows…"
+                                    aria-label="Filter due to employee rows"
+                                    onChange={(event) => {
+                                        setDueFilter(event.target.value);
+                                        setDuePage(1);
+                                    }}
+                                />
                                 <div className="overflow-x-auto rounded-md border">
                                     <table className="w-full min-w-[480px] text-sm">
                                         <thead>
@@ -528,7 +858,7 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {values.due_to_employee.map((entry, index) => (
+                                            {dueView.pageRows.map(({ entry, index }) => (
                                                 <tr key={index} className="border-b last:border-0">
                                                     <td className="px-2 py-1">
                                                         <Input
@@ -589,9 +919,25 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                                     </td>
                                                 </tr>
                                             )}
+                                            {values.due_to_employee.length > 0 && dueRows.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={frozen ? 3 : 4} className="px-2 py-4 text-center text-xs text-muted-foreground">
+                                                        No rows match this filter.
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
+                                <RowPager
+                                    navLabel="Due to employee rows pagination"
+                                    page={dueView.safePage}
+                                    totalPages={dueView.totalPages}
+                                    start={dueView.start}
+                                    end={dueView.end}
+                                    total={dueRows.length}
+                                    onPageChange={setDuePage}
+                                />
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <Field
                                         id="qc-total"
@@ -621,16 +967,15 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                     Section 2 signatories
                                 </h4>
                                 <div className="overflow-x-auto rounded-md border">
-                                    <table className="w-full min-w-[480px] text-sm">
+                                    <table className="w-full min-w-[320px] text-sm">
                                         <thead>
                                             <tr className="border-b bg-muted/50 text-left text-xs">
                                                 <th className="px-2 py-2 font-medium">Role</th>
                                                 <th className="px-2 py-2 font-medium">Name</th>
-                                                <th className="px-2 py-2 font-medium">Date</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {values.section2_signatories.map((entry, index) => (
+                                            {visibleSignatories.map((entry) => (
                                                 <tr key={entry.label} className="border-b last:border-0">
                                                     <td className="px-2 py-2 text-xs font-medium">{entry.label}</td>
                                                     <td className="px-2 py-1">
@@ -639,20 +984,11 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                                                             disabled={frozen || saving}
                                                             aria-label={`${entry.label} name`}
                                                             onChange={(event) => {
-                                                                const next = [...values.section2_signatories];
-                                                                next[index] = { ...entry, name: event.target.value };
-                                                                patch({ section2_signatories: next });
-                                                            }}
-                                                        />
-                                                    </td>
-                                                    <td className="px-2 py-1">
-                                                        <Input
-                                                            value={entry.date}
-                                                            disabled={frozen || saving}
-                                                            aria-label={`${entry.label} date`}
-                                                            onChange={(event) => {
-                                                                const next = [...values.section2_signatories];
-                                                                next[index] = { ...entry, date: event.target.value };
+                                                                const next = values.section2_signatories.map((signatory) =>
+                                                                    signatory.label === entry.label
+                                                                        ? { ...signatory, name: event.target.value }
+                                                                        : signatory
+                                                                );
                                                                 patch({ section2_signatories: next });
                                                             }}
                                                         />
@@ -720,7 +1056,7 @@ export function QuitClaimEditor({ quitclaimId, open, onOpenChange, onChanged, au
                     </div>
                 </div>
             )}
-            <QuitClaimPrintDialog quitclaim={detail} open={printOpen} onOpenChange={setPrintOpen} />
+            <QuitClaimPrintDialog quitclaim={detail} initialCompany={company} open={printOpen} onOpenChange={setPrintOpen} />
         </div>
     );
 }

@@ -9,11 +9,11 @@ const ClearanceHubContext = createContext<ClearanceHubContextValue | undefined>(
 
 export function ClearanceHubProvider({ children }: { children: ReactNode }) {
     const hub = useClearanceHub();
-    const { refresh } = hub;
+    const { refreshLookups } = hub;
 
     useEffect(() => {
-        refresh();
-    }, [refresh]);
+        refreshLookups();
+    }, [refreshLookups]);
 
     return (
         <ClearanceHubContext.Provider value={hub}>

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Empty,
     EmptyContent,
@@ -29,10 +29,17 @@ import { useDialogTriggerFocus } from "../hooks/useDialogTriggerFocus";
 import type { TemplateCreateInput, TemplateUpdateInput } from "../providers/clearanceTemplatesClient";
 import { useClearanceTemplatesFetch } from "../providers/clearanceTemplatesProvider";
 import type { ClearanceTemplate } from "../types";
+import { ListPager, SortSelect } from "./ListControls";
 import { TemplateDialog } from "./TemplateDialog";
 import { TemplateToggleDialog } from "./TemplateToggleDialog";
 
-const PAGE_SIZE = 10;
+type CatalogueSort = "title" | "code" | "status";
+
+const TEMPLATE_SORT_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+    { value: "title", label: "Title (A–Z)" },
+    { value: "code", label: "Code (A–Z)" },
+    { value: "status", label: "Status" },
+];
 
 const ICON_FOCUS_RING =
     "focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -43,7 +50,9 @@ export function TemplateCatalogue(props: { selectedId: number | null }): JSX.Ele
     const router = useRouter();
 
     const [search, setSearch] = useState("");
+    const [sort, setSort] = useState<CatalogueSort>("title");
     const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ClearanceTemplate | null>(null);
     const [saving, setSaving] = useState(false);
@@ -56,17 +65,35 @@ export function TemplateCatalogue(props: { selectedId: number | null }): JSX.Ele
 
     const query = search.trim().toLowerCase();
     const filtered = useMemo(() => {
-        if (query === "") {
-            return templates.data;
+        const rows =
+            query === ""
+                ? [...templates.data]
+                : templates.data.filter((row) => {
+                      const department =
+                          row.department_id === null ? "global" : directory.departmentName(row.department_id);
+                      return (
+                          row.title.toLowerCase().includes(query) ||
+                          row.code.toLowerCase().includes(query) ||
+                          department.toLowerCase().includes(query)
+                      );
+                  });
+        if (sort === "code") {
+            rows.sort((a, b) => a.code.localeCompare(b.code));
+        } else if (sort === "status") {
+            rows.sort(
+                (a, b) => Number(b.is_active) - Number(a.is_active) || a.title.localeCompare(b.title)
+            );
+        } else {
+            rows.sort((a, b) => a.title.localeCompare(b.title));
         }
-        return templates.data.filter((row) => row.title.toLowerCase().includes(query));
-    }, [templates.data, query]);
+        return rows;
+    }, [templates.data, query, sort, directory]);
 
-    const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
     const safePage = Math.min(page, pageCount - 1);
-    const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-    const rangeStart = filtered.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
-    const rangeEnd = Math.min(filtered.length, safePage * PAGE_SIZE + PAGE_SIZE);
+    const visible = filtered.slice(safePage * pageSize, safePage * pageSize + pageSize);
+    const rangeStart = filtered.length === 0 ? 0 : safePage * pageSize + 1;
+    const rangeEnd = Math.min(filtered.length, safePage * pageSize + pageSize);
 
     const countLabel =
         query === ""
@@ -75,6 +102,18 @@ export function TemplateCatalogue(props: { selectedId: number | null }): JSX.Ele
 
     const handleSearchChange = (value: string) => {
         setSearch(value);
+        setPage(0);
+    };
+
+    const handleSortChange = (value: string) => {
+        if (value === "title" || value === "code" || value === "status") {
+            setSort(value);
+            setPage(0);
+        }
+    };
+
+    const handlePageSizeChange = (size: number) => {
+        setPageSize(size);
         setPage(0);
     };
 
@@ -151,14 +190,14 @@ export function TemplateCatalogue(props: { selectedId: number | null }): JSX.Ele
 
     return (
         <Card className="min-w-0">
-            <CardHeader className="shrink-0 flex-row items-start justify-between gap-2">
+            <CardHeader className="shrink-0">
                 <div className="min-w-0">
                     <CardTitle>Templates</CardTitle>
                     <p className="text-sm text-muted-foreground" aria-live="polite">
                         {countLabel}
                     </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <CardAction className="flex flex-wrap items-center justify-end gap-2">
                     <Button
                         variant="outline"
                         size="icon-lg"
@@ -173,7 +212,7 @@ export function TemplateCatalogue(props: { selectedId: number | null }): JSX.Ele
                         <Plus className="h-4 w-4" />
                         New template
                     </Button>
-                </div>
+                </CardAction>
             </CardHeader>
             <CardContent className="min-w-0 space-y-4">
                 <div className="flex flex-col gap-3">
@@ -187,15 +226,23 @@ export function TemplateCatalogue(props: { selectedId: number | null }): JSX.Ele
                             className="h-10 pl-9"
                         />
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Label htmlFor="clearance-templates-show-inactive" className="cursor-pointer text-sm">
-                            Show inactive
-                        </Label>
-                        <Switch
-                            id="clearance-templates-show-inactive"
-                            checked={showInactive}
-                            onCheckedChange={handleShowInactiveChange}
-                            className={ICON_FOCUS_RING}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="clearance-templates-show-inactive" className="cursor-pointer text-sm">
+                                Show inactive
+                            </Label>
+                            <Switch
+                                id="clearance-templates-show-inactive"
+                                checked={showInactive}
+                                onCheckedChange={handleShowInactiveChange}
+                                className={ICON_FOCUS_RING}
+                            />
+                        </div>
+                        <SortSelect
+                            label="Sort"
+                            value={sort}
+                            options={TEMPLATE_SORT_OPTIONS}
+                            onChange={handleSortChange}
                         />
                     </div>
                 </div>
@@ -323,33 +370,17 @@ export function TemplateCatalogue(props: { selectedId: number | null }): JSX.Ele
                                 );
                             })}
                         </ul>
-                        {filtered.length > PAGE_SIZE && (
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <p className="text-sm text-muted-foreground" aria-live="polite">
-                                    Showing {rangeStart}–{rangeEnd} of {filtered.length}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={safePage === 0}
-                                        onClick={() => setPage(safePage - 1)}
-                                    >
-                                        Previous
-                                    </Button>
-                                    <span className="text-sm text-muted-foreground">
-                                        Page {safePage + 1} of {pageCount}
-                                    </span>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={safePage >= pageCount - 1}
-                                        onClick={() => setPage(safePage + 1)}
-                                    >
-                                        Next
-                                    </Button>
-                                </div>
-                            </div>
+                        {filtered.length > pageSize && (
+                            <ListPager
+                                page={safePage}
+                                pageCount={pageCount}
+                                rangeStart={rangeStart}
+                                rangeEnd={rangeEnd}
+                                total={filtered.length}
+                                pageSize={pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={handlePageSizeChange}
+                            />
                         )}
                     </div>
                 )}

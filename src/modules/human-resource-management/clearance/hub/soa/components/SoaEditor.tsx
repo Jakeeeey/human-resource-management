@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
-import { Loader2, Minus, Plus, Printer } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Loader2, Minus, Plus, Printer, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +21,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SoaSignatory } from "../types";
 import type { SoaPrintInput } from "../utils/soaPrintPdf";
+import { buildSoaPdf } from "../utils/soaPrintPdf";
+import { freezeApprovedSoaPdf } from "../utils/approvedPdfFreeze";
 import { useSoaCompanies } from "../hooks/useSoaCompanies";
 import { useSoaDetail, type SoaLinePayload } from "../hooks/useSoaDetail";
+import { companyLogoDataUrl } from "../../utils/company";
 import { SoaPrintDialog } from "./SoaPrintDialog";
 
 interface SoaEditorProps {
@@ -39,20 +42,38 @@ interface DraftRow {
 
 let draftKey = 0;
 
+const LINES_PAGE_SIZE = 10;
+
 function nextKey(): string {
     draftKey += 1;
     return `row-${draftKey}`;
 }
 
+function formatAmountText(value: number): string {
+    return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 function amountToText(amount: number | null): string {
-    return amount === null ? "" : String(amount);
+    return amount === null ? "" : formatAmountText(amount);
+}
+
+function parseAmountValue(text: string): number | null {
+    const cleaned = text.replace(/php\.?/gi, "").replace(/,/g, "").trim();
+    if (cleaned === "") return null;
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function isAmountValid(text: string): boolean {
-    const trimmed = text.trim();
-    if (trimmed === "") return true;
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) && parsed >= 0;
+    const cleaned = text.replace(/php\.?/gi, "").replace(/,/g, "").trim();
+    if (cleaned === "") return true;
+    return parseAmountValue(text) !== null;
+}
+
+function nonEmptySignatories(drafts: SoaSignatory[]): SoaSignatory[] {
+    return drafts.filter(
+        (draft) => draft.label.trim() !== "" || draft.name.trim() !== "" || draft.title.trim() !== ""
+    );
 }
 
 function blankSignatoryDrafts(): SoaSignatory[] {
@@ -65,10 +86,7 @@ function blankSignatoryDrafts(): SoaSignatory[] {
 
 function applySignatoryOverrides(model: SoaPrintInput, drafts: SoaSignatory[] | null): SoaPrintInput {
     if (drafts === null) return model;
-    const overridden = drafts.filter(
-        (draft) => draft.label.trim() !== "" || draft.name.trim() !== "" || draft.title.trim() !== ""
-    );
-    return { ...model, signatories: overridden };
+    return { ...model, signatories: nonEmptySignatories(drafts) };
 }
 
 function toFileName(employeeName: string, refNo: string): string {
@@ -85,18 +103,26 @@ function toFileName(employeeName: string, refNo: string): string {
 }
 
 export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX.Element {
-    const { detail, items, templateId, loading, error, reload, saveLines, fetchRenderModel } =
+    const { detail, items, templateId, formClearanceNo, loading, error, reload, saveLines, approve, fetchRenderModel } =
         useSoaDetail(requestId);
     const companies = useSoaCompanies(requestId);
     const [drafts, setDrafts] = useState<Record<number, DraftRow[]>>({});
     const [seededFor, setSeededFor] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [previewing, setPreviewing] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [approving, setApproving] = useState(false);
     const [model, setModel] = useState<SoaPrintInput | null>(null);
     const [printOpen, setPrintOpen] = useState(false);
     const [signatoryDrafts, setSignatoryDrafts] = useState<SoaSignatory[]>(() => blankSignatoryDrafts());
     const [signatoriesReady, setSignatoriesReady] = useState(false);
+    const [signatoriesError, setSignatoriesError] = useState(false);
+    const [signatoryRetry, setSignatoryRetry] = useState(0);
     const [signatorySeededFor, setSignatorySeededFor] = useState<string | null>(null);
+    const [savedDrafts, setSavedDrafts] = useState<Record<number, DraftRow[]> | null>(null);
+    const [savedSignatories, setSavedSignatories] = useState<SoaSignatory[] | null>(null);
+    const [lineQuery, setLineQuery] = useState("");
+    const [linePages, setLinePages] = useState<Record<number, number>>({});
     const autoPrintFiredRef = useRef<number | null>(null);
 
     const sections = useMemo(() => {
@@ -136,6 +162,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                 : [{ key: nextKey(), description: "", amountText: "", remarks: "" }];
         }
         setDrafts(seeded);
+        setSavedDrafts(seeded);
         setSeededFor(detail.id);
     }, [detail, sections, seededFor]);
 
@@ -149,24 +176,29 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                 seeded[index] = { label: row.label, name: row.name, title: row.title };
             });
             setSignatoryDrafts(seeded);
+            setSavedSignatories(seeded.map((row) => ({ ...row })));
             setSignatoriesReady(true);
+            setSignatoriesError(false);
             setSignatorySeededFor(key);
             return;
         }
         if (templateId === null) {
             setSignatoryDrafts(blankSignatoryDrafts());
+            setSavedSignatories(null);
             setSignatoriesReady(false);
+            setSignatoriesError(false);
             return;
         }
         let cancelled = false;
+        setSignatoriesError(false);
         (async () => {
             try {
                 const res = await fetch(`/api/hrm/clearance/soa/signatories?template_id=${templateId}`);
                 const json: unknown = await res.json().catch(() => null);
                 if (cancelled) return;
                 if (!res.ok) {
-                    setSignatoryDrafts(blankSignatoryDrafts());
                     setSignatoriesReady(false);
+                    setSignatoriesError(true);
                     return;
                 }
                 if (
@@ -190,23 +222,32 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                         seeded[index] = { label: row.label, name: row.name, title: row.title };
                     });
                     setSignatoryDrafts(seeded);
+                    setSavedSignatories(seeded.map((row) => ({ ...row })));
                     setSignatoriesReady(true);
+                    setSignatoriesError(false);
                     setSignatorySeededFor(key);
                 } else {
-                    setSignatoryDrafts(blankSignatoryDrafts());
                     setSignatoriesReady(false);
+                    setSignatoriesError(true);
                 }
             } catch {
                 if (!cancelled) {
-                    setSignatoryDrafts(blankSignatoryDrafts());
                     setSignatoriesReady(false);
+                    setSignatoriesError(true);
                 }
             }
         })();
         return () => {
             cancelled = true;
         };
-    }, [detail, templateId, signatorySeededFor]);
+    }, [detail, templateId, signatorySeededFor, signatoryRetry]);
+
+    const typedSignatoryCount = useMemo(
+        () => nonEmptySignatories(signatoryDrafts).length,
+        [signatoryDrafts]
+    );
+
+    const signatoryOverlay = signatoriesReady || typedSignatoryCount > 0 ? signatoryDrafts : null;
 
     useEffect(() => {
         if (!autoPrint || detail === null || companies.loading || companies.employeeCompanyLoading) return;
@@ -227,7 +268,10 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         (async () => {
             try {
                 const renderModel = await fetchRenderModel(requestId, snapshot);
-                setModel(applySignatoryOverrides(renderModel, signatoriesReady ? signatoryDrafts : null));
+                const withClearance = renderModel.clearanceNo === "" && formClearanceNo !== ""
+                    ? { ...renderModel, clearanceNo: formClearanceNo }
+                    : renderModel;
+                setModel(applySignatoryOverrides(withClearance, signatoryOverlay));
                 setPrintOpen(true);
             } catch (err) {
                 toast.error(err instanceof Error ? err.message : "Could not build the SOA preview.");
@@ -235,7 +279,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                 setPreviewing(false);
             }
         })();
-    }, [autoPrint, detail, companies.loading, companies.employeeCompanyLoading, companies.employeeCompany, companies.selected, companies.logoDataUrl, fetchRenderModel, requestId, signatoriesReady, signatoryDrafts]);
+    }, [autoPrint, detail, companies.loading, companies.employeeCompanyLoading, companies.employeeCompany, companies.selected, companies.logoDataUrl, fetchRenderModel, requestId, signatoryOverlay, formClearanceNo]);
 
     const invalidCount = useMemo(() => {
         let count = 0;
@@ -247,7 +291,103 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         return count;
     }, [drafts]);
 
+    const dirtyCount = useMemo(() => {
+        if (savedDrafts === null) return 0;
+        let count = 0;
+        const keys = new Set<number>([
+            ...Object.keys(drafts).map(Number),
+            ...Object.keys(savedDrafts).map(Number),
+        ]);
+        for (const key of keys) {
+            const current = drafts[key] ?? [];
+            const baseline = savedDrafts[key] ?? [];
+            const length = Math.max(current.length, baseline.length);
+            for (let index = 0; index < length; index += 1) {
+                const row = current[index];
+                const saved = baseline[index];
+                if (
+                    row === undefined ||
+                    saved === undefined ||
+                    row.description !== saved.description ||
+                    row.amountText.trim() !== saved.amountText.trim() ||
+                    row.remarks !== saved.remarks
+                ) {
+                    count += 1;
+                }
+            }
+        }
+        const baselineSignatories = savedSignatories ?? blankSignatoryDrafts();
+        signatoryDrafts.forEach((draft, index) => {
+            const saved = baselineSignatories[index] ?? { label: "", name: "", title: "" };
+            if (draft.name !== saved.name || draft.title !== saved.title) count += 1;
+        });
+        return count;
+    }, [drafts, savedDrafts, signatoryDrafts, savedSignatories]);
+
+    const isDirty = savedDrafts !== null && dirtyCount > 0;
+
     const isApproved = detail?.status === "approved";
+
+    const hasUpload = (detail?.pdf_file ?? "") !== "";
+    const approveBlockedReason = hasUpload
+        ? null
+        : "Upload the SOA PDF to the 201 file before approving.";
+
+    async function handleUpload(): Promise<void> {
+        if (!detail || isApproved || uploading) return;
+        if (companies.employeeCompanyLoading) {
+            toast.error("Resolving the employee company. Please try again.");
+            return;
+        }
+        const snapshot = companySnapshot();
+        if (!snapshot) {
+            toast.error("Pick a company for the letterhead first.");
+            return;
+        }
+        setUploading(true);
+        try {
+            const renderModel = await fetchRenderModel(requestId, snapshot);
+            const withClearance = renderModel.clearanceNo === "" && formClearanceNo !== ""
+                ? { ...renderModel, clearanceNo: formClearanceNo }
+                : renderModel;
+            const withSignatories = applySignatoryOverrides(withClearance, signatoryOverlay);
+            const bytes = buildSoaPdf(withSignatories);
+            await freezeApprovedSoaPdf({
+                documentId: detail.id,
+                bytes,
+                fileName: toFileName(withSignatories.employeeName, withSignatories.refNo),
+            });
+            toast.success("SOA PDF uploaded to the 201 file.");
+            reload();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not upload the SOA PDF to the 201 file.");
+        } finally {
+            setUploading(false);
+        }
+    }
+
+    async function handleApprove(): Promise<void> {
+        if (!detail || isApproved || approving) return;
+        if (!hasUpload) {
+            toast.error(approveBlockedReason ?? "Upload the SOA PDF to the 201 file before approving.");
+            return;
+        }
+        const companyCode = companies.selected?.company_code ?? detail.company_code ?? "";
+        if (companyCode === "") {
+            toast.error("Pick a company for the letterhead first.");
+            return;
+        }
+        setApproving(true);
+        try {
+            await approve(requestId, companyCode);
+            toast.success("Statement of account approved.");
+            reload();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Could not approve the statement of account.");
+        } finally {
+            setApproving(false);
+        }
+    }
 
     function updateRow(sectionKey: number, key: string, patch: Partial<DraftRow>): void {
         setDrafts((prev) => ({
@@ -270,6 +410,20 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         }));
     }
 
+    function moveRow(sectionKey: number, key: string, direction: -1 | 1): void {
+        setDrafts((prev) => {
+            const rows = prev[sectionKey] ?? [];
+            const index = rows.findIndex((row) => row.key === key);
+            const target = index + direction;
+            if (index < 0 || target < 0 || target >= rows.length) return prev;
+            const next = [...rows];
+            const [moved] = next.splice(index, 1);
+            if (moved === undefined) return prev;
+            next.splice(target, 0, moved);
+            return { ...prev, [sectionKey]: next };
+        });
+    }
+
     function updateSignatory(index: number, field: "name" | "title", value: string): void {
         setSignatoryDrafts((prev) =>
             prev.map((draft, draftIndex) => (draftIndex === index ? { ...draft, [field]: value } : draft))
@@ -281,12 +435,11 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         let order = 0;
         for (const section of sections) {
             for (const row of drafts[section.key] ?? []) {
-                const amountText = row.amountText.trim();
                 payload.push({
                     item_id: section.itemId,
                     soa_template_row_id: section.templateRowId,
                     description: row.description.trim(),
-                    amount: amountText === "" ? null : Number(amountText),
+                    amount: parseAmountValue(row.amountText),
                     remarks: row.remarks.trim(),
                     sort_order: order,
                 });
@@ -302,15 +455,17 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
             toast.error("Fix the highlighted amounts before saving. Amounts must be zero or more.");
             return;
         }
+        if (!isDirty) return;
         setSaving(true);
         try {
-            const signatories = signatoriesReady
-                ? signatoryDrafts.filter(
-                    (draft) => draft.label.trim() !== "" || draft.name.trim() !== "" || draft.title.trim() !== ""
-                )
-                : undefined;
+            const typed = nonEmptySignatories(signatoryDrafts);
+            const signatories = signatoriesReady || typed.length > 0 ? typed : undefined;
             await saveLines(detail.id, buildPayload(), signatories);
-            toast.success("SOA lines saved.");
+            if (!signatoriesReady && typed.length > 0) {
+                toast.success("SOA lines saved with the typed signatures.");
+            } else {
+                toast.success("SOA lines saved.");
+            }
             setSeededFor(null);
             reload();
         } catch (err) {
@@ -342,7 +497,10 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         setPreviewing(true);
         try {
             const renderModel = await fetchRenderModel(requestId, snapshot);
-            setModel(applySignatoryOverrides(renderModel, signatoriesReady ? signatoryDrafts : null));
+            const withClearance = renderModel.clearanceNo === "" && formClearanceNo !== ""
+                ? { ...renderModel, clearanceNo: formClearanceNo }
+                : renderModel;
+            setModel(applySignatoryOverrides(withClearance, signatoryOverlay));
             setPrintOpen(true);
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Could not build the SOA preview.");
@@ -351,7 +509,27 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         }
     }
 
-    if (loading) {
+    async function handleCompanySaved(companyId: number): Promise<void> {
+        await companies.refreshEmployeeCompany();
+        reload();
+        const option = companies.options.find((entry) => entry.id === companyId) ?? null;
+        if (!option) return;
+        try {
+            const renderModel = await fetchRenderModel(requestId, {
+                company_name: option.company_name,
+                company_address: option.company_address ?? "",
+                logo_data_url: companyLogoDataUrl(option),
+            });
+            const withClearance = renderModel.clearanceNo === "" && formClearanceNo !== ""
+                ? { ...renderModel, clearanceNo: formClearanceNo }
+                : renderModel;
+            setModel(applySignatoryOverrides(withClearance, signatoryOverlay));
+        } catch {
+            return;
+        }
+    }
+
+    if (loading || (detail === null && error === null)) {
         return (
             <div className="space-y-2">
                 {[...Array(6)].map((_, index) => (
@@ -374,6 +552,10 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         );
     }
 
+    const resolvedClearanceNo = detail.clearance_no !== null && detail.clearance_no !== ""
+        ? detail.clearance_no
+        : (formClearanceNo === "" ? null : formClearanceNo);
+
     return (
         <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -381,17 +563,50 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     <span className="font-medium">Request #{detail.request_id}</span>
                     <Badge variant={isApproved ? "default" : "secondary"}>{detail.status}</Badge>
                     {detail.ref_no && <Badge variant="outline">REF {detail.ref_no}</Badge>}
-                    {detail.clearance_no && <Badge variant="outline">Clearance {detail.clearance_no}</Badge>}
+                    {resolvedClearanceNo && <Badge variant="outline">Clearance {resolvedClearanceNo}</Badge>}
+                    {hasUpload && <Badge variant="outline">201 filed</Badge>}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                     {!isApproved && (
-                        <Button onClick={() => void handleSave()} disabled={saving || invalidCount > 0}>
+                        <Button
+                            className="min-h-11 md:min-h-0"
+                            onClick={() => void handleSave()}
+                            disabled={saving || invalidCount > 0 || !isDirty}
+                        >
                             {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                            {saving ? "Saving…" : "Save lines"}
+                            {saving ? "Saving…" : dirtyCount > 0 ? `Save lines (${dirtyCount})` : "Save lines"}
                         </Button>
+                    )}
+                    {!isApproved && (
+                        <Button
+                            variant="outline"
+                            className="min-h-11 md:min-h-0"
+                            onClick={() => void handleUpload()}
+                            disabled={uploading}
+                        >
+                            {uploading
+                                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                : <Upload className="h-4 w-4" aria-hidden="true" />}
+                            {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
+                        </Button>
+                    )}
+                    {!isApproved && (
+                        <span title={approveBlockedReason ?? undefined}>
+                            <Button
+                                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                onClick={() => void handleApprove()}
+                                disabled={!hasUpload || approving}
+                            >
+                                {approving
+                                    ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                    : <Check className="h-4 w-4" aria-hidden="true" />}
+                                {approving ? "Approving…" : "Approve"}
+                            </Button>
+                        </span>
                     )}
                     <Button
                         variant="outline"
+                        className="min-h-11 md:min-h-0"
                         onClick={() => void handlePreview()}
                         disabled={previewing}
                     >
@@ -402,6 +617,16 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     </Button>
                 </div>
             </div>
+            {!isApproved && !hasUpload && (
+                <p className="text-xs text-muted-foreground">
+                    Upload the SOA PDF to the 201 file to enable approval.
+                </p>
+            )}
+            {!isApproved && hasUpload && (
+                <p className="text-xs text-muted-foreground">
+                    SOA PDF filed to the 201 file. Re-upload replaces the filed copy.
+                </p>
+            )}
 
             {companies.employeeCompany === null && (
             <Card>
@@ -445,28 +670,74 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                 </Alert>
             )}
 
-            {sections.map((section) => (
+            {sections.length > 0 && (
+                <div className="relative">
+                    <Search
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden="true"
+                    />
+                    <Input
+                        id="soa-line-filter"
+                        value={lineQuery}
+                        onChange={(event) => {
+                            setLineQuery(event.target.value);
+                            setLinePages({});
+                        }}
+                        placeholder="Filter lines by description or remarks…"
+                        aria-label="Filter SOA lines by description or remarks"
+                        className="pl-9"
+                    />
+                </div>
+            )}
+
+            {sections.map((section) => {
+                const allRows = drafts[section.key] ?? [];
+                const query = lineQuery.trim().toLowerCase();
+                const matched = query === ""
+                    ? allRows
+                    : allRows.filter(
+                        (row) =>
+                            row.description.toLowerCase().includes(query) ||
+                            row.remarks.toLowerCase().includes(query)
+                    );
+                const total = matched.length;
+                const pageCount = Math.max(1, Math.ceil(total / LINES_PAGE_SIZE));
+                const page = Math.min(linePages[section.key] ?? 0, pageCount - 1);
+                const rangeStart = total === 0 ? 0 : page * LINES_PAGE_SIZE + 1;
+                const rangeEnd = Math.min(total, page * LINES_PAGE_SIZE + LINES_PAGE_SIZE);
+                const visible = matched.slice(page * LINES_PAGE_SIZE, page * LINES_PAGE_SIZE + LINES_PAGE_SIZE);
+                return (
                 <Card key={section.key}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0">
                         <CardTitle className="text-sm">{section.label}</CardTitle>
                         {!isApproved && (
-                            <Button variant="outline" size="sm" onClick={() => addRow(section.key)}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="min-h-11 md:min-h-0"
+                                onClick={() => addRow(section.key)}
+                            >
                                 <Plus className="h-4 w-4" aria-hidden="true" />
                                 Add line
                             </Button>
                         )}
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        {(drafts[section.key] ?? []).map((row) => {
+                        {visible.map((row) => {
                             const invalid = !isAmountValid(row.amountText);
+                            const position = allRows.findIndex((entry) => entry.key === row.key);
+                            const descriptionId = `soa-${section.key}-${row.key}-description`;
+                            const amountId = `soa-${section.key}-${row.key}-amount`;
+                            const remarksId = `soa-${section.key}-${row.key}-remarks`;
                             return (
                                 <div
                                     key={row.key}
                                     className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_160px_1fr_auto]"
                                 >
                                     <div className="grid gap-1.5">
-                                        <Label>Description</Label>
+                                        <Label htmlFor={descriptionId}>Description</Label>
                                         <Input
+                                            id={descriptionId}
                                             value={row.description}
                                             disabled={isApproved}
                                             placeholder="Description"
@@ -476,8 +747,9 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                                         />
                                     </div>
                                     <div className="grid gap-1.5">
-                                        <Label>Amount</Label>
+                                        <Label htmlFor={amountId}>Amount</Label>
                                         <Input
+                                            id={amountId}
                                             value={row.amountText}
                                             disabled={isApproved}
                                             inputMode="decimal"
@@ -487,6 +759,14 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                                             onChange={(event) =>
                                                 updateRow(section.key, row.key, { amountText: event.target.value })
                                             }
+                                            onBlur={() => {
+                                                const parsed = parseAmountValue(row.amountText);
+                                                if (parsed !== null) {
+                                                    updateRow(section.key, row.key, {
+                                                        amountText: formatAmountText(parsed),
+                                                    });
+                                                }
+                                            }}
                                         />
                                         {invalid && (
                                             <p className="text-xs text-destructive">
@@ -495,8 +775,9 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                                         )}
                                     </div>
                                     <div className="grid gap-1.5">
-                                        <Label>Remarks</Label>
+                                        <Label htmlFor={remarksId}>Remarks</Label>
                                         <Input
+                                            id={remarksId}
                                             value={row.remarks}
                                             disabled={isApproved}
                                             placeholder="Remarks"
@@ -506,7 +787,25 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                                         />
                                     </div>
                                     {!isApproved && (
-                                        <div className="flex items-end">
+                                        <div className="flex items-end gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label={`Move line up in ${section.label}`}
+                                                disabled={query !== "" || position <= 0}
+                                                onClick={() => moveRow(section.key, row.key, -1)}
+                                            >
+                                                <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                aria-label={`Move line down in ${section.label}`}
+                                                disabled={query !== "" || position < 0 || position >= allRows.length - 1}
+                                                onClick={() => moveRow(section.key, row.key, 1)}
+                                            >
+                                                <ArrowDown className="h-4 w-4" aria-hidden="true" />
+                                            </Button>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -520,28 +819,101 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                                 </div>
                             );
                         })}
-                        {(drafts[section.key] ?? []).length === 0 && (
+                        {allRows.length === 0 && (
                             <p className="text-sm text-muted-foreground">
                                 No lines for this category. Saved lines replace everything already stored.
                             </p>
                         )}
+                        {allRows.length > 0 && total === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                No lines match the filter.
+                            </p>
+                        )}
+                        {query !== "" && total > 0 && (
+                            <p className="text-xs text-muted-foreground" aria-live="polite">
+                                {total} of {allRows.length} lines match the filter.
+                            </p>
+                        )}
+                        {total > LINES_PAGE_SIZE && (
+                            <nav
+                                aria-label={`Pagination for ${section.label} lines`}
+                                className="flex flex-wrap items-center justify-between gap-2"
+                            >
+                                <p className="text-xs text-muted-foreground" aria-live="polite">
+                                    Showing {rangeStart}–{rangeEnd} of {total}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={page <= 0}
+                                        aria-label={`Previous page of ${section.label} lines`}
+                                        onClick={() =>
+                                            setLinePages((prev) => ({ ...prev, [section.key]: page - 1 }))
+                                        }
+                                    >
+                                        Previous
+                                    </Button>
+                                    <span className="text-xs text-muted-foreground" aria-live="polite">
+                                        Page {page + 1} of {pageCount}
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={page >= pageCount - 1}
+                                        aria-label={`Next page of ${section.label} lines`}
+                                        onClick={() =>
+                                            setLinePages((prev) => ({ ...prev, [section.key]: page + 1 }))
+                                        }
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </nav>
+                        )}
                     </CardContent>
                 </Card>
-            ))}
+                );
+            })}
 
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base">Signatories</CardTitle>
                 </CardHeader>
-                <CardContent className="grid gap-2 sm:grid-cols-3">
-                    {signatoryDrafts.map((draft, index) => (
+                <CardContent className="space-y-3">
+                    {signatoriesError && !isApproved && (
+                        <Alert variant="destructive">
+                            <AlertTitle>Could not load the template signatures.</AlertTitle>
+                            <AlertDescription className="flex flex-wrap items-center gap-2">
+                                <span>Any names and titles typed below will still be saved.</span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        setSignatoriesError(false);
+                                        setSignatoryRetry((count) => count + 1);
+                                    }}
+                                >
+                                    Retry
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    <div className="grid gap-2 sm:grid-cols-3">
+                    {signatoryDrafts.map((draft, index) => {
+                        const blockLabel = draft.label === "" ? "Additional Signatory" : draft.label;
+                        const nameId = `soa-signatory-${index}-name`;
+                        const titleId = `soa-signatory-${index}-title`;
+                        return (
                         <div key={`signatory-${index}`} className="grid gap-2 rounded-md border p-3">
                             <p className="text-sm font-medium">
-                                {draft.label === "" ? "Additional Signatory" : draft.label}
+                                {blockLabel}
                             </p>
                             <div className="grid gap-1.5">
-                                <Label>Name</Label>
+                                <Label htmlFor={nameId}>Name</Label>
                                 <Input
+                                    id={nameId}
+                                    aria-label={`${blockLabel} name`}
                                     value={draft.name}
                                     disabled={isApproved}
                                     placeholder="Name"
@@ -549,8 +921,10 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                                 />
                             </div>
                             <div className="grid gap-1.5">
-                                <Label>Title</Label>
+                                <Label htmlFor={titleId}>Title</Label>
                                 <Input
+                                    id={titleId}
+                                    aria-label={`${blockLabel} title`}
                                     value={draft.title}
                                     disabled={isApproved}
                                     placeholder="Title"
@@ -558,7 +932,9 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                                 />
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
+                    </div>
                 </CardContent>
             </Card>
 
@@ -569,6 +945,15 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                 fileName={model ? toFileName(model.employeeName, model.refNo) : ""}
                 open={printOpen}
                 onOpenChange={setPrintOpen}
+                requestId={requestId}
+                companyOptions={companies.options}
+                companiesLoading={companies.loading}
+                employeeCompany={companies.employeeCompany}
+                employeeCompanyLoading={companies.employeeCompanyLoading}
+                selectedCompanyId={companies.selectedId}
+                onSelectCompany={companies.selectById}
+                onCompanySaved={(companyId) => void handleCompanySaved(companyId)}
+                isApproved={isApproved}
             />
         </div>
     );

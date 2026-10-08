@@ -16,6 +16,8 @@ export interface ClearancePrintInput {
     company_name?: string;
     company_address?: string | null;
     logo_data_url?: string | null;
+    gmName?: string;
+    gmTitle?: string;
 }
 
 const PAGE_MARGIN = 48;
@@ -93,13 +95,17 @@ export function buildClearancePdf(input: ClearancePrintInput): Blob {
         doc.setFontSize(BODY_SIZE);
         doc.setTextColor(0);
         doc.text(label, x, baseline);
-        const valueX = x + doc.getTextWidth(label) + 6;
+        const labelWidth = doc.getTextWidth(label);
+        const valueX = x + labelWidth + 6;
+        const valueWidth = value === "" ? 0 : doc.getTextWidth(value);
         if (value !== "") {
             doc.text(value, valueX, baseline);
         }
+        const needed = labelWidth + 6 + Math.max(valueWidth, 120) + 12;
+        const endX = Math.min(x + width, x + needed);
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
-        doc.line(x, baseline + 4, x + width, baseline + 4);
+        doc.line(x, baseline + 4, endX, baseline + 4);
     }
 
     function leftHeight(entry: ClearancePrintEntry): number {
@@ -309,21 +315,45 @@ export function buildClearancePdf(input: ClearancePrintInput): Blob {
 
     const gmLineWidth = 240;
     const gmLineX = pageWidth / 2 - gmLineWidth / 2;
-    ensureSpace(24 + CAPTION_LINE + ROLE_GAP + ROLE_LINE + 8);
+    const gmName = (input.gmName ?? "").trim();
+    const gmTitle = (input.gmTitle ?? "").trim();
+    const gmNameLines = gmName === "" ? [] : (doc.splitTextToSize(gmName, gmLineWidth) as string[]);
+    const gmTitleLines = gmTitle === "" ? [] : (doc.splitTextToSize(gmTitle, gmLineWidth) as string[]);
+    const gmNameHeight = gmNameLines.length > 0 ? gmNameLines.length * BODY_LINE : BODY_LINE;
+    const gmTitleHeight = gmTitleLines.length > 0 ? gmTitleLines.length * ROLE_LINE : ROLE_LINE;
+    ensureSpace(24 + gmNameHeight + CAPTION_LINE + ROLE_GAP + gmTitleHeight + 8);
     const gmLineY = y + 24;
     doc.setDrawColor(0);
     doc.setLineWidth(0.75);
     doc.line(gmLineX, gmLineY, gmLineX + gmLineWidth, gmLineY);
+    let gmCursor = gmLineY + NAME_GAP;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(BODY_SIZE);
+    doc.setTextColor(0);
+    if (gmNameLines.length === 0) {
+        gmCursor += BODY_LINE;
+    } else {
+        for (const line of gmNameLines) {
+            doc.text(line, pageWidth / 2, gmCursor, { align: "center" });
+            gmCursor += BODY_LINE;
+        }
+    }
     doc.setFont("helvetica", "normal");
     doc.setFontSize(CAPTION_SIZE);
     doc.setTextColor(GREY);
-    doc.text(SIGN_CAPTION, pageWidth / 2, gmLineY + 14, { align: "center" });
+    doc.text(SIGN_CAPTION, pageWidth / 2, gmCursor, { align: "center" });
+    gmCursor += CAPTION_LINE + ROLE_GAP;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(ROLE_SIZE);
     doc.setTextColor(0);
-    doc.text("GENERAL MANAGER", pageWidth / 2, gmLineY + 14 + CAPTION_LINE + ROLE_GAP + ROLE_LINE, {
-        align: "center",
-    });
+    if (gmTitleLines.length === 0) {
+        gmCursor += ROLE_LINE;
+    } else {
+        for (const line of gmTitleLines) {
+            doc.text(line, pageWidth / 2, gmCursor, { align: "center" });
+            gmCursor += ROLE_LINE;
+        }
+    }
 
     const totalPages = doc.getNumberOfPages();
     for (let page = 1; page <= totalPages; page += 1) {

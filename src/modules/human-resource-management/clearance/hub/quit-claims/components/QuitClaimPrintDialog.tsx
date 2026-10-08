@@ -22,6 +22,7 @@ import { freezeApprovedQuitClaimPdf } from "../utils/approvedPdfFreeze";
 import { phToday } from "../../utils/time";
 import { QuitClaimCompanySelect } from "./QuitClaimCompanySelect";
 import {
+    findCompanyByCode,
     getQuitClaimValues,
     loadCompanyOptions,
     quitClaimErrorMessage,
@@ -30,6 +31,7 @@ import {
 
 interface QuitClaimPrintDialogProps {
     quitclaim: QuitClaimDetail | null;
+    initialCompany: CompanyOption | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }
@@ -54,9 +56,9 @@ function toFitWidthUrl(url: string): string {
     return fragment ? `${base}#${fragment}&zoom=page-width` : `${base}#zoom=page-width`;
 }
 
-function toRendererCompany(valuesCompany: string, selected: CompanyOption | null): QuitClaimCompany {
+function toRendererCompany(selected: CompanyOption | null): QuitClaimCompany {
     if (selected === null) {
-        return { company_name: valuesCompany };
+        return { company_name: "" };
     }
     return {
         company_name: selected.company_name,
@@ -67,7 +69,7 @@ function toRendererCompany(valuesCompany: string, selected: CompanyOption | null
     };
 }
 
-export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClaimPrintDialogProps): JSX.Element {
+export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenChange }: QuitClaimPrintDialogProps): JSX.Element {
     const [company, setCompany] = useState<CompanyOption | null>(null);
     const [companyOptions, setCompanyOptions] = useState<CompanyOption[] | undefined>(undefined);
     const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(undefined);
@@ -86,8 +88,10 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
     const employeeCompany = typeof employeeCompanyId === "number" && companyOptions !== undefined
         ? pickEmployeeCompany(companyOptions, employeeCompanyId)
         : null;
+    const persistedCompany = companyOptions !== undefined && quitclaim !== null
+        ? findCompanyByCode(companyOptions, quitclaim.values.letterhead_company_code)
+        : null;
     const letterheadReady = companyOptions !== undefined && employeeCompanyId !== undefined;
-    const showCompanySelect = letterheadReady && employeeCompany === null;
 
     useEffect(() => {
         if (!open || quitclaim === null) {
@@ -96,9 +100,12 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
             return;
         }
         let cancelled = false;
-        setCompany(null);
+        setCompany(initialCompany);
         setCompanyOptions(undefined);
         setEmployeeCompanyId(undefined);
+        setFreezeState("idle");
+        setFreezeError(null);
+        freezeKeyRef.current = null;
         (async () => {
             try {
                 const rows = await loadCompanyOptions();
@@ -118,13 +125,18 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
         return () => {
             cancelled = true;
         };
-    }, [open, quitclaim]);
+    }, [open, quitclaim, initialCompany]);
 
     useEffect(() => {
-        if (employeeCompany !== null && employeeCompany.id !== company?.id) {
+        if (company !== null) return;
+        if (persistedCompany !== null) {
+            setCompany(persistedCompany);
+            return;
+        }
+        if (employeeCompany !== null) {
             setCompany(employeeCompany);
         }
-    }, [employeeCompany, company]);
+    }, [company, persistedCompany, employeeCompany]);
 
     useEffect(() => {
         if (!open || quitclaim === null) {
@@ -135,6 +147,9 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
             setPreviewUrl(null);
             setFreezeError(null);
             pdfBytesRef.current = null;
+            return;
+        }
+        if (!letterheadReady) {
             return;
         }
         let cancelled = false;
@@ -151,7 +166,7 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                 if (cancelled) {
                     return;
                 }
-                const pdfBytes = buildQuitClaimPdf(values, toRendererCompany(values.identity.company, company));
+                const pdfBytes = buildQuitClaimPdf(values, toRendererCompany(company));
                 const blob = new Blob(
                     [pdfBytes as BlobPart],
                     { type: "application/pdf" }
@@ -178,10 +193,11 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
         return () => {
             cancelled = true;
         };
-    }, [open, quitclaim, company]);
+    }, [open, quitclaim, company, letterheadReady]);
 
     useEffect(() => {
         if (!open || quitclaim === null || quitclaim.status !== "approved" || quitclaim.pdf_file) return;
+        if (!letterheadReady || company === null) return;
         if (previewUrl === null || pdfBytesRef.current === null) return;
         const key = `${quitclaim.id}:${quitclaim.ref_no ?? ""}`;
         if (freezeKeyRef.current === key || freezeState !== "idle") return;
@@ -200,7 +216,7 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                 setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
             }
         })();
-    }, [open, quitclaim, previewUrl, fileName, freezeState]);
+    }, [open, quitclaim, previewUrl, fileName, freezeState, letterheadReady, company]);
 
     useEffect(() => {
         return () => {
@@ -279,7 +295,7 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
-                className="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl"
+                className="flex max-h-[90vh] w-[95vw] flex-col overflow-hidden p-0 sm:max-w-[85vw] lg:max-w-[1000px]"
                 onFocusOutside={(event) => event.preventDefault()}
             >
                 <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-6">
@@ -288,8 +304,8 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                         Print quit claim
                     </DialogTitle>
                     <DialogDescription>
-                        {quitclaim?.ref_no ?? "Pending"} — {employeeCompany !== null
-                            ? "letterhead set from the employee's company."
+                        {quitclaim?.ref_no ?? "Pending"} — {company !== null
+                            ? `letterhead: ${company.company_name}.`
                             : "choose the letterhead company, then print or download."}
                     </DialogDescription>
                 </DialogHeader>
@@ -297,7 +313,9 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                     <div className="mx-auto max-w-3xl space-y-3">
                         <div className="space-y-1 rounded-[var(--radius)] border bg-card p-3 shadow-sm">
                             <Label htmlFor="quitclaim-print-company">Letterhead company</Label>
-                            {showCompanySelect ? (
+                            {!letterheadReady ? (
+                            <p className="text-xs text-muted-foreground">Loading letterhead…</p>
+                            ) : (
                             <QuitClaimCompanySelect
                                 id="quitclaim-print-company"
                                 value={company}
@@ -305,15 +323,6 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                                 disabled={building}
                                 options={companyOptions ?? []}
                             />
-                            ) : employeeCompany !== null ? (
-                            <div className="space-y-1">
-                                <p className="text-sm font-medium">{employeeCompany.company_name}</p>
-                                {employeeCompany.company_address && (
-                                    <p className="text-xs text-muted-foreground">{employeeCompany.company_address}</p>
-                                )}
-                            </div>
-                            ) : (
-                            <p className="text-xs text-muted-foreground">Loading letterhead…</p>
                             )}
                         </div>
                         {error && (
@@ -336,7 +345,7 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                         {freezeError && (
                             <p className="text-xs text-destructive">{freezeError}</p>
                         )}
-                        {building ? (
+                        {building || !letterheadReady ? (
                             <div className="flex items-center justify-center gap-3 rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">
                                 <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
                                 <p className="text-sm text-muted-foreground">Generating PDF preview…</p>
@@ -361,12 +370,12 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                     </div>
                 </div>
                 <DialogFooter className="shrink-0 flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:justify-end">
-                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+                    <Button variant="outline" className="min-h-11 w-full sm:w-auto md:min-h-0" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
                     <Button
                         variant="outline"
-                        className="w-full sm:w-auto"
+                        className="min-h-11 w-full sm:w-auto md:min-h-0"
                         onClick={handlePrint}
                         disabled={!previewUrl || building}
                     >
@@ -374,7 +383,7 @@ export function QuitClaimPrintDialog({ quitclaim, open, onOpenChange }: QuitClai
                         Print
                     </Button>
                     <Button
-                        className="w-full sm:w-auto"
+                        className="min-h-11 w-full sm:w-auto md:min-h-0"
                         onClick={handleDownload}
                         disabled={!previewUrl || building}
                     >

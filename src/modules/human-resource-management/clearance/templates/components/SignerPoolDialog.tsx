@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { JSX } from "react";
-import { X } from "lucide-react";
+import { AlertCircle, RefreshCw, X } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,9 @@ export interface SignerPoolDialogProps {
     employees: readonly DirectoryEmployee[];
     initialUserIds: readonly number[];
     loadingPool: boolean;
+    directoryIsError?: boolean;
+    directoryError?: string | null;
+    onRetryDirectory?: () => void;
     saving: boolean;
     employeeName: (id: number) => string;
     onClose: () => void;
@@ -35,7 +39,7 @@ export interface SignerPoolDialogProps {
 function SignerPoolForm(
     props: Omit<SignerPoolDialogProps, "open" | "category" | "loadingPool">
 ): JSX.Element {
-    const { employees, initialUserIds, saving, onClose, onSave, employeeName } = props;
+    const { employees, initialUserIds, saving, onClose, onSave, employeeName, directoryIsError = false, directoryError = null, onRetryDirectory } = props;
 
     const [selected, setSelected] = useState<number[]>([...initialUserIds]);
     const [pickerValue, setPickerValue] = useState("");
@@ -60,12 +64,33 @@ function SignerPoolForm(
             <div className="space-y-4">
                 <div className="space-y-2">
                     <Label>Add signers</Label>
+                    {directoryIsError && (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Could not load employees</AlertTitle>
+                            <AlertDescription className="space-y-2">
+                                <p>{directoryError ?? "The employee directory is unavailable."}</p>
+                                {onRetryDirectory && (
+                                    <Button variant="outline" size="sm" onClick={onRetryDirectory}>
+                                        <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                                        Retry
+                                    </Button>
+                                )}
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     <EmployeeSelect
                         employees={available}
                         value={pickerValue}
                         onValueChange={addMember}
                         placeholder="Search employees to add…"
+                        searchPlaceholder="Search employees…"
                         disabled={saving}
+                        emptyMessage={
+                            directoryIsError
+                                ? "Could not load employees. Retry, then search again."
+                                : undefined
+                        }
                     />
                 </div>
 
@@ -146,6 +171,9 @@ export function SignerPoolDialog(props: SignerPoolDialogProps): JSX.Element {
                             onClose={props.onClose}
                             onSave={props.onSave}
                             employeeName={props.employeeName}
+                            directoryIsError={props.directoryIsError}
+                            directoryError={props.directoryError}
+                            onRetryDirectory={props.onRetryDirectory}
                         />
                     ))}
             </DialogContent>

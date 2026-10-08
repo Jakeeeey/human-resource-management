@@ -43,6 +43,31 @@ const DEDUCTION_MIN_ROWS = 3;
 const DUE_MIN_ROWS = 3;
 const FALLBACK_COMPANY = "VERTEX TECHNOLOGIES CORPORATION";
 
+const LONG_MONTHS = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+function formatLongDate(value: string): string {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+    if (!match) return value;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return value;
+    return `${LONG_MONTHS[month - 1]} ${String(day).padStart(2, "0")}, ${year}`;
+}
+
 const CLEARANCE_PARAGRAPHS: string[] = [
     "All clearing officers and Accounts covered should indicate on this form all employees’ accountabilities within respective offices.",
     "This form shall route to the clearing officer/offices one after the other. The last clearing officer (coordinator) shall be responsible in furnishing the copies to the employee, employee’s 201 file and disbursing officer concerned.",
@@ -172,20 +197,25 @@ function drawField(doc: jsPDF, label: string, value: string, x: number, y: numbe
     doc.setFontSize(FIELD_SIZE);
     doc.setTextColor(0);
     doc.text(label, x, y);
-    const valueX = x + doc.getTextWidth(label) + 6;
+    const labelWidth = doc.getTextWidth(label);
+    const valueX = x + labelWidth + 6;
     doc.setFont("helvetica", "normal");
     let cursor = y;
+    let widest = 0;
     if (value !== "") {
         const lines = doc.splitTextToSize(value, Math.max(24, x + width - valueX));
         for (const line of lines) {
             doc.text(line, valueX, cursor);
+            widest = Math.max(widest, doc.getTextWidth(line));
             cursor += FIELD_LEADING;
         }
         cursor -= FIELD_LEADING;
     }
+    const needed = labelWidth + 6 + Math.max(widest, 120) + 12;
+    const endX = Math.min(x + width, x + needed);
     doc.setDrawColor(0);
     doc.setLineWidth(0.5);
-    doc.line(x, cursor + 4, x + width, cursor + 4);
+    doc.line(x, cursor + 4, endX, cursor + 4);
     return cursor + 22;
 }
 
@@ -447,7 +477,7 @@ export function buildQuitClaimPdf(values: QuitClaimValues, company: QuitClaimCom
     y = drawField(doc, "DATE:", values.identity.date, MARGIN, y, CONTENT_WIDTH);
     y = drawField(doc, "NAME:", values.identity.name, MARGIN, y, CONTENT_WIDTH);
     y = drawField(doc, "POSITION:", values.identity.position, MARGIN, y, CONTENT_WIDTH);
-    y = drawField(doc, "SEPARATION:", values.identity.separation, MARGIN, y, CONTENT_WIDTH);
+    y = drawField(doc, "DATE OF SEPARATION:", formatLongDate(values.identity.separation), MARGIN, y, CONTENT_WIDTH);
     y += 6;
     for (const paragraph of CLEARANCE_PARAGRAPHS) {
         y = writeParagraph(doc, paragraph, MARGIN, y, CONTENT_WIDTH);

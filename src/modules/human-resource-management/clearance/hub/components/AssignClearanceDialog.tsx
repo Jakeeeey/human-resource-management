@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { OptionCombobox } from "./OptionCombobox";
-import { SearchableCombobox as HubCombobox } from "@/modules/human-resource-management/clearance/hub/utils/SearchableCombobox";
 import { toast } from "sonner";
 import { formatPHT } from "../utils/time";
 import { useClearanceHubContext } from "../providers/ClearanceHubProvider";
@@ -192,6 +191,7 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                             value={resignationValue}
                             onValueChange={handleResignationChange}
                             placeholder="Select resignation..."
+                            searchPlaceholder="Search resignations…"
                             disabled={isSubmitting || eligibleResignations.length === 0}
                         />
                         {selectedResignation && (
@@ -208,12 +208,13 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                     </div>
 
                     <div className="grid gap-2">
-                        <Label>Template</Label>
+                        <Label>Clearance Form Template</Label>
                         <OptionCombobox
                             options={templateOptions}
                             value={templateValue}
                             onValueChange={handleTemplateChange}
                             placeholder="Select template..."
+                            searchPlaceholder="Search templates…"
                             disabled={isSubmitting || templates.length === 0}
                         />
                         {!loadError && templates.length === 0 && (
@@ -235,11 +236,12 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
 
                     <div className="grid gap-2">
                         <Label>SOA template</Label>
-                        <HubCombobox
+                        <OptionCombobox
                             options={soaTemplateOptions}
                             value={soaTemplateValue}
                             onValueChange={handleSoaTemplateChange}
                             placeholder="Select SOA template..."
+                            searchPlaceholder="Search SOA templates…"
                             disabled={isSubmitting || soaTemplates.length === 0}
                         />
                         {soaTemplatesError && (
@@ -261,14 +263,21 @@ export function AssignClearanceDialog({ isOpen, onClose }: AssignClearanceDialog
                     )}
                 </div>
 
-                <DialogFooter>
-                    <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                <DialogFooter className="flex-col gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onClose}
+                        disabled={isSubmitting}
+                        className="w-full sm:w-auto"
+                    >
                         Cancel
                     </Button>
                     <Button
                         type="button"
                         onClick={handleSubmit}
                         disabled={isSubmitting || resignationValue === "" || templateValue === ""}
+                        className="w-full sm:w-auto"
                     >
                         {isSubmitting ? "Assigning..." : "Assign"}
                     </Button>

@@ -10,6 +10,7 @@ import {
 import { dFetch } from "../../utils/directus";
 import { nowUTC } from "../../utils/audit";
 import { allocateDocumentRef, type DocumentRefRow } from "./DocumentRefService";
+import { syncClearanceRequestCompletion } from "../../services/ClearanceRequestService";
 
 export const CLEARANCE_QUITCLAIM_ERROR_CODES = {
     invalidInput: "CLEARANCE_QUITCLAIM_INVALID_INPUT",
@@ -19,6 +20,7 @@ export const CLEARANCE_QUITCLAIM_ERROR_CODES = {
     quitclaimNotFound: "CLEARANCE_QUITCLAIM_NOT_FOUND",
     quitclaimApproved: "CLEARANCE_QUITCLAIM_APPROVED",
     quitclaimFrozen: "CLEARANCE_QUITCLAIM_FROZEN",
+    pdfMissing: "CLEARANCE_QUITCLAIM_PDF_NOT_ATTACHED",
     ownerMismatch: "CLEARANCE_QUITCLAIM_OWNER_MISMATCH",
     refAllocFailed: "DOCUMENT_REF_ALLOC_FAILED",
     writeFailed: "CLEARANCE_QUITCLAIM_WRITE_FAILED",
@@ -486,6 +488,9 @@ export async function approveQuitClaim(input: ApproveQuitClaimInput): Promise<Ap
     if (current.status === "approved") {
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimApproved, `clearance_quitclaim ${input.id} is already approved`);
     }
+    if (current.pdf_file === null || current.pdf_file === "") {
+        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.pdfMissing, `clearance_quitclaim ${input.id} has no uploaded PDF`);
+    }
     let ref: DocumentRefRow;
     try {
         ref = await allocateDocumentRef({ documentId: current.id, companyCode, actorId: input.actorId });
@@ -515,6 +520,9 @@ export async function approveQuitClaim(input: ApproveQuitClaimInput): Promise<Ap
     if (!row) {
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.writeFailed, `clearance_quitclaim/${input.id} approve failed`);
     }
+    if (row.request_id !== null) {
+        await syncClearanceRequestCompletion(row.request_id, input.actorId).catch(() => undefined);
+    }
     return { quitclaim: row, ref, clearanceNo };
 }
 
@@ -527,10 +535,7 @@ export async function attachQuitClaimPdf(
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.invalidInput, "id and pdfFileId are required");
     }
     const current = await getQuitClaim(id);
-    if (current.status !== "approved") {
-        fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimNotFound, `clearance_quitclaim ${id} is not approved`);
-    }
-    if (current.pdf_file !== null && current.pdf_file !== "") {
+    if (current.status === "approved" && current.pdf_file !== null && current.pdf_file !== "") {
         fail(CLEARANCE_QUITCLAIM_ERROR_CODES.quitclaimFrozen, `clearance_quitclaim ${id} pdf is frozen`);
     }
     const now = nowUTC();
@@ -621,6 +626,8 @@ export function mapClearanceQuitClaimError(error: unknown): NextResponse | null 
         case CLEARANCE_QUITCLAIM_ERROR_CODES.refAllocFailed:
         case "DOCUMENT_REF_ALLOC_FAILED":
             return NextResponse.json({ success: false, code, message: "The quit claim cannot be approved" }, { status: 409 });
+        case CLEARANCE_QUITCLAIM_ERROR_CODES.pdfMissing:
+            return NextResponse.json({ success: false, code, message: "Upload the quit claim PDF to the 201 file before approving" }, { status: 409 });
         default:
             return null;
     }

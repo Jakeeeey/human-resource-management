@@ -129,14 +129,14 @@ function SoaTemplateWorkspaceContent(props: { templateId: number }): JSX.Element
                     </div>
                 </div>
 
-                <div className="flex shrink-0 gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Button
                         asChild
                         variant="outline"
                         size="sm"
                         className="min-h-11 w-full sm:w-auto md:min-h-0"
                     >
-                        <Link href={`/hrm/clearance/templates?selected=${templateId}`}>Back to templates</Link>
+                        <Link href={`/hrm/clearance/templates?tab=soa&selected=${templateId}`}>Back to templates</Link>
                     </Button>
                     <Button
                         variant="outline"
@@ -167,7 +167,7 @@ function SoaTemplateWorkspaceContent(props: { templateId: number }): JSX.Element
                                 Retry
                             </Button>
                             <Button asChild variant="outline" size="sm">
-                                <Link href="/hrm/clearance/templates">Back to templates</Link>
+                                <Link href="/hrm/clearance/templates?tab=soa">Back to templates</Link>
                             </Button>
                         </span>
                     </AlertDescription>
@@ -178,7 +178,7 @@ function SoaTemplateWorkspaceContent(props: { templateId: number }): JSX.Element
                     <AlertDescription className="space-y-3">
                         <p>This template could not be found. It may have been deleted.</p>
                         <Button asChild variant="outline" size="sm">
-                            <Link href="/hrm/clearance/templates">Back to templates</Link>
+                            <Link href="/hrm/clearance/templates?tab=soa">Back to templates</Link>
                         </Button>
                     </AlertDescription>
                 </Alert>
@@ -186,12 +186,18 @@ function SoaTemplateWorkspaceContent(props: { templateId: number }): JSX.Element
                 <div className="space-y-6">
                     <Card>
                         <CardContent className="space-y-6 p-4 sm:p-6">
-                            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                                <div className="min-w-0">
-                                    {template.description ? (
+                            <div
+                                className={
+                                    template.description
+                                        ? "flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
+                                        : "flex flex-wrap items-center justify-end gap-2"
+                                }
+                            >
+                                {template.description ? (
+                                    <div className="min-w-0">
                                         <p className="text-sm text-muted-foreground">{template.description}</p>
-                                    ) : null}
-                                </div>
+                                    </div>
+                                ) : null}
                                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                                     <Button variant="outline" size="sm" onClick={openTemplateEdit}>
                                         <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />

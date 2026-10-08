@@ -10,23 +10,38 @@ async function readBody(res: Response): Promise<unknown> {
     }
 }
 
-export const APPROVED_FORM_FROZEN_CODE = "CLEARANCE_FORM_FROZEN";
+function readFileId(body: unknown): string | null {
+    if (!isRecord(body) || !isRecord(body.data)) return null;
+    const id = (body.data as { id?: unknown }).id;
+    return typeof id === "string" && id !== "" ? id : null;
+}
 
-export interface FreezeApprovedFormPdfInput {
+export interface UploadFormPdfInput {
     documentId: number;
     bytes: Uint8Array;
     fileName: string;
 }
 
-export interface FreezeApprovedFormPdfResult {
+export interface UploadFormPdfResult {
     fileId: string;
     recordId: number;
     alreadyFiled: boolean;
 }
 
-export async function freezeApprovedFormPdf(
-    input: FreezeApprovedFormPdfInput
-): Promise<FreezeApprovedFormPdfResult> {
+export function toFormUploadFileName(employeeName: string, refNo: string): string {
+    const cleaned = employeeName
+        .split("")
+        .filter((ch) => ch >= " " && !"<>:/\\|?*\"".includes(ch))
+        .join("")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+    const who = cleaned === "" ? "Employee" : cleaned;
+    const ref = refNo.trim() === "" ? "pending" : refNo.trim();
+    return `Clearance - ${who} - ${ref}.pdf`;
+}
+
+export async function uploadFormPdf(input: UploadFormPdfInput): Promise<UploadFormPdfResult> {
     if (
         !Number.isInteger(input.documentId) ||
         input.documentId <= 0 ||
@@ -34,7 +49,7 @@ export async function freezeApprovedFormPdf(
         input.bytes.byteLength === 0 ||
         input.fileName.trim() === ""
     ) {
-        throw new Error("Cannot store the approved PDF. Please try again.");
+        throw new Error("Cannot upload the clearance PDF. Please try again.");
     }
     const uploadForm = new FormData();
     uploadForm.append(
@@ -47,12 +62,9 @@ export async function freezeApprovedFormPdf(
         body: uploadForm,
     });
     const uploadBody = await readBody(uploadRes);
-    const fileId =
-        isRecord(uploadBody) && isRecord(uploadBody.data) && typeof uploadBody.data.id === "string"
-            ? uploadBody.data.id
-            : null;
-    if (!uploadRes.ok || fileId === null || fileId === "") {
-        throw new Error("Could not store the approved PDF. Please try again.");
+    const fileId = readFileId(uploadBody);
+    if (!uploadRes.ok || fileId === null) {
+        throw new Error("Could not upload the clearance PDF. Please try again.");
     }
     const attachRes = await fetch(`/api/hrm/clearance/form/${input.documentId}/attach-pdf`, {
         method: "POST",
@@ -60,23 +72,18 @@ export async function freezeApprovedFormPdf(
         body: JSON.stringify({ pdf_file_id: fileId }),
     });
     if (!attachRes.ok) {
-        const attachBody = await readBody(attachRes);
-        const code =
-            isRecord(attachBody) && typeof attachBody.code === "string" ? attachBody.code : null;
-        if (code !== APPROVED_FORM_FROZEN_CODE) {
-            throw new Error("Could not attach the approved PDF. Please try again.");
-        }
+        throw new Error("Could not attach the clearance PDF. Please try again.");
     }
     const fileRes = await fetch(`/api/hrm/clearance/form/${input.documentId}/file-record`, {
         method: "POST",
     });
     const fileBody = await readBody(fileRes);
     if (!fileRes.ok || !isRecord(fileBody) || !isRecord(fileBody.data)) {
-        throw new Error("Could not file the approved PDF to the 201 file. Please try again.");
+        throw new Error("Could not file the clearance PDF to the 201 file. Please try again.");
     }
     const recordId = typeof fileBody.data.record_id === "number" ? fileBody.data.record_id : null;
     if (recordId === null) {
-        throw new Error("Could not file the approved PDF to the 201 file. Please try again.");
+        throw new Error("Could not file the clearance PDF to the 201 file. Please try again.");
     }
     return {
         fileId,

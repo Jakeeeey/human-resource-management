@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useMemo, useState } from "react";
 import type { JSX } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
     Select,
@@ -18,6 +18,7 @@ import type { ClearanceFormOverview } from "./types";
 
 function ClearanceFormModuleInner(): JSX.Element {
     const searchParams = useSearchParams();
+    const params = useParams();
     const router = useRouter();
     const pathname = usePathname();
     const requestParam = searchParams.get("request");
@@ -37,10 +38,14 @@ function ClearanceFormModuleInner(): JSX.Element {
     const [nameCache, setNameCache] = useState<{ id: number; name: string } | null>(null);
 
     const activeRequestId = useMemo(() => {
-        const parsed = Number(requestParam);
-        if (requestParam === null || !Number.isInteger(parsed) || parsed <= 0) return null;
-        return parsed;
-    }, [requestParam]);
+        const fromQuery = Number(requestParam);
+        if (requestParam !== null && Number.isInteger(fromQuery) && fromQuery > 0) return fromQuery;
+        const routeValue = params.requestId;
+        const routeText = Array.isArray(routeValue) ? routeValue[0] : routeValue;
+        const fromRoute = Number(routeText);
+        if (typeof routeText === "string" && Number.isInteger(fromRoute) && fromRoute > 0) return fromRoute;
+        return null;
+    }, [requestParam, params]);
 
     const closeWorkspace = useCallback(() => {
         setNameCache(null);

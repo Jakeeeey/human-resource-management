@@ -26,9 +26,14 @@ export interface SearchableComboboxProps {
     value?: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
+    searchPlaceholder?: string;
     disabled?: boolean;
     id?: string;
     className?: string;
+}
+
+function defaultSearchPlaceholder(): string {
+    return "Search…";
 }
 
 export function SearchableCombobox(props: SearchableComboboxProps): JSX.Element {
@@ -37,6 +42,7 @@ export function SearchableCombobox(props: SearchableComboboxProps): JSX.Element 
         value,
         onValueChange,
         placeholder = "Select option...",
+        searchPlaceholder,
         disabled = false,
         id,
         className,
@@ -71,7 +77,7 @@ export function SearchableCombobox(props: SearchableComboboxProps): JSX.Element 
                 align="start"
             >
                 <Command>
-                    <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+                    <CommandInput placeholder={searchPlaceholder ?? defaultSearchPlaceholder()} />
                     <CommandList
                         className="max-h-64 overflow-x-hidden overflow-y-auto overscroll-contain"
                         onWheel={(e) => e.stopPropagation()}
