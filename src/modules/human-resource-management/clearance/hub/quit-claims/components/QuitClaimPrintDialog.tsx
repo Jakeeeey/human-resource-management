@@ -20,8 +20,9 @@ import { companyLogoDataUrl, fetchEmployeeCompany, pickEmployeeCompany } from ".
 import { buildQuitClaimPdf, type QuitClaimCompany } from "../utils/quitClaimPrintPdf";
 import { freezeApprovedQuitClaimPdf } from "../utils/approvedPdfFreeze";
 import { phToday } from "../../utils/time";
-import { QuitClaimCompanySelect } from "./QuitClaimCompanySelect";
+import { OptionCombobox, type ClearanceOption } from "../../components/OptionCombobox";
 import {
+    defaultCompany,
     findCompanyByCode,
     getQuitClaimValues,
     loadCompanyOptions,
@@ -54,6 +55,13 @@ function toFitWidthUrl(url: string): string {
     const fragment = url.slice(hashIndex + 1);
     if (fragment.includes("zoom=")) return url;
     return fragment ? `${base}#${fragment}&zoom=page-width` : `${base}#zoom=page-width`;
+}
+
+function toCompanyOptions(options: CompanyOption[]): ClearanceOption[] {
+    return options.map((option) => ({
+        value: String(option.id),
+        label: option.is_default ? `${option.company_name} (default)` : option.company_name,
+    }));
 }
 
 function toRendererCompany(selected: CompanyOption | null): QuitClaimCompany {
@@ -135,8 +143,12 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
         }
         if (employeeCompany !== null) {
             setCompany(employeeCompany);
+            return;
         }
-    }, [company, persistedCompany, employeeCompany]);
+        if (companyOptions !== undefined && companyOptions.length > 0) {
+            setCompany(defaultCompany(companyOptions));
+        }
+    }, [company, persistedCompany, employeeCompany, companyOptions]);
 
     useEffect(() => {
         if (!open || quitclaim === null) {
@@ -316,12 +328,17 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
                             {!letterheadReady ? (
                             <p className="text-xs text-muted-foreground">Loading letterhead…</p>
                             ) : (
-                            <QuitClaimCompanySelect
+                            <OptionCombobox
                                 id="quitclaim-print-company"
-                                value={company}
-                                onValueChange={setCompany}
+                                options={toCompanyOptions(companyOptions ?? [])}
+                                value={company ? String(company.id) : ""}
+                                onValueChange={(next) => {
+                                    const found = (companyOptions ?? []).find((option) => String(option.id) === next) ?? null;
+                                    setCompany(found);
+                                }}
+                                placeholder="Select a company"
+                                searchPlaceholder="Search companies…"
                                 disabled={building}
-                                options={companyOptions ?? []}
                             />
                             )}
                         </div>

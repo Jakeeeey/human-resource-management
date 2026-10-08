@@ -460,14 +460,43 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         try {
             const typed = nonEmptySignatories(signatoryDrafts);
             const signatories = signatoriesReady || typed.length > 0 ? typed : undefined;
-            await saveLines(detail.id, buildPayload(), signatories);
+            const payload = buildPayload();
+            const savedRows = await saveLines(detail.id, payload, signatories);
             if (!signatoriesReady && typed.length > 0) {
                 toast.success("SOA lines saved with the typed signatures.");
             } else {
                 toast.success("SOA lines saved.");
             }
-            setSeededFor(null);
-            reload();
+            const useTemplate = detail.groups.length > 0;
+            if (savedRows.length > 0 || payload.length === 0) {
+                const rebuilt: Record<number, DraftRow[]> = {};
+                for (const section of sections) {
+                    const stored = savedRows
+                        .filter((line) => useTemplate
+                            ? line.soa_template_row_id === section.key
+                            : line.item_id === section.key)
+                        .sort((left, right) => left.sort_order - right.sort_order || left.id - right.id);
+                    rebuilt[section.key] = stored.length > 0
+                        ? stored.map((line) => ({
+                            key: nextKey(),
+                            description: line.description ?? "",
+                            amountText: amountToText(line.amount),
+                            remarks: line.remarks ?? "",
+                        }))
+                        : [{ key: nextKey(), description: "", amountText: "", remarks: "" }];
+                }
+                setDrafts(rebuilt);
+                setSavedDrafts(rebuilt);
+            } else {
+                const snapshot: Record<number, DraftRow[]> = {};
+                for (const key of Object.keys(drafts)) {
+                    const numeric = Number(key);
+                    snapshot[numeric] = (drafts[numeric] ?? []).map((row) => ({ ...row }));
+                }
+                setSavedDrafts(snapshot);
+            }
+            setSavedSignatories(signatoryDrafts.map((row) => ({ ...row })));
+            await reload();
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Could not save the SOA lines.");
         } finally {
@@ -567,32 +596,28 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     {hasUpload && <Badge variant="outline">201 filed</Badge>}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                    {!isApproved && (
-                        <Button
-                            className="min-h-11 md:min-h-0"
-                            onClick={() => void handleSave()}
-                            disabled={saving || invalidCount > 0 || !isDirty}
-                        >
-                            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                            {saving ? "Saving…" : dirtyCount > 0 ? `Save lines (${dirtyCount})` : "Save lines"}
-                        </Button>
-                    )}
-                    {!isApproved && (
-                        <Button
-                            className="min-h-11 bg-info text-info-foreground hover:bg-info/90 md:min-h-0"
-                            onClick={() => void handleUpload()}
-                            disabled={uploading}
-                        >
+                    <Button
+                        className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 md:min-h-0"
+                        onClick={() => void handleSave()}
+                        disabled={saving || invalidCount > 0 || !isDirty || isApproved}
+                    >
+                        {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                        {saving ? "Saving…" : "Save lines"}
+                    </Button>
+                    <Button
+                        className="min-h-11 bg-purple-600 text-white hover:bg-purple-700 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 md:min-h-0"
+                        onClick={() => void handleUpload()}
+                        disabled={uploading || isApproved}
+                    >
                             {uploading
                                 ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                                 : <Upload className="h-4 w-4" aria-hidden="true" />}
                             {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
                         </Button>
-                    )}
                     {!isApproved && (
                         <span title={approveBlockedReason ?? undefined}>
                             <Button
-                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto md:min-h-0"
+                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
                                 onClick={() => void handleApprove()}
                                 disabled={!hasUpload || approving}
                             >
@@ -605,14 +630,14 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     )}
                     <Button
                         variant="outline"
-                        className="min-h-11 md:min-h-0"
+                        className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 md:min-h-0"
                         onClick={() => void handlePreview()}
                         disabled={previewing}
                     >
                         {previewing
                             ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                             : <Printer className="h-4 w-4" aria-hidden="true" />}
-                        {previewing ? "Building…" : "Preview / Print"}
+                        {previewing ? "Building…" : "Print"}
                     </Button>
                 </div>
             </div>

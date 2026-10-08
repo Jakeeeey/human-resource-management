@@ -181,7 +181,7 @@ export function SoaPrintDialog({
     }
 
     async function handleSaveCompany(): Promise<void> {
-        if (savingCompany) return;
+        if (savingCompany || isApproved) return;
         if (selectedCompanyId === null) {
             setCompanySaveError("Choose a company first.");
             return;
@@ -300,7 +300,7 @@ export function SoaPrintDialog({
                                 <Button
                                     className="w-full sm:w-auto"
                                     onClick={() => void handleSaveCompany()}
-                                    disabled={savingCompany || selectedCompanyId === null}
+                                    disabled={savingCompany || selectedCompanyId === null || isApproved}
                                 >
                                     {savingCompany ? (
                                         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />

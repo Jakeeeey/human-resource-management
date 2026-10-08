@@ -125,7 +125,7 @@ export function ClearanceWorkspace({
     const handleSave = useCallback(async () => {
         const didSignatories = changedCount > 0;
         const didGm = gmDirty;
-        if ((!didSignatories && !didGm) || !form) return;
+        if ((!didSignatories && !didGm) || !form || form.status === "approved" || detail?.status === "completed") return;
         if (didGm) setGmSaving(true);
         try {
             await saveSignatories();
@@ -158,7 +158,7 @@ export function ClearanceWorkspace({
         } finally {
             setGmSaving(false);
         }
-    }, [saveSignatories, refresh, onChanged, gmDirty, gmName, gmTitle, form, changedCount]);
+    }, [saveSignatories, refresh, onChanged, gmDirty, gmName, gmTitle, form, changedCount, detail]);
 
     const resolveCompany = useCallback(async (): Promise<CompanyOption | null> => {
         let companyId: number | null = null;
@@ -195,7 +195,7 @@ export function ClearanceWorkspace({
     }, [requestId]);
 
     const handleUpload = useCallback(async () => {
-        if (!form || uploading || detail?.status === "completed") return;
+        if (!form || uploading || detail?.status === "completed" || form.status === "approved") return;
         setUploading(true);
         try {
             const selected = await resolveCompany();
@@ -341,22 +341,22 @@ export function ClearanceWorkspace({
                     <Button
                         variant="default"
                         size="sm"
-                        className="min-h-11 w-full sm:w-auto md:min-h-0"
+                        className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
                         onClick={() => void handleSave()}
                         disabled={saveDisabled}
                         aria-label="Save signatories"
                         title="Save signatories"
                     >
                         <Save className="mr-2 h-4 w-4" aria-hidden="true" />
-                        {isSaving || gmSaving ? "Saving…" : totalChanges > 0 ? `Save (${totalChanges})` : "Save"}
+                        {isSaving || gmSaving ? "Saving…" : "Save"}
                     </Button>
                     {showUpload ? (
                         <Button
                             variant="default"
                             size="sm"
-                            className="min-h-11 w-full bg-info text-info-foreground hover:bg-info/90 sm:w-auto md:min-h-0"
+                            className="min-h-11 w-full bg-purple-600 text-white hover:bg-purple-700 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
                             onClick={() => void handleUpload()}
-                            disabled={uploading || approving}
+                            disabled={uploading || approving || formReadonly}
                             aria-label="Upload clearance PDF to the 201 file"
                             title="Upload clearance PDF to the 201 file"
                         >
@@ -379,7 +379,7 @@ export function ClearanceWorkspace({
                             <Button
                                 variant="default"
                                 size="sm"
-                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto md:min-h-0"
+                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
                                 onClick={() => void handleApprove()}
                                 disabled={approveDisabled}
                                 aria-label="Approve clearance form"
@@ -397,7 +397,7 @@ export function ClearanceWorkspace({
                         <Button
                             variant="outline"
                             size="sm"
-                            className="min-h-11 w-full sm:w-auto md:min-h-0"
+                            className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
                             onClick={() => setPrintOpen(true)}
                             aria-label="Print clearance form"
                             title="Print clearance form"

@@ -2,6 +2,7 @@ import {
     QUITCLAIM_SECTION2_SIGNATORY_LABELS,
     QuitClaimValuesSchema,
     type ClearanceQuitclaim,
+    type QuitClaimAcknowledgement,
     type QuitClaimValues,
 } from "../types";
 
@@ -152,7 +153,12 @@ export function normalizeQuitClaimValues(raw: unknown): QuitClaimValues {
             const found = checked.data.section2_signatories.find((entry) => entry.label === label);
             return { label, name: found?.name ?? "", date: found?.date ?? "" };
         });
-        return { ...checked.data, letterhead_company_code: checked.data.letterhead_company_code ?? "", section2_signatories: signatories };
+        return {
+            ...checked.data,
+            acknowledgement: checked.data.acknowledgement ?? blankAcknowledgement(),
+            letterhead_company_code: checked.data.letterhead_company_code ?? "",
+            section2_signatories: signatories,
+        };
     }
     return {
         identity: { date: "", name: "", position: "", separation: "", company: "" },
@@ -162,8 +168,25 @@ export function normalizeQuitClaimValues(raw: unknown): QuitClaimValues {
         totals: { total: "", less_deductions: "", net: "" },
         payment: { amount: "", check_no: "", date: "" },
         released_by: { name: "", title: "", date: "" },
+        acknowledgement: blankAcknowledgement(),
         manager_signature_date: "",
         letterhead_company_code: "",
         section2_signatories: QUITCLAIM_SECTION2_SIGNATORY_LABELS.map((label) => ({ label, name: "", date: "" })),
+    };
+}
+
+function blankAcknowledgement(): QuitClaimAcknowledgement {
+    return {
+        city: "",
+        appeared_name: "",
+        id_type: "",
+        id_no: "",
+        witness_day: "",
+        witness_month: "",
+        witness_place: "",
+        doc_no: "",
+        page_no: "",
+        book_no: "",
+        series: "",
     };
 }

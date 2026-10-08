@@ -25,17 +25,16 @@ function toRendererCompany(selected: CompanyOption | null): QuitClaimCompany {
     };
 }
 
-function toFitWidthUrl(url: string): string {
+function toFitWidthUrl(url: string, page: number): string {
     const hashIndex = url.indexOf("#");
-    if (hashIndex === -1) {
-        return `${url}#zoom=page-width`;
-    }
-    const base = url.slice(0, hashIndex);
-    const fragment = url.slice(hashIndex + 1);
-    if (fragment.includes("zoom=")) {
-        return url;
-    }
-    return fragment ? `${base}#${fragment}&zoom=page-width` : `${base}#zoom=page-width`;
+    const base = hashIndex === -1 ? url : url.slice(0, hashIndex);
+    const fragment = hashIndex === -1 ? "" : url.slice(hashIndex + 1);
+    const parts = fragment
+        .split("&")
+        .filter((part) => part !== "" && !part.startsWith("page=") && !part.startsWith("zoom="));
+    parts.push(`page=${page}`);
+    parts.push("zoom=page-width");
+    return `${base}#${parts.join("&")}`;
 }
 
 export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewProps): JSX.Element {
@@ -43,7 +42,10 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
     const [building, setBuilding] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const urlRef = useRef<string | null>(null);
-    const viewUrl = previewUrl ? toFitWidthUrl(previewUrl) : null;
+    const pendingRevokeRef = useRef<string[]>([]);
+    const iframeRef = useRef<HTMLIFrameElement | null>(null);
+    const pageRef = useRef(1);
+    const viewUrl = previewUrl ? toFitWidthUrl(previewUrl, pageRef.current) : null;
 
     useEffect(() => {
         if (values === null) {
@@ -51,14 +53,28 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
         }
         setBuilding(true);
         const timer = setTimeout(() => {
+            let nextPage = pageRef.current;
+            try {
+                const hash = iframeRef.current?.contentWindow?.location.hash ?? "";
+                const match = /page=(\d+)/.exec(hash);
+                if (match) {
+                    const parsed = Number.parseInt(match[1] ?? "", 10);
+                    if (Number.isFinite(parsed) && parsed >= 1) {
+                        nextPage = parsed;
+                    }
+                }
+            } catch {
+                nextPage = pageRef.current;
+            }
             try {
                 const pdfBytes = buildQuitClaimPdf(values, toRendererCompany(company));
                 const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
                 const url = URL.createObjectURL(blob);
                 if (urlRef.current) {
-                    URL.revokeObjectURL(urlRef.current);
+                    pendingRevokeRef.current.push(urlRef.current);
                 }
                 urlRef.current = url;
+                pageRef.current = nextPage;
                 setPreviewUrl(url);
                 setError(null);
             } catch {
@@ -66,7 +82,7 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
             } finally {
                 setBuilding(false);
             }
-        }, 250);
+        }, 700);
         return () => {
             clearTimeout(timer);
         };
@@ -78,8 +94,21 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
                 URL.revokeObjectURL(urlRef.current);
                 urlRef.current = null;
             }
+            const pending = pendingRevokeRef.current;
+            pendingRevokeRef.current = [];
+            for (const url of pending) {
+                URL.revokeObjectURL(url);
+            }
         };
     }, []);
+
+    function handlePreviewLoad(): void {
+        const pending = pendingRevokeRef.current;
+        pendingRevokeRef.current = [];
+        for (const url of pending) {
+            URL.revokeObjectURL(url);
+        }
+    }
 
     if (values === null) {
         return (
@@ -111,9 +140,11 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
                             </div>
                         )}
                         <iframe
+                            ref={iframeRef}
                             src={viewUrl ?? previewUrl}
                             className="h-[85vh] min-h-[600px] w-full border-0"
                             title="Quit claim live preview"
+                            onLoad={handlePreviewLoad}
                         />
                     </div>
                 )}

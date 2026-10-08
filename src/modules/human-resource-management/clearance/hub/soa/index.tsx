@@ -2,22 +2,24 @@
 
 import { Suspense, useMemo } from "react";
 import type { JSX } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 import { SoaEditor } from "./components/SoaEditor";
 
-function parseRequestId(raw: string | null): number | null {
-    if (raw === null) return null;
-    const parsed = Number(raw);
-    if (!Number.isInteger(parsed) || parsed <= 0) return null;
-    return parsed;
-}
-
 function ClearanceSoaModuleInner(): JSX.Element {
     const searchParams = useSearchParams();
+    const params = useParams();
     const requestParam = searchParams.get("request");
     const printParam = searchParams.get("print");
-    const activeRequestId = useMemo(() => parseRequestId(requestParam), [requestParam]);
+    const activeRequestId = useMemo(() => {
+        const fromQuery = Number(requestParam);
+        if (requestParam !== null && Number.isInteger(fromQuery) && fromQuery > 0) return fromQuery;
+        const routeValue = params.requestId;
+        const routeText = Array.isArray(routeValue) ? routeValue[0] : routeValue;
+        const fromRoute = Number(routeText);
+        if (typeof routeText === "string" && Number.isInteger(fromRoute) && fromRoute > 0) return fromRoute;
+        return null;
+    }, [requestParam, params]);
     const printRequested = activeRequestId !== null && printParam === "1";
 
     if (activeRequestId === null) {

@@ -58,6 +58,22 @@ export const QuitClaimReleasedBySchema = z.object({
 
 export type QuitClaimReleasedBy = z.infer<typeof QuitClaimReleasedBySchema>;
 
+export const QuitClaimAcknowledgementSchema = z.object({
+    city: z.string(),
+    appeared_name: z.string(),
+    id_type: z.string(),
+    id_no: z.string(),
+    witness_day: z.string(),
+    witness_month: z.string(),
+    witness_place: z.string(),
+    doc_no: z.string(),
+    page_no: z.string(),
+    book_no: z.string(),
+    series: z.string(),
+}).strict();
+
+export type QuitClaimAcknowledgement = z.infer<typeof QuitClaimAcknowledgementSchema>;
+
 export const QUITCLAIM_SECTION2_SIGNATORY_LABELS = [
     "Amount Verified By",
     "Payroll Officer",
@@ -85,6 +101,7 @@ export const QuitClaimValuesSchema = z.object({
     totals: QuitClaimTotalsSchema,
     payment: QuitClaimPaymentSchema,
     released_by: QuitClaimReleasedBySchema,
+    acknowledgement: QuitClaimAcknowledgementSchema.optional(),
     manager_signature_date: z.string(),
     letterhead_company_code: z.string().optional(),
     section2_signatories: z.array(QuitClaimSection2SignatorySchema),

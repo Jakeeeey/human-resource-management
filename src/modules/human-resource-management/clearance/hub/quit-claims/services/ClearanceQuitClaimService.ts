@@ -4,6 +4,7 @@ import {
     QUITCLAIM_SECTION2_SIGNATORY_LABELS,
     QUITCLAIM_STATUSES,
     QuitClaimValuesSchema,
+    type QuitClaimAcknowledgement,
     type QuitClaimStatus,
     type QuitClaimValues,
 } from "../types";
@@ -142,6 +143,22 @@ function defaultSection2Signatories(): QuitClaimValues["section2_signatories"] {
     return QUITCLAIM_SECTION2_SIGNATORY_LABELS.map((label) => ({ label, name: "", date: "" }));
 }
 
+function defaultAcknowledgement(): QuitClaimAcknowledgement {
+    return {
+        city: "",
+        appeared_name: "",
+        id_type: "",
+        id_no: "",
+        witness_day: "",
+        witness_month: "",
+        witness_place: "",
+        doc_no: "",
+        page_no: "",
+        book_no: "",
+        series: "",
+    };
+}
+
 function normalizeQuitclaimRow(raw: unknown): ClearanceQuitclaimRow | null {
     if (!isRecord(raw)) return null;
     const id = toId(raw.id);
@@ -178,7 +195,8 @@ function normalizeValues(raw: unknown): QuitClaimValues | null {
         }
     }
     const checked = QuitClaimValuesSchema.safeParse(parsed);
-    return checked.success ? checked.data : null;
+    if (!checked.success) return null;
+    return { ...checked.data, acknowledgement: checked.data.acknowledgement ?? defaultAcknowledgement() };
 }
 
 async function readSingleOrNull(path: string): Promise<Record<string, unknown> | null> {
@@ -278,6 +296,7 @@ function seedValues(input: {
         totals: { total: "", less_deductions: "", net: "" },
         payment: { amount: "", check_no: "", date: "" },
         released_by: { name: "", title: "", date: "" },
+        acknowledgement: defaultAcknowledgement(),
         manager_signature_date: "",
         section2_signatories: defaultSection2Signatories(),
     };

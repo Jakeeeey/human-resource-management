@@ -214,8 +214,8 @@ export function useSoaDetail(requestId: number | null) {
         setError(null);
         try {
             const [soaRes, reqRes] = await Promise.all([
-                fetch(`${BY_REQUEST_API}?request_id=${id}`),
-                fetch(`/api/hrm/clearance/requests/${id}`),
+                fetch(`${BY_REQUEST_API}?request_id=${id}`, { cache: "no-store" }),
+                fetch(`/api/hrm/clearance/requests/${id}`, { cache: "no-store" }),
             ]);
             const soaJson: unknown = await soaRes.json().catch(() => null);
             if (!soaRes.ok || !isRecord(soaJson) || soaJson.success !== true) {
@@ -274,11 +274,11 @@ export function useSoaDetail(requestId: number | null) {
         void load(requestId);
     }, [load, requestId]);
 
-    const reload = useCallback(() => {
-        if (requestId !== null) void load(requestId);
+    const reload = useCallback(async (): Promise<void> => {
+        if (requestId !== null) await load(requestId);
     }, [load, requestId]);
 
-    const saveLines = useCallback(async (soaId: number, lines: SoaLinePayload[], signatories?: SoaSignatory[]): Promise<void> => {
+    const saveLines = useCallback(async (soaId: number, lines: SoaLinePayload[], signatories?: SoaSignatory[]): Promise<SoaDetailLine[]> => {
         const res = await fetch(`/api/hrm/clearance/soa/${soaId}/lines`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -288,6 +288,14 @@ export function useSoaDetail(requestId: number | null) {
         if (!res.ok || !isRecord(json) || json.success !== true) {
             throw new Error(readErrorMessage(json, "Could not save the SOA lines. Please try again."));
         }
+        const data: unknown = isRecord(json) ? json.data : null;
+        if (!Array.isArray(data)) return [];
+        const rows: SoaDetailLine[] = [];
+        for (const entry of data as unknown[]) {
+            const line = normalizeLine(entry);
+            if (line) rows.push(line);
+        }
+        return rows;
     }, []);
 
     const approve = useCallback(async (id: number, companyCode: string): Promise<string> => {

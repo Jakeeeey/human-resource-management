@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,13 +13,6 @@ import { fetchEmployeeCompany, pickEmployeeCompany } from "../utils/company";
 interface RequestOwner {
     userId: number;
     resignationId: number | null;
-}
-
-function parseRequestId(raw: string | null): number | null {
-    if (raw === null) return null;
-    const parsed = Number(raw);
-    if (!Number.isInteger(parsed) || parsed <= 0) return null;
-    return parsed;
 }
 
 function toPositiveInt(value: unknown): number | null {
@@ -88,12 +81,21 @@ function QuitClaimUnavailable(): JSX.Element {
 
 function ClearanceQuitClaimsModuleInner(): JSX.Element {
     const searchParams = useSearchParams();
+    const params = useParams();
     const router = useRouter();
     const pathname = usePathname();
     const requestParam = searchParams.get("request");
     const printParam = searchParams.get("print");
 
-    const activeRequestId = useMemo(() => parseRequestId(requestParam), [requestParam]);
+    const activeRequestId = useMemo(() => {
+        const fromQuery = Number(requestParam);
+        if (requestParam !== null && Number.isInteger(fromQuery) && fromQuery > 0) return fromQuery;
+        const routeValue = params.requestId;
+        const routeText = Array.isArray(routeValue) ? routeValue[0] : routeValue;
+        const fromRoute = Number(routeText);
+        if (typeof routeText === "string" && Number.isInteger(fromRoute) && fromRoute > 0) return fromRoute;
+        return null;
+    }, [requestParam, params]);
     const printRequested = activeRequestId !== null && printParam === "1";
 
     const [selectedId, setSelectedId] = useState<number | null>(null);

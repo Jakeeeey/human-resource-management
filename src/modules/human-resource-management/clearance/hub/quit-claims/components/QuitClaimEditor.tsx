@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, Check, Loader2, Lock, Minus, Plus, Printer, Upload } from "lucide-react";
 import { QuitClaimPrintDialog } from "./QuitClaimPrintDialog";
-import { QuitClaimCompanySelect } from "./QuitClaimCompanySelect";
 import { QuitClaimLivePreview } from "./QuitClaimLivePreview";
+import { OptionCombobox, type ClearanceOption } from "../../components/OptionCombobox";
 import type { CompanyOption } from "../../utils/company";
 import { companyLogoDataUrl, fetchEmployeeCompany, pickEmployeeCompany } from "../../utils/company";
 import { phToday } from "../../utils/time";
@@ -19,6 +19,7 @@ import { buildQuitClaimPdf, type QuitClaimCompany } from "../utils/quitClaimPrin
 import { freezeApprovedQuitClaimPdf } from "../utils/approvedPdfFreeze";
 import {
     approveQuitClaim,
+    defaultCompany,
     findCompanyByCode,
     getQuitClaim,
     isAlreadyApprovedError,
@@ -31,6 +32,7 @@ import {
 } from "../providers/quitClaimClient";
 import type {
     QuitClaimAccountability,
+    QuitClaimAcknowledgement,
     QuitClaimDeduction,
     QuitClaimDueToEmployee,
     QuitClaimValues,
@@ -51,6 +53,7 @@ function Field({
     onChange,
     disabled,
     placeholder,
+    className,
 }: {
     id: string;
     label: string;
@@ -58,6 +61,7 @@ function Field({
     onChange: (next: string) => void;
     disabled: boolean;
     placeholder?: string;
+    className?: string;
 }): JSX.Element {
     return (
         <div className="space-y-1">
@@ -67,6 +71,7 @@ function Field({
                 value={value}
                 placeholder={placeholder ?? ""}
                 disabled={disabled}
+                className={className}
                 onChange={(event) => onChange(event.target.value)}
             />
         </div>
@@ -121,6 +126,22 @@ function blankDueToEmployee(): QuitClaimDueToEmployee {
     return { item: "", days: "", amount: "" };
 }
 
+function blankAcknowledgement(): QuitClaimAcknowledgement {
+    return {
+        city: "",
+        appeared_name: "",
+        id_type: "",
+        id_no: "",
+        witness_day: "",
+        witness_month: "",
+        witness_place: "",
+        doc_no: "",
+        page_no: "",
+        book_no: "",
+        series: "",
+    };
+}
+
 function toUploadFileName(employeeName: string): string {
     const cleaned = employeeName
         .split("")
@@ -131,6 +152,13 @@ function toUploadFileName(employeeName: string): string {
         .slice(0, 80);
     const who = cleaned === "" ? "Employee" : cleaned;
     return `Quit Claim - ${who} - ${phToday()}.pdf`;
+}
+
+function toCompanyOptions(options: CompanyOption[]): ClearanceOption[] {
+    return options.map((option) => ({
+        value: String(option.id),
+        label: option.is_default ? `${option.company_name} (default)` : option.company_name,
+    }));
 }
 
 function toRendererCompany(selected: CompanyOption | null): QuitClaimCompany {
@@ -180,7 +208,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
     const [printOpen, setPrintOpen] = useState(false);
     const [detail, setDetail] = useState<QuitClaimDetail | null>(null);
     const [company, setCompany] = useState<CompanyOption | null>(null);
-    const [editCount, setEditCount] = useState(0);
+    const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([]);
     const baselineRef = useRef<string | null>(null);
     const [accountabilityFilter, setAccountabilityFilter] = useState("");
     const [accountabilityPage, setAccountabilityPage] = useState(1);
@@ -209,7 +237,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
         setValues(null);
         setDetail(null);
         setCompany(null);
-        setEditCount(0);
+        setCompanyOptions([]);
         setAccountabilityFilter("");
         setAccountabilityPage(1);
         setDeductionFilter("");
@@ -225,16 +253,19 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                 }
                 const normalized = normalizeQuitClaimValues(loaded.values);
                 let letterhead: CompanyOption | null = null;
+                let options: CompanyOption[] = [];
                 try {
-                    const [options, employee] = await Promise.all([
+                    const [loadedOptions, employee] = await Promise.all([
                         loadCompanyOptions(),
                         fetchEmployeeCompany({ userId: loaded.user_id }),
                     ]);
                     if (cancelled) {
                         return;
                     }
-                    letterhead = findCompanyByCode(options, normalized.letterhead_company_code)
-                        ?? pickEmployeeCompany(options, employee.company_id);
+                    options = loadedOptions;
+                    letterhead = findCompanyByCode(loadedOptions, normalized.letterhead_company_code)
+                        ?? pickEmployeeCompany(loadedOptions, employee.company_id)
+                        ?? defaultCompany(loadedOptions);
                 } catch {
                     letterhead = null;
                 }
@@ -253,8 +284,8 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                     setValues(seeded);
                     setDetail({ ...loaded, values: seeded });
                     setCompany(letterhead);
+                    setCompanyOptions(options);
                     baselineRef.current = JSON.stringify(seeded);
-                    setEditCount(0);
                 }
             } catch (loadError) {
                 if (!cancelled) {
@@ -280,15 +311,14 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
 
     function patch(patchValues: Partial<QuitClaimValues>): void {
         setValues((current) => (current === null ? current : { ...current, ...patchValues }));
-        setEditCount((count) => count + 1);
         setSaved(false);
     }
 
     function handleCompanyChange(next: CompanyOption | null): void {
         setCompany(next);
         if (next === null || values === null || frozen) return;
-        if (values.letterhead_company_code === next.company_code) return;
-        patch({ letterhead_company_code: next.company_code });
+        if (values.letterhead_company_code === next.company_code && values.identity.company === next.company_name) return;
+        patch({ letterhead_company_code: next.company_code, identity: { ...values.identity, company: next.company_name } });
     }
 
     async function handleSave(): Promise<void> {
@@ -305,7 +335,6 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
             setValues(normalized);
             setDetail({ ...updated, values: normalized });
             baselineRef.current = JSON.stringify(normalized);
-            setEditCount(0);
             setSaved(true);
             onChanged(updated);
         } catch (saveError) {
@@ -317,7 +346,6 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                     const reloadedValues = normalizeQuitClaimValues(reloaded.values);
                     setValues(reloadedValues);
                     baselineRef.current = JSON.stringify(reloadedValues);
-                    setEditCount(0);
                     onChanged(reloaded);
                 } catch {
                     setRow({ ...row, status: "approved" });
@@ -395,6 +423,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
     const dueView = pageSlice(dueRows, duePage);
     const visibleSignatories = (values?.section2_signatories ?? [])
         .filter((entry) => entry.label !== "Amount Verified By");
+    const acknowledgement = values?.acknowledgement ?? blankAcknowledgement();
 
     if (quitclaimId === null || !open) {
         return <></>;
@@ -415,30 +444,27 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
-                        variant="outline"
-                        className="min-h-11 w-full sm:w-auto md:min-h-0"
-                        disabled={detail === null || loading}
-                        onClick={() => setPrintOpen(true)}
+                        className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
+                        disabled={values === null || loading || saving || frozen || !dirty}
+                        onClick={() => void handleSave()}
                     >
-                        <Printer className="h-4 w-4" aria-hidden="true" />
-                        Print / Download
+                        {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                        {saving ? "Saving…" : "Save"}
                     </Button>
-                    {!frozen && (
-                        <Button
-                            className="min-h-11 w-full bg-info text-info-foreground hover:bg-info/90 sm:w-auto md:min-h-0"
-                            disabled={values === null || loading || uploading}
-                            onClick={() => void handleUpload()}
-                        >
-                            {uploading
-                                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                                : <Upload className="h-4 w-4" aria-hidden="true" />}
-                            {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
-                        </Button>
-                    )}
+                    <Button
+                        className="min-h-11 w-full bg-purple-600 text-white hover:bg-purple-700 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
+                        disabled={values === null || loading || uploading || frozen}
+                        onClick={() => void handleUpload()}
+                    >
+                        {uploading
+                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <Upload className="h-4 w-4" aria-hidden="true" />}
+                        {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
+                    </Button>
                     {!frozen && (
                         <span title={approveBlockedReason ?? undefined}>
                             <Button
-                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto md:min-h-0"
+                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
                                 disabled={values === null || loading || approving || !hasUpload}
                                 onClick={() => void handleApprove()}
                             >
@@ -449,16 +475,15 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                             </Button>
                         </span>
                     )}
-                    {!frozen && (
-                        <Button
-                            className="min-h-11 w-full sm:w-auto md:min-h-0"
-                            disabled={values === null || loading || saving || frozen || !dirty}
-                            onClick={() => void handleSave()}
-                        >
-                            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                            {saving ? "Saving…" : dirty && editCount > 0 ? `Save (${editCount})` : "Save"}
-                        </Button>
-                    )}
+                    <Button
+                        variant="outline"
+                        className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
+                        disabled={detail === null || loading}
+                        onClick={() => setPrintOpen(true)}
+                    >
+                        <Printer className="h-4 w-4" aria-hidden="true" />
+                        Print
+                    </Button>
                 </div>
             </div>
             {!frozen && !hasUpload && (
@@ -502,12 +527,24 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                     <div className="bg-card shadow-sm border rounded-xl p-6 space-y-4">
                         <div className="space-y-1">
                             <Label htmlFor="quitclaim-editor-company">Letterhead company</Label>
-                            <QuitClaimCompanySelect
-                                id="quitclaim-editor-company"
-                                value={company}
-                                onValueChange={handleCompanyChange}
-                                disabled={frozen || loading || saving}
-                            />
+                            {companyOptions.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    The company list is unreachable. The letterhead will print without company details.
+                                </p>
+                            ) : (
+                                <OptionCombobox
+                                    id="quitclaim-editor-company"
+                                    options={toCompanyOptions(companyOptions)}
+                                    value={company ? String(company.id) : ""}
+                                    onValueChange={(next) => {
+                                        const found = companyOptions.find((option) => String(option.id) === next) ?? null;
+                                        handleCompanyChange(found);
+                                    }}
+                                    placeholder="Select a company"
+                                    searchPlaceholder="Search companies…"
+                                    disabled={frozen || loading || saving}
+                                />
+                            )}
                         </div>
                         <section className="space-y-3 rounded-md border p-4" aria-label="Section 1 identity">
                             <h3 className="text-sm font-semibold">Section 1 — Employee clearance</h3>
@@ -540,13 +577,16 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                                     disabled={frozen || saving}
                                     onChange={(next) => patch({ identity: { ...values.identity, separation: next } })}
                                 />
-                                <Field
-                                    id="qc-company"
-                                    label="Company"
-                                    value={values.identity.company}
-                                    disabled={frozen || saving}
-                                    onChange={(next) => patch({ identity: { ...values.identity, company: next } })}
-                                />
+                                <div className="space-y-1">
+                                    <Label htmlFor="qc-company">Company</Label>
+                                    <Input
+                                        id="qc-company"
+                                        value={company?.company_name ?? values.identity.company}
+                                        placeholder="Follows the letterhead company above"
+                                        disabled
+                                        readOnly
+                                    />
+                                </div>
                                 <Field
                                     id="qc-manager-date"
                                     label="Manager signature date"
@@ -1047,6 +1087,113 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                                     disabled={frozen || saving}
                                     onChange={(next) => patch({ released_by: { ...values.released_by, date: next } })}
                                 />
+                            </div>
+                        </section>
+                        <section className="space-y-3 rounded-md border p-4" aria-label="Acknowledgement">
+                            <h3 className="text-sm font-semibold">Acknowledgement</h3>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <Field
+                                    id="qc-ack-city"
+                                    label="City / Municipality"
+                                    value={acknowledgement.city}
+                                    disabled={frozen || saving}
+                                    className="min-h-11 md:min-h-0"
+                                    onChange={(next) => patch({ acknowledgement: { ...acknowledgement, city: next } })}
+                                />
+                                <Field
+                                    id="qc-ack-appeared"
+                                    label="Personally appeared"
+                                    value={acknowledgement.appeared_name}
+                                    disabled={frozen || saving}
+                                    className="min-h-11 md:min-h-0"
+                                    onChange={(next) => patch({ acknowledgement: { ...acknowledgement, appeared_name: next } })}
+                                />
+                                <Field
+                                    id="qc-ack-id-type"
+                                    label="Government-issued ID"
+                                    value={acknowledgement.id_type}
+                                    disabled={frozen || saving}
+                                    className="min-h-11 md:min-h-0"
+                                    onChange={(next) => patch({ acknowledgement: { ...acknowledgement, id_type: next } })}
+                                />
+                                <Field
+                                    id="qc-ack-id-no"
+                                    label="ID No."
+                                    value={acknowledgement.id_no}
+                                    disabled={frozen || saving}
+                                    className="min-h-11 md:min-h-0"
+                                    onChange={(next) => patch({ acknowledgement: { ...acknowledgement, id_no: next } })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Witness
+                                </h4>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <Field
+                                        id="qc-ack-day"
+                                        label="Day"
+                                        value={acknowledgement.witness_day}
+                                        disabled={frozen || saving}
+                                        className="min-h-11 md:min-h-0"
+                                        onChange={(next) => patch({ acknowledgement: { ...acknowledgement, witness_day: next } })}
+                                    />
+                                    <Field
+                                        id="qc-ack-month"
+                                        label="Month"
+                                        value={acknowledgement.witness_month}
+                                        disabled={frozen || saving}
+                                        className="min-h-11 md:min-h-0"
+                                        onChange={(next) => patch({ acknowledgement: { ...acknowledgement, witness_month: next } })}
+                                    />
+                                    <Field
+                                        id="qc-ack-place"
+                                        label="Place"
+                                        value={acknowledgement.witness_place}
+                                        disabled={frozen || saving}
+                                        className="min-h-11 md:min-h-0"
+                                        onChange={(next) => patch({ acknowledgement: { ...acknowledgement, witness_place: next } })}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Registry
+                                </h4>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <Field
+                                        id="qc-ack-doc"
+                                        label="Doc. No."
+                                        value={acknowledgement.doc_no}
+                                        disabled={frozen || saving}
+                                        className="min-h-11 md:min-h-0"
+                                        onChange={(next) => patch({ acknowledgement: { ...acknowledgement, doc_no: next } })}
+                                    />
+                                    <Field
+                                        id="qc-ack-page"
+                                        label="Page No."
+                                        value={acknowledgement.page_no}
+                                        disabled={frozen || saving}
+                                        className="min-h-11 md:min-h-0"
+                                        onChange={(next) => patch({ acknowledgement: { ...acknowledgement, page_no: next } })}
+                                    />
+                                    <Field
+                                        id="qc-ack-book"
+                                        label="Book No."
+                                        value={acknowledgement.book_no}
+                                        disabled={frozen || saving}
+                                        className="min-h-11 md:min-h-0"
+                                        onChange={(next) => patch({ acknowledgement: { ...acknowledgement, book_no: next } })}
+                                    />
+                                    <Field
+                                        id="qc-ack-series"
+                                        label="Series of"
+                                        value={acknowledgement.series}
+                                        disabled={frozen || saving}
+                                        className="min-h-11 md:min-h-0"
+                                        onChange={(next) => patch({ acknowledgement: { ...acknowledgement, series: next } })}
+                                    />
+                                </div>
                             </div>
                         </section>
                     </div>
