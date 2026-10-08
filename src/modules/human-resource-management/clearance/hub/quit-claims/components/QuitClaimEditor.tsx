@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { AlertCircle, Check, Loader2, Lock, Minus, Plus, Printer, Upload } from "lucide-react";
 import { QuitClaimPrintDialog } from "./QuitClaimPrintDialog";
-import { QuitClaimLivePreview } from "./QuitClaimLivePreview";
+import { LiveDocumentPreview } from "../../components/LiveDocumentPreview";
 import { OptionCombobox, type ClearanceOption } from "../../components/OptionCombobox";
 import type { CompanyOption } from "../../utils/company";
 import { companyLogoDataUrl, fetchEmployeeCompany, pickEmployeeCompany } from "../../utils/company";
@@ -424,6 +424,16 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
     const visibleSignatories = (values?.section2_signatories ?? [])
         .filter((entry) => entry.label !== "Amount Verified By");
     const acknowledgement = values?.acknowledgement ?? blankAcknowledgement();
+    const buildPreviewPdf = useCallback((): Uint8Array => {
+        if (values === null) {
+            return new Uint8Array();
+        }
+        return buildQuitClaimPdf(values, toRendererCompany(company));
+    }, [values, company]);
+    const previewRevision = useMemo(
+        () => `${JSON.stringify(values)}${company?.id ?? ""}`,
+        [values, company]
+    );
 
     if (quitclaimId === null || !open) {
         return <></>;
@@ -436,11 +446,11 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                     <h2 className="text-xl font-bold tracking-tight">
                         {row?.ref_no ? `Quit claim · ${row.ref_no}` : "Quit claim"}
                     </h2>
-                    <p className="text-sm text-muted-foreground">
-                        {frozen
-                            ? "This document is approved and frozen. It is read-only."
-                            : "All fields are manual entry. Nothing is computed."}
-                    </p>
+                    {frozen ? (
+                        <p className="text-sm text-muted-foreground">
+                            This document is approved and frozen. It is read-only.
+                        </p>
+                    ) : null}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
@@ -1198,7 +1208,15 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                         </section>
                     </div>
                     <div className="lg:sticky lg:top-4">
-                        <QuitClaimLivePreview values={values} company={company} />
+                        <LiveDocumentPreview
+                            build={buildPreviewPdf}
+                            revision={previewRevision}
+                            title="Quit claim live preview"
+                            loadingLabel="Generating PDF preview…"
+                            unavailable={values === null}
+                            unavailableLabel="Loading quit claim…"
+                            caption="Live preview updates as fields change."
+                        />
                     </div>
                 </div>
             )}

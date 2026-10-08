@@ -73,7 +73,7 @@ function tryPlaceSignature(
     }
 }
 
-export function buildClearancePdf(input: ClearancePrintInput): Blob {
+export function renderClearanceDocument(input: ClearancePrintInput): jsPDF {
     const doc = new jsPDF({ unit: "pt", format: "letter" });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -364,7 +364,15 @@ export function buildClearancePdf(input: ClearancePrintInput): Blob {
         doc.text(`Page ${page} of ${totalPages}`, pageWidth / 2, pageHeight - 22, { align: "center" });
     }
     doc.setTextColor(0);
-    return doc.output("blob");
+    return doc;
+}
+
+export function buildClearancePdf(input: ClearancePrintInput): Blob {
+    return renderClearanceDocument(input).output("blob");
+}
+
+export function buildClearancePdfBytes(input: ClearancePrintInput): Uint8Array {
+    return new Uint8Array(renderClearanceDocument(input).output("arraybuffer"));
 }
 
 export function downloadClearancePdf(blob: Blob, filename: string): void {

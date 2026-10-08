@@ -3,26 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
 import { Loader2 } from "lucide-react";
-import { companyLogoDataUrl, type CompanyOption } from "../../utils/company";
-import { buildQuitClaimPdf, type QuitClaimCompany } from "../utils/quitClaimPrintPdf";
-import type { QuitClaimValues } from "../types";
 
-interface QuitClaimLivePreviewProps {
-    values: QuitClaimValues | null;
-    company: CompanyOption | null;
-}
-
-function toRendererCompany(selected: CompanyOption | null): QuitClaimCompany {
-    if (selected === null) {
-        return { company_name: "" };
-    }
-    return {
-        company_name: selected.company_name,
-        company_address: selected.company_address,
-        company_contact: selected.company_contact,
-        company_email: selected.company_email,
-        logo_data_url: companyLogoDataUrl(selected),
-    };
+interface LiveDocumentPreviewProps {
+    build: () => Uint8Array;
+    revision: string;
+    title: string;
+    loadingLabel: string;
+    unavailable: boolean;
+    unavailableLabel: string;
+    caption: string;
 }
 
 function toFitWidthUrl(url: string, page: number): string {
@@ -37,7 +26,8 @@ function toFitWidthUrl(url: string, page: number): string {
     return `${base}#${parts.join("&")}`;
 }
 
-export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewProps): JSX.Element {
+export function LiveDocumentPreview(props: LiveDocumentPreviewProps): JSX.Element {
+    const { build, revision, title, loadingLabel, unavailable, unavailableLabel, caption } = props;
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [building, setBuilding] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -48,9 +38,7 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
     const viewUrl = previewUrl ? toFitWidthUrl(previewUrl, pageRef.current) : null;
 
     useEffect(() => {
-        if (values === null) {
-            return;
-        }
+        if (unavailable) return;
         setBuilding(true);
         const timer = setTimeout(() => {
             let nextPage = pageRef.current;
@@ -67,7 +55,7 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
                 nextPage = pageRef.current;
             }
             try {
-                const pdfBytes = buildQuitClaimPdf(values, toRendererCompany(company));
+                const pdfBytes = build();
                 const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
                 const url = URL.createObjectURL(blob);
                 if (urlRef.current) {
@@ -86,7 +74,7 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
         return () => {
             clearTimeout(timer);
         };
-    }, [values, company]);
+    }, [build, revision, unavailable]);
 
     useEffect(() => {
         return () => {
@@ -110,11 +98,11 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
         }
     }
 
-    if (values === null) {
+    if (unavailable) {
         return (
             <div className="flex items-center justify-center gap-3 rounded-xl border bg-card px-4 py-16 shadow-sm">
                 <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                <p className="text-sm text-muted-foreground">Loading quit claim…</p>
+                <p className="text-sm text-muted-foreground">{unavailableLabel}</p>
             </div>
         );
     }
@@ -128,7 +116,7 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
                 {!error && previewUrl === null && (
                     <div className="flex items-center justify-center gap-3 px-4 py-16">
                         <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                        <p className="text-sm text-muted-foreground">Generating PDF preview…</p>
+                        <p className="text-sm text-muted-foreground">{loadingLabel}</p>
                     </div>
                 )}
                 {!error && previewUrl !== null && (
@@ -143,13 +131,13 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
                             ref={iframeRef}
                             src={viewUrl ?? previewUrl}
                             className="h-[85vh] min-h-[600px] w-full border-0"
-                            title="Quit claim live preview"
+                            title={title}
                             onLoad={handlePreviewLoad}
                         />
                     </div>
                 )}
             </div>
-            <p className="text-xs text-muted-foreground">Live preview updates as fields change.</p>
+            <p className="text-xs text-muted-foreground">{caption}</p>
         </div>
     );
 }

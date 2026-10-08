@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import { Check, Loader2, Printer, RefreshCw, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -21,7 +21,13 @@ import {
     type CompanyOption,
 } from "../../utils/company";
 import { phToday } from "../../utils/time";
-import { buildClearancePdf, type ClearancePrintEntry } from "../utils/clearancePrintPdf";
+import { LiveDocumentPreview } from "../../components/LiveDocumentPreview";
+import {
+    buildClearancePdf,
+    buildClearancePdfBytes,
+    type ClearancePrintEntry,
+    type ClearancePrintInput,
+} from "../utils/clearancePrintPdf";
 import { toFormUploadFileName, uploadFormPdf } from "../utils/formPdfUpload";
 import { ClearanceFormPrintDialog } from "./ClearanceFormPrintDialog";
 import { GmSignatoryCard } from "./GmSignatoryCard";
@@ -66,6 +72,8 @@ export function ClearanceWorkspace({
     const [gmSaving, setGmSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [approving, setApproving] = useState(false);
+    const [previewModel, setPreviewModel] = useState<ClearanceFormRenderModel | null>(null);
+    const [previewCompany, setPreviewCompany] = useState<CompanyOption | null>(null);
     const { options: companies } = useCompanyOptions();
     const autoPrintSeenRef = useRef<number | null>(null);
 
@@ -177,6 +185,95 @@ export function ClearanceWorkspace({
         }
         return pickDefaultCompany(companies);
     }, [requestId, companies, form]);
+
+    useEffect(() => {
+        setPreviewModel(null);
+    }, [requestId]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const params = new URLSearchParams({
+                    request_id: String(requestId),
+                    date: phToday(),
+                    ref_no: form?.ref_no ?? "",
+                });
+                const res = await fetch(`/api/hrm/clearance/form/render-model?${params.toString()}`);
+                const body: unknown = await res.json().catch(() => null);
+                if (!res.ok || !isRecord(body) || body.success !== true || !isRecord(body.data)) {
+                    return;
+                }
+                if (!cancelled) setPreviewModel(body.data as ClearanceFormRenderModel);
+            } catch {
+                return;
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [requestId, form?.ref_no, items]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const selected = await resolveCompany();
+                if (!cancelled) setPreviewCompany(selected);
+            } catch {
+                if (!cancelled) setPreviewCompany(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [resolveCompany]);
+
+    const printInput = useMemo((): ClearancePrintInput | null => {
+        if (previewModel === null) return null;
+        const entries: ClearancePrintEntry[] = previewModel.roles.map((role, index) => {
+            const item = items[index] ?? null;
+            let signeeName = role.signeeName;
+            if (item !== null && role.label === item.label_snapshot && item.id in selections) {
+                const selected = selections[item.id] ?? null;
+                if (selected !== item.signatory_id) {
+                    if (selected === null) {
+                        signeeName = "";
+                    } else {
+                        const match = (candidates[item.id] ?? []).find((entry) => entry.user_id === selected) ?? null;
+                        signeeName = match?.full_name ?? role.signeeName;
+                    }
+                }
+            }
+            return {
+                category: role.label,
+                signeeName,
+                signatureDataUrl: null,
+                remarks: role.remarks,
+            };
+        });
+        return {
+            employeeName: previewModel.employeeName,
+            entries,
+            refNo: previewModel.refNo,
+            date: previewModel.date,
+            position: previewModel.position,
+            company_name: previewModel.company_name ?? previewCompany?.company_name,
+            company_address: previewModel.company_address ?? previewCompany?.company_address ?? null,
+            logo_data_url: previewModel.logo_data_url ?? (previewCompany ? companyLogoDataUrl(previewCompany) : null),
+            gmName,
+            gmTitle,
+        };
+    }, [previewModel, items, selections, candidates, previewCompany, gmName, gmTitle]);
+
+    const buildPreviewPdf = useCallback((): Uint8Array => {
+        if (printInput === null) {
+            return new Uint8Array();
+        }
+        return buildClearancePdfBytes(printInput);
+    }, [printInput]);
+
+    const previewRevision = useMemo(() => JSON.stringify(printInput), [printInput]);
 
     const refreshFormRow = useCallback(async (): Promise<void> => {
         try {
@@ -336,7 +433,13 @@ export function ClearanceWorkspace({
 
     return (
         <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
-            <div className="flex flex-col sm:flex-row sm:justify-end">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 className="text-xl font-bold tracking-tight">Clearance Form</h2>
+                    <p className="text-sm text-muted-foreground">
+                        Upload the clearance form PDF to the 201 file to enable approval.
+                    </p>
+                </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Button
                         variant="default"
@@ -423,7 +526,8 @@ export function ClearanceWorkspace({
                     </AlertDescription>
                 </Alert>
             ) : (
-                <div className="space-y-6">
+                <div className="grid gap-6 lg:grid-cols-[520px_minmax(0,1fr)] xl:grid-cols-[560px_minmax(0,1fr)] items-start">
+                    <div className="min-w-0 space-y-6">
                     {isCompleted ? (
                         <Alert>
                             <AlertTitle>Completed</AlertTitle>
@@ -453,6 +557,18 @@ export function ClearanceWorkspace({
                             disabled={isSaving || gmSaving || formReadonly}
                         />
                     ) : null}
+                    </div>
+                    <div className="min-w-0 lg:sticky lg:top-4">
+                        <LiveDocumentPreview
+                            build={buildPreviewPdf}
+                            revision={previewRevision}
+                            title="Clearance form live preview"
+                            loadingLabel="Generating PDF preview…"
+                            unavailable={previewModel === null}
+                            unavailableLabel="Loading clearance form…"
+                            caption="Live preview updates as fields change."
+                        />
+                    </div>
                 </div>
             )}
 
