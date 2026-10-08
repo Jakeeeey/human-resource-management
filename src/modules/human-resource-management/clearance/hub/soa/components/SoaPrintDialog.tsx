@@ -369,6 +369,7 @@ export function SoaPrintDialog({
                         Print
                     </Button>
                     <Button
+                        variant="outline"
                         className="w-full sm:w-auto"
                         onClick={handleDownload}
                         disabled={!previewUrl || building}

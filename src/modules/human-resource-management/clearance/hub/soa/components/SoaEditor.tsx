@@ -579,8 +579,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     )}
                     {!isApproved && (
                         <Button
-                            variant="outline"
-                            className="min-h-11 md:min-h-0"
+                            className="min-h-11 bg-info text-info-foreground hover:bg-info/90 md:min-h-0"
                             onClick={() => void handleUpload()}
                             disabled={uploading}
                         >
@@ -593,7 +592,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     {!isApproved && (
                         <span title={approveBlockedReason ?? undefined}>
                             <Button
-                                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto md:min-h-0"
                                 onClick={() => void handleApprove()}
                                 disabled={!hasUpload || approving}
                             >
@@ -639,7 +638,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                         <Select
                             value={companies.selectedId === null ? "" : String(companies.selectedId)}
                             onValueChange={(next) => companies.selectById(next === "" ? null : Number(next))}
-                            disabled={companies.loading || companies.options.length === 0}
+                            disabled={isApproved || companies.loading || companies.options.length === 0}
                         >
                             <SelectTrigger id="soa-company">
                                 <SelectValue placeholder={companies.loading ? "Loading…" : "Select company"} />
@@ -679,6 +678,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     <Input
                         id="soa-line-filter"
                         value={lineQuery}
+                        disabled={isApproved}
                         onChange={(event) => {
                             setLineQuery(event.target.value);
                             setLinePages({});

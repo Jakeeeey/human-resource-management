@@ -425,8 +425,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                     </Button>
                     {!frozen && (
                         <Button
-                            variant="outline"
-                            className="min-h-11 w-full sm:w-auto md:min-h-0"
+                            className="min-h-11 w-full bg-info text-info-foreground hover:bg-info/90 sm:w-auto md:min-h-0"
                             disabled={values === null || loading || uploading}
                             onClick={() => void handleUpload()}
                         >
@@ -439,7 +438,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                     {!frozen && (
                         <span title={approveBlockedReason ?? undefined}>
                             <Button
-                                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto md:min-h-0"
                                 disabled={values === null || loading || approving || !hasUpload}
                                 onClick={() => void handleApprove()}
                             >
@@ -507,7 +506,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                                 id="quitclaim-editor-company"
                                 value={company}
                                 onValueChange={handleCompanyChange}
-                                disabled={loading || saving}
+                                disabled={frozen || loading || saving}
                             />
                         </div>
                         <section className="space-y-3 rounded-md border p-4" aria-label="Section 1 identity">

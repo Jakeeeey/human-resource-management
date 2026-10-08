@@ -94,6 +94,7 @@ export function ClearanceFormPrintDialog({
 
     const formId = form?.id ?? null;
     const formStatus = form?.status ?? null;
+    const isApproved = formStatus === "approved";
     const formRefNo = form?.ref_no ?? null;
     const formCompanyCode = form?.company_code ?? null;
     const requestId = form?.request_id ?? null;
@@ -164,7 +165,7 @@ export function ClearanceFormPrintDialog({
                 const params = new URLSearchParams({
                     request_id: String(requestId),
                     date: dateValue,
-                    ref_no: formStatus === "approved" ? (formRefNo ?? "") : "",
+                    ref_no: isApproved ? (formRefNo ?? "") : "",
                 });
                 const res = await fetch(`/api/hrm/clearance/form/render-model?${params.toString()}`);
                 if (!res.ok) throw new Error("render-model failed");
@@ -183,7 +184,7 @@ export function ClearanceFormPrintDialog({
         return () => {
             cancelled = true;
         };
-    }, [open, requestId, dateValue, formStatus, formRefNo]);
+    }, [open, requestId, dateValue, isApproved, formRefNo]);
 
     const selectedCompany = companies.find((option) => option.company_code === companyCode) ?? null;
     const letterheadLogo = companyLogoDataUrl(selectedCompany);
@@ -232,7 +233,7 @@ export function ClearanceFormPrintDialog({
     }, [open, model, selectedCompany, letterheadLogo]);
 
     useEffect(() => {
-        if (!open || !form || form.status !== "approved" || form.pdf_file) return;
+        if (!open || !form || !isApproved || form.pdf_file) return;
         if (form.ref_no === null || model === null || model.refNo !== form.ref_no) return;
         if (!previewUrl || previewBlobRef.current === null) return;
         const key = `${form.id}:${form.ref_no}`;
@@ -253,7 +254,7 @@ export function ClearanceFormPrintDialog({
                 setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
             }
         })();
-    }, [open, form, model, previewUrl, fileName, freezeState]);
+    }, [open, form, isApproved, model, previewUrl, fileName, freezeState]);
 
     useEffect(() => {
         return () => {
@@ -383,7 +384,7 @@ export function ClearanceFormPrintDialog({
                             {showCompanySelect && (
                             <div className="space-y-2">
                                 <Label htmlFor="clearance-form-company">Company letterhead</Label>
-                                <Select value={companyCode} onValueChange={setCompanyCode} disabled={companiesLoading}>
+                                <Select value={companyCode} onValueChange={setCompanyCode} disabled={companiesLoading || isApproved}>
                                     <SelectTrigger id="clearance-form-company" className="w-full">
                                         <SelectValue
                                             placeholder={companiesLoading ? "Loading companies…" : "Choose a company"}
@@ -407,9 +408,10 @@ export function ClearanceFormPrintDialog({
                                     <p className="text-xs text-destructive">{companySaveError}</p>
                                 )}
                                 <Button
+                                    variant="default"
                                     className="w-full"
                                     onClick={() => void handleSaveCompany()}
-                                    disabled={savingCompany || companyCode === ""}
+                                    disabled={savingCompany || companyCode === "" || isApproved}
                                 >
                                     {savingCompany ? (
                                         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -426,6 +428,7 @@ export function ClearanceFormPrintDialog({
                                     id="clearance-form-date"
                                     value={dateValue}
                                     onChange={setDateValue}
+                                    disabled={isApproved}
                                 />
                             </div>
                             {freezeState === "freezing" && (
@@ -487,6 +490,7 @@ export function ClearanceFormPrintDialog({
                         Print
                     </Button>
                     <Button
+                        variant="outline"
                         className="w-full sm:w-auto"
                         onClick={handleDownload}
                         disabled={!previewUrl || building}

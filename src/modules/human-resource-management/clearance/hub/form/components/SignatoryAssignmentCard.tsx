@@ -103,6 +103,7 @@ export function SignatoryAssignmentCard({
                             <Input
                                 id="signatory-filter"
                                 value={query}
+                                disabled={disabled}
                                 onChange={(event) => {
                                     setQuery(event.target.value);
                                     setPage(1);

@@ -383,6 +383,7 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
                         Print
                     </Button>
                     <Button
+                        variant="outline"
                         className="min-h-11 w-full sm:w-auto md:min-h-0"
                         onClick={handleDownload}
                         disabled={!previewUrl || building}

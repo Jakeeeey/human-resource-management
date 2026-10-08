@@ -251,7 +251,10 @@ export function ClearanceWorkspace({
     }, [form, uploading, detail, requestId, resolveCompany, gmName, gmTitle, refreshFormRow, refresh, documents, onChanged]);
 
     const hasUpload = form !== null && form.pdf_file !== null && form.pdf_file !== "";
-    const showDocActions = form !== null && form.status === "pending" && !isCompleted;
+    const isApproved = form?.status === "approved";
+    const formReadonly = isCompleted || isApproved;
+    const showUpload = form !== null && !isCompleted;
+    const showApprove = form !== null && !isApproved && !isCompleted;
     const approveBlocked = !hasUpload;
     const approveDisabled = approving || uploading || approveBlocked;
 
@@ -328,7 +331,6 @@ export function ClearanceWorkspace({
         onChanged();
     }, [requestId, onChanged]);
 
-    const formReadonly = isCompleted || form?.status === "approved";
     const totalChanges = changedCount + (gmDirty ? 1 : 0);
     const saveDisabled = isSaving || gmSaving || signatoriesLoading || totalChanges === 0 || formReadonly;
 
@@ -337,7 +339,7 @@ export function ClearanceWorkspace({
             <div className="flex flex-col sm:flex-row sm:justify-end">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
                         className="min-h-11 w-full sm:w-auto md:min-h-0"
                         onClick={() => void handleSave()}
@@ -348,11 +350,11 @@ export function ClearanceWorkspace({
                         <Save className="mr-2 h-4 w-4" aria-hidden="true" />
                         {isSaving || gmSaving ? "Saving…" : totalChanges > 0 ? `Save (${totalChanges})` : "Save"}
                     </Button>
-                    {showDocActions ? (
+                    {showUpload ? (
                         <Button
-                            variant="outline"
+                            variant="default"
                             size="sm"
-                            className="min-h-11 w-full sm:w-auto md:min-h-0"
+                            className="min-h-11 w-full bg-info text-info-foreground hover:bg-info/90 sm:w-auto md:min-h-0"
                             onClick={() => void handleUpload()}
                             disabled={uploading || approving}
                             aria-label="Upload clearance PDF to the 201 file"
@@ -363,10 +365,10 @@ export function ClearanceWorkspace({
                             ) : (
                                 <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
                             )}
-                            {uploading ? "Uploading…" : hasUpload ? "Re-upload" : "Upload"}
+                            {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
                         </Button>
                     ) : null}
-                    {showDocActions ? (
+                    {showApprove ? (
                         <span
                             title={
                                 approveBlocked
@@ -377,7 +379,7 @@ export function ClearanceWorkspace({
                             <Button
                                 variant="default"
                                 size="sm"
-                                className="min-h-11 w-full sm:w-auto md:min-h-0"
+                                className="min-h-11 w-full bg-success text-success-foreground hover:bg-success/90 sm:w-auto md:min-h-0"
                                 onClick={() => void handleApprove()}
                                 disabled={approveDisabled}
                                 aria-label="Approve clearance form"
@@ -393,6 +395,7 @@ export function ClearanceWorkspace({
                     ) : null}
                     {form ? (
                         <Button
+                            variant="outline"
                             size="sm"
                             className="min-h-11 w-full sm:w-auto md:min-h-0"
                             onClick={() => setPrintOpen(true)}
@@ -404,7 +407,7 @@ export function ClearanceWorkspace({
                         </Button>
                     ) : null}
                 </div>
-                {showDocActions && approveBlocked ? (
+                {showApprove && approveBlocked ? (
                     <p className="mt-2 text-xs text-muted-foreground sm:text-right">
                         Upload the clearance PDF to the 201 file before approving.
                     </p>
@@ -440,7 +443,7 @@ export function ClearanceWorkspace({
                         candidates={candidates}
                         selections={selections}
                         onSelect={setSelection}
-                        disabled={isSaving || isCompleted}
+                        disabled={isSaving || formReadonly}
                         isLoading={signatoriesLoading}
                         error={signatoriesError}
                         onRetry={refreshSignatories}

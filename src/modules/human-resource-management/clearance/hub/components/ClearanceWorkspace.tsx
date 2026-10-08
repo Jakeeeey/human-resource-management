@@ -220,7 +220,6 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
                                 isLoading={documents.isLoading}
                                 error={documents.error}
                                 onRetry={() => void documents.refresh()}
-                                onApproved={() => void documents.refresh()}
                             />
 
                             {isCompleted ? (
