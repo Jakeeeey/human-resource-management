@@ -22,7 +22,6 @@ import {
   RefreshCw,
   Download,
   FileDown,
-  Printer,
   Table as TableIcon,
   ListFilter,
 } from "lucide-react";
