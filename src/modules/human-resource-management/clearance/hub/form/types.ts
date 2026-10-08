@@ -11,6 +11,8 @@ export const ClearanceFormSchema = z.object({
     ref_no: z.string().nullable(),
     company_code: z.string().nullable(),
     pdf_file: z.string().nullable(),
+    gm_name: z.string().nullable(),
+    gm_title: z.string().nullable(),
     approved_at: z.string().nullable(),
     approved_by: z.number().nullable(),
     created_at: z.string().nullable(),
@@ -58,6 +60,8 @@ export const ClearanceFormRenderModelSchema = z.object({
     company_name: z.string().optional(),
     company_address: z.string().nullable().optional(),
     logo_data_url: z.string().nullable().optional(),
+    gmName: z.string(),
+    gmTitle: z.string(),
     roles: z.array(ClearanceFormRoleBlockSchema),
 }).strict();
 

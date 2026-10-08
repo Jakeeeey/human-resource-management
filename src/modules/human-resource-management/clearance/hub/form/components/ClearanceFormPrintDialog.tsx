@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
-import Image from "next/image";
-import { AlertCircle, Download, Loader2, Printer } from "lucide-react";
+import { AlertCircle, Download, Loader2, Printer, Save } from "lucide-react";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
+import { SingleDatePicker } from "./SingleDatePicker";import {
     Select,
     SelectContent,
     SelectItem,
@@ -38,6 +37,7 @@ interface ClearanceFormPrintDialogProps {
     form: ClearanceForm | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onSaved?: () => void;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -68,6 +68,7 @@ export function ClearanceFormPrintDialog({
     form,
     open,
     onOpenChange,
+    onSaved,
 }: ClearanceFormPrintDialogProps): JSX.Element {
     const [model, setModel] = useState<ClearanceFormRenderModel | null>(null);
     const [modelLoading, setModelLoading] = useState(false);
@@ -78,6 +79,8 @@ export function ClearanceFormPrintDialog({
     const [error, setError] = useState<string | null>(null);
     const [dateValue, setDateValue] = useState(phToday());
     const [companyCode, setCompanyCode] = useState("");
+    const [savingCompany, setSavingCompany] = useState(false);
+    const [companySaveError, setCompanySaveError] = useState<string | null>(null);
     const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(undefined);
     const [freezeState, setFreezeState] = useState<"idle" | "freezing" | "done" | "error">("idle");
     const [freezeError, setFreezeError] = useState<string | null>(null);
@@ -109,6 +112,8 @@ export function ClearanceFormPrintDialog({
         }
         setDateValue(phToday());
         setCompanyCode("");
+        setSavingCompany(false);
+        setCompanySaveError(null);
     }, [open, formId]);
 
     useEffect(() => {
@@ -210,6 +215,8 @@ export function ClearanceFormPrintDialog({
                 company_name: model.company_name ?? selectedCompany?.company_name,
                 company_address: model.company_address ?? selectedCompany?.company_address ?? null,
                 logo_data_url: model.logo_data_url ?? letterheadLogo,
+                gmName: model.gmName,
+                gmTitle: model.gmTitle,
             });
             const url = URL.createObjectURL(blob);
             urlRef.current = url;
@@ -322,10 +329,42 @@ export function ClearanceFormPrintDialog({
         };
     }
 
+    async function handleSaveCompany(): Promise<void> {
+        if (requestId === null || savingCompany) return;
+        const option = companies.find((entry) => entry.company_code === companyCode) ?? null;
+        if (!option) {
+            setCompanySaveError("Choose a company first.");
+            return;
+        }
+        setSavingCompany(true);
+        setCompanySaveError(null);
+        try {
+            const res = await fetch("/api/hrm/clearance/employee-company", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ request_id: requestId, company_id: option.id }),
+            });
+            const payload: unknown = await res.json().catch(() => null);
+            if (!res.ok || !isRecord(payload) || payload.success !== true) {
+                const message = isRecord(payload) && typeof payload.message === "string" && payload.message.trim() !== ""
+                    ? payload.message
+                    : "Could not save the company. Please try again.";
+                throw new Error(message);
+            }
+            setEmployeeCompanyId(option.id);
+            toast.success("Company saved. The reference number was generated.");
+            onSaved?.();
+        } catch (err) {
+            setCompanySaveError(err instanceof Error ? err.message : "Could not save the company. Please try again.");
+        } finally {
+            setSavingCompany(false);
+        }
+    }
+
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent
-                className="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-4xl lg:max-w-5xl"
+                className="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-[85vw] lg:max-w-[1000px]"
                 onFocusOutside={(event) => event.preventDefault()}
             >
                 <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-6">
@@ -364,31 +403,31 @@ export function ClearanceFormPrintDialog({
                                 {selectedCompany?.company_address && (
                                     <p className="text-xs text-muted-foreground">{selectedCompany.company_address}</p>
                                 )}
+                                {companySaveError && (
+                                    <p className="text-xs text-destructive">{companySaveError}</p>
+                                )}
+                                <Button
+                                    className="w-full"
+                                    onClick={() => void handleSaveCompany()}
+                                    disabled={savingCompany || companyCode === ""}
+                                >
+                                    {savingCompany ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                    ) : (
+                                        <Save className="h-4 w-4" aria-hidden="true" />
+                                    )}
+                                    {savingCompany ? "Saving…" : "Save"}
+                                </Button>
                             </div>
                             )}
                             <div className="space-y-2">
                                 <Label htmlFor="clearance-form-date">Date</Label>
-                                <Input
+                                <SingleDatePicker
                                     id="clearance-form-date"
-                                    type="date"
                                     value={dateValue}
-                                    onChange={(event) => setDateValue(event.target.value)}
+                                    onChange={setDateValue}
                                 />
                             </div>
-                            {letterheadLogo && (
-                                <div className="flex items-center gap-3 sm:col-span-2">
-                                    <Image
-                                        src={letterheadLogo}
-                                        alt={`${selectedCompany?.company_name ?? "Company"} logo`}
-                                        width={160}
-                                        height={40}
-                                        className="h-10 w-auto object-contain"
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                        {selectedCompany?.company_name ?? ""}
-                                    </p>
-                                </div>
-                            )}
                             {freezeState === "freezing" && (
                                 <p className="text-xs text-muted-foreground sm:col-span-2">
                                     Storing the approved PDF to the 201 file…

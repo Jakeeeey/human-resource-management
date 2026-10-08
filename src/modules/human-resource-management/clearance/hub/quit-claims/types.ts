@@ -86,6 +86,7 @@ export const QuitClaimValuesSchema = z.object({
     payment: QuitClaimPaymentSchema,
     released_by: QuitClaimReleasedBySchema,
     manager_signature_date: z.string(),
+    letterhead_company_code: z.string().optional(),
     section2_signatories: z.array(QuitClaimSection2SignatorySchema),
 }).strict();
 

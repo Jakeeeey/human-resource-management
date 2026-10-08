@@ -22,6 +22,7 @@ export interface RequestSignatoryItem {
     sort_order: number;
     status: string;
     signatory_id: number | null;
+    remarks: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,6 +77,7 @@ function parseItem(value: unknown): RequestSignatoryItem | null {
         sort_order: toId(value.sort_order) ?? 0,
         status: typeof value.status === "string" ? value.status : "pending",
         signatory_id: toNullableId(value.signatory_id),
+        remarks: toNullableText(value.remarks),
     };
 }
 

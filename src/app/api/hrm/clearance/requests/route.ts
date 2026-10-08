@@ -26,8 +26,14 @@ const AssignClearanceRequestSchema = z
     .strict();
 
 const ListClearanceRequestQuerySchema = z.object({
-    status: z.enum(["pending", "in_progress", "completed"]).optional(),
+    status: z.enum(["pending", "in_progress", "completed", "not_completed"]).optional(),
     resignation_id: z.coerce.number().int().positive().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().max(100).optional(),
+    sort: z.string().max(64).optional(),
+    search: z.string().max(255).optional(),
+    date_from: z.string().max(32).optional(),
+    date_to: z.string().max(32).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -44,8 +50,21 @@ export async function GET(req: NextRequest) {
             const result = await listClearanceRequests({
                 status: parsed.data.status,
                 resignationId: parsed.data.resignation_id,
+                page: parsed.data.page,
+                limit: parsed.data.limit,
+                sort: parsed.data.sort,
+                search: parsed.data.search,
+                dateFrom: parsed.data.date_from,
+                dateTo: parsed.data.date_to,
             });
-            return NextResponse.json({ success: true, data: result.data, counts: result.counts });
+            return NextResponse.json({
+                success: true,
+                data: result.data,
+                counts: result.counts,
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+            });
         } catch (error) {
             return (
                 mapClearanceRequestError(error) ??

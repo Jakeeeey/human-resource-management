@@ -7,7 +7,8 @@ import { toast } from "sonner";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { QuitClaimEditor } from "./components/QuitClaimEditor";
-import { createQuitClaim } from "./providers/quitClaimClient";
+import { createQuitClaim, loadCompanyOptions } from "./providers/quitClaimClient";
+import { fetchEmployeeCompany, pickEmployeeCompany } from "../utils/company";
 
 interface RequestOwner {
     userId: number;
@@ -130,10 +131,24 @@ function ClearanceQuitClaimsModuleInner(): JSX.Element {
                 return;
             }
             try {
+                let companyName: string | undefined;
+                try {
+                    const [options, employee] = await Promise.all([
+                        loadCompanyOptions(),
+                        fetchEmployeeCompany({ userId: owner.userId }),
+                    ]);
+                    if (cancelled) return;
+                    const match = pickEmployeeCompany(options, employee.company_id);
+                    if (match) companyName = match.company_name;
+                } catch {
+                    companyName = undefined;
+                }
+                if (cancelled) return;
                 const created = await createQuitClaim({
                     user_id: owner.userId,
                     resignation_id: owner.resignationId,
                     request_id: activeRequestId,
+                    company_name: companyName,
                 });
                 if (cancelled) return;
                 linkedForRef.current = activeRequestId;

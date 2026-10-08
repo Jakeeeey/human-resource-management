@@ -115,19 +115,56 @@ function templateTitleFor(
     return "Untitled template";
 }
 
+export interface ClearanceDashboardRange {
+    readonly from?: string | null;
+    readonly to?: string | null;
+}
+
+function parseRangeBound(value: string | null | undefined): string | null {
+    if (typeof value !== "string") return null;
+    const text = value.trim();
+    if (text === "") return null;
+    const instant = new Date(text).getTime();
+    return Number.isNaN(instant) ? null : new Date(instant).toISOString();
+}
+
+function buildRequestPath(from: string | null, to: string | null): string {
+    const base =
+        "/items/clearance_request?fields=id,resignation_id,user_id,template_id,template_title_snapshot,status,confirmed_at,created_at&limit=-1";
+    const params: string[] = [];
+    if (from !== null) params.push(`filter[created_at][_gte]=${encodeURIComponent(from)}`);
+    if (to !== null) params.push(`filter[created_at][_lte]=${encodeURIComponent(to)}`);
+    if (params.length === 0) return base;
+    return `${base}&${params.join("&")}`;
+}
+
+function chunkUserIds(ids: readonly number[], size: number): number[][] {
+    const chunks: number[][] = [];
+    for (let index = 0; index < ids.length; index += size) {
+        chunks.push(ids.slice(index, index + size));
+    }
+    return chunks;
+}
+
 export async function getClearanceDashboard(
-    cap: ClearanceCapability
+    cap: ClearanceCapability,
+    range?: ClearanceDashboardRange
 ): Promise<ClearanceDashboardBundle> {
-    const [requestBody, templateBody, userBody] = await Promise.all([
-        dFetch(
-            "/items/clearance_request?fields=id,resignation_id,user_id,template_id,template_title_snapshot,status,confirmed_at,created_at&limit=-1"
-        ),
+    const from = parseRangeBound(range?.from);
+    const to = parseRangeBound(range?.to);
+    const [requestBody, templateBody] = await Promise.all([
+        dFetch(buildRequestPath(from, to)),
         dFetch("/items/clearance_template?fields=id,title&limit=-1"),
-        dFetch("/items/user?fields=user_id,user_fname,user_mname,user_lname&limit=-1"),
     ]);
     const requests = parseRowList(DashboardRequestSchema, requestBody, "clearance_request");
     const templates = parseRowList(DashboardTemplateSchema, templateBody, "clearance_template");
-    const users = parseRowList(DashboardUserSchema, userBody, "user");
+    const userIds = [...new Set(requests.map((request) => request.user_id))];
+    const userBodies = await Promise.all(
+        chunkUserIds(userIds, 200).map((chunk) =>
+            dFetch(`/items/user?fields=user_id,user_fname,user_mname,user_lname&filter[user_id][_in]=${chunk.join(",")}`)
+        )
+    );
+    const users = userBodies.flatMap((body) => parseRowList(DashboardUserSchema, body, "user"));
 
     const nowMs = Date.now();
     const generatedAt = nowUTC();

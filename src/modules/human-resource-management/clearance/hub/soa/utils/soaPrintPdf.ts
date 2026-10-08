@@ -129,12 +129,13 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
     doc.setTextColor(0);
     const fieldLabelWidth = Math.max(...fields.map(([label]) => doc.getTextWidth(label)));
     const fieldX = MARGIN + fieldLabelWidth + 6;
-    const fieldEndX = fieldX + 115;
     for (const [label, value] of fields) {
         doc.text(label, MARGIN, y);
         if (value !== "") {
             doc.text(value, fieldX, y);
         }
+        const valueWidth = value === "" ? 0 : doc.getTextWidth(value);
+        const fieldEndX = Math.min(rightEdge, fieldX + Math.max(115, valueWidth + 12));
         doc.setDrawColor(0);
         doc.setLineWidth(0.5);
         doc.line(fieldX, y + 4, fieldEndX, y + 4);
@@ -161,25 +162,29 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
     const body: RowInput[] = [];
     const groupFirst: boolean[] = [];
     const groupLast: boolean[] = [];
+    const groupStart: number[] = [];
     groups.forEach((group, groupIndex) => {
-        const count = counts[groupIndex];
-        const labelRow = Math.floor(count / 2);
+        const count = counts[groupIndex] ?? 0;
+        groupStart.push(body.length);
         for (let row = 0; row < count; row += 1) {
             const line = group.rows[row];
             const description = line === undefined ? "" : line.description;
             const amount = line === undefined || line.amount === null ? "" : formatAmount(line.amount);
             const remarks = line === undefined ? "" : line.remarks;
-            const department = row === labelRow ? group.department : "";
+            const department = row === 0 ? group.department : "";
             body.push([department, description, amount, remarks, ""]);
             groupFirst.push(row === 0);
             groupLast.push(row === count - 1);
         }
     });
 
+    const rowPage: number[] = [];
+    const rowGeom: Array<{ x: number; y: number; width: number; height: number }> = [];
+
     const table = __createTable(doc, {
         startY: y,
         margin: { left: MARGIN, right: MARGIN },
-        head: [["DEPARTMENT", "DESCRIPTION", "AMOUNT", "REMARKS", ["DATE & VERIFIED BY:", "NAME OVER SIGNATURE"]]],
+        head: [["DEPARTMENT", "DESCRIPTION", "AMOUNT", "REMARKS", "DATE & VERIFIED BY:\nNAME OVER SIGNATURE"]],
         body,
         theme: "grid",
         styles: {
@@ -210,6 +215,15 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
             if (data.section !== "body") {
                 return;
             }
+            if (data.column.index === 0) {
+                rowPage[data.row.index] = data.pageNumber;
+                rowGeom[data.row.index] = {
+                    x: data.cell.x,
+                    y: data.cell.y,
+                    width: data.cell.width,
+                    height: data.cell.height,
+                };
+            }
             if (data.column.index !== 0 && data.column.index !== 4) {
                 return;
             }
@@ -227,6 +241,30 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
         },
     });
     __drawTable(doc, table);
+
+    doc.setFont("times", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+    groups.forEach((group, groupIndex) => {
+        const count = counts[groupIndex] ?? 0;
+        const start = groupStart[groupIndex] ?? 0;
+        const seen = new Set<number>();
+        for (let row = 0; row < count; row += 1) {
+            const page = rowPage[start + row];
+            if (page === undefined || seen.has(page)) continue;
+            seen.add(page);
+            if (row === 0) continue;
+            const geom = rowGeom[start + row];
+            if (!geom) continue;
+            doc.setPage(page);
+            const wrapped = doc.splitTextToSize(group.department + " (continued)", geom.width - 10);
+            const lineHeight = 11;
+            const centerY = geom.y + geom.height / 2;
+            const firstBaseline = centerY - ((wrapped.length - 1) * lineHeight) / 2 + 3;
+            doc.text(wrapped, geom.x + geom.width / 2, firstBaseline, { align: "center" });
+        }
+    });
+    doc.setTextColor(0);
 
     let footerY = (table.finalY ?? y) + 30;
     const signerCount = input.signatories.length;

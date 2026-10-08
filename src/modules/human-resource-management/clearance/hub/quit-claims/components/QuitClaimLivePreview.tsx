@@ -12,9 +12,9 @@ interface QuitClaimLivePreviewProps {
     company: CompanyOption | null;
 }
 
-function toRendererCompany(valuesCompany: string, selected: CompanyOption | null): QuitClaimCompany {
+function toRendererCompany(selected: CompanyOption | null): QuitClaimCompany {
     if (selected === null) {
-        return { company_name: valuesCompany };
+        return { company_name: "" };
     }
     return {
         company_name: selected.company_name,
@@ -52,7 +52,7 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
         setBuilding(true);
         const timer = setTimeout(() => {
             try {
-                const pdfBytes = buildQuitClaimPdf(values, toRendererCompany(values.identity.company, company));
+                const pdfBytes = buildQuitClaimPdf(values, toRendererCompany(company));
                 const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
                 const url = URL.createObjectURL(blob);
                 if (urlRef.current) {
@@ -112,7 +112,7 @@ export function QuitClaimLivePreview({ values, company }: QuitClaimLivePreviewPr
                         )}
                         <iframe
                             src={viewUrl ?? previewUrl}
-                            className="h-[70vh] w-full border-0"
+                            className="h-[85vh] min-h-[600px] w-full border-0"
                             title="Quit claim live preview"
                         />
                     </div>

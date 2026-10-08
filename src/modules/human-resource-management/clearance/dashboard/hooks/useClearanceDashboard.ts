@@ -15,6 +15,18 @@ export interface ClearanceDashboardState {
 
 const DASHBOARD_PATH: string = "/api/hrm/clearance/dashboard";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export type ClearanceDashboardPeriod = "all" | "30d" | "90d" | "12m";
+
+function periodQuery(period: ClearanceDashboardPeriod): string {
+    if (period === "all") return "";
+    const days = period === "30d" ? 30 : period === "90d" ? 90 : 365;
+    const to = new Date();
+    const from = new Date(to.getTime() - days * DAY_MS);
+    return `?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}&period=${period}`;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object";
 }
@@ -36,7 +48,7 @@ function readBundle(body: unknown): ClearanceDashboardBundle {
     return payload as unknown as ClearanceDashboardBundle;
 }
 
-export function useClearanceDashboard(): ClearanceDashboardState {
+export function useClearanceDashboard(period: ClearanceDashboardPeriod = "all"): ClearanceDashboardState {
     const [data, setData] = React.useState<ClearanceDashboardBundle | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [refreshing, setRefreshing] = React.useState(false);
@@ -64,7 +76,7 @@ export function useClearanceDashboard(): ClearanceDashboardState {
             setError(null);
         }
         try {
-            const res = await fetch(DASHBOARD_PATH, { cache: "no-store" });
+            const res = await fetch(`${DASHBOARD_PATH}${periodQuery(period)}`, { cache: "no-store" });
             const body: unknown = await res.json().catch(() => null);
             if (!res.ok) {
                 const message = isRecord(body) && typeof body["message"] === "string"
@@ -89,7 +101,7 @@ export function useClearanceDashboard(): ClearanceDashboardState {
                 setRefreshing(false);
             }
         }
-    }, []);
+    }, [period]);
 
     React.useEffect(() => {
         void refresh();

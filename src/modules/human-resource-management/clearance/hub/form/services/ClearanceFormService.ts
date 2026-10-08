@@ -8,6 +8,9 @@ import {
 import { dFetch } from "../../utils/directus";
 import { nowUTC } from "../../utils/audit";
 import { allocateDocumentRef, type DocumentRefRow } from "./DocumentRefService";
+import { resolveCompanyCodeForUser } from "../../services/EmployeeCompanyService";
+import { syncClearanceRequestCompletion } from "../../services/ClearanceRequestService";
+import { hasFiledClearanceFormPdf } from "../server/clearanceFormFiling";
 
 export const CLEARANCE_FORM_ERROR_CODES = {
     invalidInput: "CLEARANCE_FORM_INVALID_INPUT",
@@ -16,6 +19,8 @@ export const CLEARANCE_FORM_ERROR_CODES = {
     formNotFound: "CLEARANCE_FORM_NOT_FOUND",
     formApproved: "CLEARANCE_FORM_APPROVED",
     formFrozen: "CLEARANCE_FORM_FROZEN",
+    uploadMissing: "CLEARANCE_FORM_UPLOAD_MISSING",
+    gmLocked: "CLEARANCE_FORM_GM_LOCKED",
     refAllocFailed: "DOCUMENT_REF_ALLOC_FAILED",
     writeFailed: "CLEARANCE_FORM_WRITE_FAILED",
     readFailed: "CLEARANCE_FORM_READ_FAILED",
@@ -28,6 +33,8 @@ export interface ClearanceFormRow {
     ref_no: string | null;
     company_code: string | null;
     pdf_file: string | null;
+    gm_name: string | null;
+    gm_title: string | null;
     approved_at: string | null;
     approved_by: number | null;
     created_at: string | null;
@@ -138,6 +145,8 @@ function normalizeFormRow(raw: unknown): ClearanceFormRow | null {
         ref_no: toNullableText(raw.ref_no),
         company_code: toNullableText(raw.company_code),
         pdf_file: toNullableText(raw.pdf_file),
+        gm_name: toNullableText(raw.gm_name),
+        gm_title: toNullableText(raw.gm_title),
         approved_at: toNullableText(raw.approved_at),
         approved_by: toNullableId(raw.approved_by),
         created_at: toNullableText(raw.created_at),
@@ -230,7 +239,7 @@ export async function ensureClearanceForm(requestId: number, actorId: number | n
         fail(CLEARANCE_FORM_ERROR_CODES.requestNotFound, `clearance_request ${requestId} does not exist`);
     }
     const existing = await getClearanceFormByRequest(requestId);
-    if (existing) return existing;
+    if (existing) return backfillCreationRef(existing, request.user_id, actorId);
     const now = nowUTC();
     try {
         const body: unknown = await dFetch("/items/clearance_form", {
@@ -250,7 +259,7 @@ export async function ensureClearanceForm(requestId: number, actorId: number | n
             }),
         });
         const row = isRecord(body) && !Array.isArray(body.data) ? normalizeFormRow(body.data) : null;
-        if (row) return row;
+        if (row) return backfillCreationRef(row, request.user_id, actorId);
     } catch {
         const raced = await getClearanceFormByRequest(requestId);
         if (raced) return raced;
@@ -258,6 +267,34 @@ export async function ensureClearanceForm(requestId: number, actorId: number | n
     const raced = await getClearanceFormByRequest(requestId);
     if (raced) return raced;
     fail(CLEARANCE_FORM_ERROR_CODES.writeFailed, "clearance_form create failed");
+}
+
+async function backfillCreationRef(
+    row: ClearanceFormRow,
+    userId: number,
+    actorId: number | null
+): Promise<ClearanceFormRow> {
+    if (row.ref_no !== null && row.ref_no !== "") return row;
+    const companyCode = await resolveCompanyCodeForUser(userId);
+    if (companyCode === null) return row;
+    try {
+        const ref = await allocateDocumentRef({ documentId: row.id, companyCode, actorId });
+        const now = nowUTC();
+        const body: unknown = await dFetch(`/items/clearance_form/${row.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+                ref_no: ref.ref_no,
+                company_code: companyCode,
+                updated_at: now,
+                updated_by: actorId,
+            }),
+        });
+        const updated = isRecord(body) && !Array.isArray(body.data) ? normalizeFormRow(body.data) : null;
+        if (updated) return updated;
+        return { ...row, ref_no: ref.ref_no, company_code: companyCode };
+    } catch {
+        return row;
+    }
 }
 
 export async function buildClearanceFormRenderModel(
@@ -293,6 +330,8 @@ export async function buildClearanceFormRenderModel(
         employeeName: toFullName(userRow),
         date: overrides?.date ?? "",
         position,
+        gmName: form?.gm_name ?? "",
+        gmTitle: form?.gm_title ?? "",
         ...(company === undefined ? {} : {
             company_name: company.company_name,
             company_address: company.company_address ?? null,
@@ -317,6 +356,13 @@ export async function approveClearanceForm(input: ApproveClearanceFormInput): Pr
     const form = await ensureClearanceForm(input.requestId, input.actorId);
     if (form.status === "approved") {
         fail(CLEARANCE_FORM_ERROR_CODES.formApproved, `clearance_form ${form.id} is already approved`);
+    }
+    if (!form.pdf_file) {
+        fail(CLEARANCE_FORM_ERROR_CODES.uploadMissing, `clearance_form ${form.id} has no uploaded 201 file`);
+    }
+    const filed = await hasFiledClearanceFormPdf(form.id).catch(() => false);
+    if (!filed) {
+        fail(CLEARANCE_FORM_ERROR_CODES.uploadMissing, `clearance_form ${form.id} has no uploaded 201 file`);
     }
     let ref: DocumentRefRow;
     try {
@@ -353,6 +399,7 @@ export async function approveClearanceForm(input: ApproveClearanceFormInput): Pr
         date: input.date ?? "",
         refNo: ref.ref_no,
     });
+    await syncClearanceRequestCompletion(input.requestId, input.actorId).catch(() => undefined);
     return { form: updated, ref, renderModel };
 }
 
@@ -368,12 +415,6 @@ export async function attachClearanceFormPdf(
     if (!current) {
         fail(CLEARANCE_FORM_ERROR_CODES.formNotFound, `clearance_form ${formId} does not exist`);
     }
-    if (current.status !== "approved") {
-        fail(CLEARANCE_FORM_ERROR_CODES.formNotFound, `clearance_form ${formId} is not approved`);
-    }
-    if (current.pdf_file !== null && current.pdf_file !== "") {
-        fail(CLEARANCE_FORM_ERROR_CODES.formFrozen, `clearance_form ${formId} pdf is frozen`);
-    }
     const now = nowUTC();
     const body: unknown = await dFetch(`/items/clearance_form/${formId}`, {
         method: "PATCH",
@@ -382,6 +423,48 @@ export async function attachClearanceFormPdf(
     const updated = isRecord(body) && !Array.isArray(body.data) ? normalizeFormRow(body.data) : null;
     if (!updated) {
         fail(CLEARANCE_FORM_ERROR_CODES.writeFailed, `clearance_form/${formId} pdf attach failed`);
+    }
+    return updated;
+}
+
+export interface UpdateClearanceFormGmInput {
+    gmName: string | null;
+    gmTitle: string | null;
+}
+
+export async function updateClearanceFormGm(
+    formId: number,
+    input: UpdateClearanceFormGmInput,
+    actorId: number | null
+): Promise<ClearanceFormRow> {
+    if (!Number.isInteger(formId) || formId <= 0) {
+        fail(CLEARANCE_FORM_ERROR_CODES.invalidInput, "formId is required");
+    }
+    const gmName = input.gmName === null ? null : input.gmName.trim();
+    const gmTitle = input.gmTitle === null ? null : input.gmTitle.trim();
+    if ((gmName !== null && gmName.length > 120) || (gmTitle !== null && gmTitle.length > 120)) {
+        fail(CLEARANCE_FORM_ERROR_CODES.invalidInput, "gm_name and gm_title must be 120 characters or fewer");
+    }
+    const current = await readFormRow(formId);
+    if (!current) {
+        fail(CLEARANCE_FORM_ERROR_CODES.formNotFound, `clearance_form ${formId} does not exist`);
+    }
+    if (current.status === "approved") {
+        fail(CLEARANCE_FORM_ERROR_CODES.gmLocked, `clearance_form ${formId} is approved`);
+    }
+    const now = nowUTC();
+    const body: unknown = await dFetch(`/items/clearance_form/${formId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+            gm_name: gmName === "" ? null : gmName,
+            gm_title: gmTitle === "" ? null : gmTitle,
+            updated_at: now,
+            updated_by: actorId,
+        }),
+    });
+    const updated = isRecord(body) && !Array.isArray(body.data) ? normalizeFormRow(body.data) : null;
+    if (!updated) {
+        fail(CLEARANCE_FORM_ERROR_CODES.writeFailed, `clearance_form/${formId} gm update failed`);
     }
     return updated;
 }
@@ -630,6 +713,16 @@ export function mapClearanceFormError(error: unknown): NextResponse | null {
         case CLEARANCE_FORM_ERROR_CODES.refAllocFailed:
         case "DOCUMENT_REF_ALLOC_FAILED":
             return NextResponse.json({ success: false, code, message: "The clearance form cannot be approved" }, { status: 409 });
+        case CLEARANCE_FORM_ERROR_CODES.uploadMissing:
+            return NextResponse.json(
+                { success: false, code, message: "Upload the clearance form PDF to the 201 file before approving" },
+                { status: 409 }
+            );
+        case CLEARANCE_FORM_ERROR_CODES.gmLocked:
+            return NextResponse.json(
+                { success: false, code, message: "The clearance form is approved and can no longer be edited" },
+                { status: 409 }
+            );
         default:
             return null;
     }

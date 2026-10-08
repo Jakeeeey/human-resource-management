@@ -37,6 +37,7 @@ export interface SignatoryItem {
     sort_order: number;
     status: string;
     signatory_id: number | null;
+    remarks: string | null;
 }
 
 export interface SignatoryAssignment {
@@ -144,6 +145,7 @@ function normalizeItemRow(raw: unknown): SignatoryItem | null {
         sort_order: toId(raw.sort_order) ?? 0,
         status: typeof raw.status === "string" ? raw.status : "pending",
         signatory_id: toNullableId(raw.signatory_id),
+        remarks: toNullableText(raw.remarks),
     };
 }
 

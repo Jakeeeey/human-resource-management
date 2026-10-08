@@ -17,7 +17,9 @@ export async function GET(req: NextRequest) {
             "canManageClearances",
         ]);
         if ("failure" in auth) return auth.failure;
-        return NextResponse.json({ success: true, data: await getClearanceDashboard(auth.cap) });
+        const params = req.nextUrl.searchParams;
+        const range = { from: params.get("from"), to: params.get("to") };
+        return NextResponse.json({ success: true, data: await getClearanceDashboard(auth.cap, range) });
     } catch (error) {
         return mapClearanceRouteError(error);
     }

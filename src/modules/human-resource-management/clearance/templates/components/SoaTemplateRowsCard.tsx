@@ -19,7 +19,7 @@ import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Empty,
     EmptyContent,
@@ -38,9 +38,16 @@ import { useSoaTemplateRows } from "../hooks/useSoaTemplateRows";
 import type { SoaRowCreateInput, SoaRowUpdateInput } from "../providers/soaTemplatesClient";
 import { useSoaTemplatesFetch } from "../providers/soaTemplatesProvider";
 import type { SoaTemplate, SoaTemplateRow } from "../types";
+import { ListPager, SortSelect } from "./ListControls";
 import { SoaTemplateRowDialog } from "./SoaTemplateRowDialog";
 
-const PAGE_SIZE = 10;
+type RowSort = "position" | "label" | "status";
+
+const ROW_SORT_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+    { value: "position", label: "Position" },
+    { value: "label", label: "Label (A–Z)" },
+    { value: "status", label: "Status" },
+];
 
 const ICON_FOCUS_RING =
     "focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -51,7 +58,9 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
     const rows = useSoaTemplateRows(template.id, showInactive);
 
     const [search, setSearch] = useState("");
+    const [sort, setSort] = useState<RowSort>("position");
     const [page, setPage] = useState(0);
+    const [pageSize, setPageSize] = useState(10);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<SoaTemplateRow | null>(null);
     const [saving, setSaving] = useState(false);
@@ -67,11 +76,42 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
         return rows.data.filter((row) => row.label.toLowerCase().includes(query));
     }, [rows.data, query]);
 
-    const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const sorted = useMemo(() => {
+        const next = [...filtered];
+        if (sort === "label") {
+            next.sort((a, b) => a.label.localeCompare(b.label));
+        } else if (sort === "status") {
+            next.sort(
+                (a, b) => Number(b.is_active) - Number(a.is_active) || a.label.localeCompare(b.label)
+            );
+        }
+        return next;
+    }, [filtered, sort]);
+
+    const canReorder = sort === "position";
+
+    const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
     const safePage = Math.min(page, pageCount - 1);
-    const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
-    const rangeStart = filtered.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
-    const rangeEnd = Math.min(filtered.length, safePage * PAGE_SIZE + PAGE_SIZE);
+    const visible = sorted.slice(safePage * pageSize, safePage * pageSize + pageSize);
+    const rangeStart = sorted.length === 0 ? 0 : safePage * pageSize + 1;
+    const rangeEnd = Math.min(sorted.length, safePage * pageSize + pageSize);
+
+    const handleSearchChange = (value: string) => {
+        setSearch(value);
+        setPage(0);
+    };
+
+    const handleSortChange = (value: string) => {
+        if (value === "position" || value === "label" || value === "status") {
+            setSort(value);
+            setPage(0);
+        }
+    };
+
+    const handlePageSizeChange = (size: number) => {
+        setPageSize(size);
+        setPage(0);
+    };
 
     const openCreate = () => {
         captureRowTrigger();
@@ -132,7 +172,7 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
 
     return (
         <Card className="min-w-0">
-            <CardHeader className="shrink-0 flex-row items-start justify-between gap-2">
+            <CardHeader className="shrink-0">
                 <div className="min-w-0">
                     <CardTitle className="truncate" title={`Rows for ${template.title}`}>
                         Rows · {template.title}
@@ -141,7 +181,7 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
                         {rows.data.length} {rows.data.length === 1 ? "row" : "rows"} · each row prints as a DEPARTMENT group
                     </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                <CardAction className="flex flex-wrap items-center justify-end gap-2">
                     <Button
                         variant="outline"
                         size="icon-lg"
@@ -160,20 +200,25 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
                         <Plus className="h-4 w-4" />
                         New row
                     </Button>
-                </div>
+                </CardAction>
             </CardHeader>
             <CardContent className="min-w-0 space-y-4">
-                <div className="relative min-w-0">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        value={search}
-                        onChange={(event) => {
-                            setSearch(event.target.value);
-                            setPage(0);
-                        }}
-                        placeholder="Search rows…"
-                        aria-label="Search SOA rows"
-                        className="h-10 pl-9"
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                    <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={search}
+                            onChange={(event) => handleSearchChange(event.target.value)}
+                            placeholder="Search rows…"
+                            aria-label="Search SOA rows"
+                            className="h-10 pl-9"
+                        />
+                    </div>
+                    <SortSelect
+                        label="Sort"
+                        value={sort}
+                        options={ROW_SORT_OPTIONS}
+                        onChange={handleSortChange}
                     />
                 </div>
 
@@ -222,10 +267,7 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
                             </EmptyDescription>
                         </EmptyHeader>
                         <EmptyContent>
-                            <Button variant="outline" size="sm" onClick={() => {
-                                setSearch("");
-                                setPage(0);
-                            }}>
+                            <Button variant="outline" size="sm" onClick={() => handleSearchChange("")}>
                                 Clear search
                             </Button>
                         </EmptyContent>
@@ -257,7 +299,8 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
                                                     variant="ghost"
                                                     size="icon-lg"
                                                     aria-label={`Move ${row.label} up`}
-                                                    disabled={busy || orderIndex <= 0}
+                                                    title={canReorder ? undefined : "Reset sort to Position to reorder"}
+                                                    disabled={busy || !canReorder || orderIndex <= 0}
                                                     onClick={() => handleMove(row, -1)}
                                                     className={ICON_FOCUS_RING}
                                                 >
@@ -267,7 +310,8 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
                                                     variant="ghost"
                                                     size="icon-lg"
                                                     aria-label={`Move ${row.label} down`}
-                                                    disabled={busy || orderIndex < 0 || orderIndex >= rows.data.length - 1}
+                                                    title={canReorder ? undefined : "Reset sort to Position to reorder"}
+                                                    disabled={busy || !canReorder || orderIndex < 0 || orderIndex >= rows.data.length - 1}
                                                     onClick={() => handleMove(row, 1)}
                                                     className={ICON_FOCUS_RING}
                                                 >
@@ -302,33 +346,17 @@ export function SoaTemplateRowsCard(props: { template: SoaTemplate }): JSX.Eleme
                                 );
                             })}
                         </ol>
-                        {filtered.length > PAGE_SIZE && (
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <p className="text-sm text-muted-foreground" aria-live="polite">
-                                    Showing {rangeStart}–{rangeEnd} of {filtered.length}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={safePage === 0}
-                                        onClick={() => setPage(safePage - 1)}
-                                    >
-                                        Previous
-                                    </Button>
-                                    <span className="text-sm text-muted-foreground">
-                                        Page {safePage + 1} of {pageCount}
-                                    </span>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={safePage >= pageCount - 1}
-                                        onClick={() => setPage(safePage + 1)}
-                                    >
-                                        Next
-                                    </Button>
-                                </div>
-                            </div>
+                        {sorted.length > pageSize && (
+                            <ListPager
+                                page={safePage}
+                                pageCount={pageCount}
+                                rangeStart={rangeStart}
+                                rangeEnd={rangeEnd}
+                                total={sorted.length}
+                                pageSize={pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={handlePageSizeChange}
+                            />
                         )}
                     </div>
                 )}

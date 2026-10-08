@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
-import { AlertCircle, Download, Loader2, Printer } from "lucide-react";
+import { AlertCircle, Download, Loader2, Printer, Save } from "lucide-react";
+import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,8 +15,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { buildSoaPdf, type SoaPrintInput } from "../utils/soaPrintPdf";
 import { freezeApprovedSoaPdf } from "../utils/approvedPdfFreeze";
+import type { CompanyOption } from "../../utils/company";
 
 interface SoaPrintDialogProps {
     soaId: number | null;
@@ -24,6 +34,19 @@ interface SoaPrintDialogProps {
     fileName: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    requestId: number;
+    companyOptions: CompanyOption[];
+    companiesLoading: boolean;
+    employeeCompany: CompanyOption | null;
+    employeeCompanyLoading: boolean;
+    selectedCompanyId: number | null;
+    onSelectCompany: (id: number | null) => void;
+    onCompanySaved: (companyId: number) => void;
+    isApproved: boolean;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
 }
 
 function toFitWidthUrl(url: string): string {
@@ -35,10 +58,28 @@ function toFitWidthUrl(url: string): string {
     return fragment ? `${base}#${fragment}&zoom=page-width` : `${base}#zoom=page-width`;
 }
 
-export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenChange }: SoaPrintDialogProps): JSX.Element {
+export function SoaPrintDialog({
+    soaId,
+    pdfFile,
+    model,
+    fileName,
+    open,
+    onOpenChange,
+    requestId,
+    companyOptions,
+    companiesLoading,
+    employeeCompany,
+    employeeCompanyLoading,
+    selectedCompanyId,
+    onSelectCompany,
+    onCompanySaved,
+    isApproved,
+}: SoaPrintDialogProps): JSX.Element {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [building, setBuilding] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [savingCompany, setSavingCompany] = useState(false);
+    const [companySaveError, setCompanySaveError] = useState<string | null>(null);
     const [freezeState, setFreezeState] = useState<"idle" | "freezing" | "done" | "error">("idle");
     const [freezeError, setFreezeError] = useState<string | null>(null);
     const urlRef = useRef<string | null>(null);
@@ -55,6 +96,7 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
             }
             setPreviewUrl(null);
             setFreezeError(null);
+            setCompanySaveError(null);
             return;
         }
         let cancelled = false;
@@ -86,7 +128,7 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
     }, [open, model]);
 
     useEffect(() => {
-        if (!open || soaId === null || model === null || model.refNo === "" || pdfFile) return;
+        if (!open || !isApproved || soaId === null || model === null || model.refNo === "" || pdfFile) return;
         if (building || previewUrl === null) return;
         const key = `${soaId}:${model.refNo}`;
         if (freezeKeyRef.current === key || freezeState !== "idle") return;
@@ -106,7 +148,7 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
                 setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
             }
         })();
-    }, [open, soaId, model, pdfFile, building, previewUrl, fileName, freezeState]);
+    }, [open, soaId, model, pdfFile, building, previewUrl, fileName, freezeState, isApproved]);
 
     useEffect(() => {
         return () => {
@@ -137,6 +179,38 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
         if (!next && printingRef.current) return;
         onOpenChange(next);
     }
+
+    async function handleSaveCompany(): Promise<void> {
+        if (savingCompany) return;
+        if (selectedCompanyId === null) {
+            setCompanySaveError("Choose a company first.");
+            return;
+        }
+        setSavingCompany(true);
+        setCompanySaveError(null);
+        try {
+            const res = await fetch("/api/hrm/clearance/employee-company", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ request_id: requestId, company_id: selectedCompanyId }),
+            });
+            const payload: unknown = await res.json().catch(() => null);
+            if (!res.ok || !isRecord(payload) || payload.success !== true) {
+                const message = isRecord(payload) && typeof payload.message === "string" && payload.message.trim() !== ""
+                    ? payload.message
+                    : "Could not save the company. Please try again.";
+                throw new Error(message);
+            }
+            toast.success("Company saved. The reference number was generated.");
+            onCompanySaved(selectedCompanyId);
+        } catch (err) {
+            setCompanySaveError(err instanceof Error ? err.message : "Could not save the company. Please try again.");
+        } finally {
+            setSavingCompany(false);
+        }
+    }
+
+    const showCompanySave = !employeeCompanyLoading && employeeCompany === null;
 
     function handleDownload(): void {
         if (!previewUrl || !fileName) return;
@@ -199,6 +273,44 @@ export function SoaPrintDialog({ soaId, pdfFile, model, fileName, open, onOpenCh
                 </DialogHeader>
                 <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-3 sm:p-6">
                     <div className="mx-auto max-w-3xl space-y-3">
+                        {showCompanySave && (
+                            <div className="grid gap-3 rounded-[var(--radius)] border bg-card p-4 shadow-sm sm:grid-cols-[1fr_auto] sm:items-end">
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="soa-print-company">Company</Label>
+                                    <Select
+                                        value={selectedCompanyId === null ? "" : String(selectedCompanyId)}
+                                        onValueChange={(next) => onSelectCompany(next === "" ? null : Number(next))}
+                                        disabled={companiesLoading || companyOptions.length === 0 || savingCompany}
+                                    >
+                                        <SelectTrigger id="soa-print-company" className="w-full truncate">
+                                            <SelectValue placeholder={companiesLoading ? "Loading…" : "Choose a company"} />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-60">
+                                            {companyOptions.map((option) => (
+                                                <SelectItem key={option.id} value={String(option.id)}>
+                                                    {option.company_name} ({option.company_code})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {companySaveError && (
+                                        <p className="text-xs text-destructive">{companySaveError}</p>
+                                    )}
+                                </div>
+                                <Button
+                                    className="w-full sm:w-auto"
+                                    onClick={() => void handleSaveCompany()}
+                                    disabled={savingCompany || selectedCompanyId === null}
+                                >
+                                    {savingCompany ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                    ) : (
+                                        <Save className="h-4 w-4" aria-hidden="true" />
+                                    )}
+                                    {savingCompany ? "Saving…" : "Save"}
+                                </Button>
+                            </div>
+                        )}
                         {error && (
                             <Alert variant="destructive" className="bg-card">
                                 <AlertCircle className="h-4 w-4" aria-hidden="true" />

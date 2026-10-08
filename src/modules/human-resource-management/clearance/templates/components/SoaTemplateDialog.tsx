@@ -148,6 +148,7 @@ function SoaTemplateForm(props: Omit<SoaTemplateDialogProps, "open" | "template"
                         onValueChange={setDepartmentId}
                         noneLabel="No department — global template"
                         placeholder="Optional — suggest for a department"
+                        searchPlaceholder="Search departments…"
                         disabled={saving}
                     />
                     <p className="text-xs text-muted-foreground">

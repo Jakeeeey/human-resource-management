@@ -21,11 +21,16 @@ export interface ClearanceOption {
     label: string;
 }
 
+function defaultSearchPlaceholder(): string {
+    return "Search…";
+}
+
 export function OptionCombobox(props: {
     options: readonly ClearanceOption[];
     value: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
+    searchPlaceholder?: string;
     disabled?: boolean;
     id?: string;
     emptyMessage?: string;
@@ -35,6 +40,7 @@ export function OptionCombobox(props: {
         value,
         onValueChange,
         placeholder = "Select an option",
+        searchPlaceholder,
         disabled = false,
         id,
         emptyMessage = "No results found.",
@@ -64,7 +70,7 @@ export function OptionCombobox(props: {
             </PopoverTrigger>
             <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                 <Command>
-                    <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+                    <CommandInput placeholder={searchPlaceholder ?? defaultSearchPlaceholder()} />
                     <div
                         className="max-h-64 overflow-y-auto overscroll-contain"
                         onWheel={(event) => {

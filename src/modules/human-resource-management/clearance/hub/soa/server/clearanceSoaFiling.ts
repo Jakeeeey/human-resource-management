@@ -182,9 +182,6 @@ export async function fileClearanceSoaPdf(
     if (!soa) {
         fail(CLEARANCE_SOA_FILING_ERROR_CODES.soaNotFound, `clearance_soa ${soaId} does not exist`);
     }
-    if (soa.status !== "approved") {
-        fail(CLEARANCE_SOA_FILING_ERROR_CODES.notApproved, `clearance_soa ${soaId} is not approved`);
-    }
     if (!soa.pdf_file) {
         fail(CLEARANCE_SOA_FILING_ERROR_CODES.notAttached, `clearance_soa ${soaId} has no attached PDF`);
     }
@@ -195,26 +192,44 @@ export async function fileClearanceSoaPdf(
     const listId = await ensureClearanceDocsListId();
     const now = nowUTC();
     const recordName = soa.ref_no ? `Statement of Account — ${soa.ref_no}` : `Statement of Account — #${soa.id}`;
+    const legacyName = `Statement of Account — #${soa.id}`;
     const filed = await readFirstOrNull(
         `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
         `&filter[list_id][_eq]=${listId}` +
-        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,file_ref&limit=1`
-    );
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id,list_id,record_name,file_ref&limit=1`
+    ) ?? (recordName === legacyName ? null : await readFirstOrNull(
+        `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(legacyName)}&fields=id,list_id,record_name,file_ref&limit=1`
+    ));
     if (filed) {
         const recordId = toId(filed.id);
         const filedListId = toId(filed.list_id);
         if (recordId !== null && filedListId !== null) {
-            const storedRef = toNullableText(filed.file_ref);
-            return { recordId, fileRef: storedRef ?? soa.pdf_file, listId: filedListId, alreadyFiled: true };
+            const patch: Record<string, unknown> = { file_ref: soa.pdf_file, updated_at: now };
+            if (toNullableText(filed.record_name) !== recordName) {
+                patch.record_name = recordName;
+            }
+            const patched: unknown = await dFetch(`/items/employee_file_records/${recordId}`, {
+                method: "PATCH",
+                body: JSON.stringify(patch),
+            });
+            if (!isRecord(patched) || hasErrors(patched)) {
+                fail(CLEARANCE_SOA_FILING_ERROR_CODES.writeFailed, "employee_file_records update failed");
+            }
+            return { recordId, fileRef: soa.pdf_file, listId: filedListId, alreadyFiled: true };
         }
     }
+    const description = soa.status === "approved"
+        ? `Approved statement of account filed on approval (clearance_soa #${soa.id}${soa.ref_no ? `, REF ${soa.ref_no}` : ""}).`
+        : `Statement of account uploaded to the 201 file before approval (clearance_soa #${soa.id}${soa.ref_no ? `, REF ${soa.ref_no}` : ""}).`;
     const created: unknown = await dFetch("/items/employee_file_records", {
         method: "POST",
         body: JSON.stringify({
             user_id: userId,
             list_id: listId,
             record_name: recordName,
-            description: `Approved statement of account filed on approval (clearance_soa #${soa.id}${soa.ref_no ? `, REF ${soa.ref_no}` : ""}).`,
+            description,
             file_ref: soa.pdf_file,
             is_deleted: 0,
             created_at: now,

@@ -205,7 +205,8 @@ export function useSoaDetail(requestId: number | null) {
     const [detail, setDetail] = useState<SoaDetail | null>(null);
     const [items, setItems] = useState<SoaRequestItem[]>([]);
     const [templateId, setTemplateId] = useState<number | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [formClearanceNo, setFormClearanceNo] = useState<string>("");
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async (id: number) => {
@@ -236,6 +237,24 @@ export function useSoaDetail(requestId: number | null) {
             reqItems.sort((left, right) => left.sort_order - right.sort_order || left.id - right.id);
             setDetail(parsed);
             setItems(reqItems);
+            try {
+                const formRes = await fetch(`/api/hrm/clearance/form/by-request?request_id=${id}`, {
+                    cache: "no-store",
+                });
+                const formJson: unknown = await formRes.json().catch(() => null);
+                if (
+                    formRes.ok &&
+                    isRecord(formJson) &&
+                    formJson.success === true &&
+                    isRecord(formJson.data)
+                ) {
+                    setFormClearanceNo(toNullableText(formJson.data.ref_no) ?? "");
+                } else {
+                    setFormClearanceNo("");
+                }
+            } catch {
+                setFormClearanceNo("");
+            }
             const rawTemplate = isRecord(reqJson) && isRecord(reqJson.data)
                 ? toId((reqJson.data as Record<string, unknown>).template_id)
                 : null;
@@ -248,7 +267,10 @@ export function useSoaDetail(requestId: number | null) {
     }, []);
 
     useEffect(() => {
-        if (requestId === null) return;
+        if (requestId === null) {
+            setLoading(false);
+            return;
+        }
         void load(requestId);
     }, [load, requestId]);
 
@@ -297,10 +319,29 @@ export function useSoaDetail(requestId: number | null) {
             }
             const model = normalizeRenderModel(json.data);
             if (!model) throw new Error("Could not build the SOA preview.");
+            if (model.clearanceNo === "") {
+                try {
+                    const formRes = await fetch(`/api/hrm/clearance/form/by-request?request_id=${id}`, {
+                        cache: "no-store",
+                    });
+                    const formJson: unknown = await formRes.json().catch(() => null);
+                    if (
+                        formRes.ok &&
+                        isRecord(formJson) &&
+                        formJson.success === true &&
+                        isRecord(formJson.data)
+                    ) {
+                        const ref = toNullableText((formJson.data as Record<string, unknown>).ref_no) ?? "";
+                        if (ref !== "") return { ...model, clearanceNo: ref };
+                    }
+                } catch {
+                    return model;
+                }
+            }
             return model;
         },
         []
     );
 
-    return { detail, items, templateId, loading, error, reload, saveLines, approve, fetchRenderModel };
+    return { detail, items, templateId, formClearanceNo, loading, error, reload, saveLines, approve, fetchRenderModel };
 }

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
         }
         try {
-            const result = await fileClearanceFormPdf(id);
+            const result = await fileClearanceFormPdf(id, { allowPending: true });
             return NextResponse.json({
                 success: true,
                 data: {

@@ -93,7 +93,52 @@ export function ClearanceFormList({
 
     return (
         <div className="space-y-4">
-            <div className="max-h-120 overflow-auto rounded-md border">
+            <ul className="divide-y divide-border rounded-md border xl:hidden">
+                {rows.map((row) => (
+                    <li key={row.request_id} className="space-y-2 p-4">
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium tabular-nums">
+                                Request #{row.request_id}
+                            </p>
+                            <StatusBadge tone={statusTone(row.status)}>
+                                {statusLabel(row.status)}
+                            </StatusBadge>
+                        </div>
+                        <p className="text-sm break-words" title={row.employee_name}>
+                            {row.employee_name}
+                        </p>
+                        <dl className="space-y-1 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                                <dt className="text-muted-foreground">Template</dt>
+                                <dd className="min-w-0 flex-1 text-right break-words" title={row.template_title ?? ""}>
+                                    {row.template_title ?? "—"}
+                                </dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <dt className="text-muted-foreground">Ref No.</dt>
+                                <dd className="min-w-0 flex-1 text-right break-words" title={row.ref_no ?? ""}>
+                                    {row.ref_no ?? "—"}
+                                </dd>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <dt className="text-muted-foreground">Company</dt>
+                                <dd className="min-w-0 flex-1 text-right break-words" title={row.company_code ?? ""}>
+                                    {row.company_code ?? "—"}
+                                </dd>
+                            </div>
+                        </dl>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => onSelect(row)}
+                        >
+                            View
+                        </Button>
+                    </li>
+                ))}
+            </ul>
+            <div className="hidden overflow-x-auto rounded-md border xl:block">
                 <table className="w-full min-w-200 table-fixed caption-bottom text-sm">
                     <colgroup>
                         <col className="w-24" />

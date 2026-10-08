@@ -28,6 +28,10 @@ export interface FileClearanceFormPdfResult {
     alreadyFiled: boolean;
 }
 
+export interface FileClearanceFormPdfOptions {
+    allowPending?: boolean;
+}
+
 interface FormRef {
     id: number;
     request_id: number;
@@ -173,7 +177,8 @@ export function ensureClearanceDocsListId(): Promise<number> {
 }
 
 export async function fileClearanceFormPdf(
-    formId: number
+    formId: number,
+    options?: FileClearanceFormPdfOptions
 ): Promise<FileClearanceFormPdfResult> {
     if (!Number.isInteger(formId) || formId <= 0) {
         fail(CLEARANCE_FORM_FILING_ERROR_CODES.invalidInput, "formId is required");
@@ -182,7 +187,7 @@ export async function fileClearanceFormPdf(
     if (!form) {
         fail(CLEARANCE_FORM_FILING_ERROR_CODES.formNotFound, `clearance_form ${formId} does not exist`);
     }
-    if (form.status !== "approved") {
+    if (form.status !== "approved" && options?.allowPending !== true) {
         fail(CLEARANCE_FORM_FILING_ERROR_CODES.notApproved, `clearance_form ${formId} is not approved`);
     }
     if (!form.pdf_file) {
@@ -204,8 +209,11 @@ export async function fileClearanceFormPdf(
         const recordId = toId(filed.id);
         const filedListId = toId(filed.list_id);
         if (recordId !== null && filedListId !== null) {
-            const storedRef = toNullableText(filed.file_ref);
-            return { recordId, fileRef: storedRef ?? form.pdf_file, listId: filedListId, alreadyFiled: true };
+            await dFetch(`/items/employee_file_records/${recordId}`, {
+                method: "PATCH",
+                body: JSON.stringify({ file_ref: form.pdf_file, updated_at: now }),
+            });
+            return { recordId, fileRef: form.pdf_file, listId: filedListId, alreadyFiled: true };
         }
     }
     const created: unknown = await dFetch("/items/employee_file_records", {
@@ -240,6 +248,22 @@ export async function fileClearanceFormPdf(
         return { recordId: racedId, fileRef: racedRef ?? form.pdf_file, listId: racedList, alreadyFiled: true };
     }
     fail(CLEARANCE_FORM_FILING_ERROR_CODES.writeFailed, "employee_file_records create returned no row");
+}
+
+export async function hasFiledClearanceFormPdf(formId: number): Promise<boolean> {
+    if (!Number.isInteger(formId) || formId <= 0) return false;
+    const form = await readFormRef(formId);
+    if (!form || !form.pdf_file) return false;
+    const userId = await readRequestUserId(form.request_id);
+    if (userId === null) return false;
+    const listId = await ensureClearanceDocsListId();
+    const recordName = form.ref_no ? `Clearance Form — ${form.ref_no}` : `Clearance Form — #${form.id}`;
+    const filed = await readFirstOrNull(
+        `/items/employee_file_records?filter[user_id][_eq]=${userId}` +
+        `&filter[list_id][_eq]=${listId}` +
+        `&filter[record_name][_eq]=${encodeURIComponent(recordName)}&fields=id&limit=1`
+    );
+    return filed !== null && toId(filed.id) !== null;
 }
 
 export function mapClearanceFormFilingError(error: unknown): NextResponse | null {
