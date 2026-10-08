@@ -116,7 +116,7 @@ export function SignatoryAssignmentCard({
                                 No signatories match the current filter.
                             </p>
                         ) : (
-                        <ul className="grid gap-3 md:grid-cols-2">
+                        <ul className="grid gap-3">
                         {visibleItems.map((item) => {
                             const options = candidates[item.id] ?? [];
                             const value = selections[item.id] ?? null;
