@@ -407,11 +407,6 @@ export function ClearanceWorkspace({
                         </Button>
                     ) : null}
                 </div>
-                {showApprove && approveBlocked ? (
-                    <p className="mt-2 text-xs text-muted-foreground sm:text-right">
-                        Upload the clearance PDF to the 201 file before approving.
-                    </p>
-                ) : null}
             </div>
 
             {isLoading && !detail ? (
