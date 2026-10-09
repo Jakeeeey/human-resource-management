@@ -28,6 +28,7 @@ export interface AttendanceLogWithUser extends AttendanceLog {
   overtime_minutes: number;
   sched_time_in: string | null;
   sched_time_out: string | null;
+  is_flexible_schedule?: boolean;
 }
 
 export interface AttendanceApproval {

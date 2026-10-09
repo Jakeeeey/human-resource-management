@@ -34,6 +34,7 @@ interface Sched {
   time_in: string;
   time_out: string;
   grace_period: number;
+  source: "oncall" | "department";
 }
 
 function timeToDate(dateStr: string, timeStr: string): Date {
@@ -193,6 +194,20 @@ export async function GET(req: NextRequest) {
       return false;
     };
 
+    // Helper to check flexible schedule users in Directus
+    const isFlexibleScheduleUser = (val: unknown): boolean => {
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'number') return val !== 0;
+      if (val === '1' || val === 'true') return true;
+      if (val && typeof val === 'object') {
+        const buf = val as { type?: string; data?: number[] };
+        if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+          return buf.data[0] === 1;
+        }
+      }
+      return false;
+    };
+
     interface UserDetails {
       user_id: number;
       user_fname: string;
@@ -201,11 +216,12 @@ export async function GET(req: NextRequest) {
       user_department: number | null;
       is_employee?: unknown;
       is_deleted?: unknown;
+      is_flexible_schedule?: unknown;
     }
 
     // Fetch all users to have details and identify absent active employees
     const usersResponse = await directusFetch(
-      `/items/user?limit=-1&fields=user_id,user_fname,user_lname,user_mname,user_department,is_employee,is_deleted`
+      `/items/user?limit=-1&fields=user_id,user_fname,user_lname,user_mname,user_department,is_employee,is_deleted,is_flexible_schedule`
     ).catch(() => ({ data: [] }));
 
     const allUsers: UserDetails[] = usersResponse.data || [];
@@ -386,7 +402,8 @@ export async function GET(req: NextRequest) {
             return {
               time_in: ocSched.work_start,
               time_out: ocSched.work_end,
-              grace_period: Number(ocSched.grace_period ?? 5)
+              grace_period: Number(ocSched.grace_period ?? 5),
+              source: "oncall",
             };
           }
         }
@@ -401,7 +418,8 @@ export async function GET(req: NextRequest) {
           return {
             time_in: deptSched.work_start,
             time_out: deptSched.work_end,
-            grace_period: Number(deptSched.grace_period ?? 5)
+            grace_period: Number(deptSched.grace_period ?? 5),
+            source: "department",
           };
         }
       }
@@ -416,6 +434,8 @@ export async function GET(req: NextRequest) {
       const userDeptId = user?.user_department || log.department_id;
 
       const schedule = getEmployeeSchedule(log.user_id, userDeptId, log.log_date);
+      const isFlexible = isFlexibleScheduleUser(user?.is_flexible_schedule);
+      const isExemptFromLate = isFlexible && schedule?.source === "department";
 
       let work_minutes = 0;
       let late_minutes = 0;
@@ -429,8 +449,8 @@ export async function GET(req: NextRequest) {
 
         if (actualIn > schedOut) {
           // LATE TIME IN BEYOND TIME OUT LOGIC:
-          // Cap late to 240 (half day)
-          late_minutes = 240;
+          // Cap late to 240 (half day) unless exempt via flexible schedule on department schedule
+          late_minutes = isExemptFromLate ? 0 : 240;
           work_minutes = 480;
           overtime_minutes = 0;
 
@@ -454,7 +474,7 @@ export async function GET(req: NextRequest) {
           const diffInMs = actualIn.getTime() - schedIn.getTime();
           const diffInMins = Math.floor(diffInMs / 60000);
 
-          if (diffInMins > schedule.grace_period) {
+          if (!isExemptFromLate && diffInMins > schedule.grace_period) {
             late_minutes = diffInMins;
           } else {
             late_minutes = 0;
@@ -516,6 +536,11 @@ export async function GET(req: NextRequest) {
 
       const derivedStatus = manualAdjustments?.status || log.approve_status || "pending";
 
+      let computedStatus = manualAdjustments?.remarks || log.status || (log.time_in ? "On Time" : "Absent");
+      if (isExemptFromLate && computedStatus === "Late" && !manualAdjustments?.remarks) {
+        computedStatus = "On Time";
+      }
+
       return {
         ...log,
         approval_status: derivedStatus.toLowerCase(),
@@ -529,7 +554,8 @@ export async function GET(req: NextRequest) {
         overtime_minutes,
         sched_time_in: schedule?.time_in || null,
         sched_time_out: schedule?.time_out || null,
-        status: manualAdjustments?.remarks || log.status || (log.time_in ? "On Time" : "Absent")
+        status: computedStatus,
+        is_flexible_schedule: isFlexible,
       };
     });
 
@@ -563,6 +589,8 @@ export async function GET(req: NextRequest) {
           statusRemarks = manualAdjustments.remarks || "Absent";
         }
 
+        const isFlexible = isFlexibleScheduleUser(emp.is_flexible_schedule);
+
         absentLogs.push({
           log_id: -(emp.user_id),
           user_id: emp.user_id,
@@ -589,6 +617,7 @@ export async function GET(req: NextRequest) {
           overtime_minutes,
           sched_time_in: schedule?.time_in || null,
           sched_time_out: schedule?.time_out || null,
+          is_flexible_schedule: isFlexible,
         });
       }
     }
