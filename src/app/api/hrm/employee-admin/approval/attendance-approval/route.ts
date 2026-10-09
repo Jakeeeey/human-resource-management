@@ -445,7 +445,19 @@ export async function GET(req: NextRequest) {
       if (log.time_in && schedule) {
         const actualIn = parseLocalISO(log.time_in);
         const schedIn = timeToDate(log.log_date, schedule.time_in);
-        const schedOut = timeToDate(log.log_date, schedule.time_out);
+        let schedOut = timeToDate(log.log_date, schedule.time_out);
+        if (schedOut < schedIn) {
+          schedOut = new Date(schedOut.getTime() + 24 * 60 * 60 * 1000);
+        }
+
+        let actualOut: Date | null = null;
+        if (log.time_out) {
+          actualOut = parseLocalISO(log.time_out);
+          // If actualOut is before actualIn, the punch crossed midnight into the next day
+          if (actualOut < actualIn) {
+            actualOut = new Date(actualOut.getTime() + 24 * 60 * 60 * 1000);
+          }
+        }
 
         if (actualIn > schedOut) {
           // LATE TIME IN BEYOND TIME OUT LOGIC:
@@ -454,8 +466,10 @@ export async function GET(req: NextRequest) {
           work_minutes = 480;
           overtime_minutes = 0;
 
-          if (log.time_out) {
-            const actualOut = parseLocalISO(log.time_out);
+          if (isExemptFromLate) {
+            // Flexible schedule employees are exempt from department schedule undertime
+            undertime_minutes = 0;
+          } else if (actualOut) {
             if (actualOut < schedOut) {
               undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
             } else {
@@ -483,12 +497,14 @@ export async function GET(req: NextRequest) {
           // Base Work Time (Fixed 480 for HR system compliance)
           work_minutes = 480;
 
-          if (log.time_out) {
-            const actualOut = parseLocalISO(log.time_out);
-
-            // Undertime
-            if (actualOut < schedOut) {
+          if (actualOut) {
+            // Undertime: exempt if flexible schedule on department schedule
+            if (isExemptFromLate) {
+              undertime_minutes = 0;
+            } else if (actualOut < schedOut) {
               undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
+            } else {
+              undertime_minutes = 0;
             }
 
             // Overtime: if timed out 90m (1.5h) excess AND has approved overtime_request
@@ -506,7 +522,9 @@ export async function GET(req: NextRequest) {
             // Penalty is based on general_setting 'payroll_no_time_out_undertime_amount'
             // (defaults to 240 if missing).
             // Balancing logic: Late + UT should not exceed 480.
-            if (late_minutes + noTimeOutUndertimePenalty > 480) {
+            if (isExemptFromLate) {
+              undertime_minutes = 0;
+            } else if (late_minutes + noTimeOutUndertimePenalty > 480) {
               undertime_minutes = Math.max(0, 480 - late_minutes);
             } else {
               undertime_minutes = noTimeOutUndertimePenalty;

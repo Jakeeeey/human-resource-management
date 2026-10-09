@@ -366,17 +366,36 @@ export function AttendanceApprovalCutoff() {
 
   // Group logs by employee
   const employeeSummaries = React.useMemo(() => {
-    const summaryMap = new Map<number, EmployeeSummary>();
+    const summaryMap = new Map<number, EmployeeSummary & { attendedDates: Set<string> }>();
     
     filteredLogs.forEach(log => {
+      const isAbsent =
+        (!log.time_in && !log.time_out && (log.work_minutes || 0) === 0) ||
+        (Boolean(log.status) && String(log.status).toLowerCase().includes("absent") && (log.work_minutes || 0) === 0);
+
+      const hasAttendance = !isAbsent && Boolean(
+        (log.time_in && String(log.time_in).trim() !== "") ||
+        (log.time_out && String(log.time_out).trim() !== "") ||
+        (log.work_minutes && log.work_minutes > 0)
+      );
+
       const existing = summaryMap.get(log.user_id);
       if (existing) {
         existing.total_work_minutes += log.work_minutes || 0;
         existing.total_late_minutes += log.late_minutes || 0;
         existing.total_undertime_minutes += log.undertime_minutes || 0;
         existing.total_overtime_minutes += log.overtime_minutes || 0;
-        existing.days_count += 1;
+        if (hasAttendance) {
+          const dateKey = log.log_date ? log.log_date.split("T")[0] : `${existing.attendedDates.size + 1}`;
+          existing.attendedDates.add(dateKey);
+          existing.days_count = existing.attendedDates.size;
+        }
       } else {
+        const attendedDates = new Set<string>();
+        if (hasAttendance) {
+          const dateKey = log.log_date ? log.log_date.split("T")[0] : "1";
+          attendedDates.add(dateKey);
+        }
         summaryMap.set(log.user_id, {
           user_id: log.user_id,
           user_fname: log.user_fname,
@@ -386,7 +405,8 @@ export function AttendanceApprovalCutoff() {
           total_late_minutes: log.late_minutes || 0,
           total_undertime_minutes: log.undertime_minutes || 0,
           total_overtime_minutes: log.overtime_minutes || 0,
-          days_count: 1
+          days_count: attendedDates.size,
+          attendedDates,
         });
       }
     });
