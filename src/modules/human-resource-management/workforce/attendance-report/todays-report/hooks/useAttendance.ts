@@ -42,6 +42,7 @@ export interface RawAttendanceRow {
   work_end?:       string | null;
   grace_period?:   number;
   is_oncall?:      boolean;
+  is_flexible_schedule?: boolean;
   // merged on-call schedule fields (flat) — if employee is on-call
   oncall_work_start?:   string | null;
   oncall_work_end?:     string | null;
@@ -157,11 +158,16 @@ function transformRow(row: RawAttendanceRow): AttendanceRecord {
     ? (row.oncall_work_start ?? row.work_start)
     : row.work_start;
 
+  const isFlexible = row.is_flexible_schedule ?? false;
+  const isExemptFromDeptLate = !isOncall && isFlexible;
+
   const punctuality = isAbsent
     ? null
-    : row.status === 'Late'
-      ? 'Late'
-      : derivePunctuality(timeIn, effectiveWorkStart, row.grace_period);
+    : isExemptFromDeptLate
+      ? 'On Time'
+      : row.status === 'Late'
+        ? 'Late'
+        : derivePunctuality(timeIn, effectiveWorkStart, row.grace_period);
 
   return {
     log_id:          row.log_id,
@@ -174,7 +180,7 @@ function transformRow(row: RawAttendanceRow): AttendanceRecord {
     break_start:     extractTime(row.break_start),
     break_end:       extractTime(row.break_end),
     time_out:        extractTime(row.time_out),
-    status:          row.status,
+    status:          (isExemptFromDeptLate && row.status === 'Late') ? 'On Time' : row.status,
     approval_status: row.approval_status,
     user_fname:      row.user_fname,
     user_lname:      row.user_lname,
