@@ -105,7 +105,7 @@ export function EmployeeSummaryTable({
 
               <TableCell className="px-6 py-4 text-center">
                 <Badge variant="outline" className="rounded-lg font-bold bg-background/50 border-muted/20">
-                  {summary.days_count} Days
+                  {summary.days_count} {summary.days_count === 1 ? "Day" : "Days"}
                 </Badge>
               </TableCell>
 
