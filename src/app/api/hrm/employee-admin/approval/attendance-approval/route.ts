@@ -267,13 +267,29 @@ export async function GET(req: NextRequest) {
           : `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&limit=1000`)
       : (isDailyApproval ? `filter[date_schedule][_eq]=${targetDate}&limit=1000` : `limit=1000`);
 
-    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes] = await Promise.all([
+    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, generalSettingRes] = await Promise.all([
       directusFetch(`/items/department_schedule?limit=1000&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
       directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,schedule_date,workdays`),
       directusFetch(`/items/attendance_approval?${approvalFilter}&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
-      directusFetch(`/items/overtime_request?${userIdsFilter}&filter[status][_eq]=approved&limit=1000&fields=user_id,request_date,status`)
+      directusFetch(`/items/overtime_request?${userIdsFilter}&filter[status][_eq]=approved&limit=1000&fields=user_id,request_date,status`),
+      directusFetch(`/items/general_setting?filter[setting_key][_eq]=payroll_no_time_out_undertime_amount&fields=setting_key,setting_value&limit=1`).catch(() => ({ data: [] }))
     ]);
+
+    // Parse penalty for missing time out from general_setting (defaults to 240 if missing/invalid)
+    let noTimeOutUndertimePenalty = 240;
+    const noTimeOutSetting = generalSettingRes?.data?.[0];
+    if (
+      noTimeOutSetting &&
+      noTimeOutSetting.setting_value !== undefined &&
+      noTimeOutSetting.setting_value !== null &&
+      String(noTimeOutSetting.setting_value).trim() !== ""
+    ) {
+      const parsed = Number(noTimeOutSetting.setting_value);
+      if (!isNaN(parsed) && parsed >= 0) {
+        noTimeOutUndertimePenalty = parsed;
+      }
+    }
 
     const deptSchedules = deptSchedulesRes.data || [];
     const oncallList = oncallListsRes.data || [];
@@ -413,12 +429,26 @@ export async function GET(req: NextRequest) {
 
         if (actualIn > schedOut) {
           // LATE TIME IN BEYOND TIME OUT LOGIC:
-          // Cap late and undertime to 240 each, work 480 (Total 480 deduction, net 0)
+          // Cap late to 240 (half day)
           late_minutes = 240;
-          undertime_minutes = 240;
           work_minutes = 480;
           overtime_minutes = 0;
 
+          if (log.time_out) {
+            const actualOut = parseLocalISO(log.time_out);
+            if (actualOut < schedOut) {
+              undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
+            } else {
+              undertime_minutes = 0;
+            }
+          } else {
+            // Missing time out logic: Penalty based on general_setting (defaults to 240 if missing)
+            if (late_minutes + noTimeOutUndertimePenalty > 480) {
+              undertime_minutes = Math.max(0, 480 - late_minutes);
+            } else {
+              undertime_minutes = noTimeOutUndertimePenalty;
+            }
+          }
         } else {
           // ALWAYS calculate Lateness if they timed in before scheduled time out
           const diffInMs = actualIn.getTime() - schedIn.getTime();
@@ -453,15 +483,15 @@ export async function GET(req: NextRequest) {
             }
           } else {
             // MISSING TIME OUT LOGIC: 
-            // Pay for the whole day (480), but deduct half day (at least 240 undertime)
+            // Penalty is based on general_setting 'payroll_no_time_out_undertime_amount'
+            // (defaults to 240 if missing).
             // Balancing logic: Late + UT should not exceed 480.
-            if (late_minutes > 240) {
-              undertime_minutes = 480 - late_minutes;
+            if (late_minutes + noTimeOutUndertimePenalty > 480) {
+              undertime_minutes = Math.max(0, 480 - late_minutes);
             } else {
-              undertime_minutes = 240;
+              undertime_minutes = noTimeOutUndertimePenalty;
             }
             overtime_minutes = 0;
-
           }
         }
       }
