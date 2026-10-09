@@ -1,0 +1,509 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { JSX } from "react";
+import { AlertCircle, Download, Loader2, Printer, Save } from "lucide-react";
+import { toast } from "sonner";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { SingleDatePicker } from "./SingleDatePicker";import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { type ClearanceForm, type ClearanceFormRenderModel } from "../types";
+import { useCompanyOptions } from "../hooks/useCompanyOptions";
+import { companyLogoDataUrl, fetchEmployeeCompany, pickDefaultCompany, pickEmployeeCompany } from "../../utils/company";
+import { phToday } from "../../utils/time";
+import { freezeApprovedFormPdf } from "../utils/approvedPdfFreeze";
+import {
+    buildClearancePdf,
+    type ClearancePrintEntry,
+} from "../utils/clearancePrintPdf";
+
+interface ClearanceFormPrintDialogProps {
+    form: ClearanceForm | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSaved?: () => void;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+function toFileName(employeeName: string): string {
+    const cleaned = employeeName
+        .split("")
+        .filter((ch) => ch >= " " && !"<>:/\\|?*\"".includes(ch))
+        .join("")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+    return cleaned === "" ? "Employee" : cleaned;
+}
+
+function toFitWidthUrl(url: string): string {
+    const hashIndex = url.indexOf("#");
+    if (hashIndex === -1) return `${url}#zoom=page-width`;
+    const base = url.slice(0, hashIndex);
+    const fragment = url.slice(hashIndex + 1);
+    if (fragment.includes("zoom=")) return url;
+    return fragment ? `${base}#${fragment}&zoom=page-width` : `${base}#zoom=page-width`;
+}
+
+export function ClearanceFormPrintDialog({
+    form,
+    open,
+    onOpenChange,
+    onSaved,
+}: ClearanceFormPrintDialogProps): JSX.Element {
+    const [model, setModel] = useState<ClearanceFormRenderModel | null>(null);
+    const [modelLoading, setModelLoading] = useState(false);
+    const [modelError, setModelError] = useState<string | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [fileName, setFileName] = useState<string>("");
+    const [building, setBuilding] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [dateValue, setDateValue] = useState(phToday());
+    const [companyCode, setCompanyCode] = useState("");
+    const [savingCompany, setSavingCompany] = useState(false);
+    const [companySaveError, setCompanySaveError] = useState<string | null>(null);
+    const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(undefined);
+    const [freezeState, setFreezeState] = useState<"idle" | "freezing" | "done" | "error">("idle");
+    const [freezeError, setFreezeError] = useState<string | null>(null);
+    const urlRef = useRef<string | null>(null);
+    const freezeKeyRef = useRef<string | null>(null);
+    const previewBlobRef = useRef<Blob | null>(null);
+    const printingRef = useRef(false);
+    const printingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { options: companies, isLoading: companiesLoading, error: companiesError } = useCompanyOptions();
+    const viewUrl = previewUrl ? toFitWidthUrl(previewUrl) : null;
+
+    const formId = form?.id ?? null;
+    const formStatus = form?.status ?? null;
+    const isApproved = formStatus === "approved";
+    const formRefNo = form?.ref_no ?? null;
+    const formCompanyCode = form?.company_code ?? null;
+    const requestId = form?.request_id ?? null;
+
+    useEffect(() => {
+        if (!open) {
+            if (urlRef.current) {
+                URL.revokeObjectURL(urlRef.current);
+                urlRef.current = null;
+            }
+            setPreviewUrl(null);
+            setModel(null);
+            setFreezeError(null);
+            previewBlobRef.current = null;
+            return;
+        }
+        setDateValue(phToday());
+        setCompanyCode("");
+        setSavingCompany(false);
+        setCompanySaveError(null);
+    }, [open, formId]);
+
+    useEffect(() => {
+        if (!open) {
+            setEmployeeCompanyId(undefined);
+            return;
+        }
+        if (requestId === null) {
+            setEmployeeCompanyId(null);
+            return;
+        }
+        let cancelled = false;
+        setEmployeeCompanyId(undefined);
+        (async () => {
+            try {
+                const result = await fetchEmployeeCompany({ requestId });
+                if (!cancelled) setEmployeeCompanyId(result.company_id);
+            } catch {
+                if (!cancelled) setEmployeeCompanyId(null);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [open, requestId]);
+
+    const employeeCompany = typeof employeeCompanyId === "number" ? pickEmployeeCompany(companies, employeeCompanyId) : null;
+    const showCompanySelect = employeeCompanyId !== undefined
+        && (employeeCompanyId === null || (!companiesLoading && employeeCompany === null));
+
+    useEffect(() => {
+        if (employeeCompanyId === undefined || companiesLoading) return;
+        if (employeeCompany !== null) {
+            if (companyCode !== employeeCompany.company_code) setCompanyCode(employeeCompany.company_code);
+            return;
+        }
+        const fallback = formCompanyCode ?? pickDefaultCompany(companies, undefined)?.company_code ?? "";
+        if (companyCode === "" && fallback !== "") setCompanyCode(fallback);
+    }, [companies, companiesLoading, formCompanyCode, companyCode, employeeCompanyId, employeeCompany]);
+
+    useEffect(() => {
+        if (!open || requestId === null) return;
+        let cancelled = false;
+        setModelLoading(true);
+        setModelError(null);
+        (async () => {
+            try {
+                const params = new URLSearchParams({
+                    request_id: String(requestId),
+                    date: dateValue,
+                    ref_no: isApproved ? (formRefNo ?? "") : "",
+                });
+                const res = await fetch(`/api/hrm/clearance/form/render-model?${params.toString()}`);
+                if (!res.ok) throw new Error("render-model failed");
+                const body: unknown = await res.json().catch(() => null);
+                if (!isRecord(body) || body.success !== true || !isRecord(body.data)) {
+                    throw new Error("render-model failed");
+                }
+                if (cancelled) return;
+                setModel(body.data as ClearanceFormRenderModel);
+            } catch {
+                if (!cancelled) setModelError("Could not build the clearance form. Please try again.");
+            } finally {
+                if (!cancelled) setModelLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [open, requestId, dateValue, isApproved, formRefNo]);
+
+    const selectedCompany = companies.find((option) => option.company_code === companyCode) ?? null;
+    const letterheadLogo = companyLogoDataUrl(selectedCompany);
+
+    useEffect(() => {
+        if (!open) return;
+        if (urlRef.current) {
+            URL.revokeObjectURL(urlRef.current);
+            urlRef.current = null;
+        }
+        setPreviewUrl(null);
+        previewBlobRef.current = null;
+        if (!model) return;
+        setBuilding(true);
+        setError(null);
+        try {
+            const entries: ClearancePrintEntry[] = model.roles.map((role) => ({
+                category: role.label,
+                signeeName: role.signeeName,
+                signatureDataUrl: null,
+                remarks: role.remarks,
+            }));
+            const blob = buildClearancePdf({
+                employeeName: model.employeeName,
+                entries,
+                refNo: model.refNo,
+                date: model.date,
+                position: model.position,
+                company_name: model.company_name ?? selectedCompany?.company_name,
+                company_address: model.company_address ?? selectedCompany?.company_address ?? null,
+                logo_data_url: model.logo_data_url ?? letterheadLogo,
+                gmName: model.gmName,
+                gmTitle: model.gmTitle,
+            });
+            const url = URL.createObjectURL(blob);
+            urlRef.current = url;
+            previewBlobRef.current = blob;
+            setPreviewUrl(url);
+            const stamp = phToday();
+            setFileName(`Clearance - ${toFileName(model.employeeName)} - ${stamp}.pdf`);
+        } catch {
+            setError("Could not build the PDF. Please try again.");
+        } finally {
+            setBuilding(false);
+        }
+    }, [open, model, selectedCompany, letterheadLogo]);
+
+    useEffect(() => {
+        if (!open || !form || !isApproved || form.pdf_file) return;
+        if (form.ref_no === null || model === null || model.refNo !== form.ref_no) return;
+        if (!previewUrl || previewBlobRef.current === null) return;
+        const key = `${form.id}:${form.ref_no}`;
+        if (freezeKeyRef.current === key || freezeState !== "idle") return;
+        freezeKeyRef.current = key;
+        setFreezeState("freezing");
+        setFreezeError(null);
+        const blob = previewBlobRef.current;
+        const uploadName = fileName === "" ? `Clearance Form - ${form.ref_no}.pdf` : fileName;
+        (async () => {
+            try {
+                const bytes = new Uint8Array(await blob.arrayBuffer());
+                await freezeApprovedFormPdf({ documentId: form.id, bytes, fileName: uploadName });
+                setFreezeState("done");
+            } catch {
+                freezeKeyRef.current = null;
+                setFreezeState("error");
+                setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
+            }
+        })();
+    }, [open, form, isApproved, model, previewUrl, fileName, freezeState]);
+
+    useEffect(() => {
+        return () => {
+            if (urlRef.current) {
+                URL.revokeObjectURL(urlRef.current);
+                urlRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        function releasePrintGuard(): void {
+            printingRef.current = false;
+            if (printingTimerRef.current !== null) {
+                clearTimeout(printingTimerRef.current);
+                printingTimerRef.current = null;
+            }
+        }
+        document.addEventListener("pointerdown", releasePrintGuard, true);
+        document.addEventListener("keydown", releasePrintGuard, true);
+        return () => {
+            document.removeEventListener("pointerdown", releasePrintGuard, true);
+            document.removeEventListener("keydown", releasePrintGuard, true);
+        };
+    }, []);
+
+    function handleOpenChange(next: boolean): void {
+        if (!next && printingRef.current) return;
+        onOpenChange(next);
+    }
+
+    function handleDownload(): void {
+        if (!previewUrl || !fileName) return;
+        const anchor = document.createElement("a");
+        anchor.href = previewUrl;
+        anchor.download = fileName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+    }
+
+    function handlePrint(): void {
+        if (!previewUrl) return;
+        printingRef.current = true;
+        if (printingTimerRef.current !== null) {
+            clearTimeout(printingTimerRef.current);
+        }
+        printingTimerRef.current = setTimeout(() => {
+            printingRef.current = false;
+            printingTimerRef.current = null;
+        }, 60000);
+        const iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.left = "-10000px";
+        iframe.style.top = "0";
+        iframe.style.width = "1024px";
+        iframe.style.height = "768px";
+        iframe.style.border = "0";
+        iframe.src = previewUrl;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+            const frameWindow = iframe.contentWindow;
+            if (!frameWindow) return;
+            const releaseFrame = () => {
+                if (document.body.contains(iframe)) {
+                    document.body.removeChild(iframe);
+                }
+            };
+            frameWindow.addEventListener("afterprint", releaseFrame, { once: true });
+            frameWindow.focus();
+            frameWindow.print();
+            setTimeout(releaseFrame, 60000);
+        };
+    }
+
+    async function handleSaveCompany(): Promise<void> {
+        if (requestId === null || savingCompany) return;
+        const option = companies.find((entry) => entry.company_code === companyCode) ?? null;
+        if (!option) {
+            setCompanySaveError("Choose a company first.");
+            return;
+        }
+        setSavingCompany(true);
+        setCompanySaveError(null);
+        try {
+            const res = await fetch("/api/hrm/clearance/employee-company", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ request_id: requestId, company_id: option.id }),
+            });
+            const payload: unknown = await res.json().catch(() => null);
+            if (!res.ok || !isRecord(payload) || payload.success !== true) {
+                const message = isRecord(payload) && typeof payload.message === "string" && payload.message.trim() !== ""
+                    ? payload.message
+                    : "Could not save the company. Please try again.";
+                throw new Error(message);
+            }
+            setEmployeeCompanyId(option.id);
+            toast.success("Company saved. The reference number was generated.");
+            onSaved?.();
+        } catch (err) {
+            setCompanySaveError(err instanceof Error ? err.message : "Could not save the company. Please try again.");
+        } finally {
+            setSavingCompany(false);
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogContent
+                className="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-w-[85vw] lg:max-w-[1000px]"
+                onFocusOutside={(event) => event.preventDefault()}
+            >
+                <DialogHeader className="shrink-0 border-b px-4 py-3 sm:px-6">
+                    <DialogTitle className="flex items-center gap-2 text-base">
+                        <Printer className="h-4 w-4" aria-hidden="true" />
+                        Print clearance form
+                    </DialogTitle>
+                    <DialogDescription>
+                        {model ? model.employeeName : `Request #${requestId ?? "—"}`}
+                        {formRefNo ? ` — REF ${formRefNo}` : ""}
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="min-h-0 flex-1 overflow-y-auto bg-muted/60 p-3 sm:p-6">
+                    <div className="mx-auto max-w-3xl space-y-3">
+                        <div className="grid gap-3 rounded-[var(--radius)] border bg-card p-4 shadow-sm sm:grid-cols-2">
+                            {showCompanySelect && (
+                            <div className="space-y-2">
+                                <Label htmlFor="clearance-form-company">Company letterhead</Label>
+                                <Select value={companyCode} onValueChange={setCompanyCode} disabled={companiesLoading || isApproved}>
+                                    <SelectTrigger id="clearance-form-company" className="w-full">
+                                        <SelectValue
+                                            placeholder={companiesLoading ? "Loading companies…" : "Choose a company"}
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {companies.map((option) => (
+                                            <SelectItem key={option.id} value={option.company_code}>
+                                                {option.company_name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {companiesError && (
+                                    <p className="text-xs text-destructive">{companiesError}</p>
+                                )}
+                                {selectedCompany?.company_address && (
+                                    <p className="text-xs text-muted-foreground">{selectedCompany.company_address}</p>
+                                )}
+                                {companySaveError && (
+                                    <p className="text-xs text-destructive">{companySaveError}</p>
+                                )}
+                                <Button
+                                    variant="default"
+                                    className="w-full"
+                                    onClick={() => void handleSaveCompany()}
+                                    disabled={savingCompany || companyCode === "" || isApproved}
+                                >
+                                    {savingCompany ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                    ) : (
+                                        <Save className="h-4 w-4" aria-hidden="true" />
+                                    )}
+                                    {savingCompany ? "Saving…" : "Save"}
+                                </Button>
+                            </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="clearance-form-date">Date</Label>
+                                <SingleDatePicker
+                                    id="clearance-form-date"
+                                    value={dateValue}
+                                    onChange={setDateValue}
+                                    disabled={isApproved}
+                                />
+                            </div>
+                            {freezeState === "freezing" && (
+                                <p className="text-xs text-muted-foreground sm:col-span-2">
+                                    Storing the approved PDF to the 201 file…
+                                </p>
+                            )}
+                            {freezeState === "done" && (
+                                <p className="text-xs text-muted-foreground sm:col-span-2">
+                                    Approved PDF stored to the 201 file.
+                                </p>
+                            )}
+                            {freezeError && (
+                                <p className="text-xs text-destructive sm:col-span-2">{freezeError}</p>
+                            )}
+                        </div>
+                        {(error ?? modelError) && (
+                            <Alert variant="destructive" className="bg-card">
+                                <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                                <AlertTitle>Could not build the PDF.</AlertTitle>
+                                <AlertDescription>{error ?? modelError}</AlertDescription>
+                            </Alert>
+                        )}
+                        {building || modelLoading ? (
+                            <div className="flex items-center justify-center gap-3 rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">
+                                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                                <p className="text-sm text-muted-foreground">Generating PDF preview…</p>
+                            </div>
+                        ) : previewUrl ? (
+                            <div className="overflow-hidden rounded-[var(--radius)] border bg-card shadow-md">
+                                <iframe
+                                    src={viewUrl ?? previewUrl}
+                                    className="h-[68vh] w-full border-0 sm:h-[72vh]"
+                                    title="Clearance form preview"
+                                />
+                            </div>
+                        ) : (
+                            !(error ?? modelError) && (
+                                <div className="flex items-center justify-center rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">
+                                    <p className="text-center text-sm text-muted-foreground">
+                                        Preview unavailable. Try closing and opening this dialog again.
+                                    </p>
+                                </div>
+                            )
+                        )}
+                    </div>
+                </div>
+                <DialogFooter className="shrink-0 flex-col gap-2 border-t px-4 py-3 sm:flex-row sm:justify-end">
+                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        onClick={handlePrint}
+                        disabled={!previewUrl || building}
+                    >
+                        <Printer className="h-4 w-4" aria-hidden="true" />
+                        Print
+                    </Button>
+                    <Button
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        onClick={handleDownload}
+                        disabled={!previewUrl || building}
+                    >
+                        {building ? (
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                            <Download className="h-4 w-4" aria-hidden="true" />
+                        )}
+                        {building ? "Building…" : "Download PDF"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
