@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import type { AttendanceLogWithUser } from "../type";
 import { ApprovalModal } from "./ApprovalModal";
+import { RequestDetailDialog, RequestDetailType } from "./RequestDetailDialog";
 import { Input } from "@/components/ui/input";
 import { 
   Select, 
@@ -55,6 +56,27 @@ export function AttendanceTable({
   const [modalMode, setModalMode] = useState<"approve" | "reject" | null>(null);
   const [savingLogId, setSavingLogId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [detailModalState, setDetailModalState] = useState<{
+    isOpen: boolean;
+    type: RequestDetailType;
+    log: AttendanceLogWithUser | null;
+  }>({
+    isOpen: false,
+    type: "undertime",
+    log: null,
+  });
+
+  const handleOpenDetailModal = (type: RequestDetailType, log: AttendanceLogWithUser) => {
+    setDetailModalState({
+      isOpen: true,
+      type,
+      log,
+    });
+  };
+
+  const handleCloseDetailModal = () => {
+    setDetailModalState((prev) => ({ ...prev, isOpen: false }));
+  };
 
   const handleOpenModal = (log: AttendanceLogWithUser, mode: "approve" | "reject") => {
     setSelectedLog(log);
@@ -221,36 +243,46 @@ export function AttendanceTable({
                           {log.user_fname} {log.user_lname}
                         </span>
                         {log.ot_request && (
-                          <span
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDetailModal("overtime", log);
+                            }}
                             className={cn(
-                              "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-tight border shadow-xs transition-all cursor-help whitespace-nowrap",
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-tight border shadow-xs transition-all cursor-pointer hover:brightness-95 hover:scale-105 active:scale-95 whitespace-nowrap",
                               log.ot_request.status.toLowerCase() === "approved"
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
                                 : log.ot_request.status.toLowerCase() === "pending"
-                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
                             )}
-                            title={log.ot_request.purpose ? `OT Purpose: ${log.ot_request.purpose}` : `OT Status: ${log.ot_request.status}`}
+                            title="Click to view Overtime request details"
                           >
                             OT: {log.ot_request.status.charAt(0).toUpperCase() + log.ot_request.status.slice(1).toLowerCase()}
                             {log.ot_request.duration_minutes ? ` (${log.ot_request.duration_minutes}m)` : ""}
-                          </span>
+                          </button>
                         )}
                         {log.ut_request && (
-                          <span
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDetailModal("undertime", log);
+                            }}
                             className={cn(
-                              "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-tight border shadow-xs transition-all cursor-help whitespace-nowrap",
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-tight border shadow-xs transition-all cursor-pointer hover:brightness-95 hover:scale-105 active:scale-95 whitespace-nowrap",
                               log.ut_request.status.toLowerCase() === "approved"
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
                                 : log.ut_request.status.toLowerCase() === "pending"
-                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
                             )}
-                            title={log.ut_request.reason ? `UT Reason: ${log.ut_request.reason}` : `UT Status: ${log.ut_request.status}`}
+                            title="Click to view Undertime request details"
                           >
                             UT: {log.ut_request.status.charAt(0).toUpperCase() + log.ut_request.status.slice(1).toLowerCase()}
                             {log.ut_request.duration_minutes ? ` (${log.ut_request.duration_minutes}m)` : ""}
-                          </span>
+                          </button>
                         )}
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
@@ -418,6 +450,18 @@ export function AttendanceTable({
             confirmText={modalMode === "approve" ? "Approve" : "Reject"}
             confirmVariant={modalMode === "approve" ? "default" : "destructive"}
             log={selectedLog}
+          />
+        )}
+
+        {detailModalState.log && (
+          <RequestDetailDialog
+            isOpen={detailModalState.isOpen}
+            onClose={handleCloseDetailModal}
+            type={detailModalState.type}
+            employeeName={`${detailModalState.log.user_fname} ${detailModalState.log.user_lname}`}
+            logDate={detailModalState.log.log_date}
+            utRequest={detailModalState.log.ut_request}
+            otRequest={detailModalState.log.ot_request}
           />
         )}
       </div>
