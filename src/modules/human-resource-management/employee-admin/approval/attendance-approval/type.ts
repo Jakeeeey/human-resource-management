@@ -19,18 +19,29 @@ export interface AttendanceLog {
 
 export interface OtRequestInfo {
   id: number;
-  status: 'pending' | 'approved' | 'rejected' | string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
   duration_minutes?: number | null;
   purpose?: string | null;
+  remarks?: string | null;
+  sched_timeout?: string | null;
   ot_from?: string | null;
   ot_to?: string | null;
+  filed_at?: string | null;
+  approved_at?: string | null;
 }
 
 export interface UtRequestInfo {
   id: number;
-  status: 'pending' | 'approved' | 'rejected' | string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
   duration_minutes?: number | null;
   reason?: string | null;
+  remarks?: string | null;
+  sched_timeout?: string | null;
+  actual_timeout?: string | null;
+  filed_at?: string | null;
+  approved_at?: string | null;
+  emp_attatchment_uuid?: string | null;
+  override_attachment_uuid?: string | null;
 }
 
 export interface AttendanceLogWithUser extends AttendanceLog {

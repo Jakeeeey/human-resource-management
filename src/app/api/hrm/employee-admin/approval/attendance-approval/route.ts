@@ -285,12 +285,12 @@ export async function GET(req: NextRequest) {
 
     let otFilter = userIdsFilter;
     let utFilter = userIdsFilter;
-    if (isDailyApproval) {
-      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_eq]=${targetDate}`;
-      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_eq]=${targetDate}`;
-    } else if (startDate && endDate) {
-      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${startDate}&filter[request_date][_lte]=${endDate}`;
-      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${startDate}&filter[request_date][_lte]=${endDate}`;
+    const filterDateGte = isDailyApproval ? targetDate : startDate;
+    const filterDateLte = isDailyApproval ? targetDate : endDate;
+
+    if (filterDateGte && filterDateLte) {
+      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
+      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
     }
 
     const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, utRequestsRes, generalSettingRes] = await Promise.all([
@@ -298,8 +298,8 @@ export async function GET(req: NextRequest) {
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
       directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,schedule_date,workdays`),
       directusFetch(`/items/attendance_approval?${approvalFilter}&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
-      directusFetch(`/items/overtime_request?${otFilter}&limit=1000&fields=overtime_id,user_id,request_date,status,duration_minutes,purpose,ot_from,ot_to`).catch(() => ({ data: [] })),
-      directusFetch(`/items/undertime_request?${utFilter}&limit=1000&fields=undertime_id,user_id,request_date,status,duration_minutes,reason,remarks`).catch(() => ({ data: [] })),
+      directusFetch(`/items/overtime_request?${otFilter}&limit=1000&fields=overtime_id,user_id,request_date,status,duration_minutes,purpose,remarks,sched_timeout,ot_from,ot_to,filed_at,approved_at`).catch(() => ({ data: [] })),
+      directusFetch(`/items/undertime_request?${utFilter}&limit=1000&fields=undertime_id,user_id,request_date,status,duration_minutes,reason,remarks,sched_timeout,actual_timeout,filed_at,approved_at,emp_attatchment_uuid,override_attachment_uuid`).catch(() => ({ data: [] })),
       directusFetch(`/items/general_setting?filter[setting_key][_eq]=payroll_no_time_out_undertime_amount&fields=setting_key,setting_value&limit=1`).catch(() => ({ data: [] }))
     ]);
 
@@ -352,8 +352,12 @@ export async function GET(req: NextRequest) {
       status: string;
       duration_minutes?: number | null;
       purpose?: string | null;
+      remarks?: string | null;
+      sched_timeout?: string | null;
       ot_from?: string | null;
       ot_to?: string | null;
+      filed_at?: string | null;
+      approved_at?: string | null;
     }
 
     const otRequestsMap = new Map<string, OTRequestRecord>();
@@ -373,6 +377,12 @@ export async function GET(req: NextRequest) {
       duration_minutes?: number | null;
       reason?: string | null;
       remarks?: string | null;
+      sched_timeout?: string | null;
+      actual_timeout?: string | null;
+      filed_at?: string | null;
+      approved_at?: string | null;
+      emp_attatchment_uuid?: string | null;
+      override_attachment_uuid?: string | null;
     }
 
     const utRequestsMap = new Map<string, UTRequestRecord>();
@@ -617,8 +627,12 @@ export async function GET(req: NextRequest) {
         status: logOtReq.status,
         duration_minutes: logOtReq.duration_minutes ?? null,
         purpose: logOtReq.purpose ?? null,
+        remarks: logOtReq.remarks ?? null,
+        sched_timeout: logOtReq.sched_timeout ?? null,
         ot_from: logOtReq.ot_from ?? null,
         ot_to: logOtReq.ot_to ?? null,
+        filed_at: logOtReq.filed_at ?? null,
+        approved_at: logOtReq.approved_at ?? null,
       } : null;
 
       const ut_request = logUtReq ? {
@@ -626,6 +640,13 @@ export async function GET(req: NextRequest) {
         status: logUtReq.status,
         duration_minutes: logUtReq.duration_minutes ?? null,
         reason: logUtReq.reason || logUtReq.remarks || null,
+        remarks: logUtReq.remarks || null,
+        sched_timeout: logUtReq.sched_timeout ?? null,
+        actual_timeout: logUtReq.actual_timeout ?? null,
+        filed_at: logUtReq.filed_at ?? null,
+        approved_at: logUtReq.approved_at ?? null,
+        emp_attatchment_uuid: logUtReq.emp_attatchment_uuid ?? null,
+        override_attachment_uuid: logUtReq.override_attachment_uuid ?? null,
       } : null;
 
       return {
@@ -689,8 +710,12 @@ export async function GET(req: NextRequest) {
           status: absentOtReq.status,
           duration_minutes: absentOtReq.duration_minutes ?? null,
           purpose: absentOtReq.purpose ?? null,
+          remarks: absentOtReq.remarks ?? null,
+          sched_timeout: absentOtReq.sched_timeout ?? null,
           ot_from: absentOtReq.ot_from ?? null,
           ot_to: absentOtReq.ot_to ?? null,
+          filed_at: absentOtReq.filed_at ?? null,
+          approved_at: absentOtReq.approved_at ?? null,
         } : null;
 
         const ut_request = absentUtReq ? {
@@ -698,6 +723,13 @@ export async function GET(req: NextRequest) {
           status: absentUtReq.status,
           duration_minutes: absentUtReq.duration_minutes ?? null,
           reason: absentUtReq.reason || absentUtReq.remarks || null,
+          remarks: absentUtReq.remarks || null,
+          sched_timeout: absentUtReq.sched_timeout ?? null,
+          actual_timeout: absentUtReq.actual_timeout ?? null,
+          filed_at: absentUtReq.filed_at ?? null,
+          approved_at: absentUtReq.approved_at ?? null,
+          emp_attatchment_uuid: absentUtReq.emp_attatchment_uuid ?? null,
+          override_attachment_uuid: absentUtReq.override_attachment_uuid ?? null,
         } : null;
 
         absentLogs.push({
