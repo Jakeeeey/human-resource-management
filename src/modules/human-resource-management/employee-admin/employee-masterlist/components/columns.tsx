@@ -6,8 +6,9 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, ScanFace } from "lucide-react";
+import { ArrowUpDown, MoreHorizontal, Pencil, Trash2, ScanFace, FileText } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -176,6 +177,12 @@ export const createColumns = (
                         <DropdownMenuItem onClick={() => onViewDetails(user)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href={`/hrm/employee-admin/service-record?userId=${user.id}`} className="flex items-center cursor-pointer">
+                                <FileText className="mr-2 h-4 w-4 text-primary" />
+                                Service Record
+                            </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onScanIris(user)}>
                             <ScanFace className="mr-2 h-4 w-4" />
