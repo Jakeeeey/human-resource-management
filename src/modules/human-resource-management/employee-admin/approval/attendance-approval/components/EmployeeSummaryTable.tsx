@@ -25,6 +25,8 @@ export interface EmployeeSummary {
   total_undertime_minutes: number;
   total_overtime_minutes: number;
   days_count: number;
+  pending_ot_count?: number;
+  pending_ut_count?: number;
 }
 
 interface EmployeeSummaryTableProps {
@@ -99,6 +101,20 @@ export function EmployeeSummaryTable({
                       <span className="mx-1 opacity-20">|</span>
                       <span>{summary.department_name || "No Department"}</span>
                     </span>
+                    {((summary.pending_ot_count || 0) > 0 || (summary.pending_ut_count || 0) > 0) && (
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {(summary.pending_ot_count || 0) > 0 && (
+                          <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                            {summary.pending_ot_count} Pending OT
+                          </Badge>
+                        )}
+                        {(summary.pending_ut_count || 0) > 0 && (
+                          <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                            {summary.pending_ut_count} Pending UT
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </TableCell>

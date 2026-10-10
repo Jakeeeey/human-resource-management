@@ -17,6 +17,22 @@ export interface AttendanceLog {
   updated_at: string;
 }
 
+export interface OtRequestInfo {
+  id: number;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  duration_minutes?: number | null;
+  purpose?: string | null;
+  ot_from?: string | null;
+  ot_to?: string | null;
+}
+
+export interface UtRequestInfo {
+  id: number;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  duration_minutes?: number | null;
+  reason?: string | null;
+}
+
 export interface AttendanceLogWithUser extends AttendanceLog {
   user_fname: string;
   user_lname: string;
@@ -29,6 +45,8 @@ export interface AttendanceLogWithUser extends AttendanceLog {
   sched_time_in: string | null;
   sched_time_out: string | null;
   is_flexible_schedule?: boolean;
+  ot_request?: OtRequestInfo | null;
+  ut_request?: UtRequestInfo | null;
 }
 
 export interface AttendanceApproval {
