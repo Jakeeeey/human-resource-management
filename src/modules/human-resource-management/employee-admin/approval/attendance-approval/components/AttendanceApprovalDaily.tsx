@@ -10,9 +10,12 @@ import {
   Calendar as CalendarIcon,
   Filter,
   Eye,
-  EyeOff
+  EyeOff,
+  Clock,
+  Timer
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -90,10 +93,134 @@ export function AttendanceApprovalDaily() {
     log.user_id.toString().includes(searchTerm)
   );
 
+  const pendingOtCount = React.useMemo(() => {
+    return filteredLogs.filter(log => log.ot_request?.status?.toLowerCase() === "pending").length;
+  }, [filteredLogs]);
+
+  const pendingUtCount = React.useMemo(() => {
+    return filteredLogs.filter(log => log.ut_request?.status?.toLowerCase() === "pending").length;
+  }, [filteredLogs]);
+
   const handleUpdateRow = (logId: number, field: string, value: string | number | null) => {
     setLogs(prev => prev.map(log => 
       log.log_id === logId ? { ...log, [field]: value } : log
     ));
+  };
+
+  const handleApprove = async (log: AttendanceLogWithUser, remarks: string) => {
+    try {
+      setIsProcessing(true);
+      await approveOrRejectAttendance({
+        log_id: log.log_id,
+        employee_id: log.user_id,
+        date_schedule: log.log_date,
+        status: "approved",
+        remarks,
+        work_minutes: log.work_minutes,
+        late_minutes: log.late_minutes,
+        undertime_minutes: log.undertime_minutes,
+        overtime_minutes: log.overtime_minutes
+      });
+      toast.success("Approved successfully");
+      loadLogs();
+    } catch {
+      toast.error("Approval failed");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReject = async (log: AttendanceLogWithUser, remarks: string) => {
+    try {
+      setIsProcessing(true);
+      await approveOrRejectAttendance({
+        log_id: log.log_id,
+        employee_id: log.user_id,
+        date_schedule: log.log_date,
+        status: "rejected",
+        remarks,
+        work_minutes: log.work_minutes,
+        late_minutes: log.late_minutes,
+        undertime_minutes: log.undertime_minutes,
+        overtime_minutes: log.overtime_minutes
+      });
+      toast.success("Rejected successfully");
+      loadLogs();
+    } catch {
+      toast.error("Rejection failed");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBatchApprove = async (selectedLogs: AttendanceLogWithUser[]) => {
+    try {
+      setIsProcessing(true);
+      const pendingLogs = selectedLogs.filter(log => log.approval_status === "pending" || !log.approval_status);
+      
+      if (pendingLogs.length === 0) {
+        toast.info("No pending logs in selection to approve.");
+        return;
+      }
+
+      toast.info(`Approving ${pendingLogs.length} logs...`);
+
+      const updates = pendingLogs.map(log => ({
+        log_id: log.log_id,
+        employee_id: log.user_id,
+        date_schedule: log.log_date,
+        status: "approved" as const,
+        remarks: log.status || "Batch approved",
+        work_minutes: log.work_minutes,
+        late_minutes: log.late_minutes,
+        undertime_minutes: log.undertime_minutes,
+        overtime_minutes: log.overtime_minutes
+      }));
+
+      await approveOrRejectAttendance(updates);
+      toast.success(`${pendingLogs.length} logs approved successfully`);
+      loadLogs();
+    } catch (error) {
+      console.error("Batch approval failed:", error);
+      toast.error("Batch approval failed");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBatchReject = async (selectedLogs: AttendanceLogWithUser[]) => {
+    try {
+      setIsProcessing(true);
+      const pendingLogs = selectedLogs.filter(log => log.approval_status === "pending" || !log.approval_status);
+      
+      if (pendingLogs.length === 0) {
+        toast.info("No pending logs in selection to reject.");
+        return;
+      }
+
+      toast.info(`Rejecting ${pendingLogs.length} logs...`);
+
+      const updates = pendingLogs.map(log => ({
+        log_id: log.log_id,
+        employee_id: log.user_id,
+        date_schedule: log.log_date,
+        status: "rejected" as const,
+        remarks: log.status || "Batch rejected",
+        work_minutes: log.work_minutes,
+        late_minutes: log.late_minutes,
+        undertime_minutes: log.undertime_minutes,
+        overtime_minutes: log.overtime_minutes
+      }));
+
+      await approveOrRejectAttendance(updates);
+      toast.success(`${pendingLogs.length} logs rejected successfully`);
+      loadLogs();
+    } catch (error) {
+      console.error("Batch rejection failed:", error);
+      toast.error("Batch rejection failed");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleSaveRow = async (log: AttendanceLogWithUser) => {
@@ -247,6 +374,23 @@ export function AttendanceApprovalDaily() {
               Show Approved
             </label>
           </div>
+
+          {(pendingOtCount > 0 || pendingUtCount > 0) && (
+            <div className="flex items-center gap-2 ml-2 flex-wrap">
+              {pendingOtCount > 0 && (
+                <Badge variant="outline" className="text-[10px] font-bold px-2 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1.5 shadow-xs whitespace-nowrap">
+                  <Timer className="h-3.5 w-3.5" />
+                  {pendingOtCount} Pending OT
+                </Badge>
+              )}
+              {pendingUtCount > 0 && (
+                <Badge variant="outline" className="text-[10px] font-bold px-2 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1.5 shadow-xs whitespace-nowrap">
+                  <Clock className="h-3.5 w-3.5" />
+                  {pendingUtCount} Pending UT
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -267,37 +411,12 @@ export function AttendanceApprovalDaily() {
           data={filteredLogs}
           onUpdateRow={handleUpdateRow}
           onSaveRow={handleSaveRow}
-          onApprove={async (log, remarks) => {
-             await approveOrRejectAttendance({
-                log_id: log.log_id,
-                employee_id: log.user_id,
-                date_schedule: log.log_date,
-                status: "approved",
-                remarks,
-                work_minutes: log.work_minutes,
-                late_minutes: log.late_minutes,
-                undertime_minutes: log.undertime_minutes,
-                overtime_minutes: log.overtime_minutes
-             });
-             toast.success("Approved");
-             loadLogs();
-          }}
-          onReject={async (log, remarks) => {
-             await approveOrRejectAttendance({
-                log_id: log.log_id,
-                employee_id: log.user_id,
-                date_schedule: log.log_date,
-                status: "rejected",
-                remarks,
-                work_minutes: log.work_minutes,
-                late_minutes: log.late_minutes,
-                undertime_minutes: log.undertime_minutes,
-                overtime_minutes: log.overtime_minutes
-             });
-             toast.success("Rejected");
-             loadLogs();
-          }}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onBatchApprove={handleBatchApprove}
+          onBatchReject={handleBatchReject}
           isLoading={isLoading}
+          isProcessing={isProcessing}
         />
       </div>
     </div>

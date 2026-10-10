@@ -285,12 +285,12 @@ export async function GET(req: NextRequest) {
 
     let otFilter = userIdsFilter;
     let utFilter = userIdsFilter;
-    if (isDailyApproval) {
-      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_eq]=${targetDate}`;
-      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_eq]=${targetDate}`;
-    } else if (startDate && endDate) {
-      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${startDate}&filter[request_date][_lte]=${endDate}`;
-      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${startDate}&filter[request_date][_lte]=${endDate}`;
+    const filterDateGte = isDailyApproval ? targetDate : startDate;
+    const filterDateLte = isDailyApproval ? targetDate : endDate;
+
+    if (filterDateGte && filterDateLte) {
+      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
+      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
     }
 
     const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, utRequestsRes, generalSettingRes] = await Promise.all([
