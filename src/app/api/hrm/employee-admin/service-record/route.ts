@@ -32,6 +32,26 @@ async function directusFetch(path: string, options: RequestInit = {}) {
   return response.json();
 }
 
+const SPRING_BASE = process.env.SPRING_API_BASE_URL;
+
+function isActiveUser(emp: Record<string, unknown>): boolean {
+  const val = emp.isDeleted ?? emp.is_deleted ?? emp.deleted;
+  if (val === undefined || val === null) return true;
+  if (
+    typeof val === "object" &&
+    val !== null &&
+    "data" in val &&
+    Array.isArray((val as { data: unknown[] }).data)
+  ) {
+    return (val as { data: number[] }).data[0] === 0;
+  }
+  if (typeof val === "string") {
+    const s = val.toLowerCase();
+    return s !== "1" && s !== "true";
+  }
+  return !val;
+}
+
 // ============================================================================
 // GET: Fetch Employee Service Record or Employee List
 // ============================================================================
@@ -49,13 +69,10 @@ export async function GET(req: NextRequest) {
     // Action 1: Search / List Employees for Selector
     if (action === "employees") {
       const search = searchParams.get("search")?.trim().toLowerCase() || "";
-      const filter = "filter[isDeleted][_neq]=1&sort=user_lname,user_fname&limit=500";
-      const usersRes = await directusFetch(
-        `/items/user?${filter}&fields=user_id,user_fname,user_mname,user_lname,user_position,user_department,user_dateOfHire`
-      ).catch(() => ({ data: [] }));
 
+      // 1. Fetch departments for lookup map
       const deptsRes = await directusFetch(
-        `/items/department?limit=500&fields=department_id,department_name`
+        `/items/department?limit=-1&fields=department_id,department_name`
       ).catch(() => ({ data: [] }));
 
       const deptsMap = new Map<number, string>(
@@ -65,24 +82,135 @@ export async function GET(req: NextRequest) {
         ])
       );
 
-      const allUsers = usersRes.data || [];
-      const filtered = allUsers
-        .filter((u: { user_fname?: string; user_lname?: string; user_id?: number }) => {
-          if (!search) return true;
-          const fullName = `${u.user_fname || ""} ${u.user_lname || ""}`.toLowerCase();
-          return fullName.includes(search) || String(u.user_id).includes(search);
-        })
-        .map((u: { user_id: number; user_fname: string; user_mname?: string; user_lname: string; user_position?: string; user_department?: number; user_dateOfHire?: string }) => ({
-          user_id: u.user_id,
-          user_fname: u.user_fname,
-          user_mname: u.user_mname || null,
-          user_lname: u.user_lname,
-          user_position: u.user_position || null,
-          department_name: u.user_department ? deptsMap.get(u.user_department) || null : null,
-          user_dateOfHire: u.user_dateOfHire || null,
-        }));
+      const employeeMap = new Map<
+        number,
+        {
+          user_id: number;
+          user_fname: string;
+          user_mname: string | null;
+          user_lname: string;
+          user_position: string | null;
+          department_name: string | null;
+          user_dateOfHire: string | null;
+        }
+      >();
 
-      return NextResponse.json({ data: filtered });
+      // 2. Fetch from Spring Boot (primary employee source in masterlist)
+      if (SPRING_BASE) {
+        try {
+          const upstreamUrl = `${SPRING_BASE.replace(/\/+$/, "")}/users`;
+          const res = await fetch(upstreamUrl, {
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            cache: "no-store",
+          });
+
+          if (res.ok) {
+            const json = await res.json();
+            const rawList: unknown[] = Array.isArray(json) ? json : json?.data || [];
+            for (const item of rawList) {
+              const u = item as Record<string, unknown>;
+              if (!isActiveUser(u)) continue;
+
+              const id = Number(u.id ?? u.user_id);
+              if (!id || isNaN(id)) continue;
+
+              let deptName: string | null = null;
+              if (typeof u.department === "object" && u.department !== null) {
+                deptName =
+                  (u.department as { department_name?: string }).department_name || null;
+              } else if (typeof u.department === "number") {
+                deptName = deptsMap.get(u.department) || null;
+              }
+
+              employeeMap.set(id, {
+                user_id: id,
+                user_fname: String(u.firstName || u.user_fname || ""),
+                user_mname: u.middleName
+                  ? String(u.middleName)
+                  : u.user_mname
+                  ? String(u.user_mname)
+                  : null,
+                user_lname: String(u.lastName || u.user_lname || ""),
+                user_position: u.position
+                  ? String(u.position)
+                  : u.user_position
+                  ? String(u.user_position)
+                  : null,
+                department_name: deptName,
+                user_dateOfHire: u.dateOfHire
+                  ? String(u.dateOfHire)
+                  : u.user_dateOfHire
+                  ? String(u.user_dateOfHire)
+                  : null,
+              });
+            }
+          }
+        } catch (springErr) {
+          console.warn("[Service Record] Spring Boot users fetch failed:", springErr);
+        }
+      }
+
+      // 3. Also fetch from Directus to merge or fallback (using limit=-1 and fields=*)
+      try {
+        const directusRes = await directusFetch(
+          `/items/user?limit=-1&fields=*`
+        ).catch(() => ({ data: [] }));
+
+        const dUsers: Record<string, unknown>[] = directusRes.data || [];
+        for (const u of dUsers) {
+          if (!isActiveUser(u)) continue;
+
+          const id = Number(u.user_id ?? u.id);
+          if (!id || isNaN(id)) continue;
+
+          const existing = employeeMap.get(id);
+          const deptId =
+            typeof u.user_department === "number" ? u.user_department : null;
+          const deptName = deptId
+            ? deptsMap.get(deptId) || null
+            : existing?.department_name || null;
+
+          employeeMap.set(id, {
+            user_id: id,
+            user_fname: String(
+              u.user_fname || existing?.user_fname || u.firstName || ""
+            ),
+            user_mname: u.user_mname
+              ? String(u.user_mname)
+              : existing?.user_mname || null,
+            user_lname: String(
+              u.user_lname || existing?.user_lname || u.lastName || ""
+            ),
+            user_position: u.user_position
+              ? String(u.user_position)
+              : existing?.user_position || null,
+            department_name: deptName,
+            user_dateOfHire: u.user_dateOfHire
+              ? String(u.user_dateOfHire)
+              : existing?.user_dateOfHire || null,
+          });
+        }
+      } catch (directusErr) {
+        console.warn("[Service Record] Directus user fetch failed:", directusErr);
+      }
+
+      let allEmployees = Array.from(employeeMap.values());
+      if (search) {
+        allEmployees = allEmployees.filter((u) => {
+          const fullName = `${u.user_fname} ${u.user_mname || ""} ${u.user_lname}`.toLowerCase();
+          return fullName.includes(search) || String(u.user_id).includes(search);
+        });
+      }
+
+      allEmployees.sort((a, b) => {
+        const cmp = a.user_lname.localeCompare(b.user_lname);
+        return cmp !== 0 ? cmp : a.user_fname.localeCompare(b.user_fname);
+      });
+
+      return NextResponse.json({ data: allEmployees });
     }
 
     // Action 2: Get Single Employee Service Record Profile
@@ -95,24 +223,54 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
     }
 
-    // 1. Fetch user data
-    const userRes = await directusFetch(
-      `/items/user/${userId}?fields=user_id,user_fname,user_mname,user_lname,user_maiden_name,user_bday,user_birth_place,user_bp_number,user_position,user_department,user_dateOfHire,separation_date,separation_cause,isDeleted`
-    ).catch(() => ({ data: null }));
+    // 1. Fetch user data (try Directus with fields=*, fallback to Spring Boot)
+    let user: Record<string, unknown> | null = null;
+    const userRes = await directusFetch(`/items/user/${userId}?fields=*`).catch(() => ({
+      data: null,
+    }));
 
-    if (!userRes.data) {
+    if (userRes.data) {
+      user = userRes.data as Record<string, unknown>;
+    } else if (SPRING_BASE) {
+      // Fallback: try Spring Boot
+      try {
+        const upstreamUrl = `${SPRING_BASE.replace(/\/+$/, "")}/users/${userId}`;
+        const sRes = await fetch(upstreamUrl, {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: "no-store",
+        });
+        if (sRes.ok) {
+          user = (await sRes.json()) as Record<string, unknown>;
+        }
+      } catch {
+        // Fallback error ignored
+      }
+    }
+
+    if (!user) {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
-    const user = userRes.data;
-
     // Fetch department name
     let departmentName: string | null = null;
-    if (user.user_department) {
+    const deptId =
+      typeof user.user_department === "number"
+        ? user.user_department
+        : typeof user.department === "number"
+        ? user.department
+        : null;
+
+    if (deptId) {
       const deptRes = await directusFetch(
-        `/items/department/${user.user_department}?fields=department_name`
+        `/items/department/${deptId}?fields=department_name`
       ).catch(() => ({ data: null }));
       departmentName = deptRes.data?.department_name || null;
+    } else if (typeof user.department === "object" && user.department !== null) {
+      departmentName =
+        (user.department as { department_name?: string }).department_name || null;
     }
 
     // 2. Fetch service records for this user
@@ -143,26 +301,61 @@ export async function GET(req: NextRequest) {
     };
 
     // 4. Compute active / "Still in the Service" status
-    const isSeparated = Boolean(user.separation_date && String(user.separation_date).trim() !== "");
-    const isStillInService = !isSeparated && !user.isDeleted;
+    const separationDate = user.separation_date ?? user.separationDate ?? null;
+    const isSeparated = Boolean(
+      separationDate && String(separationDate).trim() !== ""
+    );
+    const isStillInService = !isSeparated && isActiveUser(user);
 
     return NextResponse.json({
       data: {
         employee: {
-          user_id: user.user_id,
-          user_fname: user.user_fname,
-          user_mname: user.user_mname || null,
-          user_lname: user.user_lname,
-          user_maiden_name: user.user_maiden_name || null,
-          user_bday: user.user_bday || null,
-          user_birth_place: user.user_birth_place || null,
-          user_bp_number: user.user_bp_number || null,
-          user_position: user.user_position || null,
-          user_department: user.user_department || null,
+          user_id: Number(user.user_id ?? user.id ?? userId),
+          user_fname: String(user.user_fname ?? user.firstName ?? ""),
+          user_mname: user.user_mname
+            ? String(user.user_mname)
+            : user.middleName
+            ? String(user.middleName)
+            : null,
+          user_lname: String(user.user_lname ?? user.lastName ?? ""),
+          user_maiden_name: user.user_maiden_name
+            ? String(user.user_maiden_name)
+            : user.maidenName
+            ? String(user.maidenName)
+            : null,
+          user_bday: user.user_bday
+            ? String(user.user_bday)
+            : user.birthday
+            ? String(user.birthday)
+            : null,
+          user_birth_place: user.user_birth_place
+            ? String(user.user_birth_place)
+            : user.placeOfBirth
+            ? String(user.placeOfBirth)
+            : null,
+          user_bp_number: user.user_bp_number
+            ? String(user.user_bp_number)
+            : user.bpNumber
+            ? String(user.bpNumber)
+            : null,
+          user_position: user.user_position
+            ? String(user.user_position)
+            : user.position
+            ? String(user.position)
+            : null,
+          user_department: deptId,
           department_name: departmentName,
-          user_dateOfHire: user.user_dateOfHire || null,
-          separation_date: user.separation_date || null,
-          separation_cause: user.separation_cause || null,
+          user_dateOfHire: user.user_dateOfHire
+            ? String(user.user_dateOfHire)
+            : user.dateOfHire
+            ? String(user.dateOfHire)
+            : null,
+          separation_date: separationDate ? String(separationDate) : null,
+          separation_cause: user.separation_cause
+            ? String(user.separation_cause)
+            : user.separationCause
+            ? String(user.separationCause)
+            : null,
           is_active: isStillInService,
         },
         records: rawRecords,
