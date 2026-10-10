@@ -168,35 +168,73 @@ export async function listDueRelayRows(
     }
 }
 
-/**
- * Unique-constraint claim: POSTs (outbox_id, attempt) into
- * ms_outbox_claims, whose UNIQUE index on (outbox_id, attempt) lets
- * Postgres pick the winner. 2xx = this sweeper owns the row; ANY failure
- * (conflict = another sweeper holds it, or a transient) yields false and
- * the row stays due for next time.
- */
-async function tryClaimRelayRow(
-    id: string | number,
-    expectedAttempts: number,
-): Promise<boolean> {
+const MS_RELAY_CLAIM_LEASE_MS = 15 * 60 * 1000;
+
+function claimLeaseExpired(claimedAt: string): boolean {
+    const normalized = claimedAt.trim().replace(" ", "T");
+    const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(normalized) ? normalized : `${normalized}+08:00`;
+    const parsed = Date.parse(zoned);
+    if (Number.isNaN(parsed)) return false;
+    return Date.now() - parsed > MS_RELAY_CLAIM_LEASE_MS;
+}
+
+async function postClaim(id: string | number, attempt: number): Promise<boolean> {
     try {
         const res = (await dFetch(CLAIMS_COLLECTION, {
             method: "POST",
             body: JSON.stringify({
                 outbox_id: id,
-                attempt: expectedAttempts + 1,
+                attempt,
                 claimed_at: getPhilippineTime(),
             }),
         })) as { data?: unknown; errors?: unknown };
-        if (res !== null && typeof res === "object" && !("errors" in res) && "data" in res) {
-            return true;
-        }
-        msLogRedacted("[relay-service] claim lost (row left due):", res);
-        return false;
+        return isRecord(res) && !("errors" in res) && "data" in res;
     } catch (error) {
-        msLogRedacted("[relay-service] claim failed (row left due):", error);
+        msLogRedacted("[relay-service] claim request failed (row left due):", error);
         return false;
     }
+}
+
+async function releaseStaleClaim(id: string | number, attempt: number): Promise<boolean> {
+    try {
+        const res = (await dFetch(
+            `${CLAIMS_COLLECTION}?filter[outbox_id][_eq]=${encodeURIComponent(String(id))}` +
+                `&filter[attempt][_eq]=${attempt}&fields=id,claimed_at&limit=1`,
+        )) as { data?: unknown };
+        if (!isRecord(res) || !Array.isArray(res.data)) return false;
+        if (res.data.length === 0) return true;
+        const row = res.data[0];
+        if (!isRecord(row)) return false;
+        const claimedAt = row.claimed_at;
+        if (typeof claimedAt !== "string" || !claimLeaseExpired(claimedAt)) return false;
+        const claimId = row.id;
+        if (typeof claimId !== "string" && typeof claimId !== "number") return false;
+        await dFetch(`${CLAIMS_COLLECTION}/${encodeURIComponent(String(claimId))}`, {
+            method: "DELETE",
+        });
+        return true;
+    } catch (error) {
+        msLogRedacted("[relay-service] stale claim release failed:", error);
+        return false;
+    }
+}
+
+async function tryClaimRelayRow(
+    id: string | number,
+    expectedAttempts: number,
+): Promise<boolean> {
+    const attempt = expectedAttempts + 1;
+    if (await postClaim(id, attempt)) return true;
+    if (!(await releaseStaleClaim(id, attempt))) {
+        msLogRedacted("[relay-service] claim lost (row left due):", { id, attempt });
+        return false;
+    }
+    if (await postClaim(id, attempt)) {
+        msLogRedacted("[relay-service] stale claim recovered:", { id, attempt });
+        return true;
+    }
+    msLogRedacted("[relay-service] claim lost after stale release (row left due):", { id, attempt });
+    return false;
 }
 
 /** Best-effort row PATCH (logged, never thrown). */
