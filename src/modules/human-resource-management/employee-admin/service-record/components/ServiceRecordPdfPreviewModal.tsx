@@ -27,59 +27,65 @@ export function ServiceRecordPdfPreviewModal({
   data,
 }: ServiceRecordPdfPreviewModalProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [showOverrideSettings, setShowOverrideSettings] = useState(false);
 
   // Signatory overrides for this print job
-  const [preparedByName, setPreparedByName] = useState("");
-  const [preparedByTitle, setPreparedByTitle] = useState("");
-  const [certifiedByName, setCertifiedByName] = useState("");
-  const [certifiedByTitle, setCertifiedByTitle] = useState("");
+  const [overridePreparedByName, setOverridePreparedByName] = useState<string | null>(null);
+  const [overridePreparedByTitle, setOverridePreparedByTitle] = useState<string | null>(null);
+  const [overrideCertifiedByName, setOverrideCertifiedByName] = useState<string | null>(null);
+  const [overrideCertifiedByTitle, setOverrideCertifiedByTitle] = useState<string | null>(null);
   const [certDate, setCertDate] = useState(new Date().toISOString().split("T")[0]);
   const [useDittoMarks, setUseDittoMarks] = useState(false);
+  const [headerStyle, setHeaderStyle] = useState<"template" | "official">("template");
+
+  const isGenerating = Boolean(isOpen && data && !pdfUrl);
+
+  const preparedByName =
+    overridePreparedByName ?? data?.setting?.default_prepared_by_name ?? "MELISSA O. SESIO";
+  const preparedByTitle =
+    overridePreparedByTitle ?? data?.setting?.default_prepared_by_title ?? "Admin. Officer II";
+  const certifiedByName =
+    overrideCertifiedByName ?? data?.setting?.default_certified_by_name ?? "JOHN D. ALIDON";
+  const certifiedByTitle =
+    overrideCertifiedByTitle ?? data?.setting?.default_certified_by_title ?? "Admin. Officer IV/HRMO II";
 
   useEffect(() => {
-    if (data?.setting) {
-      setPreparedByName(data.setting.default_prepared_by_name || "MELISSA O. SESIO");
-      setPreparedByTitle(data.setting.default_prepared_by_title || "Admin. Officer II");
-      setCertifiedByName(data.setting.default_certified_by_name || "JOHN D. ALIDON");
-      setCertifiedByTitle(data.setting.default_certified_by_title || "Admin. Officer IV/HRMO II");
-    }
-  }, [data]);
+    if (!isOpen || !data) return;
 
-  useEffect(() => {
-    if (!isOpen || !data) {
+    let isCancelled = false;
+    let activeUrl: string | null = null;
+
+    generateServiceRecordPdf(data, {
+      preparedByName: preparedByName || undefined,
+      preparedByTitle: preparedByTitle || undefined,
+      certifiedByName: certifiedByName || undefined,
+      certifiedByTitle: certifiedByTitle || undefined,
+      certificationDate: certDate ? new Date(certDate) : new Date(),
+      useDittoMarks,
+      headerStyle,
+    })
+      .then((doc) => {
+        if (isCancelled) return;
+        const blob = doc.output("blob");
+        activeUrl = URL.createObjectURL(blob);
+        setPdfUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return activeUrl;
+        });
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.error("Failed to generate PDF preview", err);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+      if (activeUrl) URL.revokeObjectURL(activeUrl);
       setPdfUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
         return null;
       });
-      return;
-    }
-
-    let activeUrl: string | null = null;
-    setIsGenerating(true);
-
-    try {
-      const doc = generateServiceRecordPdf(data, {
-        preparedByName: preparedByName || undefined,
-        preparedByTitle: preparedByTitle || undefined,
-        certifiedByName: certifiedByName || undefined,
-        certifiedByTitle: certifiedByTitle || undefined,
-        certificationDate: certDate ? new Date(certDate) : new Date(),
-        useDittoMarks,
-      });
-
-      const blob = doc.output("blob");
-      activeUrl = URL.createObjectURL(blob);
-      setPdfUrl(activeUrl);
-    } catch (err) {
-      console.error("Failed to generate PDF preview", err);
-    } finally {
-      setIsGenerating(false);
-    }
-
-    return () => {
-      if (activeUrl) URL.revokeObjectURL(activeUrl);
     };
   }, [
     isOpen,
@@ -90,35 +96,46 @@ export function ServiceRecordPdfPreviewModal({
     certifiedByTitle,
     certDate,
     useDittoMarks,
+    headerStyle,
   ]);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!data) return;
-    const doc = generateServiceRecordPdf(data, {
-      preparedByName: preparedByName || undefined,
-      preparedByTitle: preparedByTitle || undefined,
-      certifiedByName: certifiedByName || undefined,
-      certifiedByTitle: certifiedByTitle || undefined,
-      certificationDate: certDate ? new Date(certDate) : new Date(),
-      useDittoMarks,
-    });
-    const filename = `Service_Record_${data.employee.user_lname}_${data.employee.user_fname}.pdf`;
-    doc.save(filename);
+    try {
+      const doc = await generateServiceRecordPdf(data, {
+        preparedByName: preparedByName || undefined,
+        preparedByTitle: preparedByTitle || undefined,
+        certifiedByName: certifiedByName || undefined,
+        certifiedByTitle: certifiedByTitle || undefined,
+        certificationDate: certDate ? new Date(certDate) : new Date(),
+        useDittoMarks,
+        headerStyle,
+      });
+      const filename = `Service_Record_${data.employee.user_lname}_${data.employee.user_fname}.pdf`;
+      doc.save(filename);
+    } catch (err) {
+      console.error("Failed to download PDF", err);
+    }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!data) return;
-    const doc = generateServiceRecordPdf(data, {
-      preparedByName: preparedByName || undefined,
-      preparedByTitle: preparedByTitle || undefined,
-      certifiedByName: certifiedByName || undefined,
-      certifiedByTitle: certifiedByTitle || undefined,
-      certificationDate: certDate ? new Date(certDate) : new Date(),
-      useDittoMarks,
-    });
-    doc.autoPrint();
-    const blobUrl = URL.createObjectURL(doc.output("blob"));
-    window.open(blobUrl, "_blank");
+    try {
+      const doc = await generateServiceRecordPdf(data, {
+        preparedByName: preparedByName || undefined,
+        preparedByTitle: preparedByTitle || undefined,
+        certifiedByName: certifiedByName || undefined,
+        certifiedByTitle: certifiedByTitle || undefined,
+        certificationDate: certDate ? new Date(certDate) : new Date(),
+        useDittoMarks,
+        headerStyle,
+      });
+      doc.autoPrint();
+      const blobUrl = URL.createObjectURL(doc.output("blob"));
+      window.open(blobUrl, "_blank");
+    } catch (err) {
+      console.error("Failed to print PDF", err);
+    }
   };
 
   if (!data) return null;
@@ -182,7 +199,7 @@ export function ServiceRecordPdfPreviewModal({
               <Label className="text-[10px] font-bold uppercase">Prepared By (Name)</Label>
               <Input
                 value={preparedByName}
-                onChange={(e) => setPreparedByName(e.target.value)}
+                onChange={(e) => setOverridePreparedByName(e.target.value)}
                 className="h-7 text-xs rounded-lg"
               />
             </div>
@@ -190,7 +207,7 @@ export function ServiceRecordPdfPreviewModal({
               <Label className="text-[10px] font-bold uppercase">Prepared By (Title)</Label>
               <Input
                 value={preparedByTitle}
-                onChange={(e) => setPreparedByTitle(e.target.value)}
+                onChange={(e) => setOverridePreparedByTitle(e.target.value)}
                 className="h-7 text-xs rounded-lg"
               />
             </div>
@@ -198,7 +215,15 @@ export function ServiceRecordPdfPreviewModal({
               <Label className="text-[10px] font-bold uppercase">Certified Correct (Name)</Label>
               <Input
                 value={certifiedByName}
-                onChange={(e) => setCertifiedByName(e.target.value)}
+                onChange={(e) => setOverrideCertifiedByName(e.target.value)}
+                className="h-7 text-xs rounded-lg"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase">Certified Correct (Title)</Label>
+              <Input
+                value={certifiedByTitle}
+                onChange={(e) => setOverrideCertifiedByTitle(e.target.value)}
                 className="h-7 text-xs rounded-lg"
               />
             </div>
@@ -210,6 +235,17 @@ export function ServiceRecordPdfPreviewModal({
                 onChange={(e) => setCertDate(e.target.value)}
                 className="h-7 text-xs rounded-lg"
               />
+            </div>
+            <div className="space-y-1 sm:col-span-2 md:col-span-2">
+              <Label className="text-[10px] font-bold uppercase">Header Style</Label>
+              <select
+                value={headerStyle}
+                onChange={(e) => setHeaderStyle(e.target.value as "template" | "official")}
+                className="h-7 w-full rounded-lg border border-border bg-background px-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="template">Saved PDF Template (Company / LGU Branding)</option>
+                <option value="official">Official Government Letterhead (Republic of the Philippines)</option>
+              </select>
             </div>
             <div className="col-span-full pt-1 flex items-center gap-2">
               <input

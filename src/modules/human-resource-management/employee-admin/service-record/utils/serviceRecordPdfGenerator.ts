@@ -2,21 +2,37 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import type { ServiceRecordDataResponse, ServiceRecordEntry } from "../type";
+import { PdfEngine } from "@/components/pdf-layout-design/PdfEngine";
+import { pdfTemplateService } from "@/components/pdf-layout-design/services/pdf-template";
 
-interface GeneratePdfOptions {
+export interface GeneratePdfOptions {
   preparedByName?: string;
   preparedByTitle?: string;
   certifiedByName?: string;
   certifiedByTitle?: string;
   certificationDate?: Date;
   useDittoMarks?: boolean;
+  headerStyle?: "template" | "official";
+  templateName?: string;
 }
 
-export function generateServiceRecordPdf(
+async function fetchCompanyData() {
+  try {
+    const res = await fetch("/api/pdf/company", { credentials: "include" });
+    if (!res.ok) return null;
+    const result = await res.json();
+    return result.data?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateServiceRecordPdf(
   data: ServiceRecordDataResponse,
   options: GeneratePdfOptions = {}
-): jsPDF {
+): Promise<jsPDF> {
   const { employee, records, setting, is_still_in_service } = data;
+  const headerStyle = options.headerStyle ?? "template";
 
   const doc = new jsPDF({
     orientation: "portrait",
@@ -60,36 +76,105 @@ export function generateServiceRecordPdf(
   // ==========================================================================
   // 1. TOP HEADER & LETTERHEAD
   // ==========================================================================
-  let currentY = 16;
+  let currentY = 18;
+  let templateApplied = false;
+  let companyData: Record<string, unknown> | null = null;
 
-  doc.setFont("times", "normal");
-  doc.setFontSize(10);
-  doc.text(setting.agency_name || "Republic of the Philippines", pageWidth / 2, currentY, {
-    align: "center",
-  });
-  currentY += 4.5;
+  if (headerStyle === "template") {
+    try {
+      const [fetchedCompany, templates] = await Promise.all([
+        fetchCompanyData(),
+        pdfTemplateService.fetchTemplates().catch(() => []),
+      ]);
 
-  if (setting.sub_header) {
-    doc.setFont("times", "normal");
-    doc.setFontSize(9.5);
-    doc.text(setting.sub_header, pageWidth / 2, currentY, { align: "center" });
-    currentY += 4.5;
+      companyData = fetchedCompany;
+
+      const chosenTemplate =
+        (options.templateName && templates.find((t) => t.name === options.templateName)?.name) ||
+        templates.find((t) => t.name.toLowerCase() === "header" || t.name.toLowerCase() === "official header")?.name ||
+        templates[0]?.name;
+
+      if (chosenTemplate) {
+        const templateData = {
+          ...companyData,
+          employee_name: `${employee.user_lname}, ${employee.user_fname} ${employee.user_mname || ""}`.trim(),
+          employee_id: employee.user_id,
+          department: employee.department_name || "",
+        };
+
+        const safeY = await PdfEngine.applyTemplate(doc, chosenTemplate, templateData);
+        if (safeY > 15) {
+          currentY = safeY + 4;
+          templateApplied = true;
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to apply PDF template header, using fallback:", err);
+    }
   }
 
-  if (setting.office_address) {
-    doc.setFont("times", "normal");
-    doc.setFontSize(8.5);
-    doc.text(setting.office_address, pageWidth / 2, currentY, { align: "center" });
-    currentY += 4.5;
+  // Header Rendering based on selected headerStyle
+  if (!templateApplied) {
+    if (headerStyle === "template" && companyData?.company_name) {
+      // Use Company Information
+      currentY = 16;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text(String(companyData.company_name), pageWidth / 2, currentY, { align: "center" });
+      currentY += 5;
+
+      const addressParts = [
+        companyData.company_address,
+        companyData.company_city,
+        companyData.company_province,
+      ].filter(Boolean);
+
+      if (addressParts.length > 0) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(addressParts.join(", "), pageWidth / 2, currentY, { align: "center" });
+        currentY += 4.5;
+      }
+
+      if (companyData.company_contact || companyData.company_email) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        const contactLine = [companyData.company_contact, companyData.company_email].filter(Boolean).join(" | ");
+        doc.text(contactLine, pageWidth / 2, currentY, { align: "center" });
+        currentY += 4.5;
+      }
+
+      currentY += 4;
+    } else {
+      // Official Government Letterhead
+      currentY = 18;
+      doc.setFont("times", "normal");
+      doc.setFontSize(11);
+      doc.text(
+        setting?.agency_name || "Republic of the Philippines",
+        pageWidth / 2,
+        currentY,
+        { align: "center" }
+      );
+      currentY += 5;
+
+      doc.setFont("times", "normal");
+      doc.setFontSize(11);
+      doc.text(
+        setting?.sub_header || "Civil Service Commission",
+        pageWidth / 2,
+        currentY,
+        { align: "center" }
+      );
+      currentY += 10;
+    }
   }
 
-  currentY += 3;
-
-  // Title: SERVICE RECORD
+  // Title: S E R V I C E   R E C O R D
   doc.setFont("times", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(12.5);
   doc.text("S E R V I C E   R E C O R D", pageWidth / 2, currentY, { align: "center" });
-  currentY += 8;
+  currentY += 9;
 
   // ==========================================================================
   // 2. EMPLOYEE INFORMATION HEADER BLOCK
@@ -180,7 +265,7 @@ export function generateServiceRecordPdf(
   doc.setFontSize(8);
   doc.setFont("times", "normal");
   const certParagraph =
-    setting.certification_text ||
+    setting?.certification_text ||
     "This is to certify that the employee named herein above actually rendered service in this Office as shown by the service record below. Each line of which is supported by appointment and other papers actually issued by this office and approved by the authorities concerned.";
 
   const certLines = doc.splitTextToSize(certParagraph, pageWidth - margin * 2);
@@ -244,7 +329,10 @@ export function generateServiceRecordPdf(
         { content: "Salary", styles: { halign: "center" } },
       ],
     ],
-    body: tableRows.length > 0 ? tableRows : [["--", "--", "No service records recorded", "--", "--", "--", "--", "--", "--"]],
+    body:
+      tableRows.length > 0
+        ? tableRows
+        : [["--", "--", "No service records recorded", "--", "--", "--", "--", "--", "--"]],
     theme: "plain",
     tableLineColor: [0, 0, 0],
     tableLineWidth: 0.25,
@@ -283,7 +371,7 @@ export function generateServiceRecordPdf(
   const lastAutoTable = (doc as any).lastAutoTable;
   let finalY = lastAutoTable ? lastAutoTable.finalY + 5 : currentY + 30;
 
-  // Check if we have enough room on the current page for the footer (need approx. 40mm)
+  // Check room on the current page for the footer (need approx. 40mm)
   if (finalY > pageHeight - 48) {
     doc.addPage();
     finalY = 20;
@@ -307,7 +395,7 @@ export function generateServiceRecordPdf(
   doc.setFont("times", "normal");
   doc.setFontSize(7.5);
   const complianceText =
-    setting.legal_basis_text ||
+    setting?.legal_basis_text ||
     "Issued in compliance with Executive Order No. 54, dated August 10, 1954 in accordance with Circular No. 54, dated August 10, 1954 of the System.";
   const compLines = doc.splitTextToSize(complianceText, pageWidth - margin * 2);
   doc.text(compLines, margin, finalY);
@@ -316,11 +404,11 @@ export function generateServiceRecordPdf(
   // ==========================================================================
   // 6. DUAL SIGNATORIES
   // ==========================================================================
-  const preparedName = options.preparedByName || setting.default_prepared_by_name || "MELISSA O. SESIO";
-  const preparedTitle = options.preparedByTitle || setting.default_prepared_by_title || "Admin. Officer II";
+  const preparedName = options.preparedByName || setting?.default_prepared_by_name || "MELISSA O. SESIO";
+  const preparedTitle = options.preparedByTitle || setting?.default_prepared_by_title || "Admin. Officer II";
 
-  const certifiedName = options.certifiedByName || setting.default_certified_by_name || "JOHN D. ALIDON";
-  const certifiedTitle = options.certifiedByTitle || setting.default_certified_by_title || "Admin. Officer IV/HRMO II";
+  const certifiedName = options.certifiedByName || setting?.default_certified_by_name || "JOHN D. ALIDON";
+  const certifiedTitle = options.certifiedByTitle || setting?.default_certified_by_title || "Admin. Officer IV/HRMO II";
   const certDateText = format(options.certificationDate || new Date(), "MMMM dd, yyyy");
 
   // Left Signatory (Prepared by)

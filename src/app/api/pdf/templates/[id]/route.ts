@@ -11,7 +11,7 @@ export async function PATCH(
         const cookieStore = await cookies();
         const userToken = cookieStore.get("vos_access_token")?.value;
         const staticToken = process.env.DIRECTUS_STATIC_TOKEN;
-        const activeToken = userToken || staticToken;
+        const activeToken = staticToken || userToken;
 
         const { id } = await params;
         const body = await request.json();
@@ -41,7 +41,7 @@ export async function DELETE(
         const cookieStore = await cookies();
         const userToken = cookieStore.get("vos_access_token")?.value;
         const staticToken = process.env.DIRECTUS_STATIC_TOKEN;
-        const activeToken = userToken || staticToken;
+        const activeToken = staticToken || userToken;
 
         const { id } = await params;
         const response = await fetch(`${API_BASE_URL}/items/pdf_templates/${id}`, {
