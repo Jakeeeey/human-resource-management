@@ -176,20 +176,20 @@ export function AttendanceTable({
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-b-muted/20 h-10">
-              <TableHead className="w-10 px-4">
+              <TableHead className="w-10 px-4 text-center">
                 <Checkbox 
                   checked={selectedIds.size === data.length && data.length > 0}
                   onCheckedChange={toggleSelectAll}
                   className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all shadow-sm"
                 />
               </TableHead>
-              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px]">Employee</TableHead>
-              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px]">Work</TableHead>
-              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px]">Late</TableHead>
-              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px]">Undertime</TableHead>
-              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px]">Overtime</TableHead>
-              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px]">Status</TableHead>
-              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px] text-right">Actions</TableHead>
+              <TableHead className="h-9 px-3 font-bold text-muted-foreground uppercase tracking-widest text-[8px]">Employee</TableHead>
+              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px] text-center">Work</TableHead>
+              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px] text-center">Late</TableHead>
+              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px] text-center">Undertime</TableHead>
+              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px] text-center">Overtime</TableHead>
+              <TableHead className="h-9 px-2 font-bold text-muted-foreground uppercase tracking-widest text-[8px] text-center">Status</TableHead>
+              <TableHead className="h-9 px-3 font-bold text-muted-foreground uppercase tracking-widest text-[8px] text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -197,133 +197,168 @@ export function AttendanceTable({
               <TableRow 
                 key={log.log_id} 
                 className={cn(
-                  "hover:bg-primary/[0.03] transition-colors border-b-muted/10 group h-12",
+                  "hover:bg-primary/[0.03] transition-colors border-b border-muted/15 group",
                   selectedIds.has(log.log_id) && "bg-primary/[0.02]"
                 )}
               >
-                <TableCell className="px-4">
+                <TableCell className="px-4 text-center align-middle">
                   <Checkbox 
                     checked={selectedIds.has(log.log_id)}
                     onCheckedChange={() => toggleSelectRow(log.log_id)}
                     className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all shadow-sm"
                   />
                 </TableCell>
-                <TableCell className="px-2 py-1">
+                <TableCell className="px-3 py-2.5 align-middle">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <div className="h-10 w-10 shrink-0 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                       <span className="text-xs font-bold text-primary">
                           {log.user_fname?.[0]}{log.user_lname?.[0]}
                       </span>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="font-bold text-foreground text-sm leading-tight">
-                        {log.user_fname} {log.user_lname}
-                      </span>
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-foreground text-sm leading-tight truncate">
+                          {log.user_fname} {log.user_lname}
+                        </span>
+                        {log.ot_request && (
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-tight border shadow-xs transition-all cursor-help whitespace-nowrap",
+                              log.ot_request.status.toLowerCase() === "approved"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                : log.ot_request.status.toLowerCase() === "pending"
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                            )}
+                            title={log.ot_request.purpose ? `OT Purpose: ${log.ot_request.purpose}` : `OT Status: ${log.ot_request.status}`}
+                          >
+                            OT: {log.ot_request.status.charAt(0).toUpperCase() + log.ot_request.status.slice(1).toLowerCase()}
+                            {log.ot_request.duration_minutes ? ` (${log.ot_request.duration_minutes}m)` : ""}
+                          </span>
+                        )}
+                        {log.ut_request && (
+                          <span
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-tight border shadow-xs transition-all cursor-help whitespace-nowrap",
+                              log.ut_request.status.toLowerCase() === "approved"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                : log.ut_request.status.toLowerCase() === "pending"
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                            )}
+                            title={log.ut_request.reason ? `UT Reason: ${log.ut_request.reason}` : `UT Status: ${log.ut_request.status}`}
+                          >
+                            UT: {log.ut_request.status.charAt(0).toUpperCase() + log.ut_request.status.slice(1).toLowerCase()}
+                            {log.ut_request.duration_minutes ? ` (${log.ut_request.duration_minutes}m)` : ""}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
                         <span className="opacity-60">ID:</span>
                         <span className="text-primary/80 font-bold">{log.user_id}</span>
                         <span className="mx-1 opacity-20">|</span>
                         <span>{format(new Date(log.log_date), "MMM dd, yyyy")}</span>
                       </span>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-muted-foreground/60 uppercase">Sched:</span>
-                        <span className="text-[9px] font-mono font-bold text-muted-foreground/80">
+                      <div className="mt-1 flex items-center gap-1.5 text-[9px] font-mono">
+                        <span className="font-bold text-muted-foreground/60 uppercase">Sched:</span>
+                        <span className="font-bold text-muted-foreground/80">
                           {log.sched_time_in || "--:--"} - {log.sched_time_out || "--:--"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-primary/60 uppercase">Actual:</span>
-                        <span className={cn("text-[9px] font-mono font-bold", log.time_in ? "text-primary" : "text-muted-foreground/60")}>
-                        {log.time_in ? format(new Date(log.time_in), "hh:mm a") : "--:--"} - {log.time_out ? format(new Date(log.time_out), "hh:mm a") : "--:--"}
+                      <div className="flex items-center gap-1.5 text-[9px] font-mono">
+                        <span className="font-bold text-primary/60 uppercase">Actual:</span>
+                        <span className={cn("font-bold", log.time_in ? "text-primary" : "text-muted-foreground/60")}>
+                          {log.time_in ? format(new Date(log.time_in), "hh:mm a") : "--:--"} - {log.time_out ? format(new Date(log.time_out), "hh:mm a") : "--:--"}
                         </span>
                       </div>
                     </div>
                   </div>
                 </TableCell>
 
-                <TableCell className="px-2 py-1">
-                  <div className="flex flex-col w-14">
+                <TableCell className="px-2 py-2 text-center align-middle">
+                  <div className="flex flex-col items-center justify-center w-16 mx-auto">
                     <Input 
                       type="number"
                       value={log.work_minutes || 0}
                       onChange={(e) => onUpdateRow(log.log_id, "work_minutes", parseInt(e.target.value) || 0)}
                       className={cn(
-                        "h-6 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-primary/30 text-center px-1",
+                        "h-7 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-primary/30 text-center px-1 rounded-lg",
                         (log.work_minutes || 0) > 0 ? "text-foreground" : "text-muted-foreground/40"
                       )}
                     />
-                    <span className="text-[8px] text-muted-foreground uppercase font-medium tracking-tighter text-center">mins</span>
+                    <span className="text-[8px] text-muted-foreground uppercase font-semibold tracking-tighter text-center mt-0.5">mins</span>
                   </div>
                 </TableCell>
 
-                <TableCell className="px-2 py-1">
-                  <div className="flex flex-col w-14">
+                <TableCell className="px-2 py-2 text-center align-middle">
+                  <div className="flex flex-col items-center justify-center w-16 mx-auto">
                     <Input 
                       type="number"
                       value={log.late_minutes || 0}
                       onChange={(e) => onUpdateRow(log.log_id, "late_minutes", parseInt(e.target.value) || 0)}
                       className={cn(
-                        "h-6 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-red-400 text-center px-1",
-                        log.late_minutes > 0 ? "text-red-500" : "text-muted-foreground/40"
+                        "h-7 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-red-400 text-center px-1 rounded-lg",
+                        log.late_minutes > 0 ? "text-red-500 font-extrabold" : "text-muted-foreground/40"
                       )}
                     />
-                    <span className="text-[8px] text-muted-foreground uppercase font-medium tracking-tighter text-center">mins</span>
+                    <span className="text-[8px] text-muted-foreground uppercase font-semibold tracking-tighter text-center mt-0.5">mins</span>
                   </div>
                 </TableCell>
 
-                <TableCell className="px-2 py-1">
-                  <div className="flex flex-col w-14">
+                <TableCell className="px-2 py-2 text-center align-middle">
+                  <div className="flex flex-col items-center justify-center w-16 mx-auto">
                     <Input 
                       type="number"
                       value={log.undertime_minutes || 0}
                       onChange={(e) => onUpdateRow(log.log_id, "undertime_minutes", parseInt(e.target.value) || 0)}
                       className={cn(
-                        "h-6 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-orange-400 text-center px-1",
-                        log.undertime_minutes > 0 ? "text-orange-500" : "text-muted-foreground/40"
+                        "h-7 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-orange-400 text-center px-1 rounded-lg",
+                        log.undertime_minutes > 0 ? "text-orange-500 font-extrabold" : "text-muted-foreground/40"
                       )}
                     />
-                    <span className="text-[8px] text-muted-foreground uppercase font-medium tracking-tighter text-center">mins</span>
+                    <span className="text-[8px] text-muted-foreground uppercase font-semibold tracking-tighter text-center mt-0.5">mins</span>
                   </div>
                 </TableCell>
 
-                <TableCell className="px-2 py-1">
-                  <div className="flex flex-col w-14">
+                <TableCell className="px-2 py-2 text-center align-middle">
+                  <div className="flex flex-col items-center justify-center w-16 mx-auto">
                     <Input 
                       type="number"
                       value={log.overtime_minutes || 0}
                       onChange={(e) => onUpdateRow(log.log_id, "overtime_minutes", parseInt(e.target.value) || 0)}
                       className={cn(
-                        "h-6 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-green-400 text-center px-1",
-                        log.overtime_minutes > 0 ? "text-green-500" : "text-muted-foreground/40"
+                        "h-7 text-[11px] font-bold bg-background/50 border-muted/20 focus:border-green-400 text-center px-1 rounded-lg",
+                        log.overtime_minutes > 0 ? "text-green-600 font-extrabold" : "text-muted-foreground/40"
                       )}
                     />
-                    <span className="text-[8px] text-muted-foreground uppercase font-medium tracking-tighter text-center">mins</span>
+                    <span className="text-[8px] text-muted-foreground uppercase font-semibold tracking-tighter text-center mt-0.5">mins</span>
                   </div>
                 </TableCell>
 
-
-                <TableCell className="px-2 py-1">
-                  <Select 
-                    value={log.approval_status || "pending"} 
-                    onValueChange={(val) => onUpdateRow(log.log_id, "approval_status", val)}
-                  >
-                    <SelectTrigger className={cn(
-                      "h-6 rounded-lg font-bold text-[7px] uppercase tracking-widest border-none px-1.5 py-0 w-[80px]",
-                      log.approval_status === "approved" ? "bg-green-100 text-green-700" : 
-                      log.approval_status === "rejected" ? "bg-red-100 text-red-700" : 
-                      "bg-blue-50 text-blue-600"
-                    )}>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border shadow-2xl">
-                      <SelectItem value="pending" className="text-[8px] font-bold uppercase tracking-wider text-blue-600">Pending</SelectItem>
-                      <SelectItem value="approved" className="text-[8px] font-bold uppercase tracking-wider text-green-600">Approved</SelectItem>
-                      <SelectItem value="rejected" className="text-[8px] font-bold uppercase tracking-wider text-red-600">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <TableCell className="px-2 py-2 text-center align-middle">
+                  <div className="flex justify-center">
+                    <Select 
+                      value={log.approval_status || "pending"} 
+                      onValueChange={(val) => onUpdateRow(log.log_id, "approval_status", val)}
+                    >
+                      <SelectTrigger className={cn(
+                        "h-7 rounded-lg font-bold text-[8px] uppercase tracking-wider border border-muted/20 px-2 py-0 w-[84px] shadow-xs",
+                        log.approval_status === "approved" ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-300" : 
+                        log.approval_status === "rejected" ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300" : 
+                        "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+                      )}>
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border shadow-2xl">
+                        <SelectItem value="pending" className="text-[8px] font-bold uppercase tracking-wider text-blue-600">Pending</SelectItem>
+                        <SelectItem value="approved" className="text-[8px] font-bold uppercase tracking-wider text-green-600">Approved</SelectItem>
+                        <SelectItem value="rejected" className="text-[8px] font-bold uppercase tracking-wider text-red-600">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </TableCell>
-                <TableCell className="px-2 py-1 text-right">
-                  <div className="flex justify-end gap-1 transition-opacity duration-300">
+                <TableCell className="px-3 py-2 text-center align-middle">
+                  <div className="flex items-center justify-center gap-1.5 transition-opacity duration-300">
                     <Button
                       size="sm"
                       variant="ghost"

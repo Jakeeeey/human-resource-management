@@ -283,12 +283,23 @@ export async function GET(req: NextRequest) {
           : `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&limit=1000`)
       : (isDailyApproval ? `filter[date_schedule][_eq]=${targetDate}&limit=1000` : `limit=1000`);
 
-    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, generalSettingRes] = await Promise.all([
+    let otFilter = userIdsFilter;
+    let utFilter = userIdsFilter;
+    if (isDailyApproval) {
+      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_eq]=${targetDate}`;
+      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_eq]=${targetDate}`;
+    } else if (startDate && endDate) {
+      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${startDate}&filter[request_date][_lte]=${endDate}`;
+      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${startDate}&filter[request_date][_lte]=${endDate}`;
+    }
+
+    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, utRequestsRes, generalSettingRes] = await Promise.all([
       directusFetch(`/items/department_schedule?limit=1000&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
       directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,schedule_date,workdays`),
       directusFetch(`/items/attendance_approval?${approvalFilter}&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
-      directusFetch(`/items/overtime_request?${userIdsFilter}&filter[status][_eq]=approved&limit=1000&fields=user_id,request_date,status`),
+      directusFetch(`/items/overtime_request?${otFilter}&limit=1000&fields=overtime_id,user_id,request_date,status,duration_minutes,purpose,ot_from,ot_to`).catch(() => ({ data: [] })),
+      directusFetch(`/items/undertime_request?${utFilter}&limit=1000&fields=undertime_id,user_id,request_date,status,duration_minutes,reason,remarks`).catch(() => ({ data: [] })),
       directusFetch(`/items/general_setting?filter[setting_key][_eq]=payroll_no_time_out_undertime_amount&fields=setting_key,setting_value&limit=1`).catch(() => ({ data: [] }))
     ]);
 
@@ -312,6 +323,7 @@ export async function GET(req: NextRequest) {
     const oncallSchedules = oncallSchedulesRes.data || [];
     const approvalsList = approvalsRes.data || [];
     const otRequestsList = otRequestsRes.data || [];
+    const utRequestsList = utRequestsRes.data || [];
 
     // Create a map for quick approval lookup by employee_id and date
     interface AttendanceApprovalRecord {
@@ -334,15 +346,41 @@ export async function GET(req: NextRequest) {
 
     // Create a map for quick OT request lookup by user_id and date
     interface OTRequestRecord {
+      overtime_id: number;
       user_id: number;
       request_date: string;
       status: string;
+      duration_minutes?: number | null;
+      purpose?: string | null;
+      ot_from?: string | null;
+      ot_to?: string | null;
     }
 
     const otRequestsMap = new Map<string, OTRequestRecord>();
     otRequestsList.forEach((req: OTRequestRecord) => {
-      const key = `${req.user_id}_${req.request_date}`;
-      otRequestsMap.set(key, req);
+      if (req.user_id && req.request_date) {
+        const key = `${req.user_id}_${String(req.request_date).split('T')[0]}`;
+        otRequestsMap.set(key, req);
+      }
+    });
+
+    // Create a map for quick UT request lookup by user_id and date
+    interface UTRequestRecord {
+      undertime_id: number;
+      user_id: number;
+      request_date: string;
+      status: string;
+      duration_minutes?: number | null;
+      reason?: string | null;
+      remarks?: string | null;
+    }
+
+    const utRequestsMap = new Map<string, UTRequestRecord>();
+    utRequestsList.forEach((req: UTRequestRecord) => {
+      if (req.user_id && req.request_date) {
+        const key = `${req.user_id}_${String(req.request_date).split('T')[0]}`;
+        utRequestsMap.set(key, req);
+      }
     });
 
     interface OncallScheduleRecord {
@@ -507,13 +545,24 @@ export async function GET(req: NextRequest) {
               undertime_minutes = 0;
             }
 
-            // Overtime: if timed out 90m (1.5h) excess AND has approved overtime_request
-            const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
+            // Overtime: ONLY calculate if actualOut is after schedOut AND has approved overtime_request
             const dayKey = log.log_date.split('T')[0];
             const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
+            const isOtApproved = otReq && String(otReq.status || "").toLowerCase() === "approved";
 
-            if (excessOut >= 90 && otReq?.status === 'approved') {
-              overtime_minutes = excessOut;
+            if (actualOut > schedOut && isOtApproved) {
+              const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
+              let otDurationCap = Number(otReq.duration_minutes ?? 0);
+              if (otDurationCap <= 0 && otReq.ot_from && otReq.ot_to) {
+                const otStart = timeToDate(log.log_date, otReq.ot_from);
+                let otEnd = timeToDate(log.log_date, otReq.ot_to);
+                if (otEnd < otStart) {
+                  otEnd = new Date(otEnd.getTime() + 24 * 60 * 60 * 1000);
+                }
+                otDurationCap = Math.floor((otEnd.getTime() - otStart.getTime()) / 60000);
+              }
+
+              overtime_minutes = otDurationCap > 0 ? Math.min(excessOut, otDurationCap) : excessOut;
             } else {
               overtime_minutes = 0;
             }
@@ -559,6 +608,26 @@ export async function GET(req: NextRequest) {
         computedStatus = "On Time";
       }
 
+      const logDayKey = log.log_date.split('T')[0];
+      const logOtReq = otRequestsMap.get(`${log.user_id}_${logDayKey}`);
+      const logUtReq = utRequestsMap.get(`${log.user_id}_${logDayKey}`);
+
+      const ot_request = logOtReq ? {
+        id: logOtReq.overtime_id,
+        status: logOtReq.status,
+        duration_minutes: logOtReq.duration_minutes ?? null,
+        purpose: logOtReq.purpose ?? null,
+        ot_from: logOtReq.ot_from ?? null,
+        ot_to: logOtReq.ot_to ?? null,
+      } : null;
+
+      const ut_request = logUtReq ? {
+        id: logUtReq.undertime_id,
+        status: logUtReq.status,
+        duration_minutes: logUtReq.duration_minutes ?? null,
+        reason: logUtReq.reason || logUtReq.remarks || null,
+      } : null;
+
       return {
         ...log,
         approval_status: derivedStatus.toLowerCase(),
@@ -574,6 +643,8 @@ export async function GET(req: NextRequest) {
         sched_time_out: schedule?.time_out || null,
         status: computedStatus,
         is_flexible_schedule: isFlexible,
+        ot_request,
+        ut_request,
       };
     });
 
@@ -609,6 +680,26 @@ export async function GET(req: NextRequest) {
 
         const isFlexible = isFlexibleScheduleUser(emp.is_flexible_schedule);
 
+        const absentDayKey = targetDate.split('T')[0];
+        const absentOtReq = otRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
+        const absentUtReq = utRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
+
+        const ot_request = absentOtReq ? {
+          id: absentOtReq.overtime_id,
+          status: absentOtReq.status,
+          duration_minutes: absentOtReq.duration_minutes ?? null,
+          purpose: absentOtReq.purpose ?? null,
+          ot_from: absentOtReq.ot_from ?? null,
+          ot_to: absentOtReq.ot_to ?? null,
+        } : null;
+
+        const ut_request = absentUtReq ? {
+          id: absentUtReq.undertime_id,
+          status: absentUtReq.status,
+          duration_minutes: absentUtReq.duration_minutes ?? null,
+          reason: absentUtReq.reason || absentUtReq.remarks || null,
+        } : null;
+
         absentLogs.push({
           log_id: -(emp.user_id),
           user_id: emp.user_id,
@@ -636,6 +727,8 @@ export async function GET(req: NextRequest) {
           sched_time_in: schedule?.time_in || null,
           sched_time_out: schedule?.time_out || null,
           is_flexible_schedule: isFlexible,
+          ot_request,
+          ut_request,
         });
       }
     }

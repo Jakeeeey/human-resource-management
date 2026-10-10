@@ -379,12 +379,17 @@ export function AttendanceApprovalCutoff() {
         (log.work_minutes && log.work_minutes > 0)
       );
 
+      const isOtPending = log.ot_request?.status?.toLowerCase() === "pending";
+      const isUtPending = log.ut_request?.status?.toLowerCase() === "pending";
+
       const existing = summaryMap.get(log.user_id);
       if (existing) {
         existing.total_work_minutes += log.work_minutes || 0;
         existing.total_late_minutes += log.late_minutes || 0;
         existing.total_undertime_minutes += log.undertime_minutes || 0;
         existing.total_overtime_minutes += log.overtime_minutes || 0;
+        if (isOtPending) existing.pending_ot_count = (existing.pending_ot_count || 0) + 1;
+        if (isUtPending) existing.pending_ut_count = (existing.pending_ut_count || 0) + 1;
         if (hasAttendance) {
           const dateKey = log.log_date ? log.log_date.split("T")[0] : `${existing.attendedDates.size + 1}`;
           existing.attendedDates.add(dateKey);
@@ -407,6 +412,8 @@ export function AttendanceApprovalCutoff() {
           total_overtime_minutes: log.overtime_minutes || 0,
           days_count: attendedDates.size,
           attendedDates,
+          pending_ot_count: isOtPending ? 1 : 0,
+          pending_ut_count: isUtPending ? 1 : 0,
         });
       }
     });
@@ -626,7 +633,7 @@ export function AttendanceApprovalCutoff() {
 
       {/* Detail Modal (Dialog) */}
       <Dialog open={!!selectedUserId} onOpenChange={(open) => !open && handleCloseDetails()}>
-        <DialogContent className="sm:max-w-[calc(100vw-540px)] w-[calc(100vw-540px)] left-[calc(50%+128px)] p-0 flex flex-col gap-0 border-none shadow-2xl overflow-hidden rounded-2xl max-h-[95vh] duration-500">
+        <DialogContent className="w-[95vw] sm:max-w-5xl md:max-w-6xl xl:max-w-7xl p-0 flex flex-col gap-0 border border-border/50 shadow-2xl overflow-hidden rounded-2xl max-h-[90vh] bg-background">
           <DialogHeader className="px-6 py-4 flex-row items-center justify-between space-y-0 border-b border-border/40 bg-muted/20">
             <div className="flex items-center gap-5">
               <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20 shadow-inner">
@@ -649,12 +656,12 @@ export function AttendanceApprovalCutoff() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mr-8">
+            <div className="flex items-center gap-3 mr-10">
               {selectedUserId && (
                 <Button
                   onClick={() => selectedUserId && handleApproveAll(selectedUserId)}
                   disabled={isProcessing}
-                  className="rounded-2xl h-12 px-6 gap-2 bg-green-500 hover:bg-green-600 text-white font-bold shadow-lg shadow-green-500/20 transition-all active:scale-95"
+                  className="rounded-2xl h-11 px-6 gap-2 bg-green-500 hover:bg-green-600 text-white font-bold shadow-lg shadow-green-500/20 transition-all active:scale-95"
                 >
                   <Check className="h-5 w-5" />
                   Approve All for this Employee
@@ -663,8 +670,8 @@ export function AttendanceApprovalCutoff() {
             </div>
           </DialogHeader>
           
-          <div className="flex-1 overflow-auto custom-scrollbar max-h-[70vh]">
-            <div className="p-8">
+          <div className="flex-1 overflow-auto custom-scrollbar max-h-[calc(90vh-100px)] p-6">
+            <div>
               <AttendanceTable 
                 data={selectedEmployeeLogs}
                 onUpdateRow={handleUpdateRow}
