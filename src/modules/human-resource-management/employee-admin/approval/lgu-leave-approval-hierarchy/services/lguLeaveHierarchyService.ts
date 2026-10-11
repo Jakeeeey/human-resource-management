@@ -4,6 +4,8 @@ import {
   UserInfo,
   CreateApproverInput,
   UpdateApproverInput,
+  SetupDepartmentHierarchyInput,
+  BatchApplyStandardApproversInput,
   LguLeaveHierarchyFilterParams,
   HierarchyPipelineStage,
   LGU_HIERARCHY_LEVELS,
@@ -413,4 +415,71 @@ export class LguLeaveHierarchyService {
       return true;
     }
   }
+
+  /**
+   * Setup or update all 3 hierarchy levels for a specific department in one cohesive action
+   */
+  static async setupDepartmentHierarchy(
+    input: SetupDepartmentHierarchyInput,
+    userId?: number
+  ): Promise<boolean> {
+    const deptId = input.department_id;
+    const levels = [
+      { level: 1, approverId: input.level1_approver_id },
+      { level: 2, approverId: input.level2_approver_id },
+      { level: 3, approverId: input.level3_approver_id },
+    ];
+
+    for (const { level, approverId } of levels) {
+      if (approverId === undefined) continue;
+
+      let existingId: number | null = null;
+      try {
+        const query = `/items/ta_draft_approvers?filter[department_id][_eq]=${deptId}&filter[level][_eq]=${level}&filter[is_deleted][_eq]=0&limit=1`;
+        const res = await this.directusFetch(query);
+        const item = res?.data?.[0];
+        if (item) existingId = Number(item.id);
+      } catch {
+        const mockItem = mockApproversStore.find(
+          (a) => a.department_id === deptId && a.level === level && a.is_deleted === 0
+        );
+        if (mockItem) existingId = mockItem.id;
+      }
+
+      if (approverId && approverId > 0) {
+        if (existingId) {
+          await this.updateApprover(existingId, { approver_id: approverId }, userId);
+        } else {
+          await this.createApprover({ department_id: deptId, approver_id: approverId, level }, userId);
+        }
+      } else if (existingId && (approverId === null || approverId === 0)) {
+        await this.deleteApprover(existingId, userId);
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Batch apply standard Level 2 (HRMO) and Level 3 (Mayor) to multiple departments
+   */
+  static async batchApplyStandardApprovers(
+    input: BatchApplyStandardApproversInput,
+    userId?: number
+  ): Promise<boolean> {
+    for (const deptId of input.target_department_ids) {
+      const updatePayload: SetupDepartmentHierarchyInput = {
+        department_id: deptId,
+      };
+      if (input.level2_approver_id !== undefined) {
+        updatePayload.level2_approver_id = input.level2_approver_id;
+      }
+      if (input.level3_approver_id !== undefined) {
+        updatePayload.level3_approver_id = input.level3_approver_id;
+      }
+      await this.setupDepartmentHierarchy(updatePayload, userId);
+    }
+    return true;
+  }
 }
+

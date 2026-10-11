@@ -106,3 +106,30 @@ export interface LguLeaveHierarchyResponse {
   users: UserInfo[];
   total: number;
 }
+
+export const setupDepartmentHierarchySchema = z.object({
+  department_id: z.coerce.number().min(1, "Please select a department"),
+  level1_approver_id: z.coerce.number().nullable().optional(),
+  level2_approver_id: z.coerce.number().nullable().optional(),
+  level3_approver_id: z.coerce.number().nullable().optional(),
+});
+
+export type SetupDepartmentHierarchyInput = z.infer<typeof setupDepartmentHierarchySchema>;
+
+export const batchApplyStandardApproversSchema = z.object({
+  target_department_ids: z.array(z.coerce.number()).min(1, "Select at least one department"),
+  level2_approver_id: z.coerce.number().nullable().optional(),
+  level3_approver_id: z.coerce.number().nullable().optional(),
+});
+
+export type BatchApplyStandardApproversInput = z.infer<typeof batchApplyStandardApproversSchema>;
+
+export interface DepartmentHierarchySummary {
+  department: DepartmentInfo;
+  level1Approver?: LguLeaveApprover | null;
+  level2Approver?: LguLeaveApprover | null;
+  level3Approver?: LguLeaveApprover | null;
+  status: "complete" | "partial" | "empty";
+  configuredLevelsCount: number;
+}
+

@@ -15,17 +15,20 @@ import {
   RefreshCw,
   ArrowLeft,
   AlertCircle,
-  FileText,
+  Sparkles,
 } from "lucide-react";
 
 import { useLguLeaveHierarchy } from "./hooks/useLguLeaveHierarchy";
 import { HierarchyStats } from "./components/HierarchyStats";
+import { DepartmentHierarchyMatrix } from "./components/DepartmentHierarchyMatrix";
 import { HierarchyPipelineVisualizer } from "./components/HierarchyPipelineVisualizer";
 import { ApproversDataTable } from "./components/ApproversDataTable";
+import { SetupDepartmentModal } from "./components/SetupDepartmentModal";
+import { BatchStandardApproversModal } from "./components/BatchStandardApproversModal";
 import { AddApproverModal } from "./components/AddApproverModal";
 import { EditApproverModal } from "./components/EditApproverModal";
 import { DeleteApproverDialog } from "./components/DeleteApproverDialog";
-import { LguLeaveApprover } from "./types";
+import { LguLeaveApprover, DepartmentHierarchySummary } from "./types";
 
 export function LguLeaveApprovalHierarchyModule() {
   const {
@@ -43,15 +46,22 @@ export function LguLeaveApprovalHierarchyModule() {
     setSearchQuery,
     activePipelineDepartment,
     pipelineStages,
+    departmentSummaries,
     handleCreate,
     handleUpdate,
     handleDelete,
+    handleSetupDepartment,
+    handleBatchApplyStandard,
     refresh,
   } = useLguLeaveHierarchy();
 
-  const [activeTab, setActiveTab] = useState<"pipeline" | "table">("pipeline");
+  const [activeTab, setActiveTab] = useState<"departments" | "pipeline" | "table">("departments");
 
-  // Modal dialog states
+  // Department Setup Modal states
+  const [settingUpDepartment, setSettingUpDepartment] = useState<DepartmentHierarchySummary | null>(null);
+  const [isBatchStandardOpen, setIsBatchStandardOpen] = useState(false);
+
+  // Single-approver Modal states
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [addDefaultDept, setAddDefaultDept] = useState<number | undefined>(undefined);
   const [addDefaultLevel, setAddDefaultLevel] = useState<number | undefined>(undefined);
@@ -108,7 +118,7 @@ export function LguLeaveApprovalHierarchyModule() {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -135,6 +145,16 @@ export function LguLeaveApprovalHierarchyModule() {
 
           <Button
             size="sm"
+            variant="outline"
+            className="text-xs font-semibold gap-1.5 h-9 border-dashed text-primary hover:bg-primary/5"
+            onClick={() => setIsBatchStandardOpen(true)}
+          >
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            Batch Set HR & Mayor
+          </Button>
+
+          <Button
+            size="sm"
             className="text-xs font-semibold gap-1.5 h-9 shadow-xs"
             onClick={() => handleOpenAdd()}
           >
@@ -157,18 +177,22 @@ export function LguLeaveApprovalHierarchyModule() {
       {/* Navigation Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={(val) => setActiveTab(val as "pipeline" | "table")}
+        onValueChange={(val) => setActiveTab(val as "departments" | "pipeline" | "table")}
         className="space-y-4"
       >
-        <div className="flex items-center justify-between border-b pb-2">
-          <TabsList className="grid grid-cols-2 w-full sm:w-[380px]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-2 gap-2">
+          <TabsList className="grid grid-cols-3 w-full sm:w-[540px]">
+            <TabsTrigger value="departments" className="text-xs gap-1.5">
+              <Building2 className="h-3.5 w-3.5" />
+              Department Matrix ({departments.length})
+            </TabsTrigger>
             <TabsTrigger value="pipeline" className="text-xs gap-1.5">
               <Layers className="h-3.5 w-3.5" />
-              Visual Flow Pipeline
+              Flow Pipeline
             </TabsTrigger>
             <TabsTrigger value="table" className="text-xs gap-1.5">
               <TableIcon className="h-3.5 w-3.5" />
-              Approvers Directory ({approvers.length})
+              All Approvers ({approvers.length})
             </TabsTrigger>
           </TabsList>
 
@@ -178,7 +202,16 @@ export function LguLeaveApprovalHierarchyModule() {
           </div>
         </div>
 
-        {/* TAB 1: Visual Flow Pipeline */}
+        {/* TAB 1: Department Setup Matrix */}
+        <TabsContent value="departments" className="space-y-4">
+          <DepartmentHierarchyMatrix
+            departmentSummaries={departmentSummaries}
+            onSetupDepartment={(summary) => setSettingUpDepartment(summary)}
+            onBatchApplyStandard={() => setIsBatchStandardOpen(true)}
+          />
+        </TabsContent>
+
+        {/* TAB 2: Visual Flow Pipeline */}
         <TabsContent value="pipeline" className="space-y-4">
           <HierarchyPipelineVisualizer
             departments={departments}
@@ -192,7 +225,7 @@ export function LguLeaveApprovalHierarchyModule() {
           />
         </TabsContent>
 
-        {/* TAB 2: Approver Directory Table */}
+        {/* TAB 3: Approver Directory Table */}
         <TabsContent value="table" className="space-y-4">
           <ApproversDataTable
             approvers={approvers}
@@ -211,7 +244,25 @@ export function LguLeaveApprovalHierarchyModule() {
         </TabsContent>
       </Tabs>
 
-      {/* Modals & Dialogs */}
+      {/* Complete Department 3-Level Setup Modal */}
+      <SetupDepartmentModal
+        isOpen={Boolean(settingUpDepartment)}
+        onClose={() => setSettingUpDepartment(null)}
+        departmentSummary={settingUpDepartment}
+        users={users}
+        onSubmit={handleSetupDepartment}
+      />
+
+      {/* Batch Standard HRMO & Mayor Modal */}
+      <BatchStandardApproversModal
+        isOpen={isBatchStandardOpen}
+        onClose={() => setIsBatchStandardOpen(false)}
+        departments={departments}
+        users={users}
+        onSubmit={handleBatchApplyStandard}
+      />
+
+      {/* Individual Add Approver Modal */}
       <AddApproverModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
@@ -222,6 +273,7 @@ export function LguLeaveApprovalHierarchyModule() {
         onSubmit={handleCreate}
       />
 
+      {/* Individual Edit Approver Modal */}
       <EditApproverModal
         isOpen={Boolean(editingApprover)}
         onClose={() => setEditingApprover(null)}
@@ -230,6 +282,7 @@ export function LguLeaveApprovalHierarchyModule() {
         onSubmit={handleUpdate}
       />
 
+      {/* Individual Delete Confirmation Dialog */}
       <DeleteApproverDialog
         isOpen={Boolean(deletingApprover)}
         onClose={() => setDeletingApprover(null)}

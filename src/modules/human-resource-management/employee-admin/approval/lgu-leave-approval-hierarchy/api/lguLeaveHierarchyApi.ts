@@ -4,6 +4,8 @@ import {
   UserInfo,
   CreateApproverInput,
   UpdateApproverInput,
+  SetupDepartmentHierarchyInput,
+  BatchApplyStandardApproversInput,
   LguLeaveHierarchyFilterParams,
 } from "../types";
 
@@ -81,3 +83,40 @@ export async function deleteApproverApi(id: number): Promise<void> {
     throw new Error(json.message || "Failed to delete approver assignment");
   }
 }
+
+export async function setupDepartmentHierarchyApi(
+  payload: SetupDepartmentHierarchyInput
+): Promise<void> {
+  const res = await fetch(BASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "setup-department",
+      ...payload,
+    }),
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Failed to configure department hierarchy");
+  }
+}
+
+export async function batchApplyStandardApproversApi(
+  payload: BatchApplyStandardApproversInput
+): Promise<void> {
+  const res = await fetch(BASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "batch-standard",
+      ...payload,
+    }),
+  });
+
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Failed to batch apply standard approvers");
+  }
+}
+

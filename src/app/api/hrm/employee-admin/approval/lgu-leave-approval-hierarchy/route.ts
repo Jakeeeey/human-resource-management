@@ -39,6 +39,37 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // Check if department-level setup action
+    if (body.action === "setup-department") {
+      await LguLeaveHierarchyService.setupDepartmentHierarchy({
+        department_id: Number(body.department_id),
+        level1_approver_id: body.level1_approver_id !== undefined ? (body.level1_approver_id ? Number(body.level1_approver_id) : null) : undefined,
+        level2_approver_id: body.level2_approver_id !== undefined ? (body.level2_approver_id ? Number(body.level2_approver_id) : null) : undefined,
+        level3_approver_id: body.level3_approver_id !== undefined ? (body.level3_approver_id ? Number(body.level3_approver_id) : null) : undefined,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Department hierarchy successfully configured",
+      });
+    }
+
+    // Check if batch-standard action
+    if (body.action === "batch-standard") {
+      await LguLeaveHierarchyService.batchApplyStandardApprovers({
+        target_department_ids: Array.isArray(body.target_department_ids) ? body.target_department_ids.map(Number) : [],
+        level2_approver_id: body.level2_approver_id ? Number(body.level2_approver_id) : null,
+        level3_approver_id: body.level3_approver_id ? Number(body.level3_approver_id) : null,
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: "Standard HR & Mayor approvers successfully applied across departments",
+      });
+    }
+
+    // Standard single-approver assignment
     const validation = createApproverSchema.safeParse(body);
 
     if (!validation.success) {

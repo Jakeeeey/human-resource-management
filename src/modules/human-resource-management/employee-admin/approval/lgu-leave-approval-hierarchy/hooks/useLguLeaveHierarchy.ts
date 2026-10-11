@@ -8,6 +8,9 @@ import {
   UserInfo,
   CreateApproverInput,
   UpdateApproverInput,
+  SetupDepartmentHierarchyInput,
+  BatchApplyStandardApproversInput,
+  DepartmentHierarchySummary,
   HierarchyPipelineStage,
   LGU_HIERARCHY_LEVELS,
 } from "../types";
@@ -16,6 +19,8 @@ import {
   createApproverApi,
   updateApproverApi,
   deleteApproverApi,
+  setupDepartmentHierarchyApi,
+  batchApplyStandardApproversApi,
 } from "../api/lguLeaveHierarchyApi";
 
 export function useLguLeaveHierarchy() {
@@ -89,6 +94,36 @@ export function useLguLeaveHierarchy() {
     });
   }, [activePipelineDepartment, approvers]);
 
+  // Department Summaries for the Matrix View
+  const departmentSummaries: DepartmentHierarchySummary[] = useMemo(() => {
+    return departments.map((dept) => {
+      const deptApprovers = approvers.filter(
+        (a) => a.department_id === dept.department_id
+      );
+      const l1 = deptApprovers.find((a) => a.level === 1) || null;
+      const l2 = deptApprovers.find((a) => a.level === 2) || null;
+      const l3 = deptApprovers.find((a) => a.level === 3) || null;
+
+      let configuredCount = 0;
+      if (l1) configuredCount++;
+      if (l2) configuredCount++;
+      if (l3) configuredCount++;
+
+      let status: "complete" | "partial" | "empty" = "empty";
+      if (configuredCount === 3) status = "complete";
+      else if (configuredCount > 0) status = "partial";
+
+      return {
+        department: dept,
+        level1Approver: l1,
+        level2Approver: l2,
+        level3Approver: l3,
+        status,
+        configuredLevelsCount: configuredCount,
+      };
+    });
+  }, [departments, approvers]);
+
   // Actions
   const handleCreate = async (input: CreateApproverInput) => {
     try {
@@ -129,6 +164,32 @@ export function useLguLeaveHierarchy() {
     }
   };
 
+  const handleSetupDepartment = async (input: SetupDepartmentHierarchyInput) => {
+    try {
+      await setupDepartmentHierarchyApi(input);
+      toast.success("Department hierarchy configured successfully");
+      await loadData(true);
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to setup department hierarchy";
+      toast.error(msg);
+      return false;
+    }
+  };
+
+  const handleBatchApplyStandard = async (input: BatchApplyStandardApproversInput) => {
+    try {
+      await batchApplyStandardApproversApi(input);
+      toast.success("Standard approvers successfully applied across selected departments");
+      await loadData(true);
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to batch apply standard approvers";
+      toast.error(msg);
+      return false;
+    }
+  };
+
   return {
     approvers,
     departments,
@@ -144,9 +205,12 @@ export function useLguLeaveHierarchy() {
     setSearchQuery,
     activePipelineDepartment,
     pipelineStages,
+    departmentSummaries,
     handleCreate,
     handleUpdate,
     handleDelete,
+    handleSetupDepartment,
+    handleBatchApplyStandard,
     refresh: () => loadData(true),
   };
 }
