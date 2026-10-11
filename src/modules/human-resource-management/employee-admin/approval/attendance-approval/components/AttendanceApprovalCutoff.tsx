@@ -366,7 +366,7 @@ export function AttendanceApprovalCutoff() {
 
   // Group logs by employee
   const employeeSummaries = React.useMemo(() => {
-    const summaryMap = new Map<number, EmployeeSummary & { attendedDates: Set<string> }>();
+    const summaryMap = new Map<number, EmployeeSummary & { attendedDates: Set<string>; pendingLeaveIds: Set<number> }>();
     
     filteredLogs.forEach(log => {
       const isAbsent =
@@ -381,6 +381,8 @@ export function AttendanceApprovalCutoff() {
 
       const isOtPending = log.ot_request?.status?.toLowerCase() === "pending";
       const isUtPending = log.ut_request?.status?.toLowerCase() === "pending";
+      const isLeavePending = log.leave_request?.status?.toLowerCase() === "pending";
+      const leaveId = log.leave_request?.id;
 
       const existing = summaryMap.get(log.user_id);
       if (existing) {
@@ -390,6 +392,10 @@ export function AttendanceApprovalCutoff() {
         existing.total_overtime_minutes += log.overtime_minutes || 0;
         if (isOtPending) existing.pending_ot_count = (existing.pending_ot_count || 0) + 1;
         if (isUtPending) existing.pending_ut_count = (existing.pending_ut_count || 0) + 1;
+        if (isLeavePending && leaveId && !existing.pendingLeaveIds.has(leaveId)) {
+          existing.pendingLeaveIds.add(leaveId);
+          existing.pending_leave_count = existing.pendingLeaveIds.size;
+        }
         if (hasAttendance) {
           const dateKey = log.log_date ? log.log_date.split("T")[0] : `${existing.attendedDates.size + 1}`;
           existing.attendedDates.add(dateKey);
@@ -400,6 +406,10 @@ export function AttendanceApprovalCutoff() {
         if (hasAttendance) {
           const dateKey = log.log_date ? log.log_date.split("T")[0] : "1";
           attendedDates.add(dateKey);
+        }
+        const pendingLeaveIds = new Set<number>();
+        if (isLeavePending && leaveId) {
+          pendingLeaveIds.add(leaveId);
         }
         summaryMap.set(log.user_id, {
           user_id: log.user_id,
@@ -412,8 +422,10 @@ export function AttendanceApprovalCutoff() {
           total_overtime_minutes: log.overtime_minutes || 0,
           days_count: attendedDates.size,
           attendedDates,
+          pendingLeaveIds,
           pending_ot_count: isOtPending ? 1 : 0,
           pending_ut_count: isUtPending ? 1 : 0,
+          pending_leave_count: pendingLeaveIds.size,
         });
       }
     });
