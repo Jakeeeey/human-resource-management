@@ -285,21 +285,24 @@ export async function GET(req: NextRequest) {
 
     let otFilter = userIdsFilter;
     let utFilter = userIdsFilter;
+    let leaveFilter = userIdsFilter;
     const filterDateGte = isDailyApproval ? targetDate : startDate;
     const filterDateLte = isDailyApproval ? targetDate : endDate;
 
     if (filterDateGte && filterDateLte) {
       otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
       utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
+      leaveFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[leave_start][_lte]=${filterDateLte}&filter[leave_end][_gte]=${filterDateGte}`;
     }
 
-    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, utRequestsRes, generalSettingRes] = await Promise.all([
+    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, utRequestsRes, leaveRequestsRes, generalSettingRes] = await Promise.all([
       directusFetch(`/items/department_schedule?limit=1000&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
       directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,schedule_date,workdays`),
       directusFetch(`/items/attendance_approval?${approvalFilter}&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
       directusFetch(`/items/overtime_request?${otFilter}&limit=1000&fields=overtime_id,user_id,request_date,status,duration_minutes,purpose,remarks,sched_timeout,ot_from,ot_to,filed_at,approved_at`).catch(() => ({ data: [] })),
       directusFetch(`/items/undertime_request?${utFilter}&limit=1000&fields=undertime_id,user_id,request_date,status,duration_minutes,reason,remarks,sched_timeout,actual_timeout,filed_at,approved_at,emp_attatchment_uuid,override_attachment_uuid`).catch(() => ({ data: [] })),
+      directusFetch(`/items/leave_request?${leaveFilter}&limit=1000&fields=leave_id,user_id,department_id,leave_type,leave_start,leave_end,total_days,reason,remarks,status,current_approval_level,approver_id,approved_at,filed_at,is_paid`).catch(() => ({ data: [] })),
       directusFetch(`/items/general_setting?filter[setting_key][_eq]=payroll_no_time_out_undertime_amount&fields=setting_key,setting_value&limit=1`).catch(() => ({ data: [] }))
     ]);
 
@@ -392,6 +395,58 @@ export async function GET(req: NextRequest) {
         utRequestsMap.set(key, req);
       }
     });
+
+    // Create a map for leave requests by user_id
+    interface LeaveRequestRecord {
+      leave_id: number;
+      user_id: number;
+      department_id?: number | null;
+      leave_type: string;
+      leave_start: string | null;
+      leave_end: string | null;
+      total_days?: number | string | null;
+      reason?: string | null;
+      remarks?: string | null;
+      status: string;
+      current_approval_level?: number | null;
+      approver_id?: number | null;
+      approved_at?: string | null;
+      filed_at?: string | null;
+      is_paid?: boolean | number | null;
+    }
+
+    const leaveRequestsList: LeaveRequestRecord[] = leaveRequestsRes.data || [];
+    const leaveRequestsByUser = new Map<number, LeaveRequestRecord[]>();
+    leaveRequestsList.forEach((req: LeaveRequestRecord) => {
+      if (req.user_id) {
+        const list = leaveRequestsByUser.get(req.user_id) || [];
+        list.push(req);
+        leaveRequestsByUser.set(req.user_id, list);
+      }
+    });
+
+    const getMatchingLeave = (userIdParam: number, dateStr: string): LeaveRequestRecord | null => {
+      const userLeaves = leaveRequestsByUser.get(userIdParam);
+      if (!userLeaves || userLeaves.length === 0) return null;
+      const dayKey = dateStr.split('T')[0];
+      const matching = userLeaves.filter((l) => {
+        const startKey = l.leave_start ? l.leave_start.split('T')[0] : null;
+        const endKey = l.leave_end ? l.leave_end.split('T')[0] : startKey;
+        if (!startKey) return false;
+        return startKey <= dayKey && (endKey ? endKey >= dayKey : true);
+      });
+      if (matching.length === 0) return null;
+      matching.sort((a, b) => {
+        const score = (status: string) => {
+          const s = (status || "").toLowerCase();
+          if (s === "approved") return 3;
+          if (s === "pending") return 2;
+          return 1;
+        };
+        return score(b.status) - score(a.status);
+      });
+      return matching[0];
+    };
 
     interface OncallScheduleRecord {
       id: number;
@@ -621,6 +676,7 @@ export async function GET(req: NextRequest) {
       const logDayKey = log.log_date.split('T')[0];
       const logOtReq = otRequestsMap.get(`${log.user_id}_${logDayKey}`);
       const logUtReq = utRequestsMap.get(`${log.user_id}_${logDayKey}`);
+      const logLeaveReq = getMatchingLeave(log.user_id, logDayKey);
 
       const ot_request = logOtReq ? {
         id: logOtReq.overtime_id,
@@ -649,6 +705,20 @@ export async function GET(req: NextRequest) {
         override_attachment_uuid: logUtReq.override_attachment_uuid ?? null,
       } : null;
 
+      const leave_request = logLeaveReq ? {
+        id: logLeaveReq.leave_id,
+        leave_type: logLeaveReq.leave_type,
+        leave_start: logLeaveReq.leave_start,
+        leave_end: logLeaveReq.leave_end,
+        total_days: logLeaveReq.total_days != null ? Number(logLeaveReq.total_days) : null,
+        reason: logLeaveReq.reason ?? null,
+        remarks: logLeaveReq.remarks ?? null,
+        status: logLeaveReq.status,
+        is_paid: logLeaveReq.is_paid,
+        filed_at: logLeaveReq.filed_at ?? null,
+        approved_at: logLeaveReq.approved_at ?? null,
+      } : null;
+
       return {
         ...log,
         approval_status: derivedStatus.toLowerCase(),
@@ -666,6 +736,7 @@ export async function GET(req: NextRequest) {
         is_flexible_schedule: isFlexible,
         ot_request,
         ut_request,
+        leave_request,
       };
     });
 
@@ -704,6 +775,11 @@ export async function GET(req: NextRequest) {
         const absentDayKey = targetDate.split('T')[0];
         const absentOtReq = otRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
         const absentUtReq = utRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
+        const absentLeaveReq = getMatchingLeave(emp.user_id, absentDayKey);
+
+        if (absentLeaveReq && String(absentLeaveReq.status).toLowerCase() === "approved" && !manualAdjustments?.remarks) {
+          statusRemarks = "Leave";
+        }
 
         const ot_request = absentOtReq ? {
           id: absentOtReq.overtime_id,
@@ -730,6 +806,20 @@ export async function GET(req: NextRequest) {
           approved_at: absentUtReq.approved_at ?? null,
           emp_attatchment_uuid: absentUtReq.emp_attatchment_uuid ?? null,
           override_attachment_uuid: absentUtReq.override_attachment_uuid ?? null,
+        } : null;
+
+        const leave_request = absentLeaveReq ? {
+          id: absentLeaveReq.leave_id,
+          leave_type: absentLeaveReq.leave_type,
+          leave_start: absentLeaveReq.leave_start,
+          leave_end: absentLeaveReq.leave_end,
+          total_days: absentLeaveReq.total_days != null ? Number(absentLeaveReq.total_days) : null,
+          reason: absentLeaveReq.reason ?? null,
+          remarks: absentLeaveReq.remarks ?? null,
+          status: absentLeaveReq.status,
+          is_paid: absentLeaveReq.is_paid,
+          filed_at: absentLeaveReq.filed_at ?? null,
+          approved_at: absentLeaveReq.approved_at ?? null,
         } : null;
 
         absentLogs.push({
@@ -761,6 +851,7 @@ export async function GET(req: NextRequest) {
           is_flexible_schedule: isFlexible,
           ot_request,
           ut_request,
+          leave_request,
         });
       }
     }

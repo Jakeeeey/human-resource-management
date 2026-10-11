@@ -24,9 +24,9 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { UtRequestInfo, OtRequestInfo } from "../type";
+import type { UtRequestInfo, OtRequestInfo, LeaveRequestInfo } from "../type";
 
-export type RequestDetailType = "undertime" | "overtime";
+export type RequestDetailType = "undertime" | "overtime" | "leave";
 
 interface RequestDetailDialogProps {
   isOpen: boolean;
@@ -36,6 +36,7 @@ interface RequestDetailDialogProps {
   logDate: string;
   utRequest?: UtRequestInfo | null;
   otRequest?: OtRequestInfo | null;
+  leaveRequest?: LeaveRequestInfo | null;
 }
 
 export function RequestDetailDialog({
@@ -46,9 +47,12 @@ export function RequestDetailDialog({
   logDate,
   utRequest,
   otRequest,
+  leaveRequest,
 }: RequestDetailDialogProps) {
   const isUndertime = type === "undertime";
-  const request = isUndertime ? utRequest : otRequest;
+  const isOvertime = type === "overtime";
+  const isLeave = type === "leave";
+  const request = isUndertime ? utRequest : isOvertime ? otRequest : leaveRequest;
 
   if (!request) return null;
 
@@ -97,6 +101,17 @@ export function RequestDetailDialog({
     }
   };
 
+  const formatDateOnlySafely = (dateString?: string | null) => {
+    if (!dateString) return "--";
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return dateString;
+      return format(d, "MMM dd, yyyy");
+    } catch {
+      return dateString;
+    }
+  };
+
   const formatTimeSafely = (timeString?: string | null) => {
     if (!timeString) return "--:--";
     try {
@@ -129,16 +144,28 @@ export function RequestDetailDialog({
                   "h-11 w-11 rounded-xl flex items-center justify-center border shadow-xs",
                   isUndertime
                     ? "bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400"
-                    : "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                    : isOvertime
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                    : "bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400"
                 )}
               >
-                {isUndertime ? <Clock className="h-5 w-5" /> : <Timer className="h-5 w-5" />}
+                {isUndertime ? (
+                  <Clock className="h-5 w-5" />
+                ) : isOvertime ? (
+                  <Timer className="h-5 w-5" />
+                ) : (
+                  <Calendar className="h-5 w-5" />
+                )}
               </div>
               <div>
                 <DialogTitle className="text-xl font-black tracking-tight text-foreground flex items-center gap-2">
-                  {isUndertime ? "Undertime Request" : "Overtime Request"}
+                  {isUndertime
+                    ? "Undertime Request"
+                    : isOvertime
+                    ? "Overtime Request"
+                    : "Leave Request"}
                   <span className="text-xs font-mono text-muted-foreground font-semibold">
-                    #{isUndertime ? "UT" : "OT"}-{request.id}
+                    #{isUndertime ? "UT" : isOvertime ? "OT" : "LV"}-{request.id}
                   </span>
                 </DialogTitle>
                 <DialogDescription className="text-xs font-medium text-muted-foreground flex items-center gap-2 mt-0.5">
@@ -160,15 +187,50 @@ export function RequestDetailDialog({
         <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh] custom-scrollbar">
           {/* Key Metrics Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="bg-card/50 p-3.5 rounded-xl border border-border/60 shadow-xs flex flex-col gap-1">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                Duration
-              </span>
-              <span className="text-lg font-black text-foreground font-mono">
-                {request.duration_minutes ?? 0}{" "}
-                <span className="text-xs font-semibold text-muted-foreground">mins</span>
-              </span>
-            </div>
+            {isLeave && leaveRequest ? (
+              <>
+                <div className="bg-card/50 p-3.5 rounded-xl border border-border/60 shadow-xs flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Leave Type
+                  </span>
+                  <span className="text-sm font-black text-purple-600 dark:text-purple-400 uppercase tracking-tight">
+                    {leaveRequest.leave_type}
+                  </span>
+                </div>
+
+                <div className="bg-card/50 p-3.5 rounded-xl border border-border/60 shadow-xs flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Total Days
+                  </span>
+                  <span className="text-lg font-black text-foreground font-mono">
+                    {leaveRequest.total_days ?? 0}{" "}
+                    <span className="text-xs font-semibold text-muted-foreground">day(s)</span>
+                  </span>
+                </div>
+
+                <div className="bg-card/50 p-3.5 rounded-xl border border-border/60 shadow-xs flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Compensation
+                  </span>
+                  <span className={cn(
+                    "text-sm font-bold font-mono",
+                    leaveRequest.is_paid ? "text-emerald-600 dark:text-emerald-400" : "text-slate-600 dark:text-slate-400"
+                  )}>
+                    {leaveRequest.is_paid ? "Paid" : "Unpaid"}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="bg-card/50 p-3.5 rounded-xl border border-border/60 shadow-xs flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Duration
+                </span>
+                <span className="text-lg font-black text-foreground font-mono">
+                  {(isUndertime ? utRequest?.duration_minutes : otRequest?.duration_minutes) ?? 0}{" "}
+                  <span className="text-xs font-semibold text-muted-foreground">mins</span>
+                </span>
+              </div>
+            )}
 
             {isUndertime && utRequest && (
               <>
@@ -192,7 +254,7 @@ export function RequestDetailDialog({
               </>
             )}
 
-            {!isUndertime && otRequest && (
+            {isOvertime && otRequest && (
               <>
                 <div className="bg-card/50 p-3.5 rounded-xl border border-border/60 shadow-xs flex flex-col gap-1">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -215,28 +277,58 @@ export function RequestDetailDialog({
             )}
           </div>
 
+          {/* Leave Dates Span if leave */}
+          {isLeave && leaveRequest && (
+            <div className="grid grid-cols-2 gap-3 p-3.5 rounded-xl bg-muted/20 border border-border/50 text-xs">
+              <div>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  Leave Start
+                </span>
+                <span className="font-semibold text-foreground">
+                  {formatDateOnlySafely(leaveRequest.leave_start)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  Leave End
+                </span>
+                <span className="font-semibold text-foreground">
+                  {formatDateOnlySafely(leaveRequest.leave_end)}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Reason / Purpose Section */}
           <div className="space-y-2">
             <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
               <FileText className="h-3.5 w-3.5 text-primary" />
-              <span>{isUndertime ? "Reason for Undertime" : "Overtime Purpose"}</span>
+              <span>
+                {isUndertime
+                  ? "Reason for Undertime"
+                  : isOvertime
+                  ? "Overtime Purpose"
+                  : "Reason for Leave"}
+              </span>
             </div>
             <div className="bg-muted/30 p-4 rounded-xl border border-border/50 text-sm text-foreground leading-relaxed font-medium whitespace-pre-wrap">
               {isUndertime
                 ? utRequest?.reason || "No reason specified."
-                : otRequest?.purpose || "No purpose specified."}
+                : isOvertime
+                ? otRequest?.purpose || "No purpose specified."
+                : leaveRequest?.reason || "No reason specified."}
             </div>
           </div>
 
           {/* Approver Remarks Section */}
-          {(request.remarks || (isUndertime && utRequest?.remarks)) && (
+          {(request.remarks || (isUndertime && utRequest?.remarks) || (isLeave && leaveRequest?.remarks)) && (
             <div className="space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                 <MessageSquare className="h-3.5 w-3.5 text-primary" />
                 <span>Approver Remarks</span>
               </div>
               <div className="bg-muted/30 p-4 rounded-xl border border-border/50 text-sm text-foreground/90 leading-relaxed font-medium whitespace-pre-wrap">
-                {request.remarks || (isUndertime ? utRequest?.remarks : "")}
+                {request.remarks || (isUndertime ? utRequest?.remarks : isLeave ? leaveRequest?.remarks : "")}
               </div>
             </div>
           )}
@@ -283,3 +375,4 @@ export function RequestDetailDialog({
     </Dialog>
   );
 }
+

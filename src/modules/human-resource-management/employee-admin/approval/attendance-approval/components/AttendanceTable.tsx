@@ -284,6 +284,26 @@ export function AttendanceTable({
                             {log.ut_request.duration_minutes ? ` (${log.ut_request.duration_minutes}m)` : ""}
                           </button>
                         )}
+                        {log.leave_request && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenDetailModal("leave", log);
+                            }}
+                            className={cn(
+                              "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold tracking-tight border shadow-xs transition-all cursor-pointer hover:brightness-95 hover:scale-105 active:scale-95 whitespace-nowrap",
+                              log.leave_request.status.toLowerCase() === "approved"
+                                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 hover:bg-purple-500/20"
+                                : log.leave_request.status.toLowerCase() === "pending"
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
+                            )}
+                            title="Click to view Leave request details"
+                          >
+                            LV: {log.leave_request.leave_type.toUpperCase()} ({log.leave_request.status.charAt(0).toUpperCase() + log.leave_request.status.slice(1).toLowerCase()})
+                          </button>
+                        )}
                       </div>
                       <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
                         <span className="opacity-60">ID:</span>
@@ -462,6 +482,7 @@ export function AttendanceTable({
             logDate={detailModalState.log.log_date}
             utRequest={detailModalState.log.ut_request}
             otRequest={detailModalState.log.ot_request}
+            leaveRequest={detailModalState.log.leave_request}
           />
         )}
       </div>

@@ -101,6 +101,10 @@ export function AttendanceApprovalDaily() {
     return filteredLogs.filter(log => log.ut_request?.status?.toLowerCase() === "pending").length;
   }, [filteredLogs]);
 
+  const pendingLeaveCount = React.useMemo(() => {
+    return filteredLogs.filter(log => log.leave_request?.status?.toLowerCase() === "pending").length;
+  }, [filteredLogs]);
+
   const handleUpdateRow = (logId: number, field: string, value: string | number | null) => {
     setLogs(prev => prev.map(log => 
       log.log_id === logId ? { ...log, [field]: value } : log
@@ -375,7 +379,7 @@ export function AttendanceApprovalDaily() {
             </label>
           </div>
 
-          {(pendingOtCount > 0 || pendingUtCount > 0) && (
+          {(pendingOtCount > 0 || pendingUtCount > 0 || pendingLeaveCount > 0) && (
             <div className="flex items-center gap-2 ml-2 flex-wrap">
               {pendingOtCount > 0 && (
                 <Badge variant="outline" className="text-[10px] font-bold px-2 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1.5 shadow-xs whitespace-nowrap">
@@ -387,6 +391,12 @@ export function AttendanceApprovalDaily() {
                 <Badge variant="outline" className="text-[10px] font-bold px-2 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 gap-1.5 shadow-xs whitespace-nowrap">
                   <Clock className="h-3.5 w-3.5" />
                   {pendingUtCount} Pending UT
+                </Badge>
+              )}
+              {pendingLeaveCount > 0 && (
+                <Badge variant="outline" className="text-[10px] font-bold px-2 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 gap-1.5 shadow-xs whitespace-nowrap">
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  {pendingLeaveCount} Pending Leave
                 </Badge>
               )}
             </div>
