@@ -10,7 +10,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,16 +18,12 @@ import {
   ShieldCheck,
   Crown,
   Search,
-  CheckCircle2,
   X,
-  Layers,
 } from "lucide-react";
 import {
-  DepartmentInfo,
   UserInfo,
   DepartmentHierarchySummary,
   SetupDepartmentHierarchyInput,
-  LGU_HIERARCHY_LEVELS,
 } from "../types";
 
 interface SetupDepartmentModalProps {
@@ -261,7 +256,7 @@ export function SetupDepartmentModal({
                   ))
                 ) : (
                   <div className="p-4 text-center text-xs text-muted-foreground">
-                    No personnel matching "{userSearch}"
+                    No personnel matching &quot;{userSearch}&quot;
                   </div>
                 )}
               </div>

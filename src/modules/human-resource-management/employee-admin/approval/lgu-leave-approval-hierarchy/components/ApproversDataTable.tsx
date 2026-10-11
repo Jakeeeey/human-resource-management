@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -25,14 +24,12 @@ import {
   Pencil,
   Trash2,
   Building2,
-  User,
   FilterX,
   Layers,
 } from "lucide-react";
 import {
   LguLeaveApprover,
   DepartmentInfo,
-  LGU_HIERARCHY_LEVELS,
 } from "../types";
 
 interface ApproversDataTableProps {

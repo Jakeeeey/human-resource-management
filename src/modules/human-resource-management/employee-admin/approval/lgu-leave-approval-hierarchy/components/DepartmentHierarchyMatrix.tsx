@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,6 @@ import {
   UserCheck,
   ShieldCheck,
   Crown,
-  Briefcase,
-  ArrowRight,
 } from "lucide-react";
 import { DepartmentHierarchySummary } from "../types";
 

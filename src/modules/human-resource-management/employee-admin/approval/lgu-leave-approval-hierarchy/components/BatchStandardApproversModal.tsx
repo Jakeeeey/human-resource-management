@@ -11,12 +11,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ShieldCheck,
   Crown,
-  Layers,
   Sparkles,
 } from "lucide-react";
 import {

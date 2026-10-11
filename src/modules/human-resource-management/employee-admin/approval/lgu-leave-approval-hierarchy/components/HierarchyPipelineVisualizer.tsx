@@ -63,19 +63,6 @@ export function HierarchyPipelineVisualizer({
     }
   };
 
-  const getStageHeaderBg = (level: number) => {
-    switch (level) {
-      case 1:
-        return "from-indigo-900/40 via-indigo-950/20 to-transparent border-indigo-500/30";
-      case 2:
-        return "from-purple-900/40 via-purple-950/20 to-transparent border-purple-500/30";
-      case 3:
-        return "from-emerald-900/40 via-emerald-950/20 to-transparent border-emerald-500/30";
-      default:
-        return "from-slate-900/40 to-transparent border-border";
-    }
-  };
-
   return (
     <Card className="border shadow-sm overflow-hidden bg-gradient-to-b from-card to-card/60">
       <div className="p-4 sm:p-5 border-b flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-muted/20">

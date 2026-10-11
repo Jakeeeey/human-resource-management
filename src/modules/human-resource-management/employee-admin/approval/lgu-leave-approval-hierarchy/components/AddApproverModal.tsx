@@ -265,7 +265,7 @@ export function AddApproverModal({
                 })
               ) : (
                 <div className="p-4 text-center text-xs text-muted-foreground">
-                  No personnel matching "{userSearch}"
+                  No personnel matching &quot;{userSearch}&quot;
                 </div>
               )}
             </div>

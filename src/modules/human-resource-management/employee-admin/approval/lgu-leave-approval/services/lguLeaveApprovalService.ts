@@ -256,7 +256,9 @@ export class LguLeaveApprovalService {
   /**
    * Fetch active approver assignments for user
    */
-  static async fetchApproverAssignments(approverId: number) {
+  static async fetchApproverAssignments(
+    approverId: number
+  ): Promise<{ department_id: number; level: number }[]> {
     try {
       const url = `/items/ta_draft_approvers?filter[approver_id][_eq]=${approverId}&filter[is_deleted][_eq]=0&fields=department_id,level`;
       const res = await this.directusFetch(url);

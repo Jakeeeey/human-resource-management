@@ -363,7 +363,7 @@ export class LguLeaveHierarchyService {
   /**
    * Update an existing approver assignment
    */
-  static async updateApprover(id: number, input: UpdateApproverInput, userId?: number): Promise<boolean> {
+  static async updateApprover(id: number, input: Partial<UpdateApproverInput>, userId?: number): Promise<boolean> {
     try {
       const payload: Record<string, unknown> = {
         updated_by: userId || 1,
