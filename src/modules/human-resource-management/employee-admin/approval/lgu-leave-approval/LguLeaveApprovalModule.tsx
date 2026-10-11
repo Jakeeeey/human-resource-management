@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ShieldCheck, AlertCircle, Layers } from "lucide-react";
+import { ShieldCheck, AlertCircle, Layers, SlidersHorizontal } from "lucide-react";
 
 import {
   fetchLguLeaveRequests,
@@ -154,15 +156,24 @@ export default function LguLeaveApprovalModule() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs bg-muted/50 p-2 px-3 rounded-lg border">
-          <Layers className="h-4 w-4 text-primary" />
-          <span className="text-muted-foreground">Acting as:</span>
-          <span className="font-semibold text-foreground">{currentUser.userName}</span>
-          {currentUser.isAdmin && (
-            <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded font-bold uppercase">
-              Admin
-            </span>
-          )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 text-xs bg-muted/50 p-2 px-3 rounded-lg border">
+            <Layers className="h-4 w-4 text-primary" />
+            <span className="text-muted-foreground">Acting as:</span>
+            <span className="font-semibold text-foreground">{currentUser.userName}</span>
+            {currentUser.isAdmin && (
+              <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded font-bold uppercase">
+                Admin
+              </span>
+            )}
+          </div>
+
+          <Button asChild size="sm" variant="outline" className="text-xs h-9 gap-1.5 shadow-2xs font-medium">
+            <Link href="/hrm/employee-admin/approval/lgu-leave-approval-hierarchy">
+              <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+              Hierarchy Setup
+            </Link>
+          </Button>
         </div>
       </div>
 
