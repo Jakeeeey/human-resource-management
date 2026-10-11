@@ -54,7 +54,7 @@ export function LguLeaveHistoryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <div className="flex items-center gap-2">
             <div className="p-2 bg-primary/10 rounded-lg text-primary">

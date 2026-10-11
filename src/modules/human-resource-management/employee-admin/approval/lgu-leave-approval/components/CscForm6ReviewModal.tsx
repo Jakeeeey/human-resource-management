@@ -220,7 +220,7 @@ export function CscForm6ReviewModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto p-0">
+      <DialogContent className="w-[95vw] sm:max-w-4xl md:max-w-5xl lg:max-w-6xl max-h-[92vh] overflow-y-auto p-0">
         <DialogHeader className="p-6 pb-2 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-t-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
