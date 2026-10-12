@@ -11,9 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { ID_CARD, idDocSchema } from "../types/id-layout.schema";
-import { clampIdZoom, createIdDocStore } from "../engine/store";
-import { IdCardSide } from "../engine/IdCardSide";
-import { IdStageCanvas } from "../engine/IdStageCanvas";
+import { clampIdZoom, createIdDocStore, ID_ZOOM_MAX, ID_ZOOM_MIN, ID_ZOOM_STEP } from "../engine/store";
+import { ID_SURFACE, IdStageCanvas } from "../engine/IdStageCanvas";
 import { ID_SAMPLE_USER, blankIdDoc, parseIdDesignJson } from "./idSample";
 import { getIdTemplate, isActiveFlag, isDefaultFlag, listIdCompanies, patchIdTemplate } from "./idApi";
 import type { IdCompanyRow } from "./idApi";
@@ -32,18 +31,6 @@ interface IdMeta {
 
 type IdInspectorTab = "props" | "layers";
 type IdMobileTab = "components" | "canvas" | "inspector";
-
-function useXl(): boolean {
-    const [xl, setXl] = useState(false);
-    useEffect(() => {
-        const query = window.matchMedia("(min-width: 1280px)");
-        const update = (): void => setXl(query.matches);
-        update();
-        query.addEventListener("change", update);
-        return () => query.removeEventListener("change", update);
-    }, []);
-    return xl;
-}
 
 function normaliseDesignJson(value: unknown): string {
     try {
@@ -64,12 +51,8 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
     const [saving, setSaving] = useState(false);
     const [inspectorTab, setInspectorTab] = useState<IdInspectorTab>("props");
     const [mobileTab, setMobileTab] = useState<IdMobileTab>("canvas");
-    const xl = useXl();
 
     const nodes = store((state) => state.nodes);
-    const pages = store((state) => state.pages);
-    const activePageId = store((state) => state.activePageId);
-    const setActivePage = store((state) => state.setActivePage);
     const version = store((state) => state.version);
     const zoom = store((state) => state.viewport.zoom);
     const setViewport = store((state) => state.setViewport);
@@ -79,10 +62,6 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
     const redo = store((state) => state.redo);
     const pastCount = useStore(store.temporal, (state) => state.pastStates.length);
     const futureCount = useStore(store.temporal, (state) => state.futureStates.length);
-
-    const frontPage = pages.find((page) => page.side === "front") ?? null;
-    const backPage = pages.find((page) => page.side === "back") ?? null;
-    const activeSide = pages.find((page) => page.id === activePageId)?.side ?? "front";
 
     const load = useCallback(async (): Promise<void> => {
         setStatus("loading");
@@ -198,18 +177,27 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
                 return;
             }
             if (!payload || typeof payload.kind !== "string") return;
-            const stage = event.currentTarget.querySelector('[data-stage="id-card"]');
             const state = store.getState();
             const currentZoom = state.viewport.zoom || 1;
+            const host = event.currentTarget;
             let at: { x: number; y: number } | undefined;
-            if (stage instanceof HTMLElement) {
-                const rect = stage.getBoundingClientRect();
+            let dropPageId: string | undefined;
+            const blocks = host.querySelectorAll("[data-id-card-block]");
+            for (const block of Array.from(blocks)) {
+                if (!(block instanceof HTMLElement)) continue;
+                const rect = block.getBoundingClientRect();
+                if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
+                    continue;
+                }
+                const side = block.getAttribute("data-id-card-block");
+                dropPageId = state.pages.find((page) => page.side === side)?.id;
                 at = {
                     x: Math.max(0, (event.clientX - rect.left) / currentZoom - 60),
                     y: Math.max(0, (event.clientY - rect.top) / currentZoom - 20),
                 };
+                break;
             }
-            insertPaletteNode(store, payload, at);
+            insertPaletteNode(store, payload, at, dropPageId);
         },
         [store],
     );
@@ -221,6 +209,14 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
         },
         onDrop: handleDrop,
     };
+
+    const zoomPercent = Math.round(zoom * 100);
+
+    const handleZoomFit = useCallback((): void => {
+        const scroll = document.querySelector("[data-id-studio-scroll]");
+        const avail = (scroll instanceof HTMLElement ? scroll.clientWidth : ID_SURFACE.width) - 32;
+        setViewport({ zoom: clampIdZoom(avail / ID_SURFACE.width) });
+    }, [setViewport]);
 
     if (status === "loading") {
         return (
@@ -259,47 +255,9 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
         </div>
     );
 
-    const singleCanvas = (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div aria-label="Card side" className="flex shrink-0 items-center justify-center gap-1 border-b bg-card p-2" role="tablist">
-                <Button aria-selected={activeSide === "front"} role="tab" size="sm" variant={activeSide === "front" ? "secondary" : "ghost"} onClick={() => frontPage && setActivePage(frontPage.id)}>Front</Button>
-                <Button aria-selected={activeSide === "back"} role="tab" size="sm" variant={activeSide === "back" ? "secondary" : "ghost"} onClick={() => backPage && setActivePage(backPage.id)}>Back</Button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-auto" {...dropHandlers}>
-                <IdStageCanvas store={store} values={ID_SAMPLE_USER} onEmptyAdd={() => setMobileTab("components")} />
-            </div>
-        </div>
-    );
-
-    const dualCanvas = (
-        <div className="grid min-h-0 flex-1 grid-cols-2 gap-4 overflow-auto p-4">
-            {[
-                { side: "front" as const, page: frontPage },
-                { side: "back" as const, page: backPage },
-            ].map(({ side, page }) => {
-                const isActive = activeSide === side;
-                return (
-                    <div className="flex min-h-0 flex-col items-center gap-2" key={side}>
-                        <div className="flex w-full max-w-[408px] items-center justify-between">
-                            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{side}</span>
-                            {isActive ? (
-                                <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">Editing</span>
-                            ) : (
-                                <Button size="sm" variant="outline" onClick={() => page && setActivePage(page.id)}>Edit {side}</Button>
-                            )}
-                        </div>
-                        {isActive ? (
-                            <div className="w-full max-w-[408px]" {...dropHandlers}>
-                                <IdStageCanvas store={store} values={ID_SAMPLE_USER} />
-                            </div>
-                        ) : (
-                            <div className="overflow-hidden rounded-xl border bg-card shadow-xl">
-                                {page ? <IdCardSide page={page} nodes={nodes} values={ID_SAMPLE_USER} /> : null}
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
+    const workspace = (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden" {...dropHandlers}>
+            <IdStageCanvas store={store} values={ID_SAMPLE_USER} />
         </div>
     );
 
@@ -321,9 +279,30 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
                 <div className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-2">
                     <Button aria-label="Undo" disabled={pastCount === 0} size="icon-sm" variant="ghost" onClick={() => undo()}><Undo2 /></Button>
                     <Button aria-label="Redo" disabled={futureCount === 0} size="icon-sm" variant="ghost" onClick={() => redo()}><Redo2 /></Button>
-                    <Button aria-label="Zoom out" disabled={zoom <= 0.5} size="icon-sm" variant="ghost" onClick={() => setViewport({ zoom: clampIdZoom(zoom - 0.25) })}><ZoomOut /></Button>
-                    <span aria-live="polite" className="hidden w-11 text-center text-xs tabular-nums sm:inline">{Math.round(zoom * 100)}%</span>
-                    <Button aria-label="Zoom in" disabled={zoom >= 2} size="icon-sm" variant="ghost" onClick={() => setViewport({ zoom: clampIdZoom(zoom + 0.25) })}><ZoomIn /></Button>
+                    <Button aria-label="Zoom out" disabled={zoom <= ID_ZOOM_MIN} size="icon-sm" variant="ghost" onClick={() => setViewport({ zoom: clampIdZoom(zoom - ID_ZOOM_STEP) })}><ZoomOut /></Button>
+                    <Button
+                        aria-label={`${zoomPercent}%, activate to reset to 100 percent`}
+                        aria-live="polite"
+                        className="hidden w-11 px-1 text-xs tabular-nums sm:inline-flex"
+                        size="sm"
+                        title="Reset zoom to 100%"
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setViewport({ zoom: 1 })}
+                    >
+                        {zoomPercent}%
+                    </Button>
+                    <Button aria-label="Zoom in" disabled={zoom >= ID_ZOOM_MAX} size="icon-sm" variant="ghost" onClick={() => setViewport({ zoom: clampIdZoom(zoom + ID_ZOOM_STEP) })}><ZoomIn /></Button>
+                    <Button
+                        aria-label="Fit canvas width"
+                        className="px-2 text-xs"
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                        onClick={handleZoomFit}
+                    >
+                        Fit
+                    </Button>
                     <Button aria-label="Save template" className="shrink-0 max-sm:px-2" disabled={saving} size="sm" onClick={() => void handleSave()}>
                         {saving ? <Loader2 className="animate-spin" /> : <Save />}
                         <span className="hidden min-[400px]:inline">{saving ? "Saving…" : "Save"}</span>
@@ -381,7 +360,7 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
                         {inspector}
                     </div>
                     <div className={mobileTab === "canvas" ? "flex min-h-0 flex-1 flex-col overflow-hidden" : "hidden min-h-0 flex-1 flex-col overflow-hidden md:flex"}>
-                        {xl ? dualCanvas : singleCanvas}
+                        {workspace}
                     </div>
                 </div>
                 <div className="hidden w-[280px] shrink-0 flex-col border-l bg-card lg:flex">

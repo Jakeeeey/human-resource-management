@@ -24,6 +24,21 @@ function firstText(row: Record<string, unknown>, keys: readonly string[]): strin
     return "";
 }
 
+function employeeIdFileRef(value: unknown): string {
+    if (typeof value === "string") {
+        return value.trim();
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(value);
+    }
+    if (isRecord(value)) {
+        const id = value.id;
+        if (typeof id === "string" && id.trim() !== "") return id.trim();
+        if (typeof id === "number" && Number.isFinite(id)) return String(id);
+    }
+    return "";
+}
+
 export function formatEmployeeIdDate(value: unknown): string {
     if (typeof value !== "string" && typeof value !== "number") return "";
     if (typeof value === "string" && value.trim() === "") return "";
@@ -111,10 +126,25 @@ export function buildEmployeeIdValues(
         );
         if (derived !== "") values.full_name = derived;
     }
-    const photo = firstText(row, ["user_image"]) || spring.image || "";
+    if (!values.user_id) {
+        const direct = firstText(row, ["user_id"]);
+        if (direct !== "") {
+            values.user_id = direct;
+        } else if (Number.isInteger(spring.id)) {
+            values.user_id = String(spring.id);
+        }
+    }
+    if (!values.full_address) {
+        const derived = [values.user_brgy ?? "", values.user_city ?? "", values.user_province ?? ""]
+            .map((part) => part.trim())
+            .filter((part) => part !== "")
+            .join(", ");
+        if (derived !== "") values.full_address = derived;
+    }
+    const photo = employeeIdFileRef(row.user_image) || employeeIdFileRef(spring.image) || "";
     const resolvedPhoto = resolveEmployeeIdImageUrl(photo === "" ? null : photo);
     if (resolvedPhoto !== "") values.user_image = resolvedPhoto;
-    const signature = firstText(row, ["signature"]) || spring.signature || "";
+    const signature = employeeIdFileRef(row.signature) || employeeIdFileRef(spring.signature) || "";
     const resolvedSignature = resolveEmployeeIdImageUrl(signature === "" ? null : signature);
     if (resolvedSignature !== "") values.signature = resolvedSignature;
     if (company && isRecord(company)) {

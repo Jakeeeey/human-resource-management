@@ -56,8 +56,7 @@ export interface IdViewerCompanyInput {
 }
 
 export function resolveIdViewerImageUrl(path: unknown): string {
-    if (typeof path !== "string") return "";
-    const clean = path.trim();
+    const clean = idViewerFileRef(path);
     if (clean === "") return "";
     if (clean.startsWith("http") || clean.startsWith("blob:") || clean.startsWith("data:")) {
         return clean;
@@ -65,7 +64,23 @@ export function resolveIdViewerImageUrl(path: unknown): string {
     if (ID_VIEWER_UUID_PATTERN.test(clean)) {
         return `/api/hrm/employee-admin/employee-master-list/assets/${clean}`;
     }
+    if (clean.startsWith("/")) {
+        const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
+        if (base !== "") return `${base}${clean}`;
+    }
     return clean;
+}
+
+function idViewerFileRef(value: unknown): string {
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        const record = value as Readonly<Record<string, unknown>>;
+        const id = record.id;
+        if (typeof id === "string" && id.trim() !== "") return id.trim();
+        if (typeof id === "number" && Number.isFinite(id)) return String(id);
+    }
+    return "";
 }
 
 function viewerScalarOf(value: unknown): string {
@@ -120,6 +135,11 @@ export function buildIdViewerValues(
     values.is_employee = formatIdViewerBoolean(user.is_employee);
     values.is_department_head = formatIdViewerBoolean(user.is_department_head);
     values.full_name = fullIdViewerNameOf(user);
+    values.user_id = viewerScalarOf(user.user_id);
+    values.full_address = [viewerScalarOf(user.user_brgy), viewerScalarOf(user.user_city), viewerScalarOf(user.user_province)]
+        .map((part) => part.trim())
+        .filter((part) => part !== "")
+        .join(", ");
     values.company_name =
         company !== null && typeof company.company_name === "string" ? company.company_name : "";
     values.user_image = resolveIdViewerImageUrl(user.user_image);

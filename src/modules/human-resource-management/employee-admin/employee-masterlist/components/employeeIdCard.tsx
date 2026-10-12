@@ -4,6 +4,12 @@ import { sanitizeEmployeeIdInlineHtml } from "./employeeIdSanitize";
 
 export const EMPLOYEE_ID_MISSING_VALUE = "____";
 
+const EMPLOYEE_ID_CLIP_DIAMOND = "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)";
+const EMPLOYEE_ID_CLIP_PENTAGON = "polygon(50% 0%, 100% 38%, 81% 100%, 19% 100%, 0% 38%)";
+const EMPLOYEE_ID_CLIP_HEXAGON = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
+const EMPLOYEE_ID_CLIP_STAR = "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+const EMPLOYEE_ID_CLIP_ARROW = "polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)";
+
 export interface EmployeeIdNodeValues {
     readonly node: EmployeeIdNode;
     readonly values?: Readonly<Record<string, string>>;
@@ -104,6 +110,7 @@ function EmployeeIdImageBody({ node, values }: { readonly node: EmployeeIdNode; 
     const fitValue = propOf(node.props, "fit");
     const fit = fitValue === "contain" || fitValue === "fill" ? fitValue : "cover";
     const radius = numberProp(node.props, "radius");
+    const mask = textProp(node.props, "mask") ?? "none";
     let src = "";
     if (source === "asset") {
         const direct = propOf(node.props, "src");
@@ -113,6 +120,20 @@ function EmployeeIdImageBody({ node, values }: { readonly node: EmployeeIdNode; 
         if (field !== "") src = values[field] ?? "";
     }
     if (src === "") return null;
+    const style: CSSProperties = { objectFit: fit };
+    if (mask === "circle" || mask === "ellipse") {
+        style.borderRadius = "50%";
+    } else if (mask === "rounded") {
+        style.borderRadius = 24;
+    } else if (mask === "diamond") {
+        style.clipPath = EMPLOYEE_ID_CLIP_DIAMOND;
+    } else if (mask === "hexagon") {
+        style.clipPath = EMPLOYEE_ID_CLIP_HEXAGON;
+    } else if (mask === "star") {
+        style.clipPath = EMPLOYEE_ID_CLIP_STAR;
+    } else {
+        style.borderRadius = radius ?? 0;
+    }
     return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -121,7 +142,7 @@ function EmployeeIdImageBody({ node, values }: { readonly node: EmployeeIdNode; 
             crossOrigin="anonymous"
             draggable={false}
             src={src}
-            style={{ objectFit: fit, borderRadius: radius ?? 0 }}
+            style={style}
         />
     );
 }
@@ -149,6 +170,46 @@ function EmployeeIdShapeBody({ node }: { readonly node: EmployeeIdNode }) {
             <div
                 className="h-full w-full"
                 style={{ backgroundColor: fill ?? "transparent", clipPath: "polygon(50% 0%, 100% 100%, 0% 100%)" }}
+            />
+        );
+    }
+    if (kind === "diamond") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: EMPLOYEE_ID_CLIP_DIAMOND }}
+            />
+        );
+    }
+    if (kind === "pentagon") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: EMPLOYEE_ID_CLIP_PENTAGON }}
+            />
+        );
+    }
+    if (kind === "hexagon") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: EMPLOYEE_ID_CLIP_HEXAGON }}
+            />
+        );
+    }
+    if (kind === "star") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: EMPLOYEE_ID_CLIP_STAR }}
+            />
+        );
+    }
+    if (kind === "arrow") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: EMPLOYEE_ID_CLIP_ARROW }}
             />
         );
     }
@@ -200,15 +261,16 @@ export interface EmployeeIdCardSideProps {
     readonly nodes: Readonly<Record<string, EmployeeIdNode>>;
     readonly values?: Readonly<Record<string, string>>;
     readonly innerRef?: Ref<HTMLDivElement>;
+    readonly zoom?: number;
 }
 
-export function EmployeeIdCardSide({ page, nodes, values = {}, innerRef }: EmployeeIdCardSideProps) {
+export function EmployeeIdCardSide({ page, nodes, values = {}, innerRef, zoom = 1 }: EmployeeIdCardSideProps) {
     return (
         <div
-            className="relative overflow-hidden bg-white"
+            className="relative overflow-hidden border border-transparent bg-card"
             data-id-card-side={page.side}
             ref={innerRef}
-            style={{ width: 408, height: 648 }}
+            style={{ width: 408, height: 648, zoom }}
         >
             {page.rootIds.map((id) => {
                 const node = nodes[id];

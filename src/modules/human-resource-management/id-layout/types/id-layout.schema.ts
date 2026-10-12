@@ -6,46 +6,23 @@ export const ID_CARD = {
 } as const;
 
 export const ID_VARIABLES = [
-    "user_fname",
-    "user_mname",
-    "user_lname",
-    "suffix_name",
-    "nickname",
-    "user_maiden_name",
     "full_name",
+    "user_id",
     "user_contact",
     "user_email",
-    "personal_email",
-    "user_province",
-    "user_city",
-    "user_brgy",
+    "full_address",
     "user_bday",
-    "gender",
-    "civil_status",
-    "nationality",
-    "citizenship",
-    "place_of_birth",
-    "blood_type",
-    "religion",
-    "spouse_name",
     "emergency_contact_name",
     "emergency_contact_number",
     "user_department",
     "user_position",
     "user_dateOfHire",
     "external_id",
-    "rf_id",
-    "biometric_id",
     "user_tin",
     "user_sss",
     "user_philhealth",
     "user_pagibig",
-    "user_image",
-    "signature",
     "company_name",
-    "company_logo",
-    "is_employee",
-    "is_department_head",
 ] as const;
 
 export type IdVariableField = (typeof ID_VARIABLES)[number];
@@ -82,6 +59,7 @@ const idNodeBase = {
     rotation: z.number().finite(),
     z: z.number().int().min(0),
     opacity: z.number().min(0).max(1),
+    locked: z.boolean().default(false),
 };
 
 const idTextPropsSchema = z.object({
@@ -115,6 +93,8 @@ const idVariablePropsSchema = z.object({
     strokeColor: z.string().min(1).optional(),
 });
 
+const idImageMaskSchema = z.enum(["none", "circle", "ellipse", "rounded", "diamond", "hexagon", "star"]);
+
 const idImagePropsSchema = z
     .object({
         source: z.enum(["asset", "field"]),
@@ -122,6 +102,7 @@ const idImagePropsSchema = z
         field: z.enum(["user_image", "signature"]).optional(),
         fit: z.enum(["cover", "contain", "fill"]),
         radius: z.number().finite().min(0),
+        mask: idImageMaskSchema.default("none"),
         opacity: z.number().min(0).max(1),
     })
     .superRefine((props, ctx) => {
@@ -142,7 +123,7 @@ const idImagePropsSchema = z
     });
 
 const idShapePropsSchema = z.object({
-    shape: z.enum(["rect", "ellipse", "line", "triangle"]),
+    shape: z.enum(["rect", "ellipse", "line", "triangle", "diamond", "pentagon", "hexagon", "star", "arrow"]),
     fill: z.string().min(1),
     borderColor: z.string().min(1),
     borderWidth: z.number().finite().min(0),

@@ -14,6 +14,8 @@ interface IdMoveableProps {
     readonly stageEl: HTMLDivElement | null;
     readonly targetId: string | null;
     readonly editing: boolean;
+    readonly pageId: string | null;
+    readonly panning: boolean;
 }
 
 interface ResizeCommit {
@@ -22,7 +24,7 @@ interface ResizeCommit {
     readonly drag?: { readonly left?: number; readonly top?: number };
 }
 
-export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProps) {
+export function IdMoveable({ store, stageEl, targetId, editing, pageId, panning }: IdMoveableProps) {
     const beginGesture = store((state) => state.beginGesture);
     const endGesture = store((state) => state.endGesture);
     const selectNodes = store((state) => state.selectNodes);
@@ -37,17 +39,22 @@ export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProp
     const targetW = store((state) => (targetId ? state.nodes[targetId]?.w : undefined));
     const targetH = store((state) => (targetId ? state.nodes[targetId]?.h : undefined));
     const targetRotation = store((state) => (targetId ? state.nodes[targetId]?.rotation : undefined));
+    const targetLocked = store((state) => (targetId ? (state.nodes[targetId]?.locked ?? false) : false));
+    const lockedKey = store((state) => state.selection.filter((id) => state.nodes[id]?.locked).join(","));
     const selectionKey = selection.join(",");
+
+    const lockedSet = useMemo(() => new Set(lockedKey === "" ? [] : lockedKey.split(",")), [lockedKey]);
 
     const groupTargets = useMemo(
         () =>
             selection.length > 1 && stageEl
                 ? selection.flatMap((id) => {
+                      if (lockedSet.has(id)) return [];
                       const element = stageEl.querySelector(`[data-id="${id}"]`);
                       return element instanceof HTMLElement ? [element] : [];
                   })
                 : [],
-        [stageEl, selection],
+        [stageEl, selection, lockedSet],
     );
     const isGroup = selection.length > 1 && groupTargets.length > 0;
 
@@ -61,11 +68,27 @@ export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProp
 
     const snapFor = (ids: readonly string[], primaryId: string, rawDx: number, rawDy: number) => {
         const state = store.getState();
-        const page = state.pages.find((candidate) => candidate.id === state.activePageId) ?? null;
+        const page = state.pages.find((candidate) => candidate.id === (pageId ?? state.activePageId)) ?? null;
         return snapIdDrag(state.nodes, page?.rootIds ?? [], ids, primaryId, rawDx, rawDy, state.snapEnabled);
     };
 
+    const ownedIdsOf = (ids: readonly string[]): string[] => {
+        const state = store.getState();
+        const page = state.pages.find((candidate) => candidate.id === (pageId ?? state.activePageId)) ?? null;
+        const roots = page?.rootIds ?? [];
+        return ids.filter((id) => roots.includes(id));
+    };
+
     if (!stageEl) return null;
+
+    const allowMove = !panning;
+    // react-moveable's `zoom` prop scales its own control elements
+    // ("Zooms in the elements of a moveable", default 1): each control is
+    // rendered 14px * zoom, then the browser scales it again by the
+    // ancestor transform scale. The control box lives inside the scaled
+    // surface, so screen size = 14 * zoomProp * zoom. Passing the inverse
+    // keeps handles a constant 14px on screen at any canvas zoom.
+    const moveableZoom = zoom > 0 ? 1 / zoom : 1;
 
     return (
         <>
@@ -75,7 +98,10 @@ export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProp
                 onDragEnd={(event) => {
                     const eventSelected = (event as unknown as { selected?: readonly HTMLElement[] }).selected;
                     const elements = eventSelected ?? selectoRef.current?.getSelectedTargets() ?? [];
-                    const ids = elements.map((element) => element.dataset?.id).filter((id): id is string => Boolean(id));
+                    const ids = elements
+                        .map((element) => element.dataset?.id)
+                        .filter((id): id is string => Boolean(id))
+                        .filter((id) => !store.getState().nodes[id]?.locked);
                     if (ids.length === 0 && !event.inputEvent.shiftKey) return;
                     const current = store.getState().selection;
                     selectNodes(event.inputEvent.shiftKey ? Array.from(new Set([...current, ...ids])) : ids);
@@ -84,12 +110,14 @@ export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProp
                     event.inputEvent.preventDefault();
                 }}
                 dragCondition={(event) => {
+                    if (panning) return false;
                     const target = event.inputEvent?.target as HTMLElement | null | undefined;
                     if (!target) return true;
                     if (target.closest("[data-id-editing]")) return false;
                     if (target.closest("[class*='moveable-']")) return false;
                     const block = target.closest<HTMLElement>(".id-block");
                     if (block?.dataset.id) {
+                        if (store.getState().nodes[block.dataset.id]?.locked) return false;
                         const current = store.getState().selection;
                         if (current.includes(block.dataset.id)) return false;
                     }
@@ -97,27 +125,28 @@ export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProp
                 }}
                 ref={selectoRef}
                 selectableTargets={[".id-block"]}
-                selectByClick={!editing}
+                selectByClick={!editing && allowMove}
                 toggleContinueSelect={["shift"]}
             />
             {editing ? null : isGroup ? (
                 <Moveable
                     bounds={{ left: 0, top: 0, right: ID_CARD.width, bottom: ID_CARD.height }}
                     container={stageEl}
-                    draggable
+                    draggable={allowMove}
                     flushSync={flushSync}
                     onDragGroup={(event) => {
                         const first = event.events[0];
                         if (!first) return;
                         const current = store.getState();
-                        const primaryId = current.selection[0];
+                        const owned = ownedIdsOf(current.selection);
+                        const primaryId = owned[0];
                         if (!primaryId) return;
                         const rawDx = Math.round(first.delta[0] ?? 0);
                         const rawDy = Math.round(first.delta[1] ?? 0);
                         if (rawDx === 0 && rawDy === 0) return;
-                        const snapped = snapFor(current.selection, primaryId, rawDx, rawDy);
+                        const snapped = snapFor(owned, primaryId, rawDx, rawDy);
                         if (snapped.dx === 0 && snapped.dy === 0) return;
-                        current.moveNodesBy(current.selection, snapped.dx, snapped.dy);
+                        current.moveNodesBy(owned, snapped.dx, snapped.dy);
                         setSnap(snapped.overlay);
                     }}
                     onDragGroupEnd={() => {
@@ -128,23 +157,24 @@ export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProp
                     ref={moveableRef}
                     snappable={false}
                     targets={groupTargets}
-                    zoom={zoom}
+                    zoom={moveableZoom}
                 />
-            ) : targetId ? (
+            ) : targetId && !targetLocked ? (
                 <Moveable
                     bounds={{ left: 0, top: 0, right: ID_CARD.width, bottom: ID_CARD.height }}
                     container={stageEl}
-                    draggable
+                    draggable={allowMove}
                     flushSync={flushSync}
                     onDrag={(event) => {
                         const current = store.getState();
                         const primary = current.nodes[targetId];
                         if (!primary) return;
-                        const ids = current.selection.includes(targetId) ? current.selection : [targetId];
+                        const owned = ownedIdsOf(current.selection.includes(targetId) ? current.selection : [targetId]);
+                        if (owned.length === 0 || !owned.includes(targetId)) return;
                         const rawDx = Math.round(event.left) - primary.x;
                         const rawDy = Math.round(event.top) - primary.y;
-                        const snapped = snapFor(ids, targetId, rawDx, rawDy);
-                        current.moveNodesBy(ids, snapped.dx, snapped.dy);
+                        const snapped = snapFor(owned, targetId, rawDx, rawDy);
+                        current.moveNodesBy(owned, snapped.dx, snapped.dy);
                         setSnap(snapped.overlay);
                     }}
                     onDragEnd={() => {
@@ -183,11 +213,11 @@ export function IdMoveable({ store, stageEl, targetId, editing }: IdMoveableProp
                     onRotateStart={() => beginGesture()}
                     origin={false}
                     ref={moveableRef}
-                    resizable
-                    rotatable
+                    resizable={!panning}
+                    rotatable={!panning}
                     snappable={false}
                     target={`[data-id="${targetId}"]`}
-                    zoom={zoom}
+                    zoom={moveableZoom}
                 />
             ) : null}
             <IdSnapGuidesOverlay xLines={snap?.xLines ?? []} yLines={snap?.yLines ?? []} />

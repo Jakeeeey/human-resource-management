@@ -87,7 +87,7 @@ export function buildIdDraft(kind: IdPaletteKind, field?: string): IdNodeDraft {
             rotation: 0,
             z: 0,
             opacity: 1,
-            props: { source: "asset", src: ID_PIXEL_DATA_URL, fit: "cover", radius: 0, opacity: 1 },
+            props: { source: "asset", src: ID_PIXEL_DATA_URL, fit: "cover", radius: 0, mask: "none", opacity: 1 },
         };
     }
     if (kind === "image-field") {
@@ -101,7 +101,7 @@ export function buildIdDraft(kind: IdPaletteKind, field?: string): IdNodeDraft {
             rotation: 0,
             z: 0,
             opacity: 1,
-            props: { source: "field", field: "user_image", fit: "cover", radius: 0, opacity: 1 },
+            props: { source: "field", field: "user_image", fit: "cover", radius: 0, mask: "none", opacity: 1 },
         };
     }
     const shape = kind === "shape-ellipse" ? "ellipse" : kind === "shape-line" ? "line" : kind === "shape-triangle" ? "triangle" : "rect";
@@ -119,16 +119,20 @@ export function buildIdDraft(kind: IdPaletteKind, field?: string): IdNodeDraft {
     };
 }
 
-export function insertPaletteNode(store: IdDocStore, payload: IdPaletteDnD, at?: { x: number; y: number }): string | null {
+export function insertPaletteNode(store: IdDocStore, payload: IdPaletteDnD, at?: { x: number; y: number }, pageId?: string): string | null {
     const state = store.getState();
-    const pageId = state.activePageId;
-    if (!pageId) return null;
+    const targetId = pageId ?? state.activePageId;
+    const target = state.pages.find((page) => page.id === targetId) ?? null;
+    if (!target) return null;
     const draft = buildIdDraft(payload.kind, payload.field);
-    const count = state.pages.find((page) => page.id === pageId)?.rootIds.length ?? 0;
+    const count = target.rootIds.length;
     const x = at ? Math.max(0, Math.round(at.x)) : 24 + (count % 6) * 16;
     const y = at ? Math.max(0, Math.round(at.y)) : 24 + (count % 6) * 16;
-    const id = state.addNode({ ...draft, id: nextPaletteId(), x, y }, pageId);
-    if (id) state.selectNodes([id]);
+    const id = state.addNode({ ...draft, id: nextPaletteId(), x, y }, target.id);
+    if (id) {
+        state.setActivePage(target.id);
+        state.selectNodes([id]);
+    }
     return id;
 }
 
@@ -251,8 +255,7 @@ export function IdPalette({ store }: { readonly store: IdDocStore }) {
                                         onDragStart={(event) => dragPayload(event, { kind: "variable", field })}
                                     >
                                         <Variable aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground group-hover:text-primary" />
-                                        <span className="min-w-0 flex-1 truncate text-xs font-medium">{idVariableLabel(field)}</span>
-                                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{field}</span>
+                                        <span className="min-w-0 flex-1 truncate font-mono text-xs font-medium" title={field}>{field}</span>
                                     </button>
                                 ))}
                             </div>

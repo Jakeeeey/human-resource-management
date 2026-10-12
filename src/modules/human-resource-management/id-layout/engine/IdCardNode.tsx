@@ -1,8 +1,15 @@
 import type { CSSProperties } from "react";
+import { Image as ImageIcon } from "lucide-react";
 import type { IdNode } from "../types/id-layout.schema";
 import { sanitizeIdInlineHtml } from "./sanitize";
 
 export const ID_MISSING_VALUE = "____";
+
+const ID_CLIP_DIAMOND = "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)";
+const ID_CLIP_PENTAGON = "polygon(50% 0%, 100% 38%, 81% 100%, 19% 100%, 0% 38%)";
+const ID_CLIP_HEXAGON = "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)";
+const ID_CLIP_STAR = "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+const ID_CLIP_ARROW = "polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)";
 
 export interface IdCardNodeProps {
     readonly node: IdNode;
@@ -68,19 +75,6 @@ export function idNodeText(node: IdNode): string {
     return typeof raw === "string" ? raw : "";
 }
 
-function resolveIdVariable(props: unknown, values: Readonly<Record<string, string>>): string {
-    const field = textProp(props, "field") ?? "";
-    const raw = field === "" ? undefined : values[field];
-    const base = raw === undefined || raw === "" ? ID_MISSING_VALUE : raw;
-    const transform = propOf(props, "transform");
-    const shaped = transform === "upper" ? base.toUpperCase() : transform === "lower" ? base.toLowerCase() : base;
-    const prefixValue = propOf(props, "prefix");
-    const prefix = typeof prefixValue === "string" ? prefixValue : "";
-    const suffixValue = propOf(props, "suffix");
-    const suffix = typeof suffixValue === "string" ? suffixValue : "";
-    return `${prefix}${shaped}${suffix}`;
-}
-
 function IdTextBody({ node }: { readonly node: IdNode }) {
     return (
         <div
@@ -91,10 +85,17 @@ function IdTextBody({ node }: { readonly node: IdNode }) {
     );
 }
 
-function IdVariableBody({ node, values }: { readonly node: IdNode; readonly values: Readonly<Record<string, string>> }) {
+function IdVariableBody({ node }: { readonly node: IdNode }) {
+    const field = textProp(node.props, "field") ?? "";
+    const transform = propOf(node.props, "transform");
+    const shaped = transform === "upper" ? field.toUpperCase() : transform === "lower" ? field.toLowerCase() : field;
+    const prefixValue = propOf(node.props, "prefix");
+    const prefix = typeof prefixValue === "string" ? prefixValue : "";
+    const suffixValue = propOf(node.props, "suffix");
+    const suffix = typeof suffixValue === "string" ? suffixValue : "";
     return (
         <div className="h-full w-full overflow-hidden" style={idTextStyle(node.props)}>
-            <span>{resolveIdVariable(node.props, values)}</span>
+            <span>{`${prefix}${shaped}${suffix}`}</span>
         </div>
     );
 }
@@ -104,6 +105,7 @@ function IdImageBody({ node, values }: { readonly node: IdNode; readonly values:
     const fitValue = propOf(node.props, "fit");
     const fit = fitValue === "contain" || fitValue === "fill" ? fitValue : "cover";
     const radius = numberProp(node.props, "radius");
+    const mask = textProp(node.props, "mask") ?? "none";
     let src = "";
     if (source === "asset") {
         const direct = propOf(node.props, "src");
@@ -112,16 +114,39 @@ function IdImageBody({ node, values }: { readonly node: IdNode; readonly values:
         const field = textProp(node.props, "field") ?? "";
         if (field !== "") src = values[field] ?? "";
     }
-    if (src === "") return null;
+    if (src === "") {
+        const field = textProp(node.props, "field") ?? "";
+        const label = source === "field" && field !== "" ? field : "Image";
+        return (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden border border-dashed border-border bg-muted/30 text-muted-foreground">
+                <ImageIcon aria-hidden="true" className="size-4" />
+                <span className="max-w-full truncate px-1 text-[11px] font-medium">{label}</span>
+            </div>
+        );
+    }
+    const style: CSSProperties = { objectFit: fit };
+    if (mask === "circle" || mask === "ellipse") {
+        style.borderRadius = "50%";
+    } else if (mask === "rounded") {
+        style.borderRadius = 24;
+    } else if (mask === "diamond") {
+        style.clipPath = ID_CLIP_DIAMOND;
+    } else if (mask === "hexagon") {
+        style.clipPath = ID_CLIP_HEXAGON;
+    } else if (mask === "star") {
+        style.clipPath = ID_CLIP_STAR;
+    } else {
+        style.borderRadius = radius ?? 0;
+    }
     return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
             alt=""
-            className="h-full w-full"
+            className="h-full w-full ring-1 ring-inset ring-border/50"
             crossOrigin="anonymous"
             draggable={false}
             src={src}
-            style={{ objectFit: fit, borderRadius: radius ?? 0 }}
+            style={style}
         />
     );
 }
@@ -152,6 +177,46 @@ function IdShapeBody({ node }: { readonly node: IdNode }) {
             />
         );
     }
+    if (kind === "diamond") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: ID_CLIP_DIAMOND }}
+            />
+        );
+    }
+    if (kind === "pentagon") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: ID_CLIP_PENTAGON }}
+            />
+        );
+    }
+    if (kind === "hexagon") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: ID_CLIP_HEXAGON }}
+            />
+        );
+    }
+    if (kind === "star") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: ID_CLIP_STAR }}
+            />
+        );
+    }
+    if (kind === "arrow") {
+        return (
+            <div
+                className="h-full w-full"
+                style={{ backgroundColor: fill ?? "transparent", clipPath: ID_CLIP_ARROW }}
+            />
+        );
+    }
     if (kind === "ellipse") {
         return (
             <div
@@ -170,7 +235,7 @@ function IdShapeBody({ node }: { readonly node: IdNode }) {
 
 export function IdNodeBody({ node, values = {} }: IdCardNodeProps) {
     if (node.type === "text") return <IdTextBody node={node} />;
-    if (node.type === "variable") return <IdVariableBody node={node} values={values} />;
+    if (node.type === "variable") return <IdVariableBody node={node} />;
     if (node.type === "image") return <IdImageBody node={node} values={values} />;
     if (node.type === "shape") return <IdShapeBody node={node} />;
     return null;

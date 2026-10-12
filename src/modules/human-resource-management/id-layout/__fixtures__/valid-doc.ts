@@ -31,11 +31,13 @@ export function validDoc(): IdDoc {
                 rotation: 0,
                 z: 0,
                 opacity: 1,
+                locked: false,
                 props: {
                     source: "asset",
                     src: ID_PIXEL_SRC,
                     fit: "cover",
                     radius: 60,
+                    mask: "none",
                     opacity: 1,
                 },
             },
@@ -50,6 +52,7 @@ export function validDoc(): IdDoc {
                 rotation: 0,
                 z: 1,
                 opacity: 1,
+                locked: false,
                 props: {
                     field: "full_name",
                     transform: "upper",
@@ -73,6 +76,7 @@ export function validDoc(): IdDoc {
                 rotation: 0,
                 z: 2,
                 opacity: 1,
+                locked: false,
                 props: {
                     text: "<p>Engineering Department</p>",
                     fontFamily: "Arial, Helvetica, sans-serif",
@@ -97,6 +101,7 @@ export function validDoc(): IdDoc {
                 rotation: 12,
                 z: 3,
                 opacity: 0.9,
+                locked: false,
                 props: {
                     shape: "ellipse",
                     fill: "#2563eb",
@@ -117,6 +122,7 @@ export function validDoc(): IdDoc {
                 rotation: 0,
                 z: 0,
                 opacity: 1,
+                locked: false,
                 props: {
                     text: "<p>If found, please return to the HR office.</p>",
                     fontFamily: "Arial, Helvetica, sans-serif",
@@ -141,6 +147,7 @@ export function validDoc(): IdDoc {
                 rotation: 0,
                 z: 1,
                 opacity: 1,
+                locked: false,
                 props: {
                     shape: "rect",
                     fill: "#111111",

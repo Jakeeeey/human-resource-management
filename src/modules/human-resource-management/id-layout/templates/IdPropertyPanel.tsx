@@ -219,6 +219,7 @@ export function IdPropertyPanel({ store }: { readonly store: IdDocStore }) {
     const rotateNode = store((state) => state.rotateNode);
     const setOpacity = store((state) => state.setOpacity);
     const reorderNode = store((state) => state.reorderNode);
+    const setLocked = store((state) => state.setLocked);
     const beginGesture = store((state) => state.beginGesture);
     const endGesture = store((state) => state.endGesture);
 
@@ -254,6 +255,9 @@ export function IdPropertyPanel({ store }: { readonly store: IdDocStore }) {
                 <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize">{node.type}</span>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+                <Section title="Lock">
+                    <ToggleRow label="Locked" checked={node.locked === true} onChange={(next) => setLocked(node.id, next)} />
+                </Section>
                 {node.type === "variable" ? (
                     <Section title="Field binding">
                         <SelectRow
@@ -297,6 +301,12 @@ export function IdPropertyPanel({ store }: { readonly store: IdDocStore }) {
                             onChange={(next) => updateProps(node.id, { fit: next })}
                         />
                         <NumericField label="Corner radius" value={propNumber(node, "radius", 0)} min={0} onCommit={(next) => updateProps(node.id, { radius: Math.max(0, next) })} />
+                        <SelectRow
+                            label="Mask"
+                            value={propString(node, "mask", "none")}
+                            options={[{ value: "none", label: "None" }, { value: "circle", label: "Circle" }, { value: "ellipse", label: "Ellipse" }, { value: "rounded", label: "Rounded" }, { value: "diamond", label: "Diamond" }, { value: "hexagon", label: "Hexagon" }, { value: "star", label: "Star" }]}
+                            onChange={(next) => updateProps(node.id, { mask: next })}
+                        />
                     </Section>
                 ) : null}
                 {node.type === "text" ? (
@@ -366,6 +376,11 @@ export function IdPropertyPanel({ store }: { readonly store: IdDocStore }) {
                                     <SelectItem value="ellipse">Ellipse</SelectItem>
                                     <SelectItem value="line">Line</SelectItem>
                                     <SelectItem value="triangle">Triangle</SelectItem>
+                                    <SelectItem value="diamond">Diamond</SelectItem>
+                                    <SelectItem value="pentagon">Pentagon</SelectItem>
+                                    <SelectItem value="hexagon">Hexagon</SelectItem>
+                                    <SelectItem value="star">Star</SelectItem>
+                                    <SelectItem value="arrow">Arrow</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

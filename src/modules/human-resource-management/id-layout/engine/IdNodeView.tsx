@@ -50,7 +50,7 @@ function idNodeLabel(node: IdNode): string {
     return node.type.charAt(0).toUpperCase() + node.type.slice(1);
 }
 
-export function IdNodeView({ node, store, values = {} }: IdNodeViewProps) {
+export function IdNodeView({ node, store }: IdNodeViewProps) {
     const selected = store((state) => state.selection.includes(node.id));
     const selectNodes = store((state) => state.selectNodes);
     const editingId = store((state) => state.editingId);
@@ -66,7 +66,7 @@ export function IdNodeView({ node, store, values = {} }: IdNodeViewProps) {
         return (
             <div
                 aria-label={`${node.type} block: ${label}`}
-                className="id-block absolute overflow-hidden rounded-sm border border-border/60 bg-background"
+                className="id-block absolute overflow-hidden"
                 data-id={node.id}
                 style={{
                     left: node.x,
@@ -114,7 +114,7 @@ export function IdNodeView({ node, store, values = {} }: IdNodeViewProps) {
     const stored = node.type === "text" ? idNodeText(node) : "";
     const showPlaceholder = node.type === "text" && sanitizeIdInlineHtml(stored) === "";
     const enterEdit = (): void => {
-        if (node.type !== "text") return;
+        if (node.type !== "text" || node.locked) return;
         const current = store.getState();
         current.endGesture();
         current.setEditingId(node.id);
@@ -124,7 +124,7 @@ export function IdNodeView({ node, store, values = {} }: IdNodeViewProps) {
         <div
             aria-label={`${node.type} block: ${label}`}
             className={cn(
-                "id-block absolute overflow-hidden rounded-sm border border-border/60 bg-background transition-shadow duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                "id-block absolute overflow-hidden transition-shadow duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 selected ? "ring-2 ring-primary" : "hover:ring-1 hover:ring-primary/50",
             )}
             data-id={node.id}
@@ -139,12 +139,14 @@ export function IdNodeView({ node, store, values = {} }: IdNodeViewProps) {
                 opacity: node.opacity,
             }}
             tabIndex={0}
+            {...(node.locked ? { "data-locked": "" } : {})}
             onDoubleClick={() => enterEdit()}
             onKeyDown={(event) => {
                 if (event.target !== event.currentTarget) return;
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     event.stopPropagation();
+                    if (node.locked) return;
                     selectNodes([node.id]);
                 }
             }}
@@ -155,7 +157,7 @@ export function IdNodeView({ node, store, values = {} }: IdNodeViewProps) {
                 </div>
             ) : (
                 <div className="h-full w-full" onDoubleClick={enterEdit}>
-                    <IdNodeBody node={node} values={values} />
+                    <IdNodeBody node={node} />
                 </div>
             )}
         </div>

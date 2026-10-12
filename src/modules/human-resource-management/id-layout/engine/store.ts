@@ -10,7 +10,7 @@ export interface IdViewport {
     panY: number;
 }
 
-export type IdNodeDraft = Omit<IdNode, "id"> & { id?: string };
+export type IdNodeDraft = Omit<IdNode, "id" | "locked"> & { id?: string; locked?: boolean };
 
 export interface IdDocState {
     nodes: Record<string, IdNode>;
@@ -32,7 +32,10 @@ export interface IdDocState {
     setOpacity: (id: string, opacity: number) => void;
     updateProps: (id: string, patch: Record<string, unknown>) => void;
     removeNode: (id: string) => void;
+    setLocked: (id: string, locked: boolean) => void;
+    toggleLock: (id: string) => void;
     reorderNode: (id: string, direction: "up" | "down") => void;
+    reorderNodeTo: (id: string, toIndex: number) => void;
     selectNodes: (ids: string[]) => void;
     setHover: (id: string | null) => void;
     setEditingId: (id: string | null) => void;
@@ -53,7 +56,7 @@ const ID_HISTORY_LIMIT = 100;
 const ID_STAGE_PARENT = "stage" as const;
 
 export const ID_ZOOM_MIN = 0.5;
-export const ID_ZOOM_MAX = 2;
+export const ID_ZOOM_MAX = 4;
 export const ID_ZOOM_STEP = 0.25;
 
 export function clampIdZoom(value: number): number {
@@ -136,7 +139,7 @@ export function createIdDocStore() {
                         if (draft.parentId !== ID_STAGE_PARENT) return null;
                         const id = draft.id ?? crypto.randomUUID();
                         if (state.nodes[id]) return null;
-                        const node = { ...draft, id, parentId: ID_STAGE_PARENT, z: target.rootIds.length } as IdNode;
+                        const node = { ...draft, id, parentId: ID_STAGE_PARENT, z: target.rootIds.length, locked: draft.locked ?? false } as IdNode;
                         const pages = state.pages.map((page) =>
                             page.id === target.id ? { ...page, rootIds: [...page.rootIds, id] } : page,
                         );
@@ -150,7 +153,7 @@ export function createIdDocStore() {
 
                     moveNode: (id, x, y) => {
                         const node = get().nodes[id];
-                        if (!node) return;
+                        if (!node || node.locked) return;
                         mutate({ nodes: { ...get().nodes, [id]: { ...node, x, y } } });
                     },
 
@@ -161,7 +164,7 @@ export function createIdDocStore() {
                         const nodes = { ...current };
                         for (const id of ids) {
                             const node = current[id];
-                            if (!node) continue;
+                            if (!node || node.locked) continue;
                             nodes[id] = { ...node, x: node.x + dx, y: node.y + dy };
                             touched = true;
                         }
@@ -171,13 +174,13 @@ export function createIdDocStore() {
 
                     resizeNode: (id, w, h) => {
                         const node = get().nodes[id];
-                        if (!node) return;
+                        if (!node || node.locked) return;
                         mutate({ nodes: { ...get().nodes, [id]: { ...node, w, h } } });
                     },
 
                     rotateNode: (id, rotation) => {
                         const node = get().nodes[id];
-                        if (!node) return;
+                        if (!node || node.locked) return;
                         mutate({ nodes: { ...get().nodes, [id]: { ...node, rotation } } });
                     },
 
@@ -200,7 +203,8 @@ export function createIdDocStore() {
 
                     removeNode: (id) => {
                         const state = get();
-                        if (!state.nodes[id]) return;
+                        const target = state.nodes[id];
+                        if (!target || target.locked) return;
                         const nodes: Record<string, IdNode> = {};
                         for (const [key, node] of Object.entries(state.nodes)) {
                             if (key !== id) nodes[key] = node;
@@ -222,18 +226,46 @@ export function createIdDocStore() {
                         }));
                     },
 
+                    setLocked: (id, locked) => {
+                        const node = get().nodes[id];
+                        if (!node || node.locked === locked) return;
+                        mutate({ nodes: { ...get().nodes, [id]: { ...node, locked } } });
+                    },
+
+                    toggleLock: (id) => {
+                        const node = get().nodes[id];
+                        if (!node) return;
+                        get().setLocked(id, !node.locked);
+                    },
+
                     reorderNode: (id, direction) => {
                         const state = get();
                         const page = pageOfNode(state.pages, id);
                         if (!page) return;
                         const index = page.rootIds.indexOf(id);
-                        const next = direction === "up" ? index - 1 : index + 1;
+                        const next = direction === "up" ? index + 1 : index - 1;
                         if (index < 0 || next < 0 || next >= page.rootIds.length) return;
                         const rootIds = [...page.rootIds];
                         const other = rootIds[next];
                         if (other === undefined) return;
                         rootIds[next] = id;
                         rootIds[index] = other;
+                        const pages = state.pages.map((candidate) =>
+                            candidate.id === page.id ? { ...page, rootIds } : candidate,
+                        );
+                        mutate({ nodes: renumberPageZ(state.nodes, rootIds), pages });
+                    },
+
+                    reorderNodeTo: (id, toIndex) => {
+                        const state = get();
+                        const page = pageOfNode(state.pages, id);
+                        if (!page) return;
+                        const from = page.rootIds.indexOf(id);
+                        if (from < 0) return;
+                        const clamped = Math.max(0, Math.min(page.rootIds.length - 1, Math.floor(toIndex)));
+                        if (clamped === from) return;
+                        const rootIds = page.rootIds.filter((rootId) => rootId !== id);
+                        rootIds.splice(clamped, 0, id);
                         const pages = state.pages.map((candidate) =>
                             candidate.id === page.id ? { ...page, rootIds } : candidate,
                         );
