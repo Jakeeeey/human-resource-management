@@ -17,6 +17,47 @@ export interface AttendanceLog {
   updated_at: string;
 }
 
+export interface OtRequestInfo {
+  id: number;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
+  duration_minutes?: number | null;
+  purpose?: string | null;
+  remarks?: string | null;
+  sched_timeout?: string | null;
+  ot_from?: string | null;
+  ot_to?: string | null;
+  filed_at?: string | null;
+  approved_at?: string | null;
+}
+
+export interface UtRequestInfo {
+  id: number;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
+  duration_minutes?: number | null;
+  reason?: string | null;
+  remarks?: string | null;
+  sched_timeout?: string | null;
+  actual_timeout?: string | null;
+  filed_at?: string | null;
+  approved_at?: string | null;
+  emp_attatchment_uuid?: string | null;
+  override_attachment_uuid?: string | null;
+}
+
+export interface LeaveRequestInfo {
+  id: number;
+  leave_type: 'vacation' | 'sick' | 'emergency' | 'special' | 'unpaid' | 'others' | string;
+  leave_start: string | null;
+  leave_end: string | null;
+  total_days?: number | null;
+  reason?: string | null;
+  remarks?: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | string;
+  is_paid?: boolean | number | null;
+  filed_at?: string | null;
+  approved_at?: string | null;
+}
+
 export interface AttendanceLogWithUser extends AttendanceLog {
   user_fname: string;
   user_lname: string;
@@ -28,6 +69,10 @@ export interface AttendanceLogWithUser extends AttendanceLog {
   overtime_minutes: number;
   sched_time_in: string | null;
   sched_time_out: string | null;
+  is_flexible_schedule?: boolean;
+  ot_request?: OtRequestInfo | null;
+  ut_request?: UtRequestInfo | null;
+  leave_request?: LeaveRequestInfo | null;
 }
 
 export interface AttendanceApproval {

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const getRemotePatterns = () => {
   const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -21,6 +22,8 @@ const getRemotePatterns = () => {
 };
 
 const nextConfig: NextConfig = {
+  output: "standalone",
+  outputFileTracingRoot: path.join(__dirname),
   allowedDevOrigins: ["msi-4", "msi-lo", "100.81.225.79", "msi-eulysis", "msi-jake"],
   images: {
     remotePatterns: getRemotePatterns(),
