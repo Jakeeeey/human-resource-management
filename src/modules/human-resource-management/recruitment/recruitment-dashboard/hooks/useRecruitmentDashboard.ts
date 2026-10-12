@@ -21,7 +21,7 @@ export function useRecruitmentDashboard(): DashboardState {
         let active = true;
         setIsLoading(true);
         setErrorMessage(null);
-        fetch("/api/hrm/recruitment-dashboard", { cache: "no-store" })
+        fetch("/api/hrm/recruitment/recruitment-dashboard", { cache: "no-store" })
             .then((res) => {
                 if (!res.ok) throw new Error(`Request failed with status ${res.status}`);
                 return res.json() as Promise<{ data?: RecruitmentDashboardData }>;

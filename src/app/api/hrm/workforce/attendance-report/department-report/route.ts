@@ -71,6 +71,19 @@ function timeToMins(t: string | null): number {
   return h * 60 + m;
 }
 
+function isFlexibleScheduleUser(val: unknown): boolean {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (val === '1' || val === 'true') return true;
+  if (val && typeof val === 'object') {
+    const buf = val as { type?: string; data?: number[] };
+    if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+      return buf.data[0] === 1;
+    }
+  }
+  return false;
+}
+
 /**
  * Returns how many minutes after (work_start + grace_period) the employee clocked in.
  * Handles full ISO datetime strings by extracting the time component first.
@@ -152,7 +165,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Fetch users
     const userParams: Record<string, string> = {
-      fields: 'user_id,user_fname,user_lname,user_position,user_image,user_department,is_deleted',
+      fields: 'user_id,user_fname,user_lname,user_position,user_image,user_department,is_deleted,is_flexible_schedule',
     };
     if (deptId) userParams['filter[user_department][_eq]'] = deptId;
 
@@ -228,9 +241,15 @@ export async function GET(request: NextRequest) {
         }
 
         // ── Computed metrics ──────────────────────────────────────────────────
-        const late     = calculateLate(timeIn, effectiveWorkStart, effectiveGrace);
+        const isFlexible = isFlexibleScheduleUser(user.is_flexible_schedule);
+        const isExemptFromDeptLate = isFlexible && !oncallSched;
+        const late     = isExemptFromDeptLate ? 0 : calculateLate(timeIn, effectiveWorkStart, effectiveGrace);
         const overtime = calculateOvertime(timeOut, effectiveWorkEnd);
         const workMins = calculateWorkMins(timeIn, timeOut, lunchStart, lunchEnd);
+
+        if (isExemptFromDeptLate && status === 'Late') {
+          status = 'On Time';
+        }
 
         // Punctuality is derived from computed `late`, NOT from Directus\'s stored
         // status field. Directus stores whatever the device reported at clock-in

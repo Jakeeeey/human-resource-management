@@ -31,7 +31,7 @@ export function PositionList({ rows }: { readonly rows: readonly StatusCount[] }
                 <div className="flex items-center justify-between">
                     <h2 className="text-base font-bold tracking-tight text-foreground">Applicants by position</h2>
                     <Link
-                        href="/hrm/applicants"
+                        href="/hrm/recruitment/applicants"
                         aria-label="View all applicants"
                         className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >

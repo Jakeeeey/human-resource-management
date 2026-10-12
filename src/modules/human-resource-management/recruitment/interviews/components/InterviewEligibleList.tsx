@@ -20,7 +20,7 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Eye, FileText, 
  * passed/failed badge, latest initial verdict chip); Final tab rows recommended
  * recommendations (request ref, applicant, latest final verdict
  * chip). Grade renders as a link to
- * `/hrm/interviews/grade/[id]` ONLY when an ungraded (sheet-less) interview
+ * `/hrm/recruitment/interviews/grade/[id]` ONLY when an ungraded (sheet-less) interview
  * exists for that row — otherwise the actions cell shows History only.
  * History selects the latest
  * interview via handleView for the detail dialog.
@@ -303,7 +303,7 @@ export function InterviewEligibleList() {
                                             <div className="flex items-center justify-end gap-2">
                                                 {ungraded && (
                                                     <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade application ${row.id}`}>
+                                                        <Link href={`/hrm/recruitment/interviews/grade/${ungraded.id}`} aria-label={`Grade application ${row.id}`}>
                                                             <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
                                                             Grade
                                                         </Link>
@@ -359,7 +359,7 @@ export function InterviewEligibleList() {
                                             <div className="flex items-center gap-1">
                                                 {ungraded && (
                                                     <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade application ${row.id}`}>
+                                                        <Link href={`/hrm/recruitment/interviews/grade/${ungraded.id}`} aria-label={`Grade application ${row.id}`}>
                                                             <Pencil className="mr-1.5 h-4 w-4 text-muted-foreground" />
                                                             Grade
                                                         </Link>
@@ -442,7 +442,7 @@ export function InterviewEligibleList() {
                                             <div className="flex items-center justify-end gap-2">
                                                 {ungraded && (
                                                     <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade recommendation ${row.id}`}>
+                                                        <Link href={`/hrm/recruitment/interviews/grade/${ungraded.id}`} aria-label={`Grade recommendation ${row.id}`}>
                                                             <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
                                                             Grade
                                                         </Link>
@@ -494,7 +494,7 @@ export function InterviewEligibleList() {
                                             <div className="flex items-center gap-1">
                                                 {ungraded && (
                                                     <Button variant="ghost" size="sm" asChild>
-                                                        <Link href={`/hrm/interviews/grade/${ungraded.id}`} aria-label={`Grade recommendation ${row.id}`}>
+                                                        <Link href={`/hrm/recruitment/interviews/grade/${ungraded.id}`} aria-label={`Grade recommendation ${row.id}`}>
                                                             <Pencil className="mr-1.5 h-4 w-4 text-muted-foreground" />
                                                             Grade
                                                         </Link>

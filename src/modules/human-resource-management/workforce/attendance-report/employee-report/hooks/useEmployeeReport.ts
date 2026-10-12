@@ -17,6 +17,7 @@ export interface Employee {
   working_days:    number;
   workdays_note:   string | null;
   grace_period:    number;
+  is_flexible_schedule?: boolean;
 }
 
 export interface EmployeeAttendanceRow {
@@ -244,22 +245,25 @@ export function useEmployeeAttendance(
         const logWorkEnd     = extractTime(l.work_end   as string | null) ?? workEnd;
         const logGracePeriod = (l.grace_period as number | null) ?? gracePeriod;
 
-        return {
-          log_id:          l.log_id as number,
-          directus_id:     (l.directus_id as number | null) ?? null,
-          log_date:        l.log_date as string,
-          time_in:         ti,
-          lunch_start:     ls,
-          lunch_end:       le,
-          break_start:     extractTime(l.break_start as string | null),
-          break_end:       extractTime(l.break_end   as string | null),
-          time_out:        to_,
-          status:          l.status as string,
-          approval_status: l.approval_status as string,
-          work_hours:      wh,
-          overtime:        computeOvertime(ti, to_, logWorkStart, logWorkEnd, ls, le),
-          late:            computeLate(ti, logWorkStart, logGracePeriod),
-          undertime:       computeUndertime(to_, logWorkEnd),
+          const isExemptFromDeptLate = !!(emp.is_flexible_schedule && !l.is_oncall);
+          const rawStatus = l.status as string;
+
+          return {
+            log_id:          l.log_id as number,
+            directus_id:     (l.directus_id as number | null) ?? null,
+            log_date:        l.log_date as string,
+            time_in:         ti,
+            lunch_start:     ls,
+            lunch_end:       le,
+            break_start:     extractTime(l.break_start as string | null),
+            break_end:       extractTime(l.break_end   as string | null),
+            time_out:        to_,
+            status:          (isExemptFromDeptLate && rawStatus === 'Late') ? 'On Time' : rawStatus,
+            approval_status: l.approval_status as string,
+            work_hours:      wh,
+            overtime:        computeOvertime(ti, to_, logWorkStart, logWorkEnd, ls, le),
+            late:            isExemptFromDeptLate ? 0 : computeLate(ti, logWorkStart, logGracePeriod),
+            undertime:       computeUndertime(to_, logWorkEnd),
           is_rest_day:     (l.status as string) === 'Holiday',
           is_oncall:       !!(l.is_oncall),
           oncall_schedule: (l.is_oncall && l.oncall_work_start && l.oncall_work_end) ? {

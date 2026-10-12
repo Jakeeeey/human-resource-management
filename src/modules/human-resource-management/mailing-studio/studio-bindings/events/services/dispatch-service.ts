@@ -1,4 +1,4 @@
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/mailing-studio/studio-bindings/utils/directus";
 import { compileCanvasDoc } from "@/modules/human-resource-management/mailing-studio/studio-templates/designer/services/export-service";
 import type { CanvasDoc } from "@/modules/human-resource-management/mailing-studio/studio-templates/designer/types/canvas-doc.schema";
 import {

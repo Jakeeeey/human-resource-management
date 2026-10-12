@@ -1,6 +1,6 @@
 // Client contract for the (not-yet-existing) T4 routes under
 // /api/hrm/mailing-studio/studio-templates. Envelope mirrors the old
-// src/app/api/hrm/mailing/templates/route.ts pattern (read-only reference):
+// src/app/api/hrm/recruitment/mailing/templates/route.ts pattern (read-only reference):
 //   { success: boolean, data?: T, message?: string }
 // Verb contract (T4 handlers delegate straight to
 // services/design-persistence-service.ts):

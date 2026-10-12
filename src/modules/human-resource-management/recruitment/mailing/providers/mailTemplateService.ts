@@ -45,7 +45,7 @@ function normalizeRow(row: Record<string, unknown>): MailTemplateRow {
  * @returns Envelope with the normalized rows.
  */
 export async function listMailTemplates(): Promise<Envelope<MailTemplateRow[]>> {
-    const res = await fetch("/api/hrm/mailing/templates");
+    const res = await fetch("/api/hrm/recruitment/mailing/templates");
     const body = (await res.json()) as Envelope<Record<string, unknown>[]>;
     if (!body.success || !Array.isArray(body.data)) return { success: false, message: body.message ?? "Failed to list templates" };
     return { success: true, data: body.data.map(normalizeRow) };
@@ -57,7 +57,7 @@ export async function listMailTemplates(): Promise<Envelope<MailTemplateRow[]>> 
  * @returns Envelope with the created row.
  */
 export async function createMailTemplate(input: MailTemplateInput): Promise<Envelope<MailTemplateRow>> {
-    const res = await fetch("/api/hrm/mailing/templates", {
+    const res = await fetch("/api/hrm/recruitment/mailing/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...input, updated_by: "" }),
@@ -77,7 +77,7 @@ export async function updateMailTemplate(
     id: string | number,
     patch: Partial<MailTemplateInput>
 ): Promise<Envelope<MailTemplateRow>> {
-    const res = await fetch("/api/hrm/mailing/templates", {
+    const res = await fetch("/api/hrm/recruitment/mailing/templates", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...patch, updated_by: "" }),

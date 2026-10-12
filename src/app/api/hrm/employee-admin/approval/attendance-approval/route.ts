@@ -34,6 +34,7 @@ interface Sched {
   time_in: string;
   time_out: string;
   grace_period: number;
+  source: "oncall" | "department";
 }
 
 function timeToDate(dateStr: string, timeStr: string): Date {
@@ -144,6 +145,7 @@ export async function GET(req: NextRequest) {
     // Department filtering logic:
     // 1. If a specific department is selected, use it.
     // 2. Otherwise, if the user is NOT an admin, restrict to their authorized departments.
+    let assignedDepartmentIds: number[] = [];
     if (selectedDepartmentId && selectedDepartmentId !== "all") {
       filterParts.push(`filter[department_id][_eq]=${selectedDepartmentId}`);
     } else {
@@ -152,7 +154,7 @@ export async function GET(req: NextRequest) {
       ).catch(() => ({ data: [] }));
       
       const taApprovers = taApproversRes.data || [];
-      const assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
+      assignedDepartmentIds = taApprovers.map((ta: { department_id: number }) => ta.department_id).filter(Boolean);
 
       const skipFilter = isAdmin && assignedDepartmentIds.length === 0;
 
@@ -166,28 +168,45 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const isDailyApproval = Boolean(startDate && endDate && startDate === endDate);
+    const targetDate = startDate || "";
+
     const filter = filterParts.join("&");
     // Only include fields that actually exist in the attendance_log table.
     // Calculations like work_minutes, late_minutes etc. are done in the mapping function.
     const logFields = "log_id,user_id,department_id,log_date,time_in,time_out,approve_status,status";
     const finalUrl = `/items/attendance_log?${filter}${filter ? "&" : ""}sort=-log_date&limit=1000&fields=${logFields}`;
 
-
     // Fetch attendance logs
-    const attendanceResponse = await directusFetch(finalUrl);
-
-
+    const attendanceResponse = await directusFetch(finalUrl).catch(() => ({ data: [] }));
     const logs = attendanceResponse.data || [];
 
-    if (logs.length === 0) {
-      return NextResponse.json({ data: [], total: 0 });
-    }
+    // Helper to check soft-deleted users in Directus
+    const isDeletedUser = (val: unknown): boolean => {
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'number') return val !== 0;
+      if (val && typeof val === 'object') {
+        const buf = val as { type?: string; data?: number[] };
+        if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+          return buf.data[0] === 1;
+        }
+      }
+      return false;
+    };
 
-    // Fetch user details for all logs in one batch request
-    const userIds = [...new Set(logs.map((l: AttendanceLog) => l.user_id))] as number[];
-    const usersResponse = await directusFetch(
-      `/items/user?filter[user_id][_in]=${userIds.join(",")}&fields=user_id,user_fname,user_lname,user_mname,user_department`
-    ).catch(() => ({ data: [] }));
+    // Helper to check flexible schedule users in Directus
+    const isFlexibleScheduleUser = (val: unknown): boolean => {
+      if (typeof val === 'boolean') return val;
+      if (typeof val === 'number') return val !== 0;
+      if (val === '1' || val === 'true') return true;
+      if (val && typeof val === 'object') {
+        const buf = val as { type?: string; data?: number[] };
+        if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+          return buf.data[0] === 1;
+        }
+      }
+      return false;
+    };
 
     interface UserDetails {
       user_id: number;
@@ -195,44 +214,119 @@ export async function GET(req: NextRequest) {
       user_lname: string;
       user_mname: string | null;
       user_department: number | null;
+      is_employee?: unknown;
+      is_deleted?: unknown;
+      is_flexible_schedule?: unknown;
     }
 
-    const usersMap = new Map<number, UserDetails>(
-      (usersResponse.data || []).map((u: UserDetails) => [u.user_id, u])
-    );
-
-    // Fetch department details in one batch request
-    const deptIds = [...new Set(logs.map((l: AttendanceLog) => l.department_id).filter(Boolean))] as number[];
-    const deptsResponse = await directusFetch(
-      `/items/department?filter[department_id][_in]=${deptIds.join(",")}&fields=department_id,department_name`
+    // Fetch all users to have details and identify absent active employees
+    const usersResponse = await directusFetch(
+      `/items/user?limit=-1&fields=user_id,user_fname,user_lname,user_mname,user_department,is_employee,is_deleted,is_flexible_schedule`
     ).catch(() => ({ data: [] }));
 
+    const allUsers: UserDetails[] = usersResponse.data || [];
+
+    const usersMap = new Map<number, UserDetails>(
+      allUsers.map((u: UserDetails) => [u.user_id, u])
+    );
+
+    // Filter active employees
+    const activeEmployees = allUsers.filter((u: UserDetails) =>
+      !isDeletedUser(u.is_deleted) && (u.is_employee === 1 || u.is_employee === true)
+    );
+
+    // Filter active employees by selected/authorized department
+    let eligibleEmployees = activeEmployees;
+    if (selectedDepartmentId && selectedDepartmentId !== "all") {
+      eligibleEmployees = eligibleEmployees.filter((u: UserDetails) =>
+        String(u.user_department) === String(selectedDepartmentId)
+      );
+    } else if (!isAdmin || assignedDepartmentIds.length > 0) {
+      if (assignedDepartmentIds.length > 0) {
+        const allowedDeptSet = new Set(assignedDepartmentIds.map(String));
+        eligibleEmployees = eligibleEmployees.filter((u: UserDetails) =>
+          u.user_department && allowedDeptSet.has(String(u.user_department))
+        );
+      } else {
+        eligibleEmployees = [];
+      }
+    }
+
+    if (logs.length === 0 && (!isDailyApproval || eligibleEmployees.length === 0)) {
+      return NextResponse.json({ data: [], total: 0 });
+    }
+
+    // Fetch department details in one batch request
     interface DeptDetails {
       department_id: number;
       department_name: string;
     }
 
+    const deptsResponse = await directusFetch(
+      `/items/department?limit=-1&fields=department_id,department_name`
+    ).catch(() => ({ data: [] }));
+
     const deptsMap = new Map<number, DeptDetails>(
       (deptsResponse.data || []).map((d: DeptDetails) => [d.department_id, d])
     );
 
-    // Optimized metadata fetches with specific fields and filtered by userIds/deptIds where possible
-    // Only perform filtered fetches if we have IDs, otherwise fetch with default limit
-    const userIdsFilter = userIds.length > 0 ? `filter[user_id][_in]=${userIds.join(",")}` : "";
+    // Relevant user IDs for metadata lookups (both logged and eligible absent employees)
+    const allRelevantUserIds = Array.from(new Set([
+      ...logs.map((l: AttendanceLog) => l.user_id),
+      ...(isDailyApproval ? eligibleEmployees.map((e: UserDetails) => e.user_id) : [])
+    ]));
 
-    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes] = await Promise.all([
+    const userIdsFilter = allRelevantUserIds.length > 0 ? `filter[user_id][_in]=${allRelevantUserIds.join(",")}` : "";
+    const approvalFilter = allRelevantUserIds.length > 0
+      ? (isDailyApproval
+          ? `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&filter[date_schedule][_eq]=${targetDate}&limit=1000`
+          : `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&limit=1000`)
+      : (isDailyApproval ? `filter[date_schedule][_eq]=${targetDate}&limit=1000` : `limit=1000`);
+
+    let otFilter = userIdsFilter;
+    let utFilter = userIdsFilter;
+    let leaveFilter = userIdsFilter;
+    const filterDateGte = isDailyApproval ? targetDate : startDate;
+    const filterDateLte = isDailyApproval ? targetDate : endDate;
+
+    if (filterDateGte && filterDateLte) {
+      otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
+      utFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
+      leaveFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[leave_start][_lte]=${filterDateLte}&filter[leave_end][_gte]=${filterDateGte}`;
+    }
+
+    const [deptSchedulesRes, oncallListsRes, oncallSchedulesRes, approvalsRes, otRequestsRes, utRequestsRes, leaveRequestsRes, generalSettingRes] = await Promise.all([
       directusFetch(`/items/department_schedule?limit=1000&fields=department_id,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period`),
       directusFetch(`/items/oncall_list?${userIdsFilter}&limit=1000&fields=user_id,dept_sched_id`),
       directusFetch(`/items/oncall_schedule?limit=1000&fields=id,department_id,group,work_start,work_end,lunch_start,lunch_end,break_start,break_end,grace_period,schedule_date,workdays`),
-      directusFetch(`/items/attendance_approval?${userIds.length > 0 ? `filter[employee_id][_in]=${userIds.join(",")}` : ""}&limit=1000&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
-      directusFetch(`/items/overtime_request?${userIdsFilter}&filter[status][_eq]=approved&limit=1000&fields=user_id,request_date,status`)
+      directusFetch(`/items/attendance_approval?${approvalFilter}&fields=approval_id,employee_id,date_schedule,status,remarks,work_minutes,late_minutes,undertime_minutes,overtime_minutes`),
+      directusFetch(`/items/overtime_request?${otFilter}&limit=1000&fields=overtime_id,user_id,request_date,status,duration_minutes,purpose,remarks,sched_timeout,ot_from,ot_to,filed_at,approved_at`).catch(() => ({ data: [] })),
+      directusFetch(`/items/undertime_request?${utFilter}&limit=1000&fields=undertime_id,user_id,request_date,status,duration_minutes,reason,remarks,sched_timeout,actual_timeout,filed_at,approved_at,emp_attatchment_uuid,override_attachment_uuid`).catch(() => ({ data: [] })),
+      directusFetch(`/items/leave_request?${leaveFilter}&limit=1000&fields=leave_id,user_id,department_id,leave_type,leave_start,leave_end,total_days,reason,remarks,status,current_approval_level,approver_id,approved_at,filed_at,is_paid`).catch(() => ({ data: [] })),
+      directusFetch(`/items/general_setting?filter[setting_key][_eq]=payroll_no_time_out_undertime_amount&fields=setting_key,setting_value&limit=1`).catch(() => ({ data: [] }))
     ]);
+
+    // Parse penalty for missing time out from general_setting (defaults to 240 if missing/invalid)
+    let noTimeOutUndertimePenalty = 240;
+    const noTimeOutSetting = generalSettingRes?.data?.[0];
+    if (
+      noTimeOutSetting &&
+      noTimeOutSetting.setting_value !== undefined &&
+      noTimeOutSetting.setting_value !== null &&
+      String(noTimeOutSetting.setting_value).trim() !== ""
+    ) {
+      const parsed = Number(noTimeOutSetting.setting_value);
+      if (!isNaN(parsed) && parsed >= 0) {
+        noTimeOutUndertimePenalty = parsed;
+      }
+    }
 
     const deptSchedules = deptSchedulesRes.data || [];
     const oncallList = oncallListsRes.data || [];
     const oncallSchedules = oncallSchedulesRes.data || [];
     const approvalsList = approvalsRes.data || [];
     const otRequestsList = otRequestsRes.data || [];
+    const utRequestsList = utRequestsRes.data || [];
 
     // Create a map for quick approval lookup by employee_id and date
     interface AttendanceApprovalRecord {
@@ -255,70 +349,152 @@ export async function GET(req: NextRequest) {
 
     // Create a map for quick OT request lookup by user_id and date
     interface OTRequestRecord {
+      overtime_id: number;
       user_id: number;
       request_date: string;
       status: string;
+      duration_minutes?: number | null;
+      purpose?: string | null;
+      remarks?: string | null;
+      sched_timeout?: string | null;
+      ot_from?: string | null;
+      ot_to?: string | null;
+      filed_at?: string | null;
+      approved_at?: string | null;
     }
 
     const otRequestsMap = new Map<string, OTRequestRecord>();
     otRequestsList.forEach((req: OTRequestRecord) => {
-      const key = `${req.user_id}_${req.request_date}`;
-      otRequestsMap.set(key, req);
+      if (req.user_id && req.request_date) {
+        const key = `${req.user_id}_${String(req.request_date).split('T')[0]}`;
+        otRequestsMap.set(key, req);
+      }
     });
 
-    // Combine data
-    const enrichedLogs = logs.map((log: AttendanceLog) => {
-      const user = usersMap.get(log.user_id);
-      const dept = log.department_id ? deptsMap.get(log.department_id) : null;
+    // Create a map for quick UT request lookup by user_id and date
+    interface UTRequestRecord {
+      undertime_id: number;
+      user_id: number;
+      request_date: string;
+      status: string;
+      duration_minutes?: number | null;
+      reason?: string | null;
+      remarks?: string | null;
+      sched_timeout?: string | null;
+      actual_timeout?: string | null;
+      filed_at?: string | null;
+      approved_at?: string | null;
+      emp_attatchment_uuid?: string | null;
+      override_attachment_uuid?: string | null;
+    }
 
-      // const dayOfWeek = format(new Date(log.log_date), "EEEE");
-      const userDeptId = user?.user_department;
+    const utRequestsMap = new Map<string, UTRequestRecord>();
+    utRequestsList.forEach((req: UTRequestRecord) => {
+      if (req.user_id && req.request_date) {
+        const key = `${req.user_id}_${String(req.request_date).split('T')[0]}`;
+        utRequestsMap.set(key, req);
+      }
+    });
 
+    // Create a map for leave requests by user_id
+    interface LeaveRequestRecord {
+      leave_id: number;
+      user_id: number;
+      department_id?: number | null;
+      leave_type: string;
+      leave_start: string | null;
+      leave_end: string | null;
+      total_days?: number | string | null;
+      reason?: string | null;
+      remarks?: string | null;
+      status: string;
+      current_approval_level?: number | null;
+      approver_id?: number | null;
+      approved_at?: string | null;
+      filed_at?: string | null;
+      is_paid?: boolean | number | null;
+    }
 
+    const leaveRequestsList: LeaveRequestRecord[] = leaveRequestsRes.data || [];
+    const leaveRequestsByUser = new Map<number, LeaveRequestRecord[]>();
+    leaveRequestsList.forEach((req: LeaveRequestRecord) => {
+      if (req.user_id) {
+        const list = leaveRequestsByUser.get(req.user_id) || [];
+        list.push(req);
+        leaveRequestsByUser.set(req.user_id, list);
+      }
+    });
 
-      // 1. Check Oncall Priority
+    const getMatchingLeave = (userIdParam: number, dateStr: string): LeaveRequestRecord | null => {
+      const userLeaves = leaveRequestsByUser.get(userIdParam);
+      if (!userLeaves || userLeaves.length === 0) return null;
+      const dayKey = dateStr.split('T')[0];
+      const matching = userLeaves.filter((l) => {
+        const startKey = l.leave_start ? l.leave_start.split('T')[0] : null;
+        const endKey = l.leave_end ? l.leave_end.split('T')[0] : startKey;
+        if (!startKey) return false;
+        return startKey <= dayKey && (endKey ? endKey >= dayKey : true);
+      });
+      if (matching.length === 0) return null;
+      matching.sort((a, b) => {
+        const score = (status: string) => {
+          const s = (status || "").toLowerCase();
+          if (s === "approved") return 3;
+          if (s === "pending") return 2;
+          return 1;
+        };
+        return score(b.status) - score(a.status);
+      });
+      return matching[0];
+    };
+
+    interface OncallScheduleRecord {
+      id: number;
+      department_id: number;
+      group: string;
+      work_start: string;
+      work_end: string;
+      lunch_start: string;
+      lunch_end: string;
+      break_start: string;
+      break_end: string;
+      grace_period: number;
+      schedule_date: string | null;
+      workdays: string | null;
+    }
+
+    interface DepartmentScheduleRecord {
+      department_id: number;
+      work_start: string;
+      work_end: string;
+      lunch_start: string;
+      lunch_end: string;
+      break_start: string;
+      break_end: string;
+      grace_period: number;
+    }
+
+    const getEmployeeSchedule = (userIdParam: number, userDeptIdParam: number | null | undefined, dateStr: string): Sched | null => {
       const userOncallEntries = oncallList.filter((entry: { user_id: number; dept_sched_id: number }) =>
-        String(entry.user_id) === String(log.user_id)
+        String(entry.user_id) === String(userIdParam)
       );
 
-      let schedule: Sched | null = null;
-
       if (userOncallEntries.length > 0) {
-
         for (const entry of userOncallEntries) {
-          // As verified by user example (Turn 446): oncall_list.dept_sched_id connects to oncall_schedule.id
-          // The oncall schedule must only apply if its schedule_date matches the log's date
-          interface OncallScheduleRecord {
-            id: number;
-            department_id: number;
-            group: string;
-            work_start: string;
-            work_end: string;
-            lunch_start: string;
-            lunch_end: string;
-            break_start: string;
-            break_end: string;
-            grace_period: number;
-            schedule_date: string | null;
-            workdays: string | null;
-          }
           const ocSched = oncallSchedules.find((s: OncallScheduleRecord) => {
             if (String(s.id) !== String(entry.dept_sched_id)) return false;
-            
-            if (s.schedule_date && log.log_date) {
+
+            if (s.schedule_date && dateStr) {
               const schedDateOnly = s.schedule_date.split('T')[0];
-              const logDateOnly = log.log_date.split('T')[0];
-              
-              // 1. Strict Date Match: If exactly the same date, it applies.
+              const logDateOnly = dateStr.split('T')[0];
+
               if (schedDateOnly === logDateOnly) return true;
 
-              // 2. Weekly Catchment Logic (User example: March 25 Start + Thu/Fri selected)
-              // Match if in the same ISO week AND the specific day is checked in the record.
               const schedDate = parseISO(schedDateOnly);
               const logDate = parseISO(logDateOnly);
 
               if (isSameISOWeek(schedDate, logDate)) {
-                const dayOfWeek = format(logDate, "EEEE"); // e.g., "Thursday"
+                const dayOfWeek = format(logDate, "EEEE");
                 return s.workdays?.includes(dayOfWeek);
               }
             }
@@ -326,48 +502,43 @@ export async function GET(req: NextRequest) {
           });
 
           if (ocSched) {
-
-            schedule = {
+            return {
               time_in: ocSched.work_start,
               time_out: ocSched.work_end,
-              grace_period: Number(ocSched.grace_period ?? 5)
+              grace_period: Number(ocSched.grace_period ?? 5),
+              source: "oncall",
             };
-
-            break;
           }
         }
       }
 
-      // 2. Fallback to Department Schedule
-      if (!schedule && userDeptId) {
-        interface DepartmentScheduleRecord {
-          department_id: number;
-          work_start: string;
-          work_end: string;
-          lunch_start: string;
-          lunch_end: string;
-          break_start: string;
-          break_end: string;
-          grace_period: number;
-        }
+      if (userDeptIdParam) {
         const deptSched = deptSchedules.find((s: DepartmentScheduleRecord) =>
-          String(s.department_id) === String(userDeptId)
+          String(s.department_id) === String(userDeptIdParam)
         );
 
         if (deptSched) {
-
-          schedule = {
+          return {
             time_in: deptSched.work_start,
             time_out: deptSched.work_end,
-            grace_period: Number(deptSched.grace_period ?? 5)
+            grace_period: Number(deptSched.grace_period ?? 5),
+            source: "department",
           };
-
         }
       }
 
-      if (!schedule) {
+      return null;
+    };
 
-      }
+    // Combine data for logged employees
+    const enrichedLogs = logs.map((log: AttendanceLog) => {
+      const user = usersMap.get(log.user_id);
+      const dept = log.department_id ? deptsMap.get(log.department_id) : (user?.user_department ? deptsMap.get(user.user_department) : null);
+      const userDeptId = user?.user_department || log.department_id;
+
+      const schedule = getEmployeeSchedule(log.user_id, userDeptId, log.log_date);
+      const isFlexible = isFlexibleScheduleUser(user?.is_flexible_schedule);
+      const isExemptFromLate = isFlexible && schedule?.source === "department";
 
       let work_minutes = 0;
       let late_minutes = 0;
@@ -377,22 +548,50 @@ export async function GET(req: NextRequest) {
       if (log.time_in && schedule) {
         const actualIn = parseLocalISO(log.time_in);
         const schedIn = timeToDate(log.log_date, schedule.time_in);
-        const schedOut = timeToDate(log.log_date, schedule.time_out);
+        let schedOut = timeToDate(log.log_date, schedule.time_out);
+        if (schedOut < schedIn) {
+          schedOut = new Date(schedOut.getTime() + 24 * 60 * 60 * 1000);
+        }
+
+        let actualOut: Date | null = null;
+        if (log.time_out) {
+          actualOut = parseLocalISO(log.time_out);
+          // If actualOut is before actualIn, the punch crossed midnight into the next day
+          if (actualOut < actualIn) {
+            actualOut = new Date(actualOut.getTime() + 24 * 60 * 60 * 1000);
+          }
+        }
 
         if (actualIn > schedOut) {
           // LATE TIME IN BEYOND TIME OUT LOGIC:
-          // Cap late and undertime to 240 each, work 480 (Total 480 deduction, net 0)
-          late_minutes = 240;
-          undertime_minutes = 240;
+          // Cap late to 240 (half day) unless exempt via flexible schedule on department schedule
+          late_minutes = isExemptFromLate ? 0 : 240;
           work_minutes = 480;
           overtime_minutes = 0;
 
+          if (isExemptFromLate) {
+            // Flexible schedule employees are exempt from department schedule undertime
+            undertime_minutes = 0;
+          } else if (actualOut) {
+            if (actualOut < schedOut) {
+              undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
+            } else {
+              undertime_minutes = 0;
+            }
+          } else {
+            // Missing time out logic: Penalty based on general_setting (defaults to 240 if missing)
+            if (late_minutes + noTimeOutUndertimePenalty > 480) {
+              undertime_minutes = Math.max(0, 480 - late_minutes);
+            } else {
+              undertime_minutes = noTimeOutUndertimePenalty;
+            }
+          }
         } else {
           // ALWAYS calculate Lateness if they timed in before scheduled time out
           const diffInMs = actualIn.getTime() - schedIn.getTime();
           const diffInMins = Math.floor(diffInMs / 60000);
 
-          if (diffInMins > schedule.grace_period) {
+          if (!isExemptFromLate && diffInMins > schedule.grace_period) {
             late_minutes = diffInMins;
           } else {
             late_minutes = 0;
@@ -401,35 +600,50 @@ export async function GET(req: NextRequest) {
           // Base Work Time (Fixed 480 for HR system compliance)
           work_minutes = 480;
 
-          if (log.time_out) {
-            const actualOut = parseLocalISO(log.time_out);
-
-            // Undertime
-            if (actualOut < schedOut) {
+          if (actualOut) {
+            // Undertime: exempt if flexible schedule on department schedule
+            if (isExemptFromLate) {
+              undertime_minutes = 0;
+            } else if (actualOut < schedOut) {
               undertime_minutes = Math.floor((schedOut.getTime() - actualOut.getTime()) / 60000);
+            } else {
+              undertime_minutes = 0;
             }
 
-            // Overtime: if timed out 90m (1.5h) excess AND has approved overtime_request
-            const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
+            // Overtime: ONLY calculate if actualOut is after schedOut AND has approved overtime_request
             const dayKey = log.log_date.split('T')[0];
             const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
+            const isOtApproved = otReq && String(otReq.status || "").toLowerCase() === "approved";
 
-            if (excessOut >= 90 && otReq?.status === 'approved') {
-              overtime_minutes = excessOut;
+            if (actualOut > schedOut && isOtApproved) {
+              const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
+              let otDurationCap = Number(otReq.duration_minutes ?? 0);
+              if (otDurationCap <= 0 && otReq.ot_from && otReq.ot_to) {
+                const otStart = timeToDate(log.log_date, otReq.ot_from);
+                let otEnd = timeToDate(log.log_date, otReq.ot_to);
+                if (otEnd < otStart) {
+                  otEnd = new Date(otEnd.getTime() + 24 * 60 * 60 * 1000);
+                }
+                otDurationCap = Math.floor((otEnd.getTime() - otStart.getTime()) / 60000);
+              }
+
+              overtime_minutes = otDurationCap > 0 ? Math.min(excessOut, otDurationCap) : excessOut;
             } else {
               overtime_minutes = 0;
             }
           } else {
             // MISSING TIME OUT LOGIC: 
-            // Pay for the whole day (480), but deduct half day (at least 240 undertime)
+            // Penalty is based on general_setting 'payroll_no_time_out_undertime_amount'
+            // (defaults to 240 if missing).
             // Balancing logic: Late + UT should not exceed 480.
-            if (late_minutes > 240) {
-              undertime_minutes = 480 - late_minutes;
+            if (isExemptFromLate) {
+              undertime_minutes = 0;
+            } else if (late_minutes + noTimeOutUndertimePenalty > 480) {
+              undertime_minutes = Math.max(0, 480 - late_minutes);
             } else {
-              undertime_minutes = 240;
+              undertime_minutes = noTimeOutUndertimePenalty;
             }
             overtime_minutes = 0;
-
           }
         }
       }
@@ -439,11 +653,6 @@ export async function GET(req: NextRequest) {
       const manualAdjustments = approvalsMap.get(approvalKey);
 
       if (manualAdjustments) {
-
-
-        // If it's a pending log, we might want to favor calculation if the manual record
-        // looks like it was saved with 'stale' values due to the previous calculation bug.
-        // If calculation shows more minutes and there are no manual remarks, we favor calculation.
         const isStaleManualRecord =
           log.approve_status === "pending" &&
           manualAdjustments.work_minutes < work_minutes &&
@@ -454,12 +663,61 @@ export async function GET(req: NextRequest) {
           late_minutes = manualAdjustments.late_minutes ?? late_minutes;
           undertime_minutes = manualAdjustments.undertime_minutes ?? undertime_minutes;
           overtime_minutes = manualAdjustments.overtime_minutes ?? overtime_minutes;
-        } else {
-
         }
       }
 
       const derivedStatus = manualAdjustments?.status || log.approve_status || "pending";
+
+      let computedStatus = manualAdjustments?.remarks || log.status || (log.time_in ? "On Time" : "Absent");
+      if (isExemptFromLate && computedStatus === "Late" && !manualAdjustments?.remarks) {
+        computedStatus = "On Time";
+      }
+
+      const logDayKey = log.log_date.split('T')[0];
+      const logOtReq = otRequestsMap.get(`${log.user_id}_${logDayKey}`);
+      const logUtReq = utRequestsMap.get(`${log.user_id}_${logDayKey}`);
+      const logLeaveReq = getMatchingLeave(log.user_id, logDayKey);
+
+      const ot_request = logOtReq ? {
+        id: logOtReq.overtime_id,
+        status: logOtReq.status,
+        duration_minutes: logOtReq.duration_minutes ?? null,
+        purpose: logOtReq.purpose ?? null,
+        remarks: logOtReq.remarks ?? null,
+        sched_timeout: logOtReq.sched_timeout ?? null,
+        ot_from: logOtReq.ot_from ?? null,
+        ot_to: logOtReq.ot_to ?? null,
+        filed_at: logOtReq.filed_at ?? null,
+        approved_at: logOtReq.approved_at ?? null,
+      } : null;
+
+      const ut_request = logUtReq ? {
+        id: logUtReq.undertime_id,
+        status: logUtReq.status,
+        duration_minutes: logUtReq.duration_minutes ?? null,
+        reason: logUtReq.reason || logUtReq.remarks || null,
+        remarks: logUtReq.remarks || null,
+        sched_timeout: logUtReq.sched_timeout ?? null,
+        actual_timeout: logUtReq.actual_timeout ?? null,
+        filed_at: logUtReq.filed_at ?? null,
+        approved_at: logUtReq.approved_at ?? null,
+        emp_attatchment_uuid: logUtReq.emp_attatchment_uuid ?? null,
+        override_attachment_uuid: logUtReq.override_attachment_uuid ?? null,
+      } : null;
+
+      const leave_request = logLeaveReq ? {
+        id: logLeaveReq.leave_id,
+        leave_type: logLeaveReq.leave_type,
+        leave_start: logLeaveReq.leave_start,
+        leave_end: logLeaveReq.leave_end,
+        total_days: logLeaveReq.total_days != null ? Number(logLeaveReq.total_days) : null,
+        reason: logLeaveReq.reason ?? null,
+        remarks: logLeaveReq.remarks ?? null,
+        status: logLeaveReq.status,
+        is_paid: logLeaveReq.is_paid,
+        filed_at: logLeaveReq.filed_at ?? null,
+        approved_at: logLeaveReq.approved_at ?? null,
+      } : null;
 
       return {
         ...log,
@@ -474,13 +732,135 @@ export async function GET(req: NextRequest) {
         overtime_minutes,
         sched_time_in: schedule?.time_in || null,
         sched_time_out: schedule?.time_out || null,
-        status: manualAdjustments?.remarks || log.status // Use manual remarks if available
+        status: computedStatus,
+        is_flexible_schedule: isFlexible,
+        ot_request,
+        ut_request,
+        leave_request,
       };
     });
 
-    let finalLogs = enrichedLogs;
+    // Synthesize records for absent active employees (0 0 0 0 minutes) in Daily Approval
+    const loggedUserIds = new Set(logs.map((l: AttendanceLog) => l.user_id));
+    const absentLogs: typeof enrichedLogs = [];
+
+    if (isDailyApproval) {
+      for (const emp of eligibleEmployees) {
+        if (loggedUserIds.has(emp.user_id)) continue;
+
+        const schedule = getEmployeeSchedule(emp.user_id, emp.user_department, targetDate);
+        const dept = emp.user_department ? deptsMap.get(emp.user_department) : null;
+
+        const approvalKey = `${emp.user_id}_${targetDate.split('T')[0]}`;
+        const manualAdjustments = approvalsMap.get(approvalKey);
+
+        let work_minutes = 0;
+        let late_minutes = 0;
+        let undertime_minutes = 0;
+        let overtime_minutes = 0;
+        let derivedStatus = "pending";
+        let statusRemarks = "Absent";
+
+        if (manualAdjustments) {
+          work_minutes = manualAdjustments.work_minutes ?? 0;
+          late_minutes = manualAdjustments.late_minutes ?? 0;
+          undertime_minutes = manualAdjustments.undertime_minutes ?? 0;
+          overtime_minutes = manualAdjustments.overtime_minutes ?? 0;
+          derivedStatus = manualAdjustments.status || "pending";
+          statusRemarks = manualAdjustments.remarks || "Absent";
+        }
+
+        const isFlexible = isFlexibleScheduleUser(emp.is_flexible_schedule);
+
+        const absentDayKey = targetDate.split('T')[0];
+        const absentOtReq = otRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
+        const absentUtReq = utRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
+        const absentLeaveReq = getMatchingLeave(emp.user_id, absentDayKey);
+
+        if (absentLeaveReq && String(absentLeaveReq.status).toLowerCase() === "approved" && !manualAdjustments?.remarks) {
+          statusRemarks = "Leave";
+        }
+
+        const ot_request = absentOtReq ? {
+          id: absentOtReq.overtime_id,
+          status: absentOtReq.status,
+          duration_minutes: absentOtReq.duration_minutes ?? null,
+          purpose: absentOtReq.purpose ?? null,
+          remarks: absentOtReq.remarks ?? null,
+          sched_timeout: absentOtReq.sched_timeout ?? null,
+          ot_from: absentOtReq.ot_from ?? null,
+          ot_to: absentOtReq.ot_to ?? null,
+          filed_at: absentOtReq.filed_at ?? null,
+          approved_at: absentOtReq.approved_at ?? null,
+        } : null;
+
+        const ut_request = absentUtReq ? {
+          id: absentUtReq.undertime_id,
+          status: absentUtReq.status,
+          duration_minutes: absentUtReq.duration_minutes ?? null,
+          reason: absentUtReq.reason || absentUtReq.remarks || null,
+          remarks: absentUtReq.remarks || null,
+          sched_timeout: absentUtReq.sched_timeout ?? null,
+          actual_timeout: absentUtReq.actual_timeout ?? null,
+          filed_at: absentUtReq.filed_at ?? null,
+          approved_at: absentUtReq.approved_at ?? null,
+          emp_attatchment_uuid: absentUtReq.emp_attatchment_uuid ?? null,
+          override_attachment_uuid: absentUtReq.override_attachment_uuid ?? null,
+        } : null;
+
+        const leave_request = absentLeaveReq ? {
+          id: absentLeaveReq.leave_id,
+          leave_type: absentLeaveReq.leave_type,
+          leave_start: absentLeaveReq.leave_start,
+          leave_end: absentLeaveReq.leave_end,
+          total_days: absentLeaveReq.total_days != null ? Number(absentLeaveReq.total_days) : null,
+          reason: absentLeaveReq.reason ?? null,
+          remarks: absentLeaveReq.remarks ?? null,
+          status: absentLeaveReq.status,
+          is_paid: absentLeaveReq.is_paid,
+          filed_at: absentLeaveReq.filed_at ?? null,
+          approved_at: absentLeaveReq.approved_at ?? null,
+        } : null;
+
+        absentLogs.push({
+          log_id: -(emp.user_id),
+          user_id: emp.user_id,
+          department_id: emp.user_department ?? 0,
+          log_date: targetDate,
+          time_in: null,
+          time_out: null,
+          lunch_start: null,
+          lunch_end: null,
+          break_start: null,
+          break_end: null,
+          status: statusRemarks,
+          approval_status: derivedStatus.toLowerCase(),
+          approve_status: derivedStatus.toLowerCase(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_fname: emp.user_fname || "Unknown",
+          user_lname: emp.user_lname || "",
+          user_mname: emp.user_mname || null,
+          department_name: dept?.department_name || null,
+          work_minutes,
+          late_minutes,
+          undertime_minutes,
+          overtime_minutes,
+          sched_time_in: schedule?.time_in || null,
+          sched_time_out: schedule?.time_out || null,
+          is_flexible_schedule: isFlexible,
+          ot_request,
+          ut_request,
+          leave_request,
+        });
+      }
+    }
+
+    const allEnrichedLogs = [...enrichedLogs, ...absentLogs];
+
+    let finalLogs = allEnrichedLogs;
     if (approvalStatus && approvalStatus !== "all") {
-      finalLogs = enrichedLogs.filter((log: { approval_status?: string; [key: string]: unknown }) => log.approval_status === approvalStatus.toLowerCase());
+      finalLogs = allEnrichedLogs.filter((log: { approval_status?: string; [key: string]: unknown }) => log.approval_status === approvalStatus.toLowerCase());
     }
 
     return NextResponse.json({
@@ -533,22 +913,55 @@ export async function PATCH(req: NextRequest) {
 
     const results = [];
 
-    // For large batches, we could optimize this further with Directus batch endpoints,
-    // but for now, we'll process them in the most stable way.
+    // Process items safely
     for (const item of items) {
       const { log_id, employee_id, date_schedule, status, remarks, work_minutes, late_minutes, undertime_minutes, overtime_minutes } = item;
       const cleanDate = date_schedule ? date_schedule.split('T')[0] : null;
 
-      if (!log_id || !status || !['approved', 'rejected', 'pending'].includes(status) || !employee_id || !cleanDate) {
+      if (!status || !['approved', 'rejected', 'pending'].includes(status) || !employee_id || !cleanDate) {
         results.push({ log_id, success: false, error: "Missing required fields" });
         continue;
       }
 
-      // 1. Update the attendance log status
-      await directusFetch(`/items/attendance_log/${log_id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ approve_status: status }),
-      });
+      // 1. Update or create the attendance log
+      if (log_id && log_id > 0) {
+        await directusFetch(`/items/attendance_log/${log_id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ approve_status: status }),
+        }).catch((err) => {
+          console.warn(`[Attendance Approval] Failed to update attendance_log ${log_id}:`, err);
+        });
+      } else {
+        // Employee was absent/had no attendance_log initially.
+        // Check if an attendance_log was already created for this user and date
+        const existingLogRes = await directusFetch(
+          `/items/attendance_log?filter[user_id][_eq]=${employee_id}&filter[log_date][_eq]=${cleanDate}&limit=1&fields=log_id`
+        ).catch(() => ({ data: [] }));
+
+        const existingLog = existingLogRes.data?.[0];
+        if (existingLog) {
+          await directusFetch(`/items/attendance_log/${existingLog.log_id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ approve_status: status, status: remarks || 'Absent' }),
+          }).catch((err) => console.warn(`[Attendance Approval] Update log error:`, err));
+        } else {
+          // Fetch employee's department_id
+          const empRes = await directusFetch(`/items/user/${employee_id}?fields=user_department`).catch(() => ({ data: {} }));
+          const deptId = empRes.data?.user_department || 1;
+          await directusFetch(`/items/attendance_log`, {
+            method: "POST",
+            body: JSON.stringify({
+              user_id: employee_id,
+              department_id: deptId,
+              log_date: cleanDate,
+              time_in: null,
+              time_out: null,
+              status: remarks || 'Absent',
+              approve_status: status
+            }),
+          }).catch((err) => console.warn(`[Attendance Approval] Create absent log error:`, err));
+        }
+      }
 
       // 2. Upsert the approval record
       const filter = `filter[employee_id][_eq]=${employee_id}&filter[date_schedule][_eq]=${cleanDate}`;
@@ -577,7 +990,7 @@ export async function PATCH(req: NextRequest) {
         late_minutes: late_minutes ?? 0,
         undertime_minutes: undertime_minutes ?? 0,
         overtime_minutes: overtime_minutes ?? 0,
-        remarks: remarks || null,
+        remarks: remarks || "Absent",
       };
 
       if (status !== 'pending') approvalData.status = status;

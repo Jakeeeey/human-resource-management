@@ -5,7 +5,7 @@ import { compileCanvasDoc } from "@/modules/human-resource-management/mailing-st
 import type { CanvasDoc } from "@/modules/human-resource-management/mailing-studio/studio-templates/designer/types/canvas-doc.schema";
 import { extractPayloadExample } from "@/modules/human-resource-management/mailing-studio/studio-templates/utils/ms-variables";
 import { renderTemplate } from "@/modules/human-resource-management/mailing-studio/studio-templates/utils/template-render";
-import { dFetch } from "@/modules/human-resource-management/shared/utils/directus";
+import { dFetch } from "@/modules/human-resource-management/mailing-studio/studio-templates/utils/directus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

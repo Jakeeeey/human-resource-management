@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { FileText, Loader2 } from "lucide-react";
-import { formatPHT } from "@/modules/human-resource-management/shared/utils/time";
+import { formatPHT } from "../utils/time";
 
 type InterviewVerdict = "Pending" | "Passed" | "Failed";
 
@@ -135,7 +135,7 @@ export function InterviewDetail() {
         Promise.all(
             unique.map(async (sheetId) => {
                 try {
-                    const response = await fetch(`/api/hrm/interviews/sheets/${sheetId}/items`);
+                    const response = await fetch(`/api/hrm/recruitment/interviews/sheets/${sheetId}/items`);
                     if (!response.ok) return { sheetId, items: [] as ClientSheetItem[] };
                     const json = await response.json();
                     return { sheetId, items: (Array.isArray(json.data) ? json.data : []) as ClientSheetItem[] };
@@ -165,7 +165,7 @@ export function InterviewDetail() {
         setIsSaving(true);
         try {
             await updateInterview(latest.id, { verdict: newVerdict });
-            if (latest.stage === "Initial" && newVerdict === "Passed") router.push("/hrm/manpower-recommendation");
+            if (latest.stage === "Initial" && newVerdict === "Passed") router.push("/hrm/recruitment/manpower-recommendation");
         } finally {
             setIsSaving(false);
         }

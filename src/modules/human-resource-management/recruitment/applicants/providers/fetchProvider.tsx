@@ -29,7 +29,7 @@ export function ApplicantFetchProvider({
             setIsLoading(true);
             setIsError(false);
 
-            const res = await fetch("/api/hrm/applicants", {
+            const res = await fetch("/api/hrm/recruitment/applicants", {
                 cache: "no-store",
             });
 

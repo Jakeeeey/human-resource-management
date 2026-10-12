@@ -1,0 +1,123 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+import {
+    assignClearanceRequest,
+    listClearanceRequests,
+    mapClearanceRequestError,
+} from "@/modules/human-resource-management/clearance/hub/services/ClearanceRequestService";
+import { ensureClearanceForm } from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceFormService";
+import { ensureSoa } from "@/modules/human-resource-management/clearance/hub/soa/services/ClearanceSoaService";
+import { ensureQuitClaim } from "@/modules/human-resource-management/clearance/hub/quit-claims/services/ClearanceQuitClaimService";
+import {
+    authorizeClearanceRoute,
+    mapClearanceRouteError,
+} from "@/modules/human-resource-management/clearance/hub/server/capability";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const AssignClearanceRequestSchema = z
+    .object({
+        resignation_id: z.number().int().positive(),
+        template_id: z.number().int().positive(),
+        soa_template_id: z.number().int().positive().nullish(),
+    })
+    .strict();
+
+const ListClearanceRequestQuerySchema = z.object({
+    status: z.enum(["pending", "in_progress", "completed", "not_completed"]).optional(),
+    resignation_id: z.coerce.number().int().positive().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().max(100).optional(),
+    sort: z.string().max(64).optional(),
+    search: z.string().max(255).optional(),
+    date_from: z.string().max(32).optional(),
+    date_to: z.string().max(32).optional(),
+});
+
+export async function GET(req: NextRequest) {
+    try {
+        const auth = await authorizeClearanceRoute(req, "canViewAllClearances");
+        if ("failure" in auth) return auth.failure;
+        const parsed = ListClearanceRequestQuerySchema.safeParse(
+            Object.fromEntries(req.nextUrl.searchParams.entries())
+        );
+        if (!parsed.success) {
+            return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
+        }
+        try {
+            const result = await listClearanceRequests({
+                status: parsed.data.status,
+                resignationId: parsed.data.resignation_id,
+                page: parsed.data.page,
+                limit: parsed.data.limit,
+                sort: parsed.data.sort,
+                search: parsed.data.search,
+                dateFrom: parsed.data.date_from,
+                dateTo: parsed.data.date_to,
+            });
+            return NextResponse.json({
+                success: true,
+                data: result.data,
+                counts: result.counts,
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+            });
+        } catch (error) {
+            return (
+                mapClearanceRequestError(error) ??
+                NextResponse.json({ success: false, message: "Failed to load clearance requests" }, { status: 500 })
+            );
+        }
+    } catch (error) {
+        return mapClearanceRouteError(error);
+    }
+}
+
+export async function POST(req: NextRequest) {
+    try {
+        const auth = await authorizeClearanceRoute(req, "canManageClearances");
+        if ("failure" in auth) return auth.failure;
+        const body: unknown = await req.json().catch(() => null);
+        const parsed = AssignClearanceRequestSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ success: false, message: "Invalid request" }, { status: 400 });
+        }
+        try {
+            const result = await assignClearanceRequest({
+                resignationId: parsed.data.resignation_id,
+                templateId: parsed.data.template_id,
+                soaTemplateId: parsed.data.soa_template_id ?? null,
+                actorId: auth.cap.actorId,
+            });
+            try {
+                await ensureClearanceForm(result.request.id, auth.cap.actorId);
+            } catch (error) {
+                console.error("[clearance-requests] ensure form failed:", error);
+            }
+            try {
+                await ensureSoa(result.request.id, auth.cap.actorId);
+            } catch (error) {
+                console.error("[clearance-requests] ensure soa failed:", error);
+            }
+            try {
+                await ensureQuitClaim(result.request.id, auth.cap.actorId);
+            } catch (error) {
+                console.error("[clearance-requests] ensure quit claim failed:", error);
+            }
+            return NextResponse.json(
+                { success: true, data: result.request },
+                { status: result.created ? 201 : 200 }
+            );
+        } catch (error) {
+            return (
+                mapClearanceRequestError(error) ??
+                NextResponse.json({ success: false, message: "Failed to assign clearance" }, { status: 500 })
+            );
+        }
+    } catch (error) {
+        return mapClearanceRouteError(error);
+    }
+}

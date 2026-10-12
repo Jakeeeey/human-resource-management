@@ -1,0 +1,1 @@
+export { PerformanceDashboardModule } from "./PerformanceDashboardModule";

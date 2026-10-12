@@ -107,7 +107,7 @@ function JobOfferContent() {
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch("/api/hrm/company-logos");
+                const res = await fetch("/api/hrm/recruitment/job-offer/company-logos");
                 if (!res.ok) {
                     if (!cancelled) setLogosError(true);
                     return;
@@ -170,7 +170,7 @@ function JobOfferContent() {
 
     const loadEnvelopes = React.useCallback(async () => {
         try {
-            const res = await fetch("/api/hrm/onboarding/signing-envelope?status=pending");
+            const res = await fetch("/api/hrm/recruitment/signing/signing-envelope?status=pending");
             if (!res.ok) return;
             const json = await res.json().catch(() => null);
             if (!Array.isArray(json?.data)) return;
@@ -191,8 +191,8 @@ function JobOfferContent() {
         (async () => {
             try {
                 const [applicantRes, envelopeRes] = await Promise.all([
-                    fetch("/api/hrm/applicants"),
-                    fetch("/api/hrm/onboarding/signing-envelope?status=pending"),
+                    fetch("/api/hrm/recruitment/applicants"),
+                    fetch("/api/hrm/recruitment/signing/signing-envelope?status=pending"),
                 ]);
                 if (applicantRes.ok) {
                     const json = await applicantRes.json().catch(() => null);
@@ -285,7 +285,7 @@ function JobOfferContent() {
         void (async () => {
             try {
                 const res = await fetch(
-                    `/api/hrm/applications/by-applicant?applicant_id=${envelope.applicant_id}`
+                    `/api/hrm/recruitment/applicants/applications/by-applicant?applicant_id=${envelope.applicant_id}`
                 );
                 if (!res.ok) return;
                 const json = await res.json().catch(() => null);
@@ -341,7 +341,7 @@ function JobOfferContent() {
             });
             const body = new FormData();
             body.append("file", file);
-            const res = await fetch("/api/hrm/onboarding/job-offer/upload", {
+            const res = await fetch("/api/hrm/recruitment/job-offer/upload", {
                 method: "POST",
                 body,
             });
@@ -371,7 +371,7 @@ function JobOfferContent() {
         try {
             const res =
                 envelope.joboffer_id !== null
-                    ? await fetch(`/api/hrm/onboarding/job-offer/${envelope.joboffer_id}/offer`, {
+                    ? await fetch(`/api/hrm/recruitment/job-offer/${envelope.joboffer_id}/offer`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({
@@ -382,7 +382,7 @@ function JobOfferContent() {
                               company_id: form.companyId,
                           }),
                       })
-                    : await fetch("/api/hrm/onboarding/job-offer", {
+                    : await fetch("/api/hrm/recruitment/job-offer", {
                           method: "POST",
                           headers: { "Content-Type": "application/json" },
                           body: JSON.stringify({

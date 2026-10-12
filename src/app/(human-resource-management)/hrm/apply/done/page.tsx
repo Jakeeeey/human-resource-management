@@ -49,7 +49,7 @@ function DoneContent() {
                     </div>
                     <Button
                         className="w-full"
-                        onClick={() => router.push("/hrm/quiz-file-management/quiz-management")}
+                        onClick={() => router.push("/hrm/recruitment/quiz-file-management/quiz-management")}
                     >
                         Return to HR
                     </Button>
@@ -106,7 +106,7 @@ function DoneContent() {
                 </p>
                 <Button
                     className="w-full"
-                    onClick={() => router.push("/hrm/quiz-file-management/quiz-management")}
+                    onClick={() => router.push("/hrm/recruitment/quiz-file-management/quiz-management")}
                 >
                     Return to HR
                 </Button>

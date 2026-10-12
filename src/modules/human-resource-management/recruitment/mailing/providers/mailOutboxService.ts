@@ -76,7 +76,7 @@ function normalizeRow(row: Record<string, unknown>): MailOutboxRow {
  */
 export async function listMailOutbox(status?: MailOutboxStatus | ""): Promise<Envelope<MailOutboxRow[]>> {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-    const res = await fetch(`/api/hrm/mailing/outbox${qs}`);
+    const res = await fetch(`/api/hrm/recruitment/mailing/outbox${qs}`);
     const body = (await res.json()) as Envelope<Record<string, unknown>[]>;
     if (!body.success || !Array.isArray(body.data)) return { success: false, message: body.message ?? "Failed to list outbox" };
     return { success: true, data: body.data.map(normalizeRow) };

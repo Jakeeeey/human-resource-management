@@ -5,10 +5,10 @@ import {
     canTransition,
     getApplicantStatus,
     setApplicantStatus,
-} from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import type { ApplicantStatus } from "@/modules/human-resource-management/shared/services/applicant-status-service";
-import { ensureSigningSetForFinalApproved } from "@/modules/human-resource-management/onboarding/signing/server/signing-set-service";
-import { nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
+} from "@/modules/human-resource-management/recruitment/interviews/services/applicantStatus";
+import type { ApplicantStatus } from "@/modules/human-resource-management/recruitment/interviews/services/applicantStatus";
+import { ensureSigningSetForFinalApproved } from "@/modules/human-resource-management/recruitment/signing/server/signing-set-service";
+import { nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/recruitment/interviews/utils/audit";
 
 // interviews/service — interview grading + the applicant-pipeline wiring it owns
 // (todo 8). Every stage transition below routes through the SINGLE writer

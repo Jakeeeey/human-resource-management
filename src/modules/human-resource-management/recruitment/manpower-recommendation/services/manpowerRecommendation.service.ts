@@ -1,6 +1,6 @@
 import { ManpowerRecommendation, ManpowerRecommendationCreateInput } from "../types";
 import { isApplicantSlotOccupying } from "../utils/applicantPipeline";
-import { nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/shared/utils/audit";
+import { nowUTC, stampCreate, stampUpdate } from "@/modules/human-resource-management/recruitment/manpower-recommendation/utils/audit";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const STATIC_TOKEN = process.env.DIRECTUS_STATIC_TOKEN;

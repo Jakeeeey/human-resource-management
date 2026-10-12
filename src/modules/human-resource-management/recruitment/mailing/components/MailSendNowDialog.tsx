@@ -37,7 +37,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * Manual Send-now applicant picker (mailing-module todo 12). Module-local
  * dialog: searches applicants via MailCombobox over the existing applicants
  * list shape (read-only), collects an optional to_email override, and fires
- * exactly ONE POST to /api/hrm/mailing/send-now per click — no count/bulk
+ * exactly ONE POST to /api/hrm/recruitment/mailing/send-now per click — no count/bulk
  * parameter anywhere. The POST is never awaited in a render path: the click
  * handler owns a loading flag and surfaces dispatch's { ok, reason? } as a
  * toast.

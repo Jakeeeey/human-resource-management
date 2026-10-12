@@ -205,7 +205,7 @@ export function AttentionHighlight({
             ? {
                   ...tile,
                   label: "Open manpower requests",
-                  href: "/hrm/manpower-recommendation",
+                  href: "/hrm/recruitment/manpower-recommendation",
                   hint: "Open manpower requests awaiting action.",
               }
             : tile

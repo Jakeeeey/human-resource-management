@@ -20,7 +20,12 @@ This document defines the protocols Antigravity (AG) must follow to minimize "Er
 *   **Automatic Retries**: If a tool fails with a timeout, AG will automatically attempt the same operation with a narrower scope (e.g., smaller directory or fewer lines).
 *   **State Verification**: Always check if a background command is "done" before attempting to read its output or the files it modified.
 
-## 5. UI/UX Performance
+## 5. Subagent Dispatch
+*   **Always Background**: Dispatch every subagent in background mode. Foreground subagents have been observed to stall and not proceed unless focused; background dispatch is the reliable path.
+*   **Never Block**: After dispatching, continue other work until the completion notification arrives. Do not poll, sleep, or wait on a subagent inline — even when its result is needed next, act on the notification rather than switching to foreground.
+*   **Bound Recon Agents**: Cap reconnaissance subagents' file reads (grep-first, a hard read budget) and tell them to stop and report partial rather than run long. Unbounded reading is the main cause of stalled lanes.
+
+## 6. UI/UX Performance
 *   **Concise Responses**: Keep explanations brief and technical. Avoid re-summarizing large code blocks unless the user asks for clarification.
 *   **No Placeholders**: Ensure all code generated is functional to avoid the user having to re-prompt for missing logic.
 

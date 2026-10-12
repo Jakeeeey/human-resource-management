@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { QuizTakingModule } from "@/modules/human-resource-management/quiz-file-management/quiz-taking";
+import { QuizTakingModule } from "@/modules/human-resource-management/recruitment/quiz-file-management/quiz-taking";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

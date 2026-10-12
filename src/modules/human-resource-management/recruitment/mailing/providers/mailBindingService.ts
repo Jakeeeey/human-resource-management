@@ -50,7 +50,7 @@ function normalizeRow(row: Record<string, unknown>): MailBindingRow {
  * @returns Envelope with the normalized rows.
  */
 export async function listMailBindings(): Promise<Envelope<MailBindingRow[]>> {
-    const res = await fetch("/api/hrm/mailing/bindings");
+    const res = await fetch("/api/hrm/recruitment/mailing/bindings");
     const body = (await res.json()) as Envelope<Record<string, unknown>[]>;
     if (!body.success || !Array.isArray(body.data)) return { success: false, message: body.message ?? "Failed to list bindings" };
     return { success: true, data: body.data.map(normalizeRow) };
@@ -62,7 +62,7 @@ export async function listMailBindings(): Promise<Envelope<MailBindingRow[]>> {
  * @returns Envelope with the created row.
  */
 export async function createMailBinding(input: MailBindingInput): Promise<Envelope<MailBindingRow>> {
-    const res = await fetch("/api/hrm/mailing/bindings", {
+    const res = await fetch("/api/hrm/recruitment/mailing/bindings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -82,7 +82,7 @@ export async function updateMailBinding(
     id: string | number,
     patch: Partial<Omit<MailBindingInput, "event_key">> & Partial<Pick<MailBindingInput, "event_key">>
 ): Promise<Envelope<MailBindingRow>> {
-    const res = await fetch("/api/hrm/mailing/bindings", {
+    const res = await fetch("/api/hrm/recruitment/mailing/bindings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...patch }),
@@ -98,7 +98,7 @@ export async function updateMailBinding(
  * @returns Success envelope.
  */
 export async function deleteMailBinding(id: string | number): Promise<Envelope<{ id: string | number }>> {
-    const res = await fetch(`/api/hrm/mailing/bindings?id=${encodeURIComponent(String(id))}`, { method: "DELETE" });
+    const res = await fetch(`/api/hrm/recruitment/mailing/bindings?id=${encodeURIComponent(String(id))}`, { method: "DELETE" });
     const body = (await res.json()) as Envelope<{ id: string | number }>;
     if (!body.success) return { success: false, message: body.message ?? "Failed to unhook binding" };
     return { success: true, data: { id } };
