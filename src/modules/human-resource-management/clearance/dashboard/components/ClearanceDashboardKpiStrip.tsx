@@ -41,7 +41,7 @@ interface KpiFigure {
 
 export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceDashboardKpis }) {
     const total = kpis.total;
-    const stale = kpis.stale_unsigned_count;
+    const stale = kpis.stale_open_count;
     const bottleneckClear = stale <= 0;
     const figures: readonly KpiFigure[] = [
         {
@@ -81,16 +81,16 @@ export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceD
             key: "stale",
             label: "Stalled clearances",
             value: String(stale),
-            sub: bottleneckClear ? "All clear" : "Unsigned and aging",
+            sub: bottleneckClear ? "All clear" : "Open and aging",
             deltaIcon: bottleneckClear ? CircleCheck : TriangleAlert,
-            deltaText: bottleneckClear ? "No stalled clearances" : "Open with unsigned items",
+            deltaText: bottleneckClear ? "No stalled clearances" : "Open past 14 days",
             caption: bottleneckClear ? "Nothing stalled right now" : "Review the longest-open list below",
             icon: bottleneckClear ? CircleCheck : TriangleAlert,
             tint: bottleneckClear ? TINT_EMERALD : TINT_ROSE,
         },
     ];
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" role="list" aria-label="Clearance key figures">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4" role="list" aria-label="Clearance key figures">
             {figures.map((figure) => {
                 const Icon = figure.icon;
                 const DeltaIcon = figure.deltaIcon;
@@ -104,17 +104,17 @@ export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceD
                                 <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
                                     {figure.label}
                                 </span>
-                                <span className="mt-1 block truncate text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl">
+                                <span className="mt-1 block truncate text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl" title={figure.value}>
                                     {figure.value}
                                 </span>
-                                <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground sm:text-sm">
+                                <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground sm:text-sm" title={figure.sub}>
                                     {figure.sub}
                                 </span>
                                 <span className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-foreground">
                                     <DeltaIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    <span className="truncate">{figure.deltaText}</span>
+                                    <span className="truncate" title={figure.deltaText}>{figure.deltaText}</span>
                                 </span>
-                                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                <span className="mt-0.5 block truncate text-xs text-muted-foreground" title={figure.caption}>
                                     {figure.caption}
                                 </span>
                             </span>
@@ -128,7 +128,7 @@ export function ClearanceDashboardKpiStrip({ kpis }: { readonly kpis: ClearanceD
 
 export function ClearanceDashboardKpiSkeleton() {
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Loading key figures">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4" aria-label="Loading key figures">
             {[0, 1, 2, 3].map((index) => (
                 <div key={index} className={`${CARD_SHELL} flex items-start gap-4 p-5 sm:p-6`}>
                     <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-muted" />

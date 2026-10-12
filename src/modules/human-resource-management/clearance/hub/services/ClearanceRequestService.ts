@@ -8,6 +8,7 @@ export const CLEARANCE_REQUEST_ERROR_CODES = {
     invalidInput: "CLEARANCE_INVALID_INPUT",
     resignationNotFound: "RESIGNATION_NOT_FOUND",
     templateNotFound: "CLEARANCE_TEMPLATE_NOT_FOUND",
+    soaTemplateNotFound: "SOA_TEMPLATE_NOT_FOUND",
     requestNotFound: "CLEARANCE_REQUEST_NOT_FOUND",
     itemNotFound: "CLEARANCE_ITEM_NOT_FOUND",
     resignationNotApproved: "RESIGNATION_NOT_APPROVED",
@@ -28,6 +29,9 @@ export interface ClearanceRequestRow {
     template_id: number;
     template_code_snapshot: string | null;
     template_title_snapshot: string | null;
+    soa_template_id: number | null;
+    soa_template_code_snapshot: string | null;
+    soa_template_title_snapshot: string | null;
     status: string;
     confirmed_by: number | null;
     confirmed_at: string | null;
@@ -48,13 +52,8 @@ export interface ClearanceItemRow {
     department_name_snapshot: string | null;
     sort_order: number;
     status: string;
-    expected_signer_user_id: number | null;
-    signed_by_user_id: number | null;
-    captured_by_user_id: number | null;
-    substitution_reason: string | null;
-    signature_strokes: string | null;
+    signatory_id: number | null;
     remarks: string | null;
-    signed_at: string | null;
     created_at: string | null;
     created_by: number | null;
     updated_at: string | null;
@@ -75,9 +74,23 @@ export interface ClearanceRequestCounts {
     completed: number;
 }
 
+export interface ClearanceRequestListQuery {
+    status?: string;
+    resignationId?: number;
+    page?: number;
+    limit?: number;
+    sort?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+}
+
 export interface ClearanceRequestListResult {
     data: ClearanceRequestDetail[];
     counts: ClearanceRequestCounts;
+    total: number;
+    page: number;
+    limit: number;
 }
 
 export interface ClearanceCandidate {
@@ -101,6 +114,7 @@ export interface ApprovedResignationOption {
 export interface AssignClearanceRequestInput {
     resignationId: number;
     templateId: number;
+    soaTemplateId: number | null;
     actorId: number | null;
 }
 
@@ -220,6 +234,9 @@ function normalizeRequestRow(raw: unknown): ClearanceRequestRow | null {
         template_id: templateId,
         template_code_snapshot: toNullableText(raw.template_code_snapshot),
         template_title_snapshot: toNullableText(raw.template_title_snapshot),
+        soa_template_id: toNullableId(raw.soa_template_id),
+        soa_template_code_snapshot: toNullableText(raw.soa_template_code_snapshot),
+        soa_template_title_snapshot: toNullableText(raw.soa_template_title_snapshot),
         status: typeof raw.status === "string" ? raw.status : "pending",
         confirmed_by: toNullableId(raw.confirmed_by),
         confirmed_at: toNullableText(raw.confirmed_at),
@@ -249,13 +266,8 @@ function normalizeItemRow(raw: unknown): ClearanceItemRow | null {
         department_name_snapshot: toNullableText(raw.department_name_snapshot),
         sort_order: toId(raw.sort_order) ?? 0,
         status: typeof raw.status === "string" ? raw.status : "pending",
-        expected_signer_user_id: toNullableId(raw.expected_signer_user_id),
-        signed_by_user_id: toNullableId(raw.signed_by_user_id),
-        captured_by_user_id: toNullableId(raw.captured_by_user_id),
-        substitution_reason: toNullableText(raw.substitution_reason),
-        signature_strokes: toNullableText(raw.signature_strokes),
+        signatory_id: toNullableId(raw.signatory_id),
         remarks: toNullableText(raw.remarks),
-        signed_at: toNullableText(raw.signed_at),
         created_at: toNullableText(raw.created_at),
         created_by: toNullableId(raw.created_by),
         updated_at: toNullableText(raw.updated_at),
@@ -282,6 +294,22 @@ async function readListRaw(path: string, label: string): Promise<Record<string, 
     return rows;
 }
 
+async function readListWithMeta(path: string, label: string): Promise<{ rows: Record<string, unknown>[]; total: number | null }> {
+    const body: unknown = await dFetch(path);
+    const data: unknown = isRecord(body) ? body.data : null;
+    if (!Array.isArray(data)) {
+        fail(CLEARANCE_REQUEST_ERROR_CODES.readFailed, `${label} read failed (${JSON.stringify(body).slice(0, 300)})`);
+    }
+    const rows: Record<string, unknown>[] = [];
+    for (const entry of data) {
+        if (isRecord(entry)) rows.push(entry);
+    }
+    const meta: unknown = isRecord(body) ? body.meta : null;
+    const filterCount = isRecord(meta) ? toId(meta.filter_count) : null;
+    const totalCount = isRecord(meta) ? toId(meta.total_count) : null;
+    return { rows, total: filterCount ?? totalCount };
+}
+
 async function readResignationRef(id: number): Promise<ResignationRef | null> {
     const row = await readSingleOrNull(`/items/resignation_request/${id}?fields=id,user_id,status`);
     if (!row) return null;
@@ -293,6 +321,16 @@ async function readResignationRef(id: number): Promise<ResignationRef | null> {
 
 async function readTemplateRef(id: number): Promise<{ id: number; code: string; title: string } | null> {
     const row = await readSingleOrNull(`/items/clearance_template/${id}?fields=id,code,title`);
+    if (!row) return null;
+    const rowId = toId(row.id);
+    const code = toNullableText(row.code);
+    const title = toNullableText(row.title);
+    if (rowId === null || code === null || title === null) return null;
+    return { id: rowId, code, title };
+}
+
+async function readSoaTemplateRef(id: number): Promise<{ id: number; code: string; title: string } | null> {
+    const row = await readSingleOrNull(`/items/clearance_soa_template/${id}?fields=id,code,title`);
     if (!row) return null;
     const rowId = toId(row.id);
     const code = toNullableText(row.code);
@@ -359,6 +397,66 @@ async function readRequestRow(id: number): Promise<ClearanceRequestRow | null> {
     const raw = await readSingleOrNull(`/items/clearance_request/${id}`);
     if (!raw) return null;
     return normalizeRequestRow(raw);
+}
+
+async function listItemRowsForRequests(requestIds: number[]): Promise<Map<number, ClearanceItemRow[]>> {
+    const grouped = new Map<number, ClearanceItemRow[]>();
+    if (requestIds.length === 0) return grouped;
+    const raws = await readListRaw(
+        `/items/clearance_item?filter[request_id][_in]=${requestIds.join(",")}&sort=request_id,sort_order,id&limit=-1`,
+        "clearance_item"
+    );
+    for (const raw of raws) {
+        const row = normalizeItemRow(raw);
+        if (!row) {
+            fail(CLEARANCE_REQUEST_ERROR_CODES.readFailed, "clearance_item row contract mismatch");
+        }
+        const list = grouped.get(row.request_id) ?? [];
+        list.push(row);
+        grouped.set(row.request_id, list);
+    }
+    return grouped;
+}
+
+async function listResignationIdsForEmployeeSearch(search: string): Promise<number[]> {
+    const encoded = encodeURIComponent(search);
+    const userRaws = await readListRaw(
+        `/items/user?filter[_or][0][user_fname][_icontains]=${encoded}&filter[_or][1][user_mname][_icontains]=${encoded}&filter[_or][2][user_lname][_icontains]=${encoded}&fields=user_id&limit=-1`,
+        "user"
+    );
+    const userIds = [
+        ...new Set(
+            userRaws.map((raw) => toId(raw.user_id)).filter((id): id is number => id !== null)
+        ),
+    ];
+    if (userIds.length === 0) return [];
+    const resignationRaws = await readListRaw(
+        `/items/resignation_request?filter[user_id][_in]=${userIds.join(",")}&fields=id&limit=-1`,
+        "resignation_request"
+    );
+    return resignationRaws.map((raw) => toId(raw.id)).filter((id): id is number => id !== null);
+}
+
+async function countClearanceRequests(filters: string[]): Promise<ClearanceRequestCounts> {
+    const raws = await readListRaw(
+        `/items/clearance_request?${[...filters, "fields=status", "limit=-1"].join("&")}`,
+        "clearance_request"
+    );
+    const counts: ClearanceRequestCounts = { total: raws.length, pending: 0, in_progress: 0, completed: 0 };
+    for (const raw of raws) {
+        if (raw.status === "pending") counts.pending += 1;
+        else if (raw.status === "in_progress") counts.in_progress += 1;
+        else if (raw.status === "completed") counts.completed += 1;
+    }
+    return counts;
+}
+
+const CLEARANCE_REQUEST_SORTS = ["id", "-id", "created_at", "-created_at", "updated_at", "-updated_at", "status", "-status"] as const;
+
+function toRequestSort(value: unknown): string {
+    if (typeof value !== "string") return "-id";
+    const normalized = value.trim();
+    return (CLEARANCE_REQUEST_SORTS as readonly string[]).includes(normalized) ? normalized : "-id";
 }
 
 async function listItemRows(requestId: number): Promise<ClearanceItemRow[]> {
@@ -544,30 +642,58 @@ export async function readClearanceItemRequest(itemId: number): Promise<Clearanc
     return readRequestRow(item.request_id);
 }
 
-export async function listClearanceRequests(query: {
-    status?: string;
-    resignationId?: number;
-}): Promise<ClearanceRequestListResult> {
+export async function listClearanceRequests(query: ClearanceRequestListQuery): Promise<ClearanceRequestListResult> {
     const filters: string[] = [];
-    if (query.status !== undefined) filters.push(`filter[status][_eq]=${encodeURIComponent(query.status)}`);
+    if (query.status !== undefined && query.status !== "") {
+        if (query.status === "not_completed") {
+            filters.push("filter[status][_neq]=completed");
+        } else {
+            filters.push(`filter[status][_eq]=${encodeURIComponent(query.status)}`);
+        }
+    }
     if (query.resignationId !== undefined) filters.push(`filter[resignation_id][_eq]=${query.resignationId}`);
-    filters.push("sort=-id", "limit=-1");
-    const raws = await readListRaw(`/items/clearance_request?${filters.join("&")}`, "clearance_request");
-    const details: ClearanceRequestDetail[] = [];
+    const search = query.search?.trim() ?? "";
+    if (search !== "") {
+        const encoded = encodeURIComponent(search);
+        filters.push(`filter[_or][0][template_title_snapshot][_icontains]=${encoded}`);
+        filters.push(`filter[_or][1][template_code_snapshot][_icontains]=${encoded}`);
+        filters.push(`filter[_or][2][soa_template_title_snapshot][_icontains]=${encoded}`);
+        const resignationIds = await listResignationIdsForEmployeeSearch(search);
+        if (resignationIds.length > 0) {
+            filters.push(`filter[_or][3][resignation_id][_in]=${resignationIds.join(",")}`);
+        } else {
+            filters.push("filter[_or][3][resignation_id][_eq]=-1");
+        }
+    }
+    const dateFrom = query.dateFrom?.trim() ?? "";
+    if (dateFrom !== "") filters.push(`filter[created_at][_gte]=${encodeURIComponent(dateFrom)}`);
+    const dateTo = query.dateTo?.trim() ?? "";
+    if (dateTo !== "") filters.push(`filter[created_at][_lte]=${encodeURIComponent(dateTo)}`);
+    const page = query.page ?? 1;
+    const limit = query.limit ?? -1;
+    const paging = limit > 0 ? `limit=${limit}&page=${page}` : "limit=-1";
+    const { rows: raws, total: metaTotal } = await readListWithMeta(
+        `/items/clearance_request?${[...filters, `sort=${encodeURIComponent(toRequestSort(query.sort))}`, paging, "meta=filter_count"].join("&")}`,
+        "clearance_request"
+    );
+    const requests: ClearanceRequestRow[] = [];
     for (const raw of raws) {
         const request = normalizeRequestRow(raw);
         if (!request) {
             fail(CLEARANCE_REQUEST_ERROR_CODES.readFailed, "clearance_request row contract mismatch");
         }
-        details.push(toDetail(request, await listItemRows(request.id)));
+        requests.push(request);
     }
-    const counts: ClearanceRequestCounts = { total: details.length, pending: 0, in_progress: 0, completed: 0 };
-    for (const detail of details) {
-        if (detail.status === "pending") counts.pending += 1;
-        else if (detail.status === "in_progress") counts.in_progress += 1;
-        else if (detail.status === "completed") counts.completed += 1;
-    }
-    return { data: details, counts };
+    const itemsByRequest = await listItemRowsForRequests(requests.map((request) => request.id));
+    const details = requests.map((request) => toDetail(request, itemsByRequest.get(request.id) ?? []));
+    const counts = await countClearanceRequests(filters);
+    return {
+        data: details,
+        counts,
+        total: metaTotal ?? (limit > 0 ? details.length : counts.total),
+        page,
+        limit,
+    };
 }
 
 export async function assignClearanceRequest(input: AssignClearanceRequestInput): Promise<AssignClearanceRequestResult> {
@@ -592,6 +718,12 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
     if (!template) {
         fail(CLEARANCE_REQUEST_ERROR_CODES.templateNotFound, `clearance_template ${input.templateId} does not exist`);
     }
+    const soaTemplate = input.soaTemplateId === null || input.soaTemplateId === undefined
+        ? null
+        : await readSoaTemplateRef(input.soaTemplateId);
+    if (input.soaTemplateId !== null && input.soaTemplateId !== undefined && !soaTemplate) {
+        fail(CLEARANCE_REQUEST_ERROR_CODES.soaTemplateNotFound, `clearance_soa_template ${input.soaTemplateId} does not exist`);
+    }
     const categories = await listActiveCategories(input.templateId);
     if (categories.length === 0) {
         fail(
@@ -608,6 +740,9 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
             template_id: input.templateId,
             template_code_snapshot: template.code,
             template_title_snapshot: template.title,
+            soa_template_id: soaTemplate ? soaTemplate.id : null,
+            soa_template_code_snapshot: soaTemplate ? soaTemplate.code : null,
+            soa_template_title_snapshot: soaTemplate ? soaTemplate.title : null,
             status: "pending",
             confirmed_by: null,
             confirmed_at: null,
@@ -639,13 +774,8 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
                 category.department_id === null ? null : (namesByDepartment.get(category.department_id) ?? null),
             sort_order: category.sort_order,
             status: "pending",
-            expected_signer_user_id: null,
-            signed_by_user_id: null,
-            captured_by_user_id: null,
-            substitution_reason: null,
-            signature_strokes: null,
+            signatory_id: null,
             remarks: null,
-            signed_at: null,
             created_at: now,
             created_by: input.actorId,
         }))
@@ -688,7 +818,7 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
         event_type: "assigned",
         actor_id: input.actorId,
         reason: null,
-        payload: { template_id: input.templateId, item_count: items.length },
+        payload: { template_id: input.templateId, soa_template_id: soaTemplate ? soaTemplate.id : null, item_count: items.length },
     });
     return { request: toDetail(request, items), created: true };
 }
@@ -855,55 +985,33 @@ export async function confirmClearanceRequest(id: number, actorId: number | null
     return toDetail(updated, await listItemRows(id));
 }
 
-export async function unlockClearanceItem(
-    id: number,
-    reason: string,
-    actorId: number | null
-): Promise<ClearanceItemRow> {
-    if (reason.trim() === "") {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.invalidInput, "reason is required");
+export async function syncClearanceRequestCompletion(requestId: number, actorId: number | null): Promise<void> {
+    const request = await readRequestRow(requestId);
+    if (!request) return;
+    const [formBody, soaBody, quitBody] = await Promise.all([
+        dFetch(`/items/clearance_form?filter[request_id][_eq]=${requestId}&fields=status&limit=1`),
+        dFetch(`/items/clearance_soa?filter[request_id][_eq]=${requestId}&fields=status&limit=1`),
+        dFetch(`/items/clearance_quitclaim?filter[request_id][_eq]=${requestId}&fields=status&limit=1`),
+    ]);
+    function firstStatus(body: unknown): string | null {
+        if (!isRecord(body) || !Array.isArray(body.data) || body.data.length === 0) return null;
+        const first: unknown = body.data[0];
+        if (!isRecord(first) || typeof first.status !== "string") return null;
+        return first.status;
     }
-    const current = await readItemRow(id);
-    if (!current) {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.itemNotFound, `clearance_item ${id} does not exist`);
-    }
-    const request = await readRequestRow(current.request_id);
-    if (!request) {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.requestNotFound, `clearance_request ${current.request_id} does not exist`);
+    const allApproved = firstStatus(formBody) === "approved" &&
+        firstStatus(soaBody) === "approved" &&
+        firstStatus(quitBody) === "approved";
+    const now = nowUTC();
+    if (allApproved) {
+        if (request.status !== "completed") {
+            await patchRequestRow(requestId, { status: "completed", updated_at: now, updated_by: actorId });
+        }
+        return;
     }
     if (request.status === "completed") {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.requestCompleted, `clearance_request ${request.id} is completed`);
+        await patchRequestRow(requestId, { status: "in_progress", updated_at: now, updated_by: actorId });
     }
-    if (current.status !== "signed") {
-        fail(CLEARANCE_REQUEST_ERROR_CODES.itemNotSigned, `clearance_item ${id} is not signed`);
-    }
-    const now = nowUTC();
-    const updated = await patchItemRow(id, {
-        status: "pending",
-        expected_signer_user_id: null,
-        signed_by_user_id: null,
-        captured_by_user_id: null,
-        substitution_reason: null,
-        signature_strokes: null,
-        signed_at: null,
-        updated_at: now,
-        updated_by: actorId,
-    });
-    await appendEvent({
-        request_id: current.request_id,
-        item_id: id,
-        event_type: "unlocked",
-        actor_id: actorId,
-        reason,
-        payload: {
-            signed_by_user_id: current.signed_by_user_id,
-            expected_signer_user_id: current.expected_signer_user_id,
-            captured_by_user_id: current.captured_by_user_id,
-            signature_strokes: current.signature_strokes,
-            signed_at: current.signed_at,
-        },
-    });
-    return updated;
 }
 
 export async function resolveCandidateSet(itemId: number): Promise<ClearanceCandidate[]> {
@@ -1039,6 +1147,11 @@ export function mapClearanceRequestError(error: unknown): NextResponse | null {
         case CLEARANCE_REQUEST_ERROR_CODES.templateNotFound:
             return NextResponse.json(
                 { success: false, code, message: "Clearance template not found" },
+                { status: 404 }
+            );
+        case CLEARANCE_REQUEST_ERROR_CODES.soaTemplateNotFound:
+            return NextResponse.json(
+                { success: false, code, message: "SOA template not found" },
                 { status: 404 }
             );
         case CLEARANCE_REQUEST_ERROR_CODES.requestNotFound:

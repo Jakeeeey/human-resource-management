@@ -7,7 +7,7 @@ export interface ClearanceDashboardKpis {
     not_started_count: number;
     completion_rate: number | null;
     avg_days_to_confirm: number | null;
-    stale_unsigned_count: number;
+    stale_open_count: number;
 }
 
 export interface ClearanceDashboardTrendPoint {
@@ -37,8 +37,7 @@ export interface ClearanceDashboardOldestOpen {
     employee_name: string;
     template_title: string;
     days_open: number;
-    signed_count: number;
-    total_count: number;
+    status: ClearanceRequestStatus;
     created_at: string | null;
 }
 

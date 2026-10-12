@@ -80,6 +80,19 @@ function timeToMins(t: string | null): number {
   return h * 60 + m;
 }
 
+function isFlexibleScheduleUser(val: unknown): boolean {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (val === '1' || val === 'true') return true;
+  if (val && typeof val === 'object') {
+    const buf = val as { type?: string; data?: number[] };
+    if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+      return buf.data[0] === 1;
+    }
+  }
+  return false;
+}
+
 /**
  * Returns how many minutes after (work_start + grace_period) the employee clocked in.
  * Normalises full datetime strings to HH:MM before comparing.
@@ -166,7 +179,7 @@ export async function GET(request: NextRequest) {
       fetchCollection('user', {
         'filter[user_id][_eq]': userId,
         limit: '1',
-        fields: 'user_id,user_fname,user_lname,user_email,user_position,user_image,user_department',
+        fields: 'user_id,user_fname,user_lname,user_email,user_position,user_image,user_department,is_flexible_schedule',
       }),
       fetchCollection('department', {
         fields: 'department_id,department_name',
@@ -216,6 +229,7 @@ export async function GET(request: NextRequest) {
       working_days:    deptSchedFields.working_days  ?? 5,
       workdays_note:   deptSchedFields.workdays_note ?? null,
       grace_period:    deptSchedFields.grace_period  ?? 5,
+      is_flexible_schedule: isFlexibleScheduleUser(rawUser.is_flexible_schedule),
     };
 
     const logsMap = new Map(
@@ -324,7 +338,11 @@ export async function GET(request: NextRequest) {
           enrichedLog.oncall_break_start = null;
           enrichedLog.oncall_break_end   = null;
           // ✅ Fixed: was "lateLate(...)" / "lateOvertime(...)" — correct names are late / overtime
-          enrichedLog.late     = calculateLate(log.time_in as string | null, schedFields.work_start as string | null, schedFields.grace_period as number);
+          const isFlexible = isFlexibleScheduleUser(rawUser.is_flexible_schedule);
+          enrichedLog.late     = isFlexible ? 0 : calculateLate(log.time_in as string | null, schedFields.work_start as string | null, schedFields.grace_period as number);
+          if (isFlexible && enrichedLog.status === 'Late') {
+            enrichedLog.status = 'On Time';
+          }
           enrichedLog.overtime = calculateOvertime(log.time_in as string | null, log.time_out as string | null, schedFields.work_start as string | null, schedFields.work_end as string | null, log.lunch_start as string | null, log.lunch_end as string | null);
         }
 

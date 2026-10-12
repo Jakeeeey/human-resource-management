@@ -185,13 +185,8 @@ export const ClearanceItemSchema = z.object({
     department_name_snapshot: z.string().nullable(),
     sort_order: z.number(),
     status: z.enum(CLEARANCE_ITEM_STATUSES),
-    expected_signer_user_id: z.number().nullable(),
-    signed_by_user_id: z.number().nullable(),
-    captured_by_user_id: z.number().nullable(),
-    substitution_reason: z.string().nullable(),
-    signature_strokes: z.string().nullable(),
+    signatory_id: z.number().nullable(),
     remarks: z.string().nullable(),
-    signed_at: z.string().nullable(),
     created_at: z.string().nullable(),
     created_by: z.number().nullable(),
     updated_at: z.string().nullable(),
@@ -225,3 +220,71 @@ export const ClearanceEventSchema = z.object({
 });
 
 export type ClearanceEvent = z.infer<typeof ClearanceEventSchema>;
+
+export const SoaTemplateSchema = z.object({
+    id: z.number(),
+    code: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    department_id: z.number().nullable(),
+    is_active: z.boolean(),
+    sort_order: z.number(),
+    created_at: z.string().nullable(),
+    created_by: z.number().nullable(),
+    updated_at: z.string().nullable(),
+    updated_by: z.number().nullable(),
+});
+
+export type SoaTemplate = z.infer<typeof SoaTemplateSchema>;
+
+export const SoaTemplateCreateSchema = z.object({
+    code: z.string().trim().min(1).max(64),
+    title: z.string().trim().min(1).max(255),
+    description: z.string().nullable().optional(),
+    department_id: z.number().int().positive().nullable().optional(),
+    is_active: z.boolean().optional(),
+    sort_order: z.number().int().optional(),
+}).strict();
+
+export type SoaTemplateCreate = z.infer<typeof SoaTemplateCreateSchema>;
+
+export const SoaTemplateUpdateSchema = z.object({
+    title: z.string().trim().min(1).max(255).optional(),
+    description: z.string().nullable().optional(),
+    department_id: z.number().int().positive().nullable().optional(),
+    is_active: z.boolean().optional(),
+    sort_order: z.number().int().optional(),
+}).strict();
+
+export type SoaTemplateUpdate = z.infer<typeof SoaTemplateUpdateSchema>;
+
+export const SoaTemplateRowSchema = z.object({
+    id: z.number(),
+    template_id: z.number(),
+    label: z.string(),
+    sort_order: z.number(),
+    is_active: z.boolean(),
+    created_at: z.string().nullable(),
+    created_by: z.number().nullable(),
+    updated_at: z.string().nullable(),
+    updated_by: z.number().nullable(),
+});
+
+export type SoaTemplateRow = z.infer<typeof SoaTemplateRowSchema>;
+
+export const SoaTemplateRowCreateSchema = z.object({
+    template_id: z.number().int().positive(),
+    label: z.string().trim().min(1).max(255),
+    is_active: z.boolean().optional(),
+    sort_order: z.number().int().optional(),
+}).strict();
+
+export type SoaTemplateRowCreate = z.infer<typeof SoaTemplateRowCreateSchema>;
+
+export const SoaTemplateRowUpdateSchema = z.object({
+    label: z.string().trim().min(1).max(255).optional(),
+    is_active: z.boolean().optional(),
+    sort_order: z.number().int().optional(),
+}).strict();
+
+export type SoaTemplateRowUpdate = z.infer<typeof SoaTemplateRowUpdateSchema>;

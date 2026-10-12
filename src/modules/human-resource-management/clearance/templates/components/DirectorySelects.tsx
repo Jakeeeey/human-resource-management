@@ -14,10 +14,11 @@ export function DepartmentSelect(props: {
     onValueChange: (value: number | null) => void;
     noneLabel: string;
     placeholder?: string;
+    searchPlaceholder?: string;
     disabled?: boolean;
     id?: string;
 }): JSX.Element {
-    const { departments, value, onValueChange, noneLabel, placeholder, disabled, id } = props;
+    const { departments, value, onValueChange, noneLabel, placeholder, searchPlaceholder, disabled, id } = props;
 
     const options = useMemo(
         () => [
@@ -40,6 +41,7 @@ export function DepartmentSelect(props: {
                 onValueChange(Number.isInteger(parsed) && parsed > 0 ? parsed : null);
             }}
             placeholder={placeholder ?? "Select a department"}
+            searchPlaceholder={searchPlaceholder ?? "Search departments…"}
             disabled={disabled}
             id={id}
             emptyMessage="No department matches the search."
@@ -52,10 +54,12 @@ export function EmployeeSelect(props: {
     value: string;
     onValueChange: (value: string) => void;
     placeholder?: string;
+    searchPlaceholder?: string;
     disabled?: boolean;
     id?: string;
+    emptyMessage?: string;
 }): JSX.Element {
-    const { employees, value, onValueChange, placeholder, disabled, id } = props;
+    const { employees, value, onValueChange, placeholder, searchPlaceholder, disabled, id, emptyMessage } = props;
 
     const options = useMemo(
         () => employees.map((employee) => ({ value: String(employee.id), label: employee.fullName })),
@@ -68,9 +72,10 @@ export function EmployeeSelect(props: {
             value={value}
             onValueChange={onValueChange}
             placeholder={placeholder ?? "Select an employee"}
+            searchPlaceholder={searchPlaceholder ?? "Search employees…"}
             disabled={disabled}
             id={id}
-            emptyMessage="No employee matches the search."
+            emptyMessage={emptyMessage ?? "No employee matches the search."}
         />
     );
 }

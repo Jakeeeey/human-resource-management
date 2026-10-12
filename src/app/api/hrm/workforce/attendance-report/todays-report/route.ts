@@ -57,6 +57,19 @@ function isRestDay(dateStr: string, departmentName: string): boolean {
   return day === 0;
 }
 
+function isFlexibleScheduleUser(val: unknown): boolean {
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (val === '1' || val === 'true') return true;
+  if (val && typeof val === 'object') {
+    const buf = val as { type?: string; data?: number[] };
+    if (buf.type === 'Buffer' && Array.isArray(buf.data)) {
+      return buf.data[0] === 1;
+    }
+  }
+  return false;
+}
+
 export async function GET(request: NextRequest) {
   if (!DIRECTUS_BASE || !DIRECTUS_TOKEN) {
     console.error('[HRM/Attendance] Missing NEXT_PUBLIC_API_BASE_URL or DIRECTUS_STATIC_TOKEN');
@@ -139,7 +152,8 @@ export async function GET(request: NextRequest) {
         grace_period:    schedFields.grace_period,
         working_days:    schedFields.working_days,
         workdays_note:   schedFields.workdays_note,
-        is_oncall:       schedFields.is_oncall,
+        is_oncall:             schedFields.is_oncall,
+        is_flexible_schedule:  isFlexibleScheduleUser((user as Record<string, unknown>).is_flexible_schedule),
       };
 
       if (schedFields.is_oncall) {

@@ -1,5 +1,8 @@
 export { ClearanceTemplatesModule } from "./ClearanceTemplatesModule";
 export { TemplateWorkspace } from "./components/TemplateWorkspace";
+export { SoaTemplateWorkspace } from "./components/SoaTemplateWorkspace";
+export { SoaTemplateCatalogue } from "./components/SoaTemplateCatalogue";
+export { SoaTemplateRowsCard } from "./components/SoaTemplateRowsCard";
 export {
     CLEARANCE_EVENT_TYPE_LABELS,
     CLEARANCE_ITEM_STATUS_LABELS,
@@ -14,4 +17,6 @@ export type {
     ClearanceRequestStatus,
     ClearanceSignerType,
     ClearanceTemplate,
+    SoaTemplate,
+    SoaTemplateRow,
 } from "./types";

@@ -5,7 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, RefreshCw } from "lucide-react";
-import { useClearanceDashboard } from "./hooks/useClearanceDashboard";
+import { useClearanceDashboard, type ClearanceDashboardPeriod } from "./hooks/useClearanceDashboard";
 import {
     ClearanceDashboardKpiSkeleton,
     ClearanceDashboardKpiStrip,
@@ -49,8 +49,16 @@ function LoadingState() {
     );
 }
 
+const PERIOD_OPTIONS: readonly { readonly value: ClearanceDashboardPeriod; readonly label: string }[] = [
+    { value: "all", label: "All time" },
+    { value: "30d", label: "Last 30 days" },
+    { value: "90d", label: "Last 90 days" },
+    { value: "12m", label: "Last 12 months" },
+];
+
 export function ClearanceDashboardModule() {
-    const { data, isLoading, refreshing, error, refresh } = useClearanceDashboard();
+    const [period, setPeriod] = React.useState<ClearanceDashboardPeriod>("all");
+    const { data, isLoading, refreshing, error, refresh } = useClearanceDashboard(period);
     const busy = isLoading || refreshing;
 
     if (error !== null && data === null && !isLoading) {
@@ -70,7 +78,7 @@ export function ClearanceDashboardModule() {
     }
 
     return (
-        <div className="min-h-screen rounded-2xl bg-[#f2f2f9] p-3 sm:p-5 md:p-6 dark:bg-background">
+        <div className="min-h-screen rounded-2xl bg-muted/40 p-3 sm:p-5 md:p-6">
             <div className="mx-auto max-w-[1400px] space-y-4 sm:space-y-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -85,13 +93,28 @@ export function ClearanceDashboardModule() {
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <div role="group" aria-label="Period" className="flex flex-wrap items-center gap-1 rounded-full border border-border bg-card p-1">
+                            {PERIOD_OPTIONS.map((option) => (
+                                <Button
+                                    key={option.value}
+                                    type="button"
+                                    variant={period === option.value ? "secondary" : "ghost"}
+                                    size="sm"
+                                    aria-pressed={period === option.value}
+                                    onClick={() => setPeriod(option.value)}
+                                    className={`min-h-11 rounded-full md:min-h-0 ${FOCUS_RING}`}
+                                >
+                                    {option.label}
+                                </Button>
+                            ))}
+                        </div>
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={() => void refresh()}
                             disabled={busy}
                             aria-label="Refresh dashboard"
-                            className={`rounded-full bg-card ${FOCUS_RING}`}
+                            className={`min-h-11 rounded-full bg-card md:min-h-0 ${FOCUS_RING}`}
                         >
                             <RefreshCw className={`mr-2 h-4 w-4 ${busy ? "animate-spin" : ""}`} aria-hidden="true" />
                             {refreshing && data !== null ? "Refreshing" : "Refresh"}
