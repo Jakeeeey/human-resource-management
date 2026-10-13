@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ChevronRight, ClipboardList } from "lucide-react";
+import { Eye, ChevronRight, ClipboardList, Timer, Clock, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "./EmptyState";
 
@@ -24,7 +24,9 @@ export interface EmployeeSummary {
   total_late_minutes: number;
   total_undertime_minutes: number;
   total_overtime_minutes: number;
+  total_requested_overtime_minutes?: number;
   days_count: number;
+  total_leave_days?: number;
   pending_ot_count?: number;
   pending_ut_count?: number;
   pending_leave_count?: number;
@@ -102,25 +104,70 @@ export function EmployeeSummaryTable({
                       <span className="mx-1 opacity-20">|</span>
                       <span>{summary.department_name || "No Department"}</span>
                     </span>
-                    {((summary.pending_ot_count || 0) > 0 || (summary.pending_ut_count || 0) > 0 || (summary.pending_leave_count || 0) > 0) && (
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        {(summary.pending_ot_count || 0) > 0 && (
-                          <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
-                            {summary.pending_ot_count} Pending OT
-                          </Badge>
+                    {/* Total Summary & Pending Badges */}
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      {/* Overtime Summary Badge */}
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[9px] font-bold px-1.5 py-0 h-4.5 gap-1 shadow-xs transition-colors whitespace-nowrap",
+                          (summary.total_requested_overtime_minutes || 0) > 0
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                            : "bg-muted/30 text-muted-foreground/60 border-muted/20"
                         )}
-                        {(summary.pending_ut_count || 0) > 0 && (
-                          <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
-                            {summary.pending_ut_count} Pending UT
-                          </Badge>
+                        title={`Total Requested Overtime: ${summary.total_requested_overtime_minutes || 0} minutes`}
+                      >
+                        <Timer className="h-2.5 w-2.5 opacity-80" />
+                        OT: {summary.total_requested_overtime_minutes || 0}m
+                      </Badge>
+
+                      {/* Undertime Summary Badge */}
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[9px] font-bold px-1.5 py-0 h-4.5 gap-1 shadow-xs transition-colors whitespace-nowrap",
+                          (summary.total_undertime_minutes || 0) > 0
+                            ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30"
+                            : "bg-muted/30 text-muted-foreground/60 border-muted/20"
                         )}
-                        {(summary.pending_leave_count || 0) > 0 && (
-                          <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30">
-                            {summary.pending_leave_count} Pending Leave
-                          </Badge>
+                        title={`Total Undertime: ${summary.total_undertime_minutes || 0} minutes`}
+                      >
+                        <Clock className="h-2.5 w-2.5 opacity-80" />
+                        UT: {summary.total_undertime_minutes || 0}m
+                      </Badge>
+
+                      {/* Leave Summary Badge */}
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[9px] font-bold px-1.5 py-0 h-4.5 gap-1 shadow-xs transition-colors whitespace-nowrap",
+                          (summary.total_leave_days || 0) > 0
+                            ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30"
+                            : "bg-muted/30 text-muted-foreground/60 border-muted/20"
                         )}
-                      </div>
-                    )}
+                        title={`Total Leave: ${summary.total_leave_days || 0} day(s)`}
+                      >
+                        <Calendar className="h-2.5 w-2.5 opacity-80" />
+                        Leave: {summary.total_leave_days || 0}d
+                      </Badge>
+
+                      {/* Pending Notifications */}
+                      {(summary.pending_ot_count || 0) > 0 && (
+                        <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 whitespace-nowrap">
+                          {summary.pending_ot_count} Pending OT
+                        </Badge>
+                      )}
+                      {(summary.pending_ut_count || 0) > 0 && (
+                        <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4.5 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 whitespace-nowrap">
+                          {summary.pending_ut_count} Pending UT
+                        </Badge>
+                      )}
+                      {(summary.pending_leave_count || 0) > 0 && (
+                        <Badge variant="outline" className="text-[9px] font-bold px-1.5 py-0 h-4.5 bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40 whitespace-nowrap">
+                          {summary.pending_leave_count} Pending Leave
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </TableCell>
