@@ -49,7 +49,11 @@ function idViewerTextStyle(props: unknown): CSSProperties {
         style.fontWeight = fontWeight;
     }
     if (viewerPropOf(props, "italic") === true) style.fontStyle = "italic";
-    if (viewerPropOf(props, "underline") === true) style.textDecorationLine = "underline";
+    const underline = viewerPropOf(props, "underline") === true;
+    const strikethrough = viewerPropOf(props, "strikethrough") === true;
+    if (underline && strikethrough) style.textDecorationLine = "underline line-through";
+    else if (underline) style.textDecorationLine = "underline";
+    else if (strikethrough) style.textDecorationLine = "line-through";
     const color = viewerTextProp(props, "color");
     if (color !== undefined) style.color = color;
     const align = viewerAlignProp(props);

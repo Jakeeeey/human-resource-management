@@ -45,6 +45,13 @@ export function IdTemplatesPage() {
     const [newName, setNewName] = useState("");
     const [newCompany, setNewCompany] = useState<string>("none");
     const [newDefault, setNewDefault] = useState(false);
+    const [editTarget, setEditTarget] = useState<IdTemplateRow | null>(null);
+    const [editName, setEditName] = useState("");
+    const [editCompany, setEditCompany] = useState<string>("none");
+    const [editDefault, setEditDefault] = useState(false);
+    const [editActive, setEditActive] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<IdTemplateRow | null>(null);
 
     const refresh = async (): Promise<void> => {
@@ -75,6 +82,25 @@ export function IdTemplatesPage() {
             .filter((row) => row.name.toLowerCase().includes(query) || companyNameOf(row, companies).toLowerCase().includes(query))
             .sort((a, b) => a.name.localeCompare(b.name));
     }, [rows, search, companies]);
+
+    const takenCompanyIds = useMemo(() => {
+        const taken = new Set<number>();
+        for (const row of rows ?? []) {
+            if (row.company_id !== null && isActiveFlag(row.is_active)) {
+                taken.add(row.company_id);
+            }
+        }
+        return taken;
+    }, [rows]);
+
+    const availableCompanies = useMemo(() => {
+        return companies.filter((company) => !takenCompanyIds.has(company.company_id));
+    }, [companies, takenCompanyIds]);
+
+    const editAvailableCompanies = useMemo(() => {
+        if (!editTarget) return availableCompanies;
+        return companies.filter((company) => company.company_id === editTarget.company_id || !takenCompanyIds.has(company.company_id));
+    }, [companies, takenCompanyIds, editTarget, availableCompanies]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / ID_PAGE_SIZE));
     const safePage = Math.min(Math.max(1, page), totalPages);
@@ -115,6 +141,41 @@ export function IdTemplatesPage() {
             setCreateError(cause instanceof Error ? cause.message : "Could not create the template.");
         } finally {
             setCreating(false);
+        }
+    };
+
+    const handleOpenEdit = (row: IdTemplateRow): void => {
+        setEditTarget(row);
+        setEditName(row.name);
+        setEditCompany(row.company_id === null ? "none" : String(row.company_id));
+        setEditDefault(isDefaultFlag(row.is_default));
+        setEditActive(isActiveFlag(row.is_active));
+        setEditError(null);
+    };
+
+    const handleEditSave = async (): Promise<void> => {
+        if (!editTarget) return;
+        const name = editName.trim();
+        if (name === "") {
+            setEditError("Template name is required.");
+            return;
+        }
+        setEditing(true);
+        setEditError(null);
+        try {
+            await patchIdTemplate(editTarget.id, {
+                name,
+                company_id: editCompany === "none" ? null : Number(editCompany),
+                is_default: editDefault,
+                is_active: editActive,
+            });
+            toast.success("Template updated.");
+            setEditTarget(null);
+            await refresh();
+        } catch (cause) {
+            setEditError(cause instanceof Error ? cause.message : "Could not update the template.");
+        } finally {
+            setEditing(false);
         }
     };
 
@@ -258,8 +319,8 @@ export function IdTemplatesPage() {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-[180px]">
-                                        <DropdownMenuItem disabled={busy} onSelect={() => router.push(`/hrm/id-layout/${encodeURIComponent(String(row.id))}`)}>
-                                            Edit in designer
+                                        <DropdownMenuItem disabled={busy} onSelect={() => handleOpenEdit(row)}>
+                                            Edit
                                         </DropdownMenuItem>
                                         <DropdownMenuItem disabled={busy} onSelect={() => void handleToggleActive(row)}>
                                             {active ? "Deactivate" : "Activate"}
@@ -300,15 +361,15 @@ export function IdTemplatesPage() {
                             <IdCombobox
                                 className="h-9 text-sm"
                                 id="id-new-company"
-                                options={[{ value: "none", label: "No company" }, ...companies.map((company) => ({ value: String(company.company_id), label: company.company_name }))]}
+                                options={[{ value: "none", label: "No company" }, ...availableCompanies.map((company) => ({ value: String(company.company_id), label: company.company_name }))]}
                                 placeholder="No company"
                                 value={newCompany}
                                 onValueChange={setNewCompany}
                             />
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                            <Label className="text-xs font-medium" htmlFor="id-new-default">Fallback default</Label>
-                            <Switch checked={newDefault} id="id-new-default" size="sm" onCheckedChange={setNewDefault} />
+                        <div className="flex items-center justify-between gap-3">
+                            <Label className="text-sm font-medium" htmlFor="id-new-default">Fallback default</Label>
+                            <Switch checked={newDefault} className="scale-110" id="id-new-default" onCheckedChange={setNewDefault} />
                         </div>
                         {createError ? <p className="text-xs leading-snug text-destructive" role="alert">{createError}</p> : null}
                     </div>
@@ -322,12 +383,54 @@ export function IdTemplatesPage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog open={editTarget !== null} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit ID template</DialogTitle>
+                        <DialogDescription>Update the template name, linked company, fallback default, or active status. Open the card to edit its design.</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4 py-2">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium" htmlFor="id-edit-name">Name</Label>
+                            <Input aria-label="Template name" className="h-9 text-sm" id="id-edit-name" placeholder="VTC employee ID" value={editName} onChange={(event) => setEditName(event.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium" htmlFor="id-edit-company">Linked company</Label>
+                            <IdCombobox
+                                className="h-9 text-sm"
+                                id="id-edit-company"
+                                options={[{ value: "none", label: "No company" }, ...editAvailableCompanies.map((company) => ({ value: String(company.company_id), label: company.company_name }))]}
+                                placeholder="No company"
+                                value={editCompany}
+                                onValueChange={setEditCompany}
+                            />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <Label className="text-sm font-medium" htmlFor="id-edit-default">Fallback default</Label>
+                            <Switch checked={editDefault} className="scale-110" id="id-edit-default" onCheckedChange={setEditDefault} />
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <Label className="text-sm font-medium" htmlFor="id-edit-active">Active</Label>
+                            <Switch checked={editActive} className="scale-110" id="id-edit-active" onCheckedChange={setEditActive} />
+                        </div>
+                        {editError ? <p className="text-xs leading-snug text-destructive" role="alert">{editError}</p> : null}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+                        <Button disabled={editing} onClick={() => void handleEditSave()}>
+                            {editing ? <Loader2 className="size-4 animate-spin" /> : null}
+                            Save changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Delete this template?</DialogTitle>
+                        <DialogTitle>Delete this template permanently?</DialogTitle>
                         <DialogDescription>
-                            {deleteTarget ? `“${deleteTarget.name}” will be removed. Templates referenced by name stay taken until the row is gone.` : "This template will be removed."}
+                            {deleteTarget ? `“${deleteTarget.name}” will be permanently removed. This cannot be undone.` : "This template will be permanently removed. This cannot be undone."}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>

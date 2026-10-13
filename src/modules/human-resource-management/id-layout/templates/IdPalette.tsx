@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { IdDocStore, IdNodeDraft } from "../engine/store";
 import { ID_PIXEL_DATA_URL, ID_VARIABLE_GROUPS, idVariableLabel, isIdVariableField } from "./idSample";
 
-export type IdPaletteKind = "text" | "image-asset" | "image-field" | "shape-rect" | "shape-ellipse" | "shape-line" | "shape-triangle" | "variable";
+export type IdPaletteKind = "text" | "image-asset" | "image-field" | "image-signature" | "shape-rect" | "shape-ellipse" | "shape-line" | "shape-triangle" | "variable";
 
 export interface IdPaletteDnD {
     readonly kind: IdPaletteKind;
@@ -44,6 +44,7 @@ export function buildIdDraft(kind: IdPaletteKind, field?: string): IdNodeDraft {
                 fontWeight: "normal",
                 italic: false,
                 underline: false,
+                strikethrough: false,
                 color: "#111111",
                 align: "left",
                 letterSpacing: 0,
@@ -69,6 +70,9 @@ export function buildIdDraft(kind: IdPaletteKind, field?: string): IdNodeDraft {
                 fontFamily: ID_TEXT_FONT,
                 fontSize: 16,
                 fontWeight: "normal",
+                italic: false,
+                underline: false,
+                strikethrough: false,
                 color: "#111111",
                 align: "left",
                 letterSpacing: 0,
@@ -102,6 +106,20 @@ export function buildIdDraft(kind: IdPaletteKind, field?: string): IdNodeDraft {
             z: 0,
             opacity: 1,
             props: { source: "field", field: "user_image", fit: "cover", radius: 0, mask: "none", opacity: 1 },
+        };
+    }
+    if (kind === "image-signature") {
+        return {
+            parentId: "stage",
+            type: "image",
+            x: 24,
+            y: 24,
+            w: 120,
+            h: 60,
+            rotation: 0,
+            z: 0,
+            opacity: 1,
+            props: { source: "field", field: "signature", fit: "cover", radius: 0, mask: "none", opacity: 1 },
         };
     }
     const shape = kind === "shape-ellipse" ? "ellipse" : kind === "shape-line" ? "line" : kind === "shape-triangle" ? "triangle" : "rect";
@@ -194,7 +212,7 @@ export function IdPalette({ store }: { readonly store: IdDocStore }) {
                             onDragStart={(event) => dragPayload(event, { kind: "image-asset" })}
                         >
                             <ImageIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-                            <span className="text-xs font-medium">Photo (upload)</span>
+                            <span className="text-xs font-medium">Image</span>
                         </button>
                     ) : null}
                     {match("employee photo field") ? (
@@ -207,6 +225,18 @@ export function IdPalette({ store }: { readonly store: IdDocStore }) {
                         >
                             <ImageIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                             <span className="text-xs font-medium">Employee photo (field)</span>
+                        </button>
+                    ) : null}
+                    {match("signature field") ? (
+                        <button
+                            className={chipClass}
+                            draggable
+                            type="button"
+                            onClick={() => insertPaletteNode(store, { kind: "image-signature" })}
+                            onDragStart={(event) => dragPayload(event, { kind: "image-signature" })}
+                        >
+                            <ImageIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                            <span className="text-xs font-medium">Signature (field)</span>
                         </button>
                     ) : null}
                 </section>

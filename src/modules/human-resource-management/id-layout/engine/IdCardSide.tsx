@@ -14,7 +14,7 @@ export interface IdCardSideProps {
 export function IdCardSide({ page, nodes, values = {}, innerRef, zoom = 1 }: IdCardSideProps) {
     return (
         <div
-            className="relative overflow-hidden border border-transparent bg-card"
+            className="relative overflow-hidden border border-transparent bg-white text-black"
             data-id-card-side={page.side}
             ref={innerRef}
             style={{ width: ID_CARD.width, height: ID_CARD.height, zoom }}

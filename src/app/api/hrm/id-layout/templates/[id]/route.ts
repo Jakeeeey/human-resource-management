@@ -4,11 +4,14 @@ import { z } from "zod";
 import { idDocSchema } from "@/modules/human-resource-management/id-layout/types/id-layout.schema";
 
 import {
+    clearOtherDefaultTemplates,
     coerceDesignInput,
     dFetch,
     directusMessage,
+    idTemplateUniqueMessage,
     ID_TEMPLATES_COLLECTION,
     isRecord,
+    isTruthyFlag,
     nowUTC,
     parseDesignJson,
     readTemplateById,
@@ -22,6 +25,7 @@ const templatePatchSchema = z.object({
     name: z.string().trim().min(1).max(150).optional(),
     company_id: z.number().int().positive().nullable().optional(),
     is_default: z.union([z.boolean(), z.literal(0), z.literal(1)]).optional(),
+    is_active: z.union([z.boolean(), z.literal(0), z.literal(1)]).optional(),
     design_json: z.unknown().optional(),
 });
 
@@ -90,6 +94,10 @@ export async function PATCH(
         if (!existing) {
             return NextResponse.json({ message: "ID template not found" }, { status: 404 });
         }
+        const promoting = isTruthyFlag(parsed.data.is_default);
+        if (promoting) {
+            await clearOtherDefaultTemplates(existing.id);
+        }
         const payload: Record<string, unknown> = { updated_at: nowUTC() };
         if (parsed.data.name !== undefined) {
             payload.name = parsed.data.name;
@@ -98,7 +106,13 @@ export async function PATCH(
             payload.company_id = parsed.data.company_id;
         }
         if (parsed.data.is_default !== undefined) {
-            payload.is_default = parsed.data.is_default;
+            payload.is_default = promoting ? 1 : parsed.data.is_default;
+        }
+        if (parsed.data.is_active !== undefined) {
+            payload.is_active = parsed.data.is_active;
+        }
+        if (promoting) {
+            payload.is_active = 1;
         }
         if (designJson !== undefined) {
             payload.design_json = designJson;
@@ -108,6 +122,10 @@ export async function PATCH(
             { method: "PATCH", body: JSON.stringify(payload) }
         );
         if (!isRecord(written) || !isRecord(written.data)) {
+            const uniqueMessage = idTemplateUniqueMessage(written);
+            if (uniqueMessage !== null) {
+                return NextResponse.json({ message: uniqueMessage }, { status: 409 });
+            }
             return NextResponse.json(
                 { message: directusMessage(written) ?? "Failed to update ID template" },
                 { status: 500 }
@@ -129,6 +147,10 @@ export async function PATCH(
         return NextResponse.json(toFullRow(verified));
     } catch (error) {
         console.error("[id-layout-templates] PATCH error:", error);
+        const uniqueMessage = idTemplateUniqueMessage(error);
+        if (uniqueMessage !== null) {
+            return NextResponse.json({ message: uniqueMessage }, { status: 409 });
+        }
         return NextResponse.json({ message: "Failed to update ID template" }, { status: 500 });
     }
 }
@@ -143,24 +165,12 @@ export async function DELETE(
         if (!existing) {
             return NextResponse.json({ message: "ID template not found" }, { status: 404 });
         }
-        const written: unknown = await dFetch(
-            `/items/${ID_TEMPLATES_COLLECTION}/${String(existing.id)}`,
-            { method: "PATCH", body: JSON.stringify({ is_active: false, updated_at: nowUTC() }) }
-        );
-        if (!isRecord(written) || !isRecord(written.data)) {
-            return NextResponse.json(
-                { message: directusMessage(written) ?? "Failed to delete ID template" },
-                { status: 500 }
-            );
-        }
+        await dFetch(`/items/${ID_TEMPLATES_COLLECTION}/${String(existing.id)}`, { method: "DELETE" });
         const verified = await readTemplateById(existing.id);
-        if (!verified) {
-            return NextResponse.json(
-                { message: "ID template write not found on read-back" },
-                { status: 500 }
-            );
+        if (verified) {
+            return NextResponse.json({ message: "ID template was not removed" }, { status: 500 });
         }
-        return NextResponse.json(toFullRow(verified));
+        return new NextResponse(null, { status: 204 });
     } catch (error) {
         console.error("[id-layout-templates] DELETE error:", error);
         return NextResponse.json({ message: "Failed to delete ID template" }, { status: 500 });

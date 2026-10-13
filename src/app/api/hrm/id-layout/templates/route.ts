@@ -4,12 +4,15 @@ import { z } from "zod";
 import { idDocSchema } from "@/modules/human-resource-management/id-layout/types/id-layout.schema";
 
 import {
+    clearOtherDefaultTemplates,
     coerceDesignInput,
     dFetch,
     directusMessage,
+    idTemplateUniqueMessage,
     ID_TEMPLATE_LIST_FIELDS,
     ID_TEMPLATES_COLLECTION,
     isRecord,
+    isTruthyFlag,
     nowUTC,
     parseDesignJson,
     readTemplateById,
@@ -26,6 +29,7 @@ const templateCreateSchema = z.object({
     name: z.string().trim().min(1).max(150),
     company_id: z.number().int().positive().nullish(),
     is_default: z.union([z.boolean(), z.literal(0), z.literal(1)]).nullish(),
+    is_active: z.union([z.boolean(), z.literal(0), z.literal(1)]).nullish(),
     design_json: z.unknown(),
 });
 
@@ -76,10 +80,15 @@ export async function POST(req: NextRequest) {
             );
         }
         const now = nowUTC();
+        const promoting = isTruthyFlag(parsed.data.is_default);
+        if (promoting) {
+            await clearOtherDefaultTemplates();
+        }
         const payload = {
             name: parsed.data.name,
             company_id: parsed.data.company_id ?? null,
-            is_default: parsed.data.is_default ?? false,
+            is_default: promoting ? 1 : (parsed.data.is_default ?? false),
+            is_active: promoting ? 1 : (parsed.data.is_active ?? true),
             design_json: JSON.stringify(design.data),
             created_at: now,
             updated_at: now,
@@ -89,6 +98,10 @@ export async function POST(req: NextRequest) {
             body: JSON.stringify(payload),
         });
         if (!isRecord(written) || !isRecord(written.data)) {
+            const uniqueMessage = idTemplateUniqueMessage(written);
+            if (uniqueMessage !== null) {
+                return NextResponse.json({ message: uniqueMessage }, { status: 409 });
+            }
             return NextResponse.json(
                 { message: directusMessage(written) ?? "Failed to create ID template" },
                 { status: 500 }
@@ -110,6 +123,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(toFullRow(verified), { status: 201 });
     } catch (error) {
         console.error("[id-layout-templates] POST error:", error);
+        const uniqueMessage = idTemplateUniqueMessage(error);
+        if (uniqueMessage !== null) {
+            return NextResponse.json({ message: uniqueMessage }, { status: 409 });
+        }
         return NextResponse.json({ message: "Failed to create ID template" }, { status: 500 });
     }
 }

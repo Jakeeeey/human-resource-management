@@ -230,6 +230,9 @@ export function createIdDocStore() {
                         const node = get().nodes[id];
                         if (!node || node.locked === locked) return;
                         mutate({ nodes: { ...get().nodes, [id]: { ...node, locked } } });
+                        if (locked && get().selection.includes(id)) {
+                            get().selectNodes(get().selection.filter((selected) => selected !== id));
+                        }
                     },
 
                     toggleLock: (id) => {
@@ -273,7 +276,8 @@ export function createIdDocStore() {
                     },
 
                     selectNodes: (ids) => {
-                        set({ selection: Array.from(new Set(ids)) });
+                        const nodes = get().nodes;
+                        set({ selection: Array.from(new Set(ids)).filter((id) => !nodes[id]?.locked) });
                     },
 
                     setHover: (id) => {

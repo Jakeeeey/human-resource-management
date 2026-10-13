@@ -217,12 +217,12 @@ export function IdStageCanvas({ store, values = {} }: IdStageCanvasProps) {
             if (spaceRef.current) event.preventDefault();
             releaseSpacePan();
         };
-        window.addEventListener("keydown", onSpaceDown);
-        window.addEventListener("keyup", onSpaceUp);
+        window.addEventListener("keydown", onSpaceDown, true);
+        window.addEventListener("keyup", onSpaceUp, true);
         window.addEventListener("blur", releaseSpacePan);
         return () => {
-            window.removeEventListener("keydown", onSpaceDown);
-            window.removeEventListener("keyup", onSpaceUp);
+            window.removeEventListener("keydown", onSpaceDown, true);
+            window.removeEventListener("keyup", onSpaceUp, true);
             window.removeEventListener("blur", releaseSpacePan);
         };
     }, []);
@@ -405,7 +405,7 @@ export function IdStageCanvas({ store, values = {} }: IdStageCanvasProps) {
                     <div className="flex" style={{ gap: ID_BLOCK_GAP }}>
                         {blocks.map((block) => (
                             <div
-                                className="relative shrink-0 overflow-hidden rounded-xl border bg-card shadow-xl dark:shadow-black/50"
+                                className="relative shrink-0 rounded-xl border bg-white text-black shadow-xl dark:shadow-black/50"
                                 data-id-card-block={block.side}
                                 key={block.side}
                                 style={{ width: ID_CARD.width, height: ID_CARD.height }}
@@ -420,21 +420,26 @@ export function IdStageCanvas({ store, values = {} }: IdStageCanvasProps) {
                                         latest.setEditingId(null);
                                         return;
                                     }
-                                    if (event.target === event.currentTarget && !event.shiftKey) {
+                                    const target = event.target as HTMLElement | null;
+                                    const onNode = target?.closest?.("[data-id]") != null;
+                                    const onMoveable = target?.closest?.("[class*='moveable-']") != null;
+                                    if (!event.shiftKey && !onNode && !onMoveable) {
                                         selectNodes([]);
                                     }
                                 }}
                                 ref={blockRefs[block.side]}
                             >
-                                {block.page === null || block.rootIds.length === 0 ? (
-                                    <IdEmptyCanvasCta />
-                                ) : (
-                                    block.rootIds.map((id) => {
-                                        const node = nodes[id];
-                                        if (!node) return null;
-                                        return <IdNodeView key={id} node={node} store={store} values={values} />;
-                                    })
-                                )}
+                                <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+                                    {block.page === null || block.rootIds.length === 0 ? (
+                                        <IdEmptyCanvasCta />
+                                    ) : (
+                                        block.rootIds.map((id) => {
+                                            const node = nodes[id];
+                                            if (!node) return null;
+                                            return <IdNodeView key={id} node={node} store={store} values={values} />;
+                                        })
+                                    )}
+                                </div>
                                 <IdMoveable
                                     store={store}
                                     stageEl={blockElements[block.side]}

@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { useStore } from "zustand";
 import { ArrowLeft, Loader2, Redo2, Save, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -14,20 +13,11 @@ import { ID_CARD, idDocSchema } from "../types/id-layout.schema";
 import { clampIdZoom, createIdDocStore, ID_ZOOM_MAX, ID_ZOOM_MIN, ID_ZOOM_STEP } from "../engine/store";
 import { ID_SURFACE, IdStageCanvas } from "../engine/IdStageCanvas";
 import { ID_SAMPLE_USER, blankIdDoc, parseIdDesignJson } from "./idSample";
-import { getIdTemplate, isActiveFlag, isDefaultFlag, listIdCompanies, patchIdTemplate } from "./idApi";
-import type { IdCompanyRow } from "./idApi";
+import { getIdTemplate, isActiveFlag, patchIdTemplate } from "./idApi";
 import { ID_PALETTE_MIME, IdPalette, insertPaletteNode } from "./IdPalette";
 import type { IdPaletteDnD } from "./IdPalette";
 import { IdLayersPanel } from "./IdLayersPanel";
 import { IdPropertyPanel } from "./IdPropertyPanel";
-import { IdCombobox } from "./IdCombobox";
-
-interface IdMeta {
-    name: string;
-    company_id: number | null;
-    is_default: boolean;
-    is_active: boolean;
-}
 
 type IdInspectorTab = "props" | "layers";
 type IdMobileTab = "components" | "canvas" | "inspector";
@@ -44,10 +34,10 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
     const [store] = useState(() => createIdDocStore());
     const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [meta, setMeta] = useState<IdMeta>({ name: "", company_id: null, is_default: false, is_active: true });
-    const [savedMeta, setSavedMeta] = useState<IdMeta>({ name: "", company_id: null, is_default: false, is_active: true });
+    const [templateName, setTemplateName] = useState("");
+    const [isActive, setIsActive] = useState(true);
+    const [activeBusy, setActiveBusy] = useState(false);
     const [savedVersion, setSavedVersion] = useState<number | null>(null);
-    const [companies, setCompanies] = useState<IdCompanyRow[]>([]);
     const [saving, setSaving] = useState(false);
     const [inspectorTab, setInspectorTab] = useState<IdInspectorTab>("props");
     const [mobileTab, setMobileTab] = useState<IdMobileTab>("canvas");
@@ -68,26 +58,13 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
         setLoadError(null);
         try {
             const row = await getIdTemplate(templateId);
-            let companyRows: IdCompanyRow[] = [];
-            try {
-                companyRows = await listIdCompanies();
-            } catch {
-                companyRows = [];
-            }
             if (!row) {
                 setLoadError("No template found for this id.");
                 setStatus("error");
                 return;
             }
-            const nextMeta: IdMeta = {
-                name: row.name,
-                company_id: row.company_id,
-                is_default: isDefaultFlag(row.is_default),
-                is_active: isActiveFlag(row.is_active),
-            };
-            setMeta(nextMeta);
-            setSavedMeta(nextMeta);
-            setCompanies(companyRows);
+            setTemplateName(row.name);
+            setIsActive(isActiveFlag(row.is_active));
             const parsed = parseIdDesignJson(row.design_json) ?? blankIdDoc();
             const result = idDocSchema.safeParse(parsed);
             if (!result.success) {
@@ -108,18 +85,13 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
         void load();
     }, [load]);
 
-    const dirty = savedVersion !== null && (version !== savedVersion || JSON.stringify(meta) !== JSON.stringify(savedMeta));
+    const dirty = savedVersion !== null && version !== savedVersion;
 
     const overflowIds = Object.values(nodes)
         .filter((node) => node.x < 0 || node.y < 0 || node.x + node.w > ID_CARD.width || node.y + node.h > ID_CARD.height)
         .map((node) => node.id);
 
     const handleSave = useCallback(async (): Promise<void> => {
-        const name = meta.name.trim();
-        if (name === "") {
-            toast.error("Template name is required.");
-            return;
-        }
         const state = store.getState();
         const doc = { version: 2, card: { width: ID_CARD.width, height: ID_CARD.height }, pages: state.pages, nodes: state.nodes };
         const parsed = idDocSchema.safeParse(doc);
@@ -130,10 +102,6 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
         setSaving(true);
         try {
             const row = await patchIdTemplate(templateId, {
-                name,
-                company_id: meta.company_id,
-                is_default: meta.is_default,
-                is_active: meta.is_active,
                 design_json: parsed.data,
             });
             const verify = await getIdTemplate(templateId);
@@ -142,9 +110,6 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
                 toast.error("Save verification failed — please reload and try again.");
                 return;
             }
-            const nextMeta: IdMeta = { ...meta, name };
-            setMeta(nextMeta);
-            setSavedMeta(nextMeta);
             setSavedVersion(store.getState().version);
             toast.success("Template saved.");
         } catch (cause) {
@@ -152,7 +117,19 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
         } finally {
             setSaving(false);
         }
-    }, [meta, store, templateId]);
+    }, [store, templateId]);
+
+    const handleToggleActive = useCallback(async (next: boolean): Promise<void> => {
+        setActiveBusy(true);
+        try {
+            await patchIdTemplate(templateId, { is_active: next });
+            setIsActive(next);
+        } catch (cause) {
+            toast.error(cause instanceof Error ? cause.message : "Could not update the template.");
+        } finally {
+            setActiveBusy(false);
+        }
+    }, [templateId]);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent): void => {
@@ -267,12 +244,7 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
                 <Button aria-label="Back to templates" size="icon-sm" variant="ghost" asChild>
                     <Link href="/hrm/id-layout"><ArrowLeft /></Link>
                 </Button>
-                <Input
-                    aria-label="Template name"
-                    className="h-8 w-32 shrink border-transparent bg-transparent px-2 font-medium shadow-none hover:border-input sm:w-56"
-                    value={meta.name}
-                    onChange={(event) => setMeta((prev) => ({ ...prev, name: event.target.value }))}
-                />
+                <span className="max-w-32 truncate px-2 text-sm font-medium sm:max-w-56" title={templateName}>{templateName}</span>
                 <span aria-live="polite" className="hidden shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline-flex">
                     {saving ? "Saving…" : dirty ? "Unsaved" : "Saved"}
                 </span>
@@ -311,23 +283,8 @@ export function IdEditor({ templateId }: { readonly templateId: string }) {
             </header>
             <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b bg-card px-3 py-2">
                 <div className="flex items-center gap-2">
-                    <Label className="text-xs font-medium text-muted-foreground" htmlFor="id-template-company">Company</Label>
-                    <IdCombobox
-                        className="h-8 w-44 text-xs"
-                        id="id-template-company"
-                        options={[{ value: "none", label: "No company" }, ...companies.map((company) => ({ value: String(company.company_id), label: company.company_name }))]}
-                        placeholder="No company"
-                        value={meta.company_id === null ? "none" : String(meta.company_id)}
-                        onValueChange={(next) => setMeta((prev) => ({ ...prev, company_id: next === "none" ? null : Number(next) }))}
-                    />
-                </div>
-                <div className="flex items-center gap-2">
-                    <Label className="text-xs font-medium text-muted-foreground" htmlFor="id-template-default">Default</Label>
-                    <Switch checked={meta.is_default} id="id-template-default" size="sm" onCheckedChange={(next) => setMeta((prev) => ({ ...prev, is_default: next }))} />
-                </div>
-                <div className="flex items-center gap-2">
                     <Label className="text-xs font-medium text-muted-foreground" htmlFor="id-template-active">Active</Label>
-                    <Switch checked={meta.is_active} id="id-template-active" size="sm" onCheckedChange={(next) => setMeta((prev) => ({ ...prev, is_active: next }))} />
+                    <Switch checked={isActive} disabled={activeBusy} id="id-template-active" size="sm" onCheckedChange={(next) => void handleToggleActive(next)} />
                 </div>
                 <div className="flex items-center gap-2">
                     <Label className="text-xs font-medium text-muted-foreground" htmlFor="id-template-snap">Snapping</Label>

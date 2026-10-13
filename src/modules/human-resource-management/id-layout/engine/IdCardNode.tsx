@@ -49,7 +49,11 @@ function idTextStyle(props: unknown): CSSProperties {
         style.fontWeight = fontWeight;
     }
     if (propOf(props, "italic") === true) style.fontStyle = "italic";
-    if (propOf(props, "underline") === true) style.textDecorationLine = "underline";
+    const underline = propOf(props, "underline") === true;
+    const strikethrough = propOf(props, "strikethrough") === true;
+    if (underline && strikethrough) style.textDecorationLine = "underline line-through";
+    else if (underline) style.textDecorationLine = "underline";
+    else if (strikethrough) style.textDecorationLine = "line-through";
     const color = textProp(props, "color");
     if (color !== undefined) style.color = color;
     const align = alignProp(props);
@@ -114,30 +118,22 @@ function IdImageBody({ node, values }: { readonly node: IdNode; readonly values:
         const field = textProp(node.props, "field") ?? "";
         if (field !== "") src = values[field] ?? "";
     }
+    const maskStyle = idMaskStyle(mask, radius);
     if (src === "") {
         const field = textProp(node.props, "field") ?? "";
         const label = source === "field" && field !== "" ? field : "Image";
+        const clipped = "clipPath" in maskStyle;
         return (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden border border-dashed border-border bg-muted/30 text-muted-foreground">
+            <div
+                className={`flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden text-muted-foreground${clipped ? " bg-muted/60" : " border-2 border-dashed border-muted-foreground/40 bg-muted/40"}`}
+                style={maskStyle}
+            >
                 <ImageIcon aria-hidden="true" className="size-4" />
                 <span className="max-w-full truncate px-1 text-[11px] font-medium">{label}</span>
             </div>
         );
     }
-    const style: CSSProperties = { objectFit: fit };
-    if (mask === "circle" || mask === "ellipse") {
-        style.borderRadius = "50%";
-    } else if (mask === "rounded") {
-        style.borderRadius = 24;
-    } else if (mask === "diamond") {
-        style.clipPath = ID_CLIP_DIAMOND;
-    } else if (mask === "hexagon") {
-        style.clipPath = ID_CLIP_HEXAGON;
-    } else if (mask === "star") {
-        style.clipPath = ID_CLIP_STAR;
-    } else {
-        style.borderRadius = radius ?? 0;
-    }
+    const style: CSSProperties = { objectFit: fit, ...maskStyle };
     return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -154,6 +150,15 @@ function IdImageBody({ node, values }: { readonly node: IdNode; readonly values:
 function idShapeBorder(borderWidth: number | undefined, borderColor: string | undefined): CSSProperties {
     if (borderWidth === undefined || borderWidth <= 0) return {};
     return { borderWidth, borderStyle: "solid", borderColor: borderColor ?? "#000000" };
+}
+
+function idMaskStyle(mask: string, radius: number | undefined): CSSProperties {
+    if (mask === "circle" || mask === "ellipse") return { borderRadius: "50%" };
+    if (mask === "rounded") return { borderRadius: 24 };
+    if (mask === "diamond") return { clipPath: ID_CLIP_DIAMOND };
+    if (mask === "hexagon") return { clipPath: ID_CLIP_HEXAGON };
+    if (mask === "star") return { clipPath: ID_CLIP_STAR };
+    return { borderRadius: radius ?? 0 };
 }
 
 function IdShapeBody({ node }: { readonly node: IdNode }) {

@@ -29,8 +29,6 @@ interface EmployeeIdOption {
     readonly name: string;
 }
 
-const RESOLVED_OVERRIDE = "resolved";
-
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -59,7 +57,8 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
     const [resolvedName, setResolvedName] = useState<string>("");
     const [values, setValues] = useState<Record<string, string>>({});
     const [options, setOptions] = useState<EmployeeIdOption[]>([]);
-    const [overrideId, setOverrideId] = useState<string>(RESOLVED_OVERRIDE);
+    const [overrideId, setOverrideId] = useState<string>("");
+    const [resolvedId, setResolvedId] = useState<string>("");
     const [overrideBusy, setOverrideBusy] = useState<boolean>(false);
     const [exporting, setExporting] = useState<"front" | "back" | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -70,7 +69,10 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
         async function load(): Promise<void> {
             setStatus("loading");
             setNotice(null);
-            setOverrideId(RESOLVED_OVERRIDE);
+            setOverrideId("");
+            setResolvedId("");
+            let resolvedTemplateId = "";
+            let resolvedTemplateName = "";
             try {
                 const res = await fetch(`/api/hrm/id-layout/resolve?user_id=${user.id}`);
                 if (!res.ok) throw new Error("resolve request failed");
@@ -93,24 +95,34 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
                 }
                 if (!isRecord(template)) throw new Error("template payload invalid");
                 const name = typeof template.name === "string" && template.name !== "" ? template.name : "ID template";
+                const templateId =
+                    typeof template.id === "number" || typeof template.id === "string" ? String(template.id) : "";
                 const parsed = parseEmployeeIdDoc(template.design_json);
                 if (parsed === null) {
+                    resolvedTemplateId = templateId;
+                    resolvedTemplateName = name;
                     if (!cancelled) {
                         setDoc(null);
                         setResolvedDoc(null);
                         setResolvedKind("corrupt");
                         setTemplateName(name);
                         setResolvedName(name);
+                        setResolvedId(templateId);
+                        setOverrideId(templateId);
                         setStatus("corrupt");
                     }
                     return;
                 }
                 if (!cancelled) {
+                    resolvedTemplateId = templateId;
+                    resolvedTemplateName = name;
                     setDoc(parsed);
                     setResolvedDoc(parsed);
                     setResolvedKind("ready");
                     setTemplateName(name);
                     setResolvedName(name);
+                    setResolvedId(templateId);
+                    setOverrideId(templateId);
                     setStatus("ready");
                 }
             } catch {
@@ -120,7 +132,20 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
                 const listRes = await fetch("/api/hrm/id-layout/templates?page=1");
                 if (!listRes.ok) return;
                 const listPayload: unknown = await listRes.json();
-                if (!cancelled) setOptions(readIdOptions(listPayload));
+                if (cancelled) return;
+                const listed = readIdOptions(listPayload);
+                const resolvedNumeric = Number(resolvedTemplateId);
+                if (
+                    resolvedTemplateId !== "" &&
+                    Number.isInteger(resolvedNumeric) &&
+                    !listed.some((option) => option.id === resolvedNumeric)
+                ) {
+                    listed.unshift({
+                        id: resolvedNumeric,
+                        name: resolvedTemplateName !== "" ? resolvedTemplateName : "ID template",
+                    });
+                }
+                setOptions(listed);
             } catch {
                 return;
             }
@@ -134,7 +159,7 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
     async function handleOverride(value: string): Promise<void> {
         setOverrideId(value);
         setNotice(null);
-        if (value === RESOLVED_OVERRIDE) {
+        if (value !== "" && value === resolvedId) {
             setDoc(resolvedDoc);
             setTemplateName(resolvedName);
             setStatus(resolvedKind);
@@ -150,7 +175,10 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
             if (parsed === null) {
                 toast.error("That ID template could not be displayed.");
                 setNotice("That ID template could not be displayed.");
-                setOverrideId(RESOLVED_OVERRIDE);
+                setOverrideId(resolvedId);
+                setDoc(resolvedDoc);
+                setTemplateName(resolvedName);
+                setStatus(resolvedKind);
                 return;
             }
             const name = isRecord(row) && typeof row.name === "string" && row.name !== "" ? row.name : "ID template";
@@ -160,7 +188,10 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
         } catch {
             toast.error("Could not load that ID template. Please try again.");
             setNotice("Could not load that ID template. Please try again.");
-            setOverrideId(RESOLVED_OVERRIDE);
+            setOverrideId(resolvedId);
+            setDoc(resolvedDoc);
+            setTemplateName(resolvedName);
+            setStatus(resolvedKind);
         } finally {
             setOverrideBusy(false);
         }
@@ -203,20 +234,16 @@ export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
         <div className="flex flex-col gap-6 animate-in fade-in duration-300">
             <div className="flex flex-col gap-2 rounded-2xl border border-border/50 bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col gap-1">
-                    <span className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">Template</span>
-                    <span className="text-sm font-medium">{templateName !== "" ? templateName : "No template resolved"}</span>
+                    <span className="text-sm font-medium">{templateName !== "" ? templateName : "No ID template"}</span>
                     <span className="text-xs text-muted-foreground">Preview only. Changing this does not reassign the employee template.</span>
                 </div>
                 <EmployeeIdCombobox
                     value={overrideId}
                     onValueChange={(value) => void handleOverride(value)}
-                    placeholder="Resolved template"
+                    placeholder="Select template..."
                     disabled={options.length === 0 || overrideBusy || status === "loading"}
                     className="w-[240px]"
-                    options={[
-                        { value: RESOLVED_OVERRIDE, label: "Resolved template" },
-                        ...options.map((option) => ({ value: String(option.id), label: option.name })),
-                    ]}
+                    options={options.map((option) => ({ value: String(option.id), label: option.name }))}
                 />
             </div>
 

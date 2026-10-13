@@ -48,7 +48,11 @@ function employeeIdTextStyle(props: unknown): CSSProperties {
         style.fontWeight = fontWeight;
     }
     if (propOf(props, "italic") === true) style.fontStyle = "italic";
-    if (propOf(props, "underline") === true) style.textDecorationLine = "underline";
+    const underline = propOf(props, "underline") === true;
+    const strikethrough = propOf(props, "strikethrough") === true;
+    if (underline && strikethrough) style.textDecorationLine = "underline line-through";
+    else if (underline) style.textDecorationLine = "underline";
+    else if (strikethrough) style.textDecorationLine = "line-through";
     const color = textProp(props, "color");
     if (color !== undefined) style.color = color;
     const align = alignProp(props);
@@ -267,7 +271,7 @@ export interface EmployeeIdCardSideProps {
 export function EmployeeIdCardSide({ page, nodes, values = {}, innerRef, zoom = 1 }: EmployeeIdCardSideProps) {
     return (
         <div
-            className="relative overflow-hidden border border-transparent bg-card"
+            className="relative overflow-hidden border border-transparent bg-white text-black"
             data-id-card-side={page.side}
             ref={innerRef}
             style={{ width: 408, height: 648, zoom }}

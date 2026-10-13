@@ -58,6 +58,44 @@ export function directusMessage(value: unknown): string | null {
     return null;
 }
 
+export function idTemplateUniqueMessage(value: unknown): string | null {
+    let text = "";
+    if (typeof value === "string") {
+        text = value;
+    } else if (value instanceof Error) {
+        text = value.message;
+    } else {
+        try {
+            text = JSON.stringify(value) ?? "";
+        } catch {
+            text = "";
+        }
+    }
+    const lowered = text.toLowerCase();
+    if (!lowered.includes("unique")) {
+        return null;
+    }
+    if (lowered.includes("uq_id_templates_company")) {
+        return "That company already has an ID template.";
+    }
+    if (lowered.includes("uq_id_templates_default") || lowered.includes("is_default_uq")) {
+        return "Another template is already set as the fallback default.";
+    }
+    if (lowered.includes("uq_id_templates_name")) {
+        return "A template with that name already exists.";
+    }
+    if (lowered.includes("company_id")) {
+        return "That company already has an ID template.";
+    }
+    if (lowered.includes("is_default")) {
+        return "Another template is already set as the fallback default.";
+    }
+    if (lowered.includes("name")) {
+        return "A template with that name already exists.";
+    }
+    return "That template conflicts with an existing template.";
+}
+
 export function parseDesignJson(value: unknown): unknown {
     if (typeof value !== "string") {
         return value;
@@ -119,4 +157,31 @@ export async function readTemplateById(id: unknown): Promise<Record<string, unkn
     }
     const first: unknown = body.data[0];
     return isRecord(first) ? first : null;
+}
+
+export function isTruthyFlag(value: unknown): boolean {
+    return value === true || value === 1;
+}
+
+export async function clearOtherDefaultTemplates(excludeId?: unknown): Promise<void> {
+    const body: unknown = await dFetch(
+        `/items/${ID_TEMPLATES_COLLECTION}?fields=${ID_TEMPLATE_FULL_FIELDS}&filter[is_default][_eq]=1`
+    );
+    if (!isRecord(body) || !Array.isArray(body.data)) {
+        return;
+    }
+    const excluded = String(excludeId ?? "").trim();
+    for (const entry of body.data) {
+        if (!isRecord(entry)) {
+            continue;
+        }
+        if (excluded !== "" && String(entry.id) === excluded) {
+            continue;
+        }
+        await dFetch(`/items/${ID_TEMPLATES_COLLECTION}/${String(entry.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ is_default: 0 }),
+        });
+        await readTemplateById(entry.id);
+    }
 }

@@ -17,7 +17,7 @@ export interface IdViewerSideProps {
 export function IdViewerSide({ page, nodes, values = {}, innerRef }: IdViewerSideProps) {
     return (
         <div
-            className="relative overflow-hidden bg-white"
+            className="relative overflow-hidden bg-white text-black"
             data-id-viewer-side={page.side}
             ref={innerRef}
             style={{ width: ID_VIEWER_CARD.width, height: ID_VIEWER_CARD.height }}

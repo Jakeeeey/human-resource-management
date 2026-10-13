@@ -6,7 +6,7 @@ import Moveable from "react-moveable";
 import Selecto from "react-selecto";
 import { ID_CARD } from "../types/id-layout.schema";
 import { IdSnapGuidesOverlay } from "./IdNodeView";
-import { snapIdDrag, type IdSnapOverlay } from "./snap";
+import { snapIdDrag, snapIdResize, type IdSnapOverlay } from "./snap";
 import type { IdDocStore } from "./store";
 
 interface IdMoveableProps {
@@ -21,7 +21,8 @@ interface IdMoveableProps {
 interface ResizeCommit {
     readonly width?: number;
     readonly height?: number;
-    readonly drag?: { readonly left?: number; readonly top?: number };
+    readonly direction?: readonly number[];
+    readonly drag?: { readonly left?: number; readonly top?: number; readonly transform?: string };
 }
 
 export function IdMoveable({ store, stageEl, targetId, editing, pageId, panning }: IdMoveableProps) {
@@ -32,6 +33,7 @@ export function IdMoveable({ store, stageEl, targetId, editing, pageId, panning 
     const zoom = store((state) => state.viewport.zoom);
     const selectoRef = useRef<Selecto>(null);
     const moveableRef = useRef<Moveable>(null);
+    const resizeStartRef = useRef<{ readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null>(null);
     const [snap, setSnap] = useState<IdSnapOverlay | null>(null);
 
     const targetX = store((state) => (targetId ? state.nodes[targetId]?.x : undefined));
@@ -79,6 +81,25 @@ export function IdMoveable({ store, stageEl, targetId, editing, pageId, panning 
         return ids.filter((id) => roots.includes(id));
     };
 
+    const snapResizeFor = (
+        resizingId: string,
+        proposed: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+        direction: readonly number[],
+    ) => {
+        const state = store.getState();
+        const page = state.pages.find((candidate) => candidate.id === (pageId ?? state.activePageId)) ?? null;
+        return snapIdResize(state.nodes, page?.rootIds ?? [], resizingId, proposed, direction, state.snapEnabled);
+    };
+
+    const inferResizeDirection = (
+        original: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+        proposed: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+    ): readonly number[] => {
+        const dirX = proposed.x !== original.x ? -1 : proposed.w !== original.w ? 1 : 0;
+        const dirY = proposed.y !== original.y ? -1 : proposed.h !== original.h ? 1 : 0;
+        return [dirX, dirY];
+    };
+
     if (!stageEl) return null;
 
     const allowMove = !panning;
@@ -106,6 +127,25 @@ export function IdMoveable({ store, stageEl, targetId, editing, pageId, panning 
                     const current = store.getState().selection;
                     selectNodes(event.inputEvent.shiftKey ? Array.from(new Set([...current, ...ids])) : ids);
                 }}
+                onSelect={(event) => {
+                    const selected = (event as unknown as { selected?: readonly HTMLElement[] }).selected ?? [];
+                    const unlocked = selected.filter((element) => !store.getState().nodes[element.dataset?.id ?? ""]?.locked);
+                    if (unlocked.length === selected.length) return;
+                    selectoRef.current?.setSelectedTargets(unlocked);
+                    const ids = unlocked.map((element) => element.dataset?.id).filter((id): id is string => Boolean(id));
+                    const current = store.getState().selection;
+                    selectNodes(event.inputEvent.shiftKey ? Array.from(new Set([...current, ...ids])) : ids);
+                }}
+                onSelectEnd={(event) => {
+                    const selected = (event as unknown as { selected?: readonly HTMLElement[] }).selected ?? selectoRef.current?.getSelectedTargets() ?? [];
+                    const current = store.getState().selection;
+                    if (current.some((id) => store.getState().nodes[id]?.locked)) {
+                        selectNodes(current.filter((id) => !store.getState().nodes[id]?.locked));
+                        return;
+                    }
+                    const ids = selected.map((element) => element.dataset?.id).filter((id): id is string => Boolean(id));
+                    if (ids.length === 0 && !event.inputEvent.shiftKey) selectNodes(current);
+                }}
                 onDragStart={(event) => {
                     event.inputEvent.preventDefault();
                 }}
@@ -117,13 +157,13 @@ export function IdMoveable({ store, stageEl, targetId, editing, pageId, panning 
                     if (target.closest("[class*='moveable-']")) return false;
                     const block = target.closest<HTMLElement>(".id-block");
                     if (block?.dataset.id) {
-                        if (store.getState().nodes[block.dataset.id]?.locked) return false;
                         const current = store.getState().selection;
                         if (current.includes(block.dataset.id)) return false;
                     }
                     return true;
                 }}
                 ref={selectoRef}
+                rootContainer={stageEl.ownerDocument.body}
                 selectableTargets={[".id-block"]}
                 selectByClick={!editing && allowMove}
                 toggleContinueSelect={["shift"]}
@@ -183,31 +223,179 @@ export function IdMoveable({ store, stageEl, targetId, editing, pageId, panning 
                     }}
                     onDragStart={() => beginGesture()}
                     onResize={(event) => {
-                        event.target.style.width = `${event.width}px`;
-                        event.target.style.height = `${event.height}px`;
-                        if (event.drag) {
-                            event.target.style.transform = event.drag.transform;
+                        const current = store.getState();
+                        const node = current.nodes[targetId];
+                        if (!node) {
+                            event.target.style.width = `${event.width}px`;
+                            event.target.style.height = `${event.height}px`;
+                            if (event.drag) {
+                                event.target.style.transform = event.drag.transform;
+                            }
+                            return;
                         }
+                        const start = resizeStartRef.current ?? node;
+                        const rawDirection = (event as unknown as { readonly direction?: unknown }).direction;
+                        const rawDist = (event as unknown as { readonly dist?: unknown }).dist;
+                        const direction: readonly number[] = Array.isArray(rawDirection)
+                            ? (rawDirection as readonly number[])
+                            : inferResizeDirection(start, {
+                                  x:
+                                      typeof event.drag?.left === "number"
+                                          ? Math.round(event.drag.left)
+                                          : start.x,
+                                  y:
+                                      typeof event.drag?.top === "number"
+                                          ? Math.round(event.drag.top)
+                                          : start.y,
+                                  w: Math.max(1, Math.round(event.width)),
+                                  h: Math.max(1, Math.round(event.height)),
+                              });
+                        const dirX = direction[0] === undefined ? 0 : direction[0] < 0 ? -1 : direction[0] > 0 ? 1 : 0;
+                        const dirY = direction[1] === undefined ? 0 : direction[1] < 0 ? -1 : direction[1] > 0 ? 1 : 0;
+                        let proposed: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+                        if (
+                            Array.isArray(rawDist) &&
+                            typeof rawDist[0] === "number" &&
+                            Number.isFinite(rawDist[0]) &&
+                            typeof rawDist[1] === "number" &&
+                            Number.isFinite(rawDist[1])
+                        ) {
+                            const absoluteW = Math.max(1, Math.round(start.w + (rawDist[0] as number)));
+                            const absoluteH = Math.max(1, Math.round(start.h + (rawDist[1] as number)));
+                            proposed = {
+                                x: dirX < 0 ? start.x + start.w - absoluteW : start.x,
+                                y: dirY < 0 ? start.y + start.h - absoluteH : start.y,
+                                w: absoluteW,
+                                h: absoluteH,
+                            };
+                        } else {
+                            const fallbackW = Math.max(1, Math.round(event.width));
+                            const fallbackH = Math.max(1, Math.round(event.height));
+                            proposed = {
+                                x:
+                                    typeof event.drag?.left === "number"
+                                        ? Math.round(event.drag.left)
+                                        : start.x,
+                                y:
+                                    typeof event.drag?.top === "number"
+                                        ? Math.round(event.drag.top)
+                                        : start.y,
+                                w: fallbackW,
+                                h: fallbackH,
+                            };
+                        }
+                        const snapped = snapResizeFor(targetId, proposed, direction);
+                        event.target.style.width = `${snapped.w}px`;
+                        event.target.style.height = `${snapped.h}px`;
+                        if (event.drag) {
+                            const shiftX = snapped.x - start.x;
+                            const shiftY = snapped.y - start.y;
+                            if (node.rotation === 0) {
+                                if (shiftX === 0 && shiftY === 0) {
+                                    event.target.style.transform = event.drag.transform;
+                                } else {
+                                    event.target.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+                                }
+                            } else if (shiftX === 0 && shiftY === 0) {
+                                event.target.style.transform = event.drag.transform;
+                            } else {
+                                event.target.style.transform = `translate(${shiftX}px, ${shiftY}px) rotate(${node.rotation}deg)`;
+                            }
+                        }
+                        setSnap(snapped.overlay);
                     }}
                     onResizeEnd={(event) => {
                         const last = event.lastEvent as ResizeCommit | undefined;
                         const current = store.getState();
                         const node = current.nodes[targetId];
-                        if (node && last && typeof last.width === "number") {
-                            const nextW = Math.max(1, Math.round(last.width));
-                            const nextH = Math.max(1, Math.round(typeof last.height === "number" ? last.height : node.h));
-                            const nextX = typeof last.drag?.left === "number" ? Math.round(last.drag.left) : node.x;
-                            const nextY = typeof last.drag?.top === "number" ? Math.round(last.drag.top) : node.y;
-                            if (nextX !== node.x || nextY !== node.y) {
-                                current.moveNode(targetId, nextX, nextY);
+                        const start = resizeStartRef.current ?? node ?? null;
+                        resizeStartRef.current = null;
+                        setSnap(null);
+                        if (node && start && last && typeof last.width === "number") {
+                            const lastDirection: readonly number[] | null = Array.isArray(last.direction)
+                                ? last.direction
+                                : null;
+                            const lastDist = (last as unknown as { readonly dist?: unknown }).dist;
+                            let proposed: {
+                                readonly x: number;
+                                readonly y: number;
+                                readonly w: number;
+                                readonly h: number;
+                            };
+                            let direction: readonly number[];
+                            if (
+                                Array.isArray(lastDist) &&
+                                typeof lastDist[0] === "number" &&
+                                Number.isFinite(lastDist[0]) &&
+                                typeof lastDist[1] === "number" &&
+                                Number.isFinite(lastDist[1])
+                            ) {
+                                direction =
+                                    lastDirection ??
+                                    inferResizeDirection(start, {
+                                        x:
+                                            typeof last.drag?.left === "number"
+                                                ? Math.round(last.drag.left)
+                                                : start.x,
+                                        y:
+                                            typeof last.drag?.top === "number"
+                                                ? Math.round(last.drag.top)
+                                                : start.y,
+                                        w: Math.max(1, Math.round(last.width)),
+                                        h: Math.max(
+                                            1,
+                                            Math.round(
+                                                typeof last.height === "number" ? last.height : start.h,
+                                            ),
+                                        ),
+                                    });
+                                const dirX = direction[0] === undefined ? 0 : direction[0] < 0 ? -1 : direction[0] > 0 ? 1 : 0;
+                                const dirY = direction[1] === undefined ? 0 : direction[1] < 0 ? -1 : direction[1] > 0 ? 1 : 0;
+                                const absoluteW = Math.max(1, Math.round(start.w + (lastDist[0] as number)));
+                                const absoluteH = Math.max(1, Math.round(start.h + (lastDist[1] as number)));
+                                proposed = {
+                                    x: dirX < 0 ? start.x + start.w - absoluteW : start.x,
+                                    y: dirY < 0 ? start.y + start.h - absoluteH : start.y,
+                                    w: absoluteW,
+                                    h: absoluteH,
+                                };
+                            } else {
+                                const fallbackW = Math.max(1, Math.round(last.width));
+                                const fallbackH = Math.max(
+                                    1,
+                                    Math.round(typeof last.height === "number" ? last.height : node.h),
+                                );
+                                proposed = {
+                                    x:
+                                        typeof last.drag?.left === "number"
+                                            ? Math.round(last.drag.left)
+                                            : node.x,
+                                    y:
+                                        typeof last.drag?.top === "number"
+                                            ? Math.round(last.drag.top)
+                                            : node.y,
+                                    w: fallbackW,
+                                    h: fallbackH,
+                                };
+                                direction = lastDirection ?? inferResizeDirection(node, proposed);
                             }
-                            if (nextW !== node.w || nextH !== node.h) {
-                                current.resizeNode(targetId, nextW, nextH);
+                            const snapped = snapResizeFor(targetId, proposed, direction);
+                            if (snapped.x !== node.x || snapped.y !== node.y) {
+                                current.moveNode(targetId, snapped.x, snapped.y);
+                            }
+                            if (snapped.w !== node.w || snapped.h !== node.h) {
+                                current.resizeNode(targetId, snapped.w, snapped.h);
                             }
                         }
                         endGesture();
                     }}
-                    onResizeStart={() => beginGesture()}
+                    onResizeStart={() => {
+                        const node = store.getState().nodes[targetId];
+                        resizeStartRef.current = node
+                            ? { x: node.x, y: node.y, w: node.w, h: node.h }
+                            : null;
+                        beginGesture();
+                    }}
                     onRotate={(event) => store.getState().rotateNode(targetId, Math.round(event.rotation))}
                     onRotateEnd={() => endGesture()}
                     onRotateStart={() => beginGesture()}
