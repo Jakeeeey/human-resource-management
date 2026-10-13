@@ -1,3 +1,6 @@
+const SOA_PDF_FROZEN_CODE = "CLEARANCE_SOA_FROZEN";
+const MAX_SOA_PDF_BYTES = 10 * 1024 * 1024;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null;
 }
@@ -10,23 +13,60 @@ async function readBody(res: Response): Promise<unknown> {
     }
 }
 
-export const APPROVED_SOA_FROZEN_CODE = "CLEARANCE_SOA_FROZEN";
+function readFileId(body: unknown): string | null {
+    if (!isRecord(body) || !isRecord(body.data)) return null;
+    const id = (body.data as { id?: unknown }).id;
+    return typeof id === "string" && id !== "" ? id : null;
+}
 
-export interface FreezeApprovedSoaPdfInput {
+export interface UploadSoa201StagedInput {
     documentId: number;
     bytes: Uint8Array;
     fileName: string;
 }
 
-export interface FreezeApprovedSoaPdfResult {
-    fileId: string;
-    recordId: number;
-    alreadyFiled: boolean;
+export function pickSoaPdfFile(): Promise<File | null> {
+    return new Promise((resolve, reject) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/pdf,.pdf";
+        input.style.display = "none";
+        document.body.appendChild(input);
+        const cleanup = (): void => {
+            input.removeEventListener("change", onChange);
+            input.removeEventListener("cancel", onCancel);
+            input.remove();
+        };
+        const onChange = (): void => {
+            const file = input.files?.[0] ?? null;
+            cleanup();
+            if (file === null) {
+                resolve(null);
+                return;
+            }
+            if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
+                reject(new Error("Only PDF files can be uploaded."));
+                return;
+            }
+            if (file.size > MAX_SOA_PDF_BYTES) {
+                reject(new Error("File too large. Maximum size is 10 MB."));
+                return;
+            }
+            resolve(file);
+        };
+        const onCancel = (): void => {
+            cleanup();
+            resolve(null);
+        };
+        input.addEventListener("change", onChange);
+        input.addEventListener("cancel", onCancel);
+        input.click();
+    });
 }
 
-export async function freezeApprovedSoaPdf(
-    input: FreezeApprovedSoaPdfInput
-): Promise<FreezeApprovedSoaPdfResult> {
+export async function uploadSoa201Staged(
+    input: UploadSoa201StagedInput
+): Promise<{ fileId: string }> {
     if (
         !Number.isInteger(input.documentId) ||
         input.documentId <= 0 ||
@@ -47,23 +87,24 @@ export async function freezeApprovedSoaPdf(
         body: uploadForm,
     });
     const uploadBody = await readBody(uploadRes);
-    const fileId =
-        isRecord(uploadBody) && isRecord(uploadBody.data) && typeof uploadBody.data.id === "string"
-            ? uploadBody.data.id
-            : null;
+    const fileId = readFileId(uploadBody);
     if (!uploadRes.ok || fileId === null || fileId === "") {
         throw new Error("Could not store the approved PDF. Please try again.");
     }
+    return { fileId };
+}
+
+export async function fileSoa201(input: { documentId: number; fileId: string }): Promise<void> {
     const attachRes = await fetch(`/api/hrm/clearance/soa/${input.documentId}/attach-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdf_file_id: fileId }),
+        body: JSON.stringify({ pdf_file_id: input.fileId }),
     });
     if (!attachRes.ok) {
         const attachBody = await readBody(attachRes);
         const code =
             isRecord(attachBody) && typeof attachBody.code === "string" ? attachBody.code : null;
-        if (code !== APPROVED_SOA_FROZEN_CODE) {
+        if (code !== SOA_PDF_FROZEN_CODE) {
             throw new Error("Could not attach the approved PDF. Please try again.");
         }
     }
@@ -78,9 +119,4 @@ export async function freezeApprovedSoaPdf(
     if (recordId === null) {
         throw new Error("Could not file the approved PDF to the 201 file. Please try again.");
     }
-    return {
-        fileId,
-        recordId,
-        alreadyFiled: fileBody.data.already_filed === true,
-    };
 }

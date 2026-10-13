@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
-import { ArrowDown, ArrowUp, Check, Loader2, Minus, Plus, Printer, Search, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Eye, Loader2, Minus, Plus, Printer, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,22 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SoaSignatory } from "../types";
 import type { SoaPrintInput, SoaPrintLine } from "../utils/soaPrintPdf";
 import { buildSoaPdf } from "../utils/soaPrintPdf";
-import { freezeApprovedSoaPdf } from "../utils/approvedPdfFreeze";
 import { useSoaCompanies } from "../hooks/useSoaCompanies";
 import { useSoaDetail, type SoaLinePayload } from "../hooks/useSoaDetail";
 import { companyLogoDataUrl } from "../../utils/company";
 import { SoaPrintDialog } from "./SoaPrintDialog";
+import { Soa201Dialog } from "./Soa201Dialog";
 import { LiveDocumentPreview } from "../../components/LiveDocumentPreview";
 
 interface SoaEditorProps {
@@ -90,6 +83,15 @@ function applySignatoryOverrides(model: SoaPrintInput, drafts: SoaSignatory[] | 
     return { ...model, signatories: nonEmptySignatories(drafts) };
 }
 
+function describeSoa201(model: SoaPrintInput | null, refNo: string | null): string {
+    const name = model === null ? "" : model.employeeName.trim();
+    const ref = refNo === null || refNo === "" ? "" : `REF ${refNo}`;
+    if (name === "" && ref === "") return "Statement of account";
+    if (name === "") return ref;
+    if (ref === "") return name;
+    return `${name} — ${ref}`;
+}
+
 function toFileName(employeeName: string, refNo: string): string {
     const cleaned = employeeName
         .split("")
@@ -111,7 +113,6 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
     const [seededFor, setSeededFor] = useState<number | null>(null);
     const [saving, setSaving] = useState(false);
     const [previewing, setPreviewing] = useState(false);
-    const [uploading, setUploading] = useState(false);
     const [approving, setApproving] = useState(false);
     const [model, setModel] = useState<SoaPrintInput | null>(null);
     const [printOpen, setPrintOpen] = useState(false);
@@ -124,6 +125,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
     const [savedSignatories, setSavedSignatories] = useState<SoaSignatory[] | null>(null);
     const [lineQuery, setLineQuery] = useState("");
     const [linePages, setLinePages] = useState<Record<number, number>>({});
+    const [soa201Open, setSoa201Open] = useState(false);
     const autoPrintFiredRef = useRef<number | null>(null);
     const liveModelKeyRef = useRef<string | null>(null);
 
@@ -398,50 +400,18 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
     const hasUpload = (detail?.pdf_file ?? "") !== "";
     const approveBlockedReason = hasUpload
         ? null
-        : "Upload the SOA PDF to the 201 file before approving.";
-
-    async function handleUpload(): Promise<void> {
-        if (!detail || isApproved || uploading) return;
-        if (companies.employeeCompanyLoading) {
-            toast.error("Resolving the employee company. Please try again.");
-            return;
-        }
-        const snapshot = companySnapshot();
-        if (!snapshot) {
-            toast.error("Pick a company for the letterhead first.");
-            return;
-        }
-        setUploading(true);
-        try {
-            const renderModel = await fetchRenderModel(requestId, snapshot);
-            const withClearance = renderModel.clearanceNo === "" && formClearanceNo !== ""
-                ? { ...renderModel, clearanceNo: formClearanceNo }
-                : renderModel;
-            const withSignatories = applySignatoryOverrides(withClearance, signatoryOverlay);
-            const bytes = buildSoaPdf(withSignatories);
-            await freezeApprovedSoaPdf({
-                documentId: detail.id,
-                bytes,
-                fileName: toFileName(withSignatories.employeeName, withSignatories.refNo),
-            });
-            toast.success("SOA PDF uploaded to the 201 file.");
-            reload();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Could not upload the SOA PDF to the 201 file.");
-        } finally {
-            setUploading(false);
-        }
-    }
+        : "Upload the signed copy to the 201 file before approving.";
+    const soa201Description = describeSoa201(model, detail?.ref_no ?? null);
 
     async function handleApprove(): Promise<void> {
         if (!detail || isApproved || approving) return;
         if (!hasUpload) {
-            toast.error(approveBlockedReason ?? "Upload the SOA PDF to the 201 file before approving.");
+            toast.error(approveBlockedReason ?? "Upload the signed copy to the 201 file before approving.");
             return;
         }
         const companyCode = companies.selected?.company_code ?? detail.company_code ?? "";
         if (companyCode === "") {
-            toast.error("Pick a company for the letterhead first.");
+            toast.error("Set the employee company before approving.");
             return;
         }
         setApproving(true);
@@ -587,7 +557,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
         }
         const snapshot = companySnapshot();
         if (!snapshot) {
-            toast.error("Pick a company for the letterhead first.");
+            toast.error("Could not resolve the company for the letterhead.");
             return;
         }
         setPreviewing(true);
@@ -660,7 +630,6 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                     {detail.ref_no && <Badge variant="outline">REF {detail.ref_no}</Badge>}
                     {resolvedClearanceNo && <Badge variant="outline">Clearance {resolvedClearanceNo}</Badge>}
-                    {hasUpload && <Badge variant="outline">201 filed</Badge>}
                     </div>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
@@ -673,15 +642,31 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                         {saving ? "Saving…" : "Save lines"}
                     </Button>
                     <Button
-                        className="min-h-11 bg-purple-600 text-white hover:bg-purple-700 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 md:min-h-0"
-                        onClick={() => void handleUpload()}
-                        disabled={uploading || isApproved}
+                        variant="outline"
+                        className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 md:min-h-0"
+                        onClick={() => void handlePreview()}
+                        disabled={previewing}
                     >
-                            {uploading
-                                ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                                : <Upload className="h-4 w-4" aria-hidden="true" />}
-                            {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
-                        </Button>
+                        {previewing
+                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <Printer className="h-4 w-4" aria-hidden="true" />}
+                        {previewing ? "Building…" : "Print"}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={hasUpload ? "outline" : "default"}
+                        onClick={() => setSoa201Open(true)}
+                        disabled={isApproved}
+                        aria-label={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
+                        title={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
+                    >
+                        {hasUpload ? (
+                            <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                        ) : (
+                            <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+                        )}
+                        {hasUpload ? "View" : "Upload to 201"}
+                    </Button>
                     {!isApproved && (
                         <span title={approveBlockedReason ?? undefined}>
                             <Button
@@ -696,66 +681,21 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                             </Button>
                         </span>
                     )}
-                    <Button
-                        variant="outline"
-                        className="min-h-11 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 md:min-h-0"
-                        onClick={() => void handlePreview()}
-                        disabled={previewing}
-                    >
-                        {previewing
-                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                            : <Printer className="h-4 w-4" aria-hidden="true" />}
-                        {previewing ? "Building…" : "Print"}
-                    </Button>
                 </div>
             </div>
             {!isApproved && !hasUpload && (
                 <p className="text-xs text-muted-foreground">
-                    Upload the SOA PDF to the 201 file to enable approval.
+                    Upload the scanned signed copy to the 201 file to enable approval.
                 </p>
             )}
             {!isApproved && hasUpload && (
                 <p className="text-xs text-muted-foreground">
-                    SOA PDF filed to the 201 file. Re-upload replaces the filed copy.
+                    Signed copy filed to the 201 file. Replacing it overwrites the filed copy.
                 </p>
             )}
 
             <div className="grid gap-6 lg:grid-cols-[520px_minmax(0,1fr)] xl:grid-cols-[560px_minmax(0,1fr)] items-start">
                 <div className="min-w-0 space-y-4">
-                    {companies.employeeCompany === null && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Letterhead</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                            <div className="grid w-full max-w-sm gap-1.5">
-                                <Label htmlFor="soa-company">Company</Label>
-                                <Select
-                                    value={companies.selectedId === null ? "" : String(companies.selectedId)}
-                                    onValueChange={(next) => companies.selectById(next === "" ? null : Number(next))}
-                                    disabled={isApproved || companies.loading || companies.options.length === 0}
-                                >
-                                    <SelectTrigger id="soa-company">
-                                        <SelectValue placeholder={companies.loading ? "Loading…" : "Select company"} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {companies.options.map((option) => (
-                                            <SelectItem key={option.id} value={String(option.id)}>
-                                                {option.company_name} ({option.company_code})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            {companies.unreachable && (
-                                <p className="text-sm text-muted-foreground">
-                                    Company list is unreachable. The letterhead prints without company details.
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                    )}
-
                     {sections.length === 0 && (
                         <Alert>
                             <AlertDescription>
@@ -1046,9 +986,19 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                 </div>
             </div>
 
+            <Soa201Dialog
+                open={soa201Open}
+                onOpenChange={setSoa201Open}
+                documentId={detail.id}
+                pdfFile={detail.pdf_file}
+                description={soa201Description}
+                readOnly={isApproved}
+                onUploaded={() => {
+                    void reload();
+                }}
+            />
+
             <SoaPrintDialog
-                soaId={detail?.id ?? null}
-                pdfFile={detail?.pdf_file ?? null}
                 model={model}
                 fileName={model ? toFileName(model.employeeName, model.refNo) : ""}
                 open={printOpen}
@@ -1058,8 +1008,6 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                 companiesLoading={companies.loading}
                 employeeCompany={companies.employeeCompany}
                 employeeCompanyLoading={companies.employeeCompanyLoading}
-                selectedCompanyId={companies.selectedId}
-                onSelectCompany={companies.selectById}
                 onCompanySaved={(companyId) => void handleCompanySaved(companyId)}
                 isApproved={isApproved}
             />
