@@ -1,4 +1,4 @@
-import { nowUTC } from "@/modules/human-resource-management/resignation/resignation-approval/utils/audit";
+import { nowUTC } from "@/modules/human-resource-management/resignation/resignation-acknowledgement/utils/audit";
 import type { ResignationRequestWithUser } from "../types";
 
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -18,10 +18,12 @@ interface DirectusDepartmentRow {
 
 interface ReviewInput {
     id: number;
-    status: "approved" | "rejected";
+    status: "approved" | "withdrawn";
     remarks: string;
     reviewerId: number;
 }
+
+export const RESIGNATION_ACTIVE_STATUSES = ["pending", "approved"] as const;
 
 interface AttachmentRef {
     fileId: string;
@@ -84,12 +86,13 @@ function toDepartmentRow(value: unknown): DirectusDepartmentRow | null {
     };
 }
 
-export const resignationApprovalService = {
-    async fetchPending(): Promise<ResignationRequestWithUser[]> {
-        const pendingResponse = await directusGet(
-            "/items/resignation_request?filter[status][_eq]=pending&sort=-filed_at&limit=-1&fields=*"
+export const resignationAcknowledgementService = {
+    async fetchRequests(options: { includeInactive: boolean }): Promise<ResignationRequestWithUser[]> {
+        const statusFilter = options.includeInactive ? "" : "filter[status][_in]=pending,approved&";
+        const response = await directusGet(
+            `/items/resignation_request?${statusFilter}sort=-filed_at&limit=-1&fields=*`
         );
-        const rows = Array.isArray(pendingResponse.data) ? pendingResponse.data : [];
+        const rows = Array.isArray(response.data) ? response.data : [];
         const userIds = [...new Set(
             rows
                 .map((row) => (isRecord(row) ? Number(row.user_id) : Number.NaN))
@@ -144,7 +147,7 @@ export const resignationApprovalService = {
                     department_name: department && department.department_name ? department.department_name : null,
                     reviewer_name: null,
                     view_file_url: attachmentUuid
-                        ? `/api/hrm/resignation/resignation-approval/${id}/file`
+                        ? `/api/hrm/resignation/resignation-acknowledgement/${id}/file`
                         : null,
                 } as ResignationRequestWithUser;
             });

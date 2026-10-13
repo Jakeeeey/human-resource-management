@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { resignationApprovalService } from "@/modules/human-resource-management/resignation/resignation-approval/services/ResignationApprovalService";
+import { resignationAcknowledgementService } from "@/modules/human-resource-management/resignation/resignation-acknowledgement/services/ResignationAcknowledgementService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +46,7 @@ export async function GET(
         if (Number.isNaN(recordId)) {
             return NextResponse.json({ error: "Invalid resignation id" }, { status: 400 });
         }
-        const attachment = await resignationApprovalService.fetchAttachmentFileId(recordId);
+        const attachment = await resignationAcknowledgementService.fetchAttachmentFileId(recordId);
         if (!attachment) {
             return NextResponse.json({ error: "No file attached" }, { status: 404 });
         }

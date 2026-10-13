@@ -32,7 +32,7 @@ export function ResignationDetailDialog({ isOpen, onClose, data }: ResignationDe
     const [reloadKey, setReloadKey] = useState(0);
 
     const fileUrl = data?.view_file_url ?? (data && data.attachment_uuid
-        ? `/api/hrm/resignation/resignation-approval/${data.id}/file`
+        ? `/api/hrm/resignation/resignation-acknowledgement/${data.id}/file`
         : null);
     const fileName = data?.attachment_name ?? "Attachment";
 
@@ -111,7 +111,7 @@ export function ResignationDetailDialog({ isOpen, onClose, data }: ResignationDe
                         <h3 className="font-semibold text-sm">Request Details</h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <p className="text-xs text-muted-foreground">Resignation Date</p>
+                                <p className="text-xs text-muted-foreground">Effectivity Date</p>
                                 <p className="font-medium">{formatDateOnly(data.resignation_date)}</p>
                             </div>
                             <div>

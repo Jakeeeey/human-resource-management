@@ -1,25 +1,30 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ResignationListResponse, ResignationRequestWithUser } from "../types";
 
-const API_BASE = "/api/hrm/resignation/resignation-approval";
+const API_BASE = "/api/hrm/resignation/resignation-acknowledgement";
 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
     const payload = (await response.json().catch(() => null)) as { error?: unknown } | null;
     return typeof payload?.error === "string" ? payload.error : fallback;
 }
 
-export function useResignationApproval() {
+export function useResignationAcknowledgement() {
     const [requests, setRequests] = useState<ResignationRequestWithUser[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [includeInactive, setIncludeInactiveState] = useState<boolean>(false);
+    const includeInactiveRef = useRef<boolean>(false);
 
-    const refresh = useCallback(async (): Promise<void> => {
+    const refresh = useCallback(async (inactive?: boolean): Promise<void> => {
+        const includeInactiveValue = inactive ?? includeInactiveRef.current;
+        includeInactiveRef.current = includeInactiveValue;
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch(API_BASE, {
+            const url = includeInactiveValue ? `${API_BASE}?include_inactive=1` : API_BASE;
+            const response = await fetch(url, {
                 method: "GET",
                 headers: {
                     "Content-Type": "application/json",
@@ -38,8 +43,17 @@ export function useResignationApproval() {
         }
     }, []);
 
+    const setIncludeInactive = useCallback(
+        (value: boolean): void => {
+            setIncludeInactiveState(value);
+            includeInactiveRef.current = value;
+            void refresh(value);
+        },
+        [refresh]
+    );
+
     const reviewRequest = useCallback(
-        async (id: number, status: "approved" | "rejected", remarks: string): Promise<string> => {
+        async (id: number, status: "approved" | "withdrawn", remarks: string): Promise<string> => {
             const response = await fetch(API_BASE, {
                 method: "PATCH",
                 headers: {
@@ -57,13 +71,13 @@ export function useResignationApproval() {
         [refresh]
     );
 
-    const approveRequest = useCallback(
+    const acknowledgeRequest = useCallback(
         (id: number, remarks: string): Promise<string> => reviewRequest(id, "approved", remarks),
         [reviewRequest]
     );
 
-    const rejectRequest = useCallback(
-        (id: number, remarks: string): Promise<string> => reviewRequest(id, "rejected", remarks),
+    const withdrawRequest = useCallback(
+        (id: number, remarks: string): Promise<string> => reviewRequest(id, "withdrawn", remarks),
         [reviewRequest]
     );
 
@@ -71,8 +85,10 @@ export function useResignationApproval() {
         requests,
         isLoading,
         error,
+        includeInactive,
         refresh,
-        approveRequest,
-        rejectRequest,
+        setIncludeInactive,
+        acknowledgeRequest,
+        withdrawRequest,
     };
 }

@@ -6,7 +6,7 @@ export type ResignationStatus = (typeof RESIGNATION_STATUSES)[number];
 
 export const RESIGNATION_STATUS_LABELS: Record<ResignationStatus, string> = {
     pending: "Pending",
-    approved: "Approved",
+    approved: "Acknowledged",
     rejected: "Rejected",
     withdrawn: "Withdrawn",
 };
@@ -47,7 +47,7 @@ export interface ResignationListResponse {
 
 export const ResignationReviewSchema = z.object({
     id: z.number(),
-    status: z.enum(["approved", "rejected"]),
+    status: z.enum(["approved", "withdrawn"]),
     remarks: z.string().trim().min(1).max(REMARKS_MAX_LENGTH),
 });
 

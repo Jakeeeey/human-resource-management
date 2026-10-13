@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { resignationApprovalService } from "@/modules/human-resource-management/resignation/resignation-approval/services/ResignationApprovalService";
-import { ResignationReviewSchema } from "@/modules/human-resource-management/resignation/resignation-approval/types";
+import { resignationAcknowledgementService } from "@/modules/human-resource-management/resignation/resignation-acknowledgement/services/ResignationAcknowledgementService";
+import { ResignationReviewSchema } from "@/modules/human-resource-management/resignation/resignation-acknowledgement/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ function reviewerIdFromPayload(payload: Record<string, unknown>): number | null 
     return Number.isNaN(id) ? null : id;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
         const token = await getAuthToken();
         const payload = token ? decodeJwtPayload(token) : null;
@@ -45,11 +45,12 @@ export async function GET() {
                 { status: 401 }
             );
         }
-        const pending = await resignationApprovalService.fetchPending();
-        const data = pending.map((row) => ({
+        const includeInactive = new URL(req.url).searchParams.get("include_inactive") === "1";
+        const requests = await resignationAcknowledgementService.fetchRequests({ includeInactive });
+        const data = requests.map((row) => ({
             ...row,
             view_file_url: row.attachment_uuid
-                ? `/api/hrm/resignation/resignation-approval/${row.id}/file`
+                ? `/api/hrm/resignation/resignation-acknowledgement/${row.id}/file`
                 : null,
         }));
         return NextResponse.json({
@@ -57,7 +58,7 @@ export async function GET() {
             total: data.length,
         });
     } catch (error) {
-        console.error("GET resignation-approval error:", error);
+        console.error("GET resignation-acknowledgement error:", error);
         return NextResponse.json(
             { error: "Failed to fetch resignation requests" },
             { status: 500 }
@@ -90,7 +91,7 @@ export async function PATCH(req: NextRequest) {
                 { status: 400 }
             );
         }
-        await resignationApprovalService.review({
+        await resignationAcknowledgementService.review({
             id: parsed.data.id,
             status: parsed.data.status,
             remarks: parsed.data.remarks,
@@ -98,10 +99,12 @@ export async function PATCH(req: NextRequest) {
         });
         return NextResponse.json({
             success: true,
-            message: `Resignation ${parsed.data.status} successfully`,
+            message: parsed.data.status === "approved"
+                ? "Resignation acknowledged successfully"
+                : "Resignation withdrawn successfully",
         });
     } catch (error) {
-        console.error("PATCH resignation-approval error:", error);
+        console.error("PATCH resignation-acknowledgement error:", error);
         return NextResponse.json(
             { error: "Failed to update resignation request" },
             { status: 500 }

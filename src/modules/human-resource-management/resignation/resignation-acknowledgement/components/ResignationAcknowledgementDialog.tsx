@@ -14,24 +14,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { REMARKS_MAX_LENGTH } from "../types";
 
-interface ResignationApprovalDialogProps {
+interface ResignationAcknowledgementDialogProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirm: (remarks: string) => Promise<void>;
-    action: "approve" | "reject" | null;
+    action: "acknowledge" | "withdraw" | null;
     employeeName: string;
     isLoading?: boolean;
 }
 
-export function ResignationApprovalDialog({
+export function ResignationAcknowledgementDialog({
     isOpen,
     onClose,
     onConfirm,
     action,
     employeeName,
     isLoading = false,
-}: ResignationApprovalDialogProps) {
+}: ResignationAcknowledgementDialogProps) {
     const [remarks, setRemarks] = useState("");
+
+    const isAcknowledge = action === "acknowledge";
 
     const handleConfirm = async (): Promise<void> => {
         try {
@@ -52,12 +54,12 @@ export function ResignationApprovalDialog({
             <DialogContent className="sm:max-w-125">
                 <DialogHeader>
                     <DialogTitle>
-                        {action === "approve" ? "Approve" : "Reject"} Resignation Request
+                        {isAcknowledge ? "Acknowledge" : "Withdraw"} Resignation Request
                     </DialogTitle>
                     <DialogDescription>
-                        {action === "approve"
-                            ? `You are about to approve the resignation request for ${employeeName}.`
-                            : `You are about to reject the resignation request for ${employeeName}.`
+                        {isAcknowledge
+                            ? `You are about to acknowledge the resignation request for ${employeeName}. This records that the resignation notice has been received.`
+                            : `You are about to mark the resignation request for ${employeeName} as withdrawn. Use this when the employee decides to withdraw their resignation.`
                         }
                     </DialogDescription>
                 </DialogHeader>
@@ -92,9 +94,9 @@ export function ResignationApprovalDialog({
                         type="button"
                         onClick={handleConfirm}
                         disabled={isLoading || remarks.trim().length === 0}
-                        variant={action === "approve" ? "default" : "destructive"}
+                        variant={isAcknowledge ? "default" : "secondary"}
                     >
-                        {isLoading ? "Processing..." : action === "approve" ? "Approve" : "Reject"}
+                        {isLoading ? "Processing..." : isAcknowledge ? "Acknowledge" : "Withdraw"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

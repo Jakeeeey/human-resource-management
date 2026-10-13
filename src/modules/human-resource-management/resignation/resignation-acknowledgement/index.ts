@@ -1,5 +1,5 @@
-export { default } from "./ResignationApprovalModule";
-export { default as ResignationApprovalModule } from "./ResignationApprovalModule";
+export { default } from "./ResignationAcknowledgementModule";
+export { default as ResignationAcknowledgementModule } from "./ResignationAcknowledgementModule";
 export {
     REMARKS_MAX_LENGTH,
     RESIGNATION_STATUSES,

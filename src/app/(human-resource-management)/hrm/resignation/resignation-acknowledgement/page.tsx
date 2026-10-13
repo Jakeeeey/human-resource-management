@@ -12,7 +12,7 @@ import { NavUser } from "@/components/shared/app-sidebar/nav-user";
 
 import { cookies } from "next/headers";
 
-import ResignationApprovalModule from "@/modules/human-resource-management/resignation/resignation-approval";
+import ResignationAcknowledgementModule from "@/modules/human-resource-management/resignation/resignation-acknowledgement";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,7 +97,7 @@ export default async function Page() {
                                 <BreadcrumbSeparator className="hidden md:block shrink-0" />
                                 <BreadcrumbItem className="min-w-0 overflow-hidden">
                                     <BreadcrumbPage className="truncate max-w-[56vw] sm:max-w-[60vw] md:max-w-none">
-                                        Resignation Approval
+                                        Resignation Acknowledgement
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -111,7 +111,7 @@ export default async function Page() {
             </header>
 
             <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4">
-                <ResignationApprovalModule />
+                <ResignationAcknowledgementModule />
             </main>
         </div>
     );
