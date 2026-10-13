@@ -16,29 +16,31 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatDateOnly, formatPHT } from "../utils/time";
 import { RESIGNATION_STATUS_LABELS } from "../types";
 import type { ResignationRequestWithUser } from "../types";
-import { ResignationApprovalDialog } from "./ResignationApprovalDialog";
+import { ResignationAcknowledgementDialog } from "./ResignationAcknowledgementDialog";
 import { ResignationDetailDialog } from "./ResignationDetailDialog";
 
-interface ResignationApprovalTableProps {
+interface ResignationAcknowledgementTableProps {
     data: ResignationRequestWithUser[];
-    onApprove: (id: number, remarks: string) => Promise<void>;
-    onReject: (id: number, remarks: string) => Promise<void>;
+    onAcknowledge: (id: number, remarks: string) => Promise<void>;
+    onWithdraw: (id: number, remarks: string) => Promise<void>;
     onRetry: () => Promise<void>;
     isLoading?: boolean;
     error?: string | null;
+    includeInactive?: boolean;
 }
 
-export function ResignationApprovalTable({
+export function ResignationAcknowledgementTable({
     data,
-    onApprove,
-    onReject,
+    onAcknowledge,
+    onWithdraw,
     onRetry,
     isLoading = false,
     error = null,
-}: ResignationApprovalTableProps) {
+    includeInactive = false,
+}: ResignationAcknowledgementTableProps) {
     const [modalState, setModalState] = useState<{
         isOpen: boolean;
-        action: "approve" | "reject" | null;
+        action: "acknowledge" | "withdraw" | null;
         requestId: number | null;
         employeeName: string;
     }>({
@@ -65,7 +67,7 @@ export function ResignationApprovalTable({
     const displayedData = data.slice(startIndex, endIndex);
 
     const handleOpenModal = (
-        action: "approve" | "reject",
+        action: "acknowledge" | "withdraw",
         requestId: number,
         employeeName: string
     ) => {
@@ -106,10 +108,10 @@ export function ResignationApprovalTable({
         try {
             setProcessingId(modalState.requestId);
 
-            if (modalState.action === "approve") {
-                await onApprove(modalState.requestId, remarks);
+            if (modalState.action === "acknowledge") {
+                await onAcknowledge(modalState.requestId, remarks);
             } else {
-                await onReject(modalState.requestId, remarks);
+                await onWithdraw(modalState.requestId, remarks);
             }
 
             handleCloseModal();
@@ -146,7 +148,11 @@ export function ResignationApprovalTable({
     if (data.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-muted-foreground">No pending resignation requests found.</p>
+                <p className="text-muted-foreground">
+                    {includeInactive
+                        ? "No resignation requests found."
+                        : "No active resignation requests found."}
+                </p>
             </div>
         );
     }
@@ -159,7 +165,7 @@ export function ResignationApprovalTable({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Employee</TableHead>
-                                <TableHead>Resignation Date</TableHead>
+                                <TableHead>Effectivity Date</TableHead>
                                 <TableHead>Filed Date</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Action</TableHead>
@@ -200,26 +206,30 @@ export function ResignationApprovalTable({
                                                 >
                                                     View
                                                 </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="default"
-                                                    onClick={() =>
-                                                        handleOpenModal("approve", request.id, fullName)
-                                                    }
-                                                    disabled={isProcessing}
-                                                >
-                                                    Approve
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    onClick={() =>
-                                                        handleOpenModal("reject", request.id, fullName)
-                                                    }
-                                                    disabled={isProcessing}
-                                                >
-                                                    Reject
-                                                </Button>
+                                                {request.status === "pending" && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="default"
+                                                        onClick={() =>
+                                                            handleOpenModal("acknowledge", request.id, fullName)
+                                                        }
+                                                        disabled={isProcessing}
+                                                    >
+                                                        Acknowledge
+                                                    </Button>
+                                                )}
+                                                {request.status === "approved" && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="secondary"
+                                                        onClick={() =>
+                                                            handleOpenModal("withdraw", request.id, fullName)
+                                                        }
+                                                        disabled={isProcessing}
+                                                    >
+                                                        Withdraw
+                                                    </Button>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -270,7 +280,7 @@ export function ResignationApprovalTable({
                 data={viewModalState.data}
             />
 
-            <ResignationApprovalDialog
+            <ResignationAcknowledgementDialog
                 isOpen={modalState.isOpen}
                 onClose={handleCloseModal}
                 onConfirm={handleConfirm}

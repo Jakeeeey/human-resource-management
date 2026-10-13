@@ -27,7 +27,6 @@ import { type ClearanceForm, type ClearanceFormRenderModel } from "../types";
 import { useCompanyOptions } from "../hooks/useCompanyOptions";
 import { companyLogoDataUrl, fetchEmployeeCompany, pickDefaultCompany, pickEmployeeCompany } from "../../utils/company";
 import { phToday } from "../../utils/time";
-import { freezeApprovedFormPdf } from "../utils/approvedPdfFreeze";
 import {
     buildClearancePdf,
     type ClearancePrintEntry,
@@ -82,11 +81,7 @@ export function ClearanceFormPrintDialog({
     const [savingCompany, setSavingCompany] = useState(false);
     const [companySaveError, setCompanySaveError] = useState<string | null>(null);
     const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(undefined);
-    const [freezeState, setFreezeState] = useState<"idle" | "freezing" | "done" | "error">("idle");
-    const [freezeError, setFreezeError] = useState<string | null>(null);
     const urlRef = useRef<string | null>(null);
-    const freezeKeyRef = useRef<string | null>(null);
-    const previewBlobRef = useRef<Blob | null>(null);
     const printingRef = useRef(false);
     const printingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { options: companies, isLoading: companiesLoading, error: companiesError } = useCompanyOptions();
@@ -107,8 +102,6 @@ export function ClearanceFormPrintDialog({
             }
             setPreviewUrl(null);
             setModel(null);
-            setFreezeError(null);
-            previewBlobRef.current = null;
             return;
         }
         setDateValue(phToday());
@@ -196,7 +189,6 @@ export function ClearanceFormPrintDialog({
             urlRef.current = null;
         }
         setPreviewUrl(null);
-        previewBlobRef.current = null;
         if (!model) return;
         setBuilding(true);
         setError(null);
@@ -221,7 +213,6 @@ export function ClearanceFormPrintDialog({
             });
             const url = URL.createObjectURL(blob);
             urlRef.current = url;
-            previewBlobRef.current = blob;
             setPreviewUrl(url);
             const stamp = phToday();
             setFileName(`Clearance - ${toFileName(model.employeeName)} - ${stamp}.pdf`);
@@ -231,30 +222,6 @@ export function ClearanceFormPrintDialog({
             setBuilding(false);
         }
     }, [open, model, selectedCompany, letterheadLogo]);
-
-    useEffect(() => {
-        if (!open || !form || !isApproved || form.pdf_file) return;
-        if (form.ref_no === null || model === null || model.refNo !== form.ref_no) return;
-        if (!previewUrl || previewBlobRef.current === null) return;
-        const key = `${form.id}:${form.ref_no}`;
-        if (freezeKeyRef.current === key || freezeState !== "idle") return;
-        freezeKeyRef.current = key;
-        setFreezeState("freezing");
-        setFreezeError(null);
-        const blob = previewBlobRef.current;
-        const uploadName = fileName === "" ? `Clearance Form - ${form.ref_no}.pdf` : fileName;
-        (async () => {
-            try {
-                const bytes = new Uint8Array(await blob.arrayBuffer());
-                await freezeApprovedFormPdf({ documentId: form.id, bytes, fileName: uploadName });
-                setFreezeState("done");
-            } catch {
-                freezeKeyRef.current = null;
-                setFreezeState("error");
-                setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
-            }
-        })();
-    }, [open, form, isApproved, model, previewUrl, fileName, freezeState]);
 
     useEffect(() => {
         return () => {
@@ -431,19 +398,6 @@ export function ClearanceFormPrintDialog({
                                     disabled={isApproved}
                                 />
                             </div>
-                            {freezeState === "freezing" && (
-                                <p className="text-xs text-muted-foreground sm:col-span-2">
-                                    Storing the approved PDF to the 201 file…
-                                </p>
-                            )}
-                            {freezeState === "done" && (
-                                <p className="text-xs text-muted-foreground sm:col-span-2">
-                                    Approved PDF stored to the 201 file.
-                                </p>
-                            )}
-                            {freezeError && (
-                                <p className="text-xs text-destructive sm:col-span-2">{freezeError}</p>
-                            )}
                         </div>
                         {(error ?? modelError) && (
                             <Alert variant="destructive" className="bg-card">

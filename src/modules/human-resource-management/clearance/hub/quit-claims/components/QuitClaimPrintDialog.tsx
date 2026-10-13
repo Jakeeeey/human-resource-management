@@ -18,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import type { CompanyOption } from "../../utils/company";
 import { companyLogoDataUrl, fetchEmployeeCompany, pickEmployeeCompany } from "../../utils/company";
 import { buildQuitClaimPdf, type QuitClaimCompany } from "../utils/quitClaimPrintPdf";
-import { freezeApprovedQuitClaimPdf } from "../utils/approvedPdfFreeze";
 import { phToday } from "../../utils/time";
 import { OptionCombobox, type ClearanceOption } from "../../components/OptionCombobox";
 import {
@@ -85,11 +84,7 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
     const [fileName, setFileName] = useState<string>("");
     const [building, setBuilding] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [freezeState, setFreezeState] = useState<"idle" | "freezing" | "done" | "error">("idle");
-    const [freezeError, setFreezeError] = useState<string | null>(null);
     const urlRef = useRef<string | null>(null);
-    const freezeKeyRef = useRef<string | null>(null);
-    const pdfBytesRef = useRef<Uint8Array | null>(null);
     const printingRef = useRef(false);
     const printingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const viewUrl = previewUrl ? toFitWidthUrl(previewUrl) : null;
@@ -111,9 +106,6 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
         setCompany(initialCompany);
         setCompanyOptions(undefined);
         setEmployeeCompanyId(undefined);
-        setFreezeState("idle");
-        setFreezeError(null);
-        freezeKeyRef.current = null;
         (async () => {
             try {
                 const rows = await loadCompanyOptions();
@@ -157,8 +149,6 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
                 urlRef.current = null;
             }
             setPreviewUrl(null);
-            setFreezeError(null);
-            pdfBytesRef.current = null;
             return;
         }
         if (!letterheadReady) {
@@ -188,7 +178,6 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
                 }
                 const url = URL.createObjectURL(blob);
                 urlRef.current = url;
-                pdfBytesRef.current = pdfBytes;
                 setPreviewUrl(url);
                 const stamp = phToday();
                 setFileName(`Quit Claim - ${toFileName(values.identity.name)} - ${stamp}.pdf`);
@@ -206,29 +195,6 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
             cancelled = true;
         };
     }, [open, quitclaim, company, letterheadReady]);
-
-    useEffect(() => {
-        if (!open || quitclaim === null || quitclaim.status !== "approved" || quitclaim.pdf_file) return;
-        if (!letterheadReady || company === null) return;
-        if (previewUrl === null || pdfBytesRef.current === null) return;
-        const key = `${quitclaim.id}:${quitclaim.ref_no ?? ""}`;
-        if (freezeKeyRef.current === key || freezeState !== "idle") return;
-        freezeKeyRef.current = key;
-        setFreezeState("freezing");
-        setFreezeError(null);
-        const bytes = pdfBytesRef.current;
-        const uploadName = fileName === "" ? `Quit Claim - ${quitclaim.ref_no ?? quitclaim.id}.pdf` : fileName;
-        (async () => {
-            try {
-                await freezeApprovedQuitClaimPdf({ documentId: quitclaim.id, bytes, fileName: uploadName });
-                setFreezeState("done");
-            } catch {
-                freezeKeyRef.current = null;
-                setFreezeState("error");
-                setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
-            }
-        })();
-    }, [open, quitclaim, previewUrl, fileName, freezeState, letterheadReady, company]);
 
     useEffect(() => {
         return () => {
@@ -348,19 +314,6 @@ export function QuitClaimPrintDialog({ quitclaim, initialCompany, open, onOpenCh
                                 <AlertTitle>Could not build the PDF.</AlertTitle>
                                 <AlertDescription>{error}</AlertDescription>
                             </Alert>
-                        )}
-                        {freezeState === "freezing" && (
-                            <p className="text-xs text-muted-foreground">
-                                Storing the approved PDF to the 201 file…
-                            </p>
-                        )}
-                        {freezeState === "done" && (
-                            <p className="text-xs text-muted-foreground">
-                                Approved PDF stored to the 201 file.
-                            </p>
-                        )}
-                        {freezeError && (
-                            <p className="text-xs text-destructive">{freezeError}</p>
                         )}
                         {building || !letterheadReady ? (
                             <div className="flex items-center justify-center gap-3 rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">

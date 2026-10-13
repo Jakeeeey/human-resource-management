@@ -114,14 +114,14 @@ export function ResignationFilingForm() {
                     <FileText className="h-5 w-5" />
                     File a Resignation
                 </CardTitle>
-                <CardDescription>Choose your resignation date, state your reason, and optionally attach a supporting document.</CardDescription>
+                <CardDescription>Choose your effectivity date, state your reason, and optionally attach a supporting document.</CardDescription>
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="max-w-[16rem] space-y-2">
                             <Label htmlFor="resignation-date">
-                                Resignation date <span className="text-destructive">*</span>
+                                Effectivity Date <span className="text-destructive">*</span>
                             </Label>
                             <Input
                                 id="resignation-date"

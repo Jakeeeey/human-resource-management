@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import {
     Popover,
@@ -22,39 +24,47 @@ import { CalendarIcon, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPHT } from "./utils/time";
 import {
-    ResignationApprovalProvider,
-    useResignationApprovalContext,
-} from "./providers/ResignationApprovalProvider";
-import { ResignationApprovalTable } from "./components/ResignationApprovalTable";
+    ResignationAcknowledgementProvider,
+    useResignationAcknowledgementContext,
+} from "./providers/ResignationAcknowledgementProvider";
+import { ResignationAcknowledgementTable } from "./components/ResignationAcknowledgementTable";
 
-function ResignationApprovalContent() {
-    const { requests, isLoading, error, refresh, approveRequest, rejectRequest } =
-        useResignationApprovalContext();
+function ResignationAcknowledgementContent() {
+    const {
+        requests,
+        isLoading,
+        error,
+        refresh,
+        acknowledgeRequest,
+        withdrawRequest,
+        includeInactive,
+        setIncludeInactive,
+    } = useResignationAcknowledgementContext();
 
     const [searchQuery, setSearchQuery] = useState("");
     const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
     const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
     const [nameFilter, setNameFilter] = useState<string | null>(null);
 
-    const handleApprove = async (id: number, remarks: string) => {
+    const handleAcknowledge = async (id: number, remarks: string) => {
         try {
-            const message = await approveRequest(id, remarks);
+            const message = await acknowledgeRequest(id, remarks);
             toast.success(message);
         } catch (err) {
             const errorMessage =
-                err instanceof Error ? err.message : "Failed to approve resignation request";
+                err instanceof Error ? err.message : "Failed to acknowledge resignation request";
             toast.error(errorMessage);
             throw err;
         }
     };
 
-    const handleReject = async (id: number, remarks: string) => {
+    const handleWithdraw = async (id: number, remarks: string) => {
         try {
-            const message = await rejectRequest(id, remarks);
+            const message = await withdrawRequest(id, remarks);
             toast.success(message);
         } catch (err) {
             const errorMessage =
-                err instanceof Error ? err.message : "Failed to reject resignation request";
+                err instanceof Error ? err.message : "Failed to withdraw resignation request";
             toast.error(errorMessage);
             throw err;
         }
@@ -138,10 +148,10 @@ function ResignationApprovalContent() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">
-                        Resignation Approval
+                        Resignation Acknowledgement
                     </h1>
                     <p className="text-muted-foreground">
-                        Review pending resignation requests
+                        Acknowledge and track resignation notices
                     </p>
                 </div>
                 <Button
@@ -251,6 +261,17 @@ function ResignationApprovalContent() {
                                 Clear
                             </Button>
                         )}
+
+                        <div className="flex items-center gap-2">
+                            <Switch
+                                id="include-inactive"
+                                checked={includeInactive}
+                                onCheckedChange={setIncludeInactive}
+                            />
+                            <Label htmlFor="include-inactive">
+                                Show non-active resignations
+                            </Label>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -263,22 +284,23 @@ function ResignationApprovalContent() {
                 </p>
             </div>
 
-            <ResignationApprovalTable
+            <ResignationAcknowledgementTable
                 data={filteredRequests}
-                onApprove={handleApprove}
-                onReject={handleReject}
+                onAcknowledge={handleAcknowledge}
+                onWithdraw={handleWithdraw}
                 onRetry={handleRetry}
                 isLoading={isLoading}
                 error={error}
+                includeInactive={includeInactive}
             />
         </div>
     );
 }
 
-export default function ResignationApprovalModule() {
+export default function ResignationAcknowledgementModule() {
     return (
-        <ResignationApprovalProvider>
-            <ResignationApprovalContent />
-        </ResignationApprovalProvider>
+        <ResignationAcknowledgementProvider>
+            <ResignationAcknowledgementContent />
+        </ResignationAcknowledgementProvider>
     );
 }

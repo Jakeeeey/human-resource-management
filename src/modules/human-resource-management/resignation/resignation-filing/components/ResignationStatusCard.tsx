@@ -29,7 +29,7 @@ export function ResignationStatusCard({ filing, onPreview, onWithdraw }: Resigna
         <Card>
             <CardHeader className="space-y-1 pb-3">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold">Resignation date: {formatDateOnly(filing.resignation_date)}</span>
+                    <span className="text-sm font-semibold">Effectivity Date: {formatDateOnly(filing.resignation_date)}</span>
                     <Badge variant="outline" className={STATUS_BADGE_STYLES[filing.status]}>
                         {RESIGNATION_STATUS_LABELS[filing.status]}
                     </Badge>

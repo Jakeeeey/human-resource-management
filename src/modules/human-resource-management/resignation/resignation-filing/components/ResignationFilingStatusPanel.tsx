@@ -30,7 +30,7 @@ function eligibilityDetail(eligibility: ResignationEligibility | null): string {
         return "You already have a pending resignation filing under review.";
     }
     if (eligibility.reason === "approved") {
-        return "Your resignation has already been approved, so you cannot file again.";
+        return "Your resignation has already been acknowledged, so you cannot file again.";
     }
     if (eligibility.reason === "cooling_down") {
         if (eligibility.nextAllowedAt) {
@@ -42,9 +42,9 @@ function eligibilityDetail(eligibility: ResignationEligibility | null): string {
 }
 
 const PROCESS_STEPS: ReadonlyArray<{ title: string; detail: string }> = [
-    { title: "Submit", detail: "Send your resignation with its effective date." },
-    { title: "HR review", detail: "HR reviews the filing and any attachment." },
-    { title: "Decision", detail: "You are notified once it is approved or rejected." },
+    { title: "Submit", detail: "Send your resignation with its effectivity date." },
+    { title: "HR acknowledgement", detail: "HR records that your resignation notice was received." },
+    { title: "Next steps", detail: "You are notified once HR acknowledges your filing." },
 ];
 
 export function ResignationFilingStatusPanel({ eligibility }: ResignationFilingStatusPanelProps) {
