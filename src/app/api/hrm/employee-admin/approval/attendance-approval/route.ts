@@ -277,17 +277,25 @@ export async function GET(req: NextRequest) {
     ]));
 
     const userIdsFilter = allRelevantUserIds.length > 0 ? `filter[user_id][_in]=${allRelevantUserIds.join(",")}` : "";
-    const approvalFilter = allRelevantUserIds.length > 0
-      ? (isDailyApproval
-          ? `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&filter[date_schedule][_eq]=${targetDate}&limit=1000`
-          : `filter[employee_id][_in]=${allRelevantUserIds.join(",")}&limit=1000`)
-      : (isDailyApproval ? `filter[date_schedule][_eq]=${targetDate}&limit=1000` : `limit=1000`);
+    const filterDateGte = isDailyApproval ? targetDate : startDate;
+    const filterDateLte = isDailyApproval ? targetDate : endDate;
+
+    const approvalFilterParts: string[] = [];
+    if (allRelevantUserIds.length > 0) {
+      approvalFilterParts.push(`filter[employee_id][_in]=${allRelevantUserIds.join(",")}`);
+    }
+    if (isDailyApproval) {
+      if (targetDate) approvalFilterParts.push(`filter[date_schedule][_eq]=${targetDate}`);
+    } else {
+      if (filterDateGte) approvalFilterParts.push(`filter[date_schedule][_gte]=${filterDateGte}`);
+      if (filterDateLte) approvalFilterParts.push(`filter[date_schedule][_lte]=${filterDateLte}`);
+    }
+    approvalFilterParts.push("limit=-1&sort=approval_id");
+    const approvalFilter = approvalFilterParts.join("&");
 
     let otFilter = userIdsFilter;
     let utFilter = userIdsFilter;
     let leaveFilter = userIdsFilter;
-    const filterDateGte = isDailyApproval ? targetDate : startDate;
-    const filterDateLte = isDailyApproval ? targetDate : endDate;
 
     if (filterDateGte && filterDateLte) {
       otFilter = `${userIdsFilter ? userIdsFilter + "&" : ""}filter[request_date][_gte]=${filterDateGte}&filter[request_date][_lte]=${filterDateLte}`;
@@ -343,7 +351,8 @@ export async function GET(req: NextRequest) {
 
     const approvalsMap = new Map<string, AttendanceApprovalRecord>();
     approvalsList.forEach((app: AttendanceApprovalRecord) => {
-      const key = `${app.employee_id}_${app.date_schedule.split('T')[0]}`;
+      const datePart = String(app.date_schedule).split('T')[0].split(' ')[0];
+      const key = `${app.employee_id}_${datePart}`;
       approvalsMap.set(key, app);
     });
 
@@ -567,7 +576,25 @@ export async function GET(req: NextRequest) {
           // Cap late to 240 (half day) unless exempt via flexible schedule on department schedule
           late_minutes = isExemptFromLate ? 0 : 240;
           work_minutes = 480;
-          overtime_minutes = 0;
+
+          const dayKey = log.log_date.split('T')[0];
+          const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
+          const isOtApproved = otReq && String(otReq.status || "").toLowerCase() === "approved";
+
+          if (isOtApproved) {
+            let otApprovedMins = Number(otReq.duration_minutes ?? 0);
+            if (otApprovedMins <= 0 && otReq.ot_from && otReq.ot_to) {
+              const otStart = timeToDate(log.log_date, otReq.ot_from);
+              let otEnd = timeToDate(log.log_date, otReq.ot_to);
+              if (otEnd < otStart) {
+                otEnd = new Date(otEnd.getTime() + 24 * 60 * 60 * 1000);
+              }
+              otApprovedMins = Math.floor((otEnd.getTime() - otStart.getTime()) / 60000);
+            }
+            overtime_minutes = otApprovedMins > 0 ? otApprovedMins : 0;
+          } else {
+            overtime_minutes = 0;
+          }
 
           if (isExemptFromLate) {
             // Flexible schedule employees are exempt from department schedule undertime
@@ -610,24 +637,28 @@ export async function GET(req: NextRequest) {
               undertime_minutes = 0;
             }
 
-            // Overtime: ONLY calculate if actualOut is after schedOut AND has approved overtime_request
+            // Overtime: based on approved overtime_request duration and actual punch out
             const dayKey = log.log_date.split('T')[0];
             const otReq = otRequestsMap.get(`${log.user_id}_${dayKey}`);
             const isOtApproved = otReq && String(otReq.status || "").toLowerCase() === "approved";
 
-            if (actualOut > schedOut && isOtApproved) {
-              const excessOut = Math.floor((actualOut.getTime() - schedOut.getTime()) / 60000);
-              let otDurationCap = Number(otReq.duration_minutes ?? 0);
-              if (otDurationCap <= 0 && otReq.ot_from && otReq.ot_to) {
-                const otStart = timeToDate(log.log_date, otReq.ot_from);
+            if (isOtApproved && actualOut) {
+              let otRequestedMins = Number(otReq.duration_minutes ?? 0);
+              const otStartTime = otReq.ot_from ? timeToDate(log.log_date, otReq.ot_from) : schedOut;
+              if (otRequestedMins <= 0 && otReq.ot_from && otReq.ot_to) {
                 let otEnd = timeToDate(log.log_date, otReq.ot_to);
-                if (otEnd < otStart) {
+                if (otEnd < otStartTime) {
                   otEnd = new Date(otEnd.getTime() + 24 * 60 * 60 * 1000);
                 }
-                otDurationCap = Math.floor((otEnd.getTime() - otStart.getTime()) / 60000);
+                otRequestedMins = Math.floor((otEnd.getTime() - otStartTime.getTime()) / 60000);
               }
 
-              overtime_minutes = otDurationCap > 0 ? Math.min(excessOut, otDurationCap) : excessOut;
+              if (otRequestedMins > 0 && actualOut > otStartTime) {
+                const actualWorkedOtMins = Math.floor((actualOut.getTime() - otStartTime.getTime()) / 60000);
+                overtime_minutes = Math.max(0, Math.min(otRequestedMins, actualWorkedOtMins));
+              } else {
+                overtime_minutes = 0;
+              }
             } else {
               overtime_minutes = 0;
             }
@@ -643,26 +674,77 @@ export async function GET(req: NextRequest) {
             } else {
               undertime_minutes = noTimeOutUndertimePenalty;
             }
+
+            // No time out punch means no approved overtime can be validated
             overtime_minutes = 0;
           }
         }
       }
 
+      const logDayKey = log.log_date.split('T')[0];
+      const logOtReq = otRequestsMap.get(`${log.user_id}_${logDayKey}`);
+      const logUtReq = utRequestsMap.get(`${log.user_id}_${logDayKey}`);
+      const logLeaveReq = getMatchingLeave(log.user_id, logDayKey);
+
+      const isOtApproved = logOtReq && String(logOtReq.status || "").toLowerCase() === "approved";
+      let otApprovedMins = 0;
+      let otRequestedDuration = 0;
+      if (isOtApproved) {
+        otRequestedDuration = Number(logOtReq.duration_minutes ?? 0);
+        const otStartTime = logOtReq.ot_from
+          ? timeToDate(log.log_date, logOtReq.ot_from)
+          : (schedule?.time_out ? timeToDate(log.log_date, schedule.time_out) : null);
+
+        if (otRequestedDuration <= 0 && logOtReq.ot_from && logOtReq.ot_to) {
+          const otStart = timeToDate(log.log_date, logOtReq.ot_from);
+          let otEnd = timeToDate(log.log_date, logOtReq.ot_to);
+          if (otEnd < otStart) {
+            otEnd = new Date(otEnd.getTime() + 24 * 60 * 60 * 1000);
+          }
+          otRequestedDuration = Math.floor((otEnd.getTime() - otStart.getTime()) / 60000);
+        }
+
+        if (otRequestedDuration > 0 && log.time_out && otStartTime) {
+          let actualOut = parseLocalISO(log.time_out);
+          if (log.time_in) {
+            const actualIn = parseLocalISO(log.time_in);
+            if (actualOut < actualIn) {
+              actualOut = new Date(actualOut.getTime() + 24 * 60 * 60 * 1000);
+            }
+          } else if (actualOut < otStartTime) {
+            const diffHours = (otStartTime.getTime() - actualOut.getTime()) / 3600000;
+            if (diffHours > 12) {
+              actualOut = new Date(actualOut.getTime() + 24 * 60 * 60 * 1000);
+            }
+          }
+
+          if (actualOut > otStartTime) {
+            const actualWorkedOtMins = Math.floor((actualOut.getTime() - otStartTime.getTime()) / 60000);
+            otApprovedMins = Math.max(0, Math.min(otRequestedDuration, actualWorkedOtMins));
+          }
+        }
+      }
+
+      // Overtime is strictly based on approved overtime request and actual time out
+      overtime_minutes = isOtApproved && otApprovedMins > 0 ? otApprovedMins : 0;
+
       // 3. OVERRIDE with manual adjustments if they exist in attendance_approval
-      const approvalKey = `${log.user_id}_${log.log_date.split('T')[0]}`;
+      const approvalDatePart = String(log.log_date).split('T')[0].split(' ')[0];
+      const approvalKey = `${log.user_id}_${approvalDatePart}`;
       const manualAdjustments = approvalsMap.get(approvalKey);
 
       if (manualAdjustments) {
-        const isStaleManualRecord =
-          log.approve_status === "pending" &&
-          manualAdjustments.work_minutes < work_minutes &&
-          !manualAdjustments.remarks;
-
-        if (!isStaleManualRecord) {
-          work_minutes = manualAdjustments.work_minutes ?? work_minutes;
-          late_minutes = manualAdjustments.late_minutes ?? late_minutes;
-          undertime_minutes = manualAdjustments.undertime_minutes ?? undertime_minutes;
-          overtime_minutes = manualAdjustments.overtime_minutes ?? overtime_minutes;
+        work_minutes = manualAdjustments.work_minutes ?? work_minutes;
+        late_minutes = manualAdjustments.late_minutes ?? late_minutes;
+        undertime_minutes = manualAdjustments.undertime_minutes ?? undertime_minutes;
+        if (manualAdjustments.overtime_minutes !== undefined && manualAdjustments.overtime_minutes !== null) {
+          // If approved OT request exists, cap manual adjustment at requested/computed overtime
+          const cap = otRequestedDuration > 0 ? otRequestedDuration : otApprovedMins;
+          overtime_minutes = cap > 0
+            ? Math.min(manualAdjustments.overtime_minutes, cap)
+            : manualAdjustments.overtime_minutes;
+        } else {
+          overtime_minutes = isOtApproved && otApprovedMins > 0 ? otApprovedMins : 0;
         }
       }
 
@@ -673,15 +755,10 @@ export async function GET(req: NextRequest) {
         computedStatus = "On Time";
       }
 
-      const logDayKey = log.log_date.split('T')[0];
-      const logOtReq = otRequestsMap.get(`${log.user_id}_${logDayKey}`);
-      const logUtReq = utRequestsMap.get(`${log.user_id}_${logDayKey}`);
-      const logLeaveReq = getMatchingLeave(log.user_id, logDayKey);
-
       const ot_request = logOtReq ? {
         id: logOtReq.overtime_id,
         status: logOtReq.status,
-        duration_minutes: logOtReq.duration_minutes ?? null,
+        duration_minutes: logOtReq.duration_minutes ? Number(logOtReq.duration_minutes) : (otApprovedMins > 0 ? otApprovedMins : null),
         purpose: logOtReq.purpose ?? null,
         remarks: logOtReq.remarks ?? null,
         sched_timeout: logOtReq.sched_timeout ?? null,
@@ -751,13 +828,33 @@ export async function GET(req: NextRequest) {
         const schedule = getEmployeeSchedule(emp.user_id, emp.user_department, targetDate);
         const dept = emp.user_department ? deptsMap.get(emp.user_department) : null;
 
-        const approvalKey = `${emp.user_id}_${targetDate.split('T')[0]}`;
+        const absentDayKey = targetDate.split('T')[0];
+        const absentDatePart = String(targetDate).split('T')[0].split(' ')[0];
+        const approvalKey = `${emp.user_id}_${absentDatePart}`;
         const manualAdjustments = approvalsMap.get(approvalKey);
+
+        const absentOtReq = otRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
+        const absentUtReq = utRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
+        const absentLeaveReq = getMatchingLeave(emp.user_id, absentDayKey);
+
+        const isAbsentOtApproved = absentOtReq && String(absentOtReq.status || "").toLowerCase() === "approved";
+        let absentOtApprovedMins = 0;
+        if (isAbsentOtApproved) {
+          absentOtApprovedMins = Number(absentOtReq.duration_minutes ?? 0);
+          if (absentOtApprovedMins <= 0 && absentOtReq.ot_from && absentOtReq.ot_to) {
+            const otStart = timeToDate(targetDate, absentOtReq.ot_from);
+            let otEnd = timeToDate(targetDate, absentOtReq.ot_to);
+            if (otEnd < otStart) {
+              otEnd = new Date(otEnd.getTime() + 24 * 60 * 60 * 1000);
+            }
+            absentOtApprovedMins = Math.floor((otEnd.getTime() - otStart.getTime()) / 60000);
+          }
+        }
 
         let work_minutes = 0;
         let late_minutes = 0;
         let undertime_minutes = 0;
-        let overtime_minutes = 0;
+        let overtime_minutes = isAbsentOtApproved && absentOtApprovedMins > 0 ? absentOtApprovedMins : 0;
         let derivedStatus = "pending";
         let statusRemarks = "Absent";
 
@@ -765,17 +862,14 @@ export async function GET(req: NextRequest) {
           work_minutes = manualAdjustments.work_minutes ?? 0;
           late_minutes = manualAdjustments.late_minutes ?? 0;
           undertime_minutes = manualAdjustments.undertime_minutes ?? 0;
-          overtime_minutes = manualAdjustments.overtime_minutes ?? 0;
+          overtime_minutes = (manualAdjustments.overtime_minutes && manualAdjustments.overtime_minutes > 0)
+            ? manualAdjustments.overtime_minutes
+            : (isAbsentOtApproved && absentOtApprovedMins > 0 ? absentOtApprovedMins : (manualAdjustments.overtime_minutes ?? 0));
           derivedStatus = manualAdjustments.status || "pending";
           statusRemarks = manualAdjustments.remarks || "Absent";
         }
 
         const isFlexible = isFlexibleScheduleUser(emp.is_flexible_schedule);
-
-        const absentDayKey = targetDate.split('T')[0];
-        const absentOtReq = otRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
-        const absentUtReq = utRequestsMap.get(`${emp.user_id}_${absentDayKey}`);
-        const absentLeaveReq = getMatchingLeave(emp.user_id, absentDayKey);
 
         if (absentLeaveReq && String(absentLeaveReq.status).toLowerCase() === "approved" && !manualAdjustments?.remarks) {
           statusRemarks = "Leave";
@@ -784,7 +878,7 @@ export async function GET(req: NextRequest) {
         const ot_request = absentOtReq ? {
           id: absentOtReq.overtime_id,
           status: absentOtReq.status,
-          duration_minutes: absentOtReq.duration_minutes ?? null,
+          duration_minutes: absentOtReq.duration_minutes ? Number(absentOtReq.duration_minutes) : (absentOtApprovedMins > 0 ? absentOtApprovedMins : null),
           purpose: absentOtReq.purpose ?? null,
           remarks: absentOtReq.remarks ?? null,
           sched_timeout: absentOtReq.sched_timeout ?? null,
@@ -981,6 +1075,24 @@ export async function PATCH(req: NextRequest) {
         status?: string;
       }
 
+      let resolvedOvertimeMinutes = overtime_minutes ?? 0;
+      if (resolvedOvertimeMinutes <= 0) {
+        const otRes = await directusFetch(
+          `/items/overtime_request?filter[user_id][_eq]=${employee_id}&filter[request_date][_eq]=${cleanDate}&filter[status][_eq]=approved&limit=1&fields=duration_minutes,ot_from,ot_to`
+        ).catch(() => ({ data: [] }));
+        const approvedOt = otRes.data?.[0];
+        if (approvedOt) {
+          let otMins = Number(approvedOt.duration_minutes ?? 0);
+          if (otMins <= 0 && approvedOt.ot_from && approvedOt.ot_to) {
+            const otStart = timeToDate(cleanDate, approvedOt.ot_from);
+            let otEnd = timeToDate(cleanDate, approvedOt.ot_to);
+            if (otEnd < otStart) otEnd = new Date(otEnd.getTime() + 24 * 60 * 60 * 1000);
+            otMins = Math.floor((otEnd.getTime() - otStart.getTime()) / 60000);
+          }
+          if (otMins > 0) resolvedOvertimeMinutes = otMins;
+        }
+      }
+
       const approvalData: ApprovalPOSTData = {
         employee_id,
         date_schedule: cleanDate,
@@ -989,7 +1101,7 @@ export async function PATCH(req: NextRequest) {
         work_minutes: work_minutes ?? 0,
         late_minutes: late_minutes ?? 0,
         undertime_minutes: undertime_minutes ?? 0,
-        overtime_minutes: overtime_minutes ?? 0,
+        overtime_minutes: resolvedOvertimeMinutes,
         remarks: remarks || "Absent",
       };
 

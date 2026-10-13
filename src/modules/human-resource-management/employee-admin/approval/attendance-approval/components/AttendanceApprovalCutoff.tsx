@@ -7,7 +7,6 @@ import {
   Users,
   Building2,
   ArrowRight,
-  X,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +14,9 @@ import {
   Database,
   Check,
   Eye,
-  EyeOff
+  EyeOff,
+  Timer,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +52,7 @@ import {
 } from "../providers/fetchProvider";
 import { AttendanceLogWithUser } from "../type";
 import { EmployeeSummaryTable, EmployeeSummary } from "./EmployeeSummaryTable";
+import { computeLogOvertimeMinutes, getLogRequestedOtMinutes } from "../utils/overtimeUtils";
 
 export function AttendanceApprovalCutoff() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -121,7 +123,17 @@ export function AttendanceApprovalCutoff() {
         departmentId: department,
         approvalStatus: showApproved ? "all" : "pending"
       });
-      setLogs(response.data || []);
+      const mappedLogs = (response.data || []).map(log => {
+        const isApprovedOt = Boolean(log.ot_request && String(log.ot_request.status).toLowerCase() === "approved");
+        if (isApprovedOt && log.ot_request) {
+          return {
+            ...log,
+            overtime_minutes: computeLogOvertimeMinutes(log),
+          };
+        }
+        return log;
+      });
+      setLogs(mappedLogs);
       toast.success("Logs loaded successfully");
     } catch {
       toast.error("Failed to load logs");
@@ -136,6 +148,14 @@ export function AttendanceApprovalCutoff() {
     ));
   };
 
+  const getEffectiveOvertimeMinutes = (log: AttendanceLogWithUser): number => {
+    const isApprovedOt = Boolean(log.ot_request && String(log.ot_request.status).toLowerCase() === "approved");
+    if (isApprovedOt && log.ot_request) {
+      return computeLogOvertimeMinutes(log);
+    }
+    return log.overtime_minutes || 0;
+  };
+
   const handleSaveRow = async (log: AttendanceLogWithUser) => {
     try {
       setIsProcessing(true);
@@ -148,7 +168,7 @@ export function AttendanceApprovalCutoff() {
         work_minutes: log.work_minutes,
         late_minutes: log.late_minutes,
         undertime_minutes: log.undertime_minutes,
-        overtime_minutes: log.overtime_minutes
+        overtime_minutes: getEffectiveOvertimeMinutes(log)
       });
       toast.success(`Saved changes for ${log.user_fname}`);
       // Refresh in background
@@ -233,7 +253,7 @@ export function AttendanceApprovalCutoff() {
         work_minutes: log.work_minutes,
         late_minutes: log.late_minutes,
         undertime_minutes: log.undertime_minutes,
-        overtime_minutes: log.overtime_minutes
+        overtime_minutes: getEffectiveOvertimeMinutes(log)
       }));
 
       await approveOrRejectAttendance(updates);
@@ -258,7 +278,7 @@ export function AttendanceApprovalCutoff() {
         work_minutes: log.work_minutes,
         late_minutes: log.late_minutes,
         undertime_minutes: log.undertime_minutes,
-        overtime_minutes: log.overtime_minutes
+        overtime_minutes: getEffectiveOvertimeMinutes(log)
       });
       toast.success("Approved successfully");
       loadLogs();
@@ -308,7 +328,7 @@ export function AttendanceApprovalCutoff() {
         work_minutes: log.work_minutes,
         late_minutes: log.late_minutes,
         undertime_minutes: log.undertime_minutes,
-        overtime_minutes: log.overtime_minutes
+        overtime_minutes: getEffectiveOvertimeMinutes(log)
       }));
 
       await approveOrRejectAttendance(updates);
@@ -343,7 +363,7 @@ export function AttendanceApprovalCutoff() {
         work_minutes: log.work_minutes,
         late_minutes: log.late_minutes,
         undertime_minutes: log.undertime_minutes,
-        overtime_minutes: log.overtime_minutes
+        overtime_minutes: getEffectiveOvertimeMinutes(log)
       }));
 
       await approveOrRejectAttendance(updates);
@@ -366,7 +386,7 @@ export function AttendanceApprovalCutoff() {
 
   // Group logs by employee
   const employeeSummaries = React.useMemo(() => {
-    const summaryMap = new Map<number, EmployeeSummary & { attendedDates: Set<string>; pendingLeaveIds: Set<number> }>();
+    const summaryMap = new Map<number, EmployeeSummary & { attendedDates: Set<string>; pendingLeaveIds: Set<number>; leaveDates: Set<string> }>();
     
     filteredLogs.forEach(log => {
       const isAbsent =
@@ -384,17 +404,37 @@ export function AttendanceApprovalCutoff() {
       const isLeavePending = log.leave_request?.status?.toLowerCase() === "pending";
       const leaveId = log.leave_request?.id;
 
+      const isApprovedLeave = Boolean(
+        (log.leave_request && String(log.leave_request.status).toLowerCase() === "approved") ||
+        (Boolean(log.status) && String(log.status).toLowerCase().includes("leave"))
+      );
+
+      const isApprovedOt = Boolean(
+        log.ot_request && String(log.ot_request.status).toLowerCase() === "approved"
+      );
+      const requestedOtMinutes = getLogRequestedOtMinutes(log);
+      const computedOtMinutes = computeLogOvertimeMinutes(log);
+      const approvedOtMinutes = isApprovedOt ? computedOtMinutes : 0;
+
       const existing = summaryMap.get(log.user_id);
       if (existing) {
         existing.total_work_minutes += log.work_minutes || 0;
         existing.total_late_minutes += log.late_minutes || 0;
         existing.total_undertime_minutes += log.undertime_minutes || 0;
-        existing.total_overtime_minutes += log.overtime_minutes || 0;
+        existing.total_overtime_minutes += approvedOtMinutes;
+        existing.total_requested_overtime_minutes = (existing.total_requested_overtime_minutes || 0) + requestedOtMinutes;
         if (isOtPending) existing.pending_ot_count = (existing.pending_ot_count || 0) + 1;
         if (isUtPending) existing.pending_ut_count = (existing.pending_ut_count || 0) + 1;
         if (isLeavePending && leaveId && !existing.pendingLeaveIds.has(leaveId)) {
           existing.pendingLeaveIds.add(leaveId);
           existing.pending_leave_count = existing.pendingLeaveIds.size;
+        }
+        if (isApprovedLeave) {
+          const dateKey = log.log_date ? log.log_date.split("T")[0] : "";
+          if (dateKey) {
+            existing.leaveDates.add(dateKey);
+            existing.total_leave_days = existing.leaveDates.size;
+          }
         }
         if (hasAttendance) {
           const dateKey = log.log_date ? log.log_date.split("T")[0] : `${existing.attendedDates.size + 1}`;
@@ -411,6 +451,11 @@ export function AttendanceApprovalCutoff() {
         if (isLeavePending && leaveId) {
           pendingLeaveIds.add(leaveId);
         }
+        const leaveDates = new Set<string>();
+        if (isApprovedLeave) {
+          const dateKey = log.log_date ? log.log_date.split("T")[0] : "";
+          if (dateKey) leaveDates.add(dateKey);
+        }
         summaryMap.set(log.user_id, {
           user_id: log.user_id,
           user_fname: log.user_fname,
@@ -419,10 +464,13 @@ export function AttendanceApprovalCutoff() {
           total_work_minutes: log.work_minutes || 0,
           total_late_minutes: log.late_minutes || 0,
           total_undertime_minutes: log.undertime_minutes || 0,
-          total_overtime_minutes: log.overtime_minutes || 0,
+          total_overtime_minutes: approvedOtMinutes,
+          total_requested_overtime_minutes: requestedOtMinutes,
           days_count: attendedDates.size,
           attendedDates,
           pendingLeaveIds,
+          leaveDates,
+          total_leave_days: leaveDates.size,
           pending_ot_count: isOtPending ? 1 : 0,
           pending_ut_count: isUtPending ? 1 : 0,
           pending_leave_count: pendingLeaveIds.size,
@@ -432,6 +480,18 @@ export function AttendanceApprovalCutoff() {
     
     return Array.from(summaryMap.values());
   }, [filteredLogs]);
+
+  const cutoffTotals = React.useMemo(() => {
+    let totalOt = 0;
+    let totalUt = 0;
+    let totalLeaves = 0;
+    employeeSummaries.forEach(s => {
+      totalOt += s.total_overtime_minutes || 0;
+      totalUt += s.total_undertime_minutes || 0;
+      totalLeaves += s.total_leave_days || 0;
+    });
+    return { totalOt, totalUt, totalLeaves };
+  }, [employeeSummaries]);
 
   const selectedEmployeeLogs = React.useMemo(() => {
     if (!selectedUserId) return [];
@@ -622,16 +682,38 @@ export function AttendanceApprovalCutoff() {
           />
         </div>
 
-        <div className="flex items-center gap-3 bg-background/50 px-4 py-2 rounded-xl border border-border/40 shadow-sm">
-          <div className="text-xs font-bold text-muted-foreground uppercase tracking-tighter">Cutoff Range</div>
-          <div className="flex items-center gap-2 text-sm font-mono font-bold text-primary whitespace-nowrap">
-            <span>{format(start, "MMM dd, yyyy")}</span>
-            <ArrowRight className="h-3 w-3 opacity-50" />
-            <span>{format(end, "MMM dd, yyyy")}</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          {(cutoffTotals.totalOt > 0 || cutoffTotals.totalUt > 0 || cutoffTotals.totalLeaves > 0) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {cutoffTotals.totalOt > 0 && (
+                <Badge variant="outline" className="text-xs font-bold px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 gap-1.5 shadow-xs whitespace-nowrap">
+                  <Timer className="h-3.5 w-3.5" />
+                  {cutoffTotals.totalOt}m Total OT
+                </Badge>
+              )}
+              {cutoffTotals.totalUt > 0 && (
+                <Badge variant="outline" className="text-xs font-bold px-2.5 py-1 bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 gap-1.5 shadow-xs whitespace-nowrap">
+                  <Clock className="h-3.5 w-3.5" />
+                  {cutoffTotals.totalUt}m Total UT
+                </Badge>
+              )}
+              {cutoffTotals.totalLeaves > 0 && (
+                <Badge variant="outline" className="text-xs font-bold px-2.5 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 gap-1.5 shadow-xs whitespace-nowrap">
+                  <CalendarIcon className="h-3.5 w-3.5" />
+                  {cutoffTotals.totalLeaves} {cutoffTotals.totalLeaves === 1 ? "Day" : "Days"} Leave
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 bg-background/50 px-4 py-2 rounded-xl border border-border/40 shadow-sm">
+            <div className="text-xs font-bold text-muted-foreground uppercase tracking-tighter">Cutoff Range</div>
+            <div className="flex items-center gap-2 text-sm font-mono font-bold text-primary whitespace-nowrap">
+              <span>{format(start, "MMM dd, yyyy")}</span>
+              <ArrowRight className="h-3 w-3 opacity-50" />
+              <span>{format(end, "MMM dd, yyyy")}</span>
+            </div>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md ml-2 hover:bg-red-50 hover:text-red-500">
-            <X className="h-3 w-3" />
-          </Button>
         </div>
       </div>
 
