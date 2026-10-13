@@ -6,7 +6,7 @@ export type ResignationStatus = (typeof RESIGNATION_STATUSES)[number];
 
 export const RESIGNATION_STATUS_LABELS: Record<ResignationStatus, string> = {
     pending: "Pending",
-    approved: "Approved",
+    approved: "Acknowledged",
     rejected: "Rejected",
     withdrawn: "Withdrawn",
 };

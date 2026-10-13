@@ -32,7 +32,7 @@ function eligibilityMessage(eligibility: ResignationEligibility): string {
         return "You already have a pending resignation filing under review.";
     }
     if (eligibility.reason === "approved") {
-        return "Your resignation has already been approved, so you cannot file again.";
+        return "Your resignation has already been acknowledged, so you cannot file again.";
     }
     if (eligibility.reason === "cooling_down") {
         if (eligibility.nextAllowedAt) {

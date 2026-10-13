@@ -39,7 +39,7 @@ type NavUserProps = {
         avatar?: string
     }
     /**
-     * Optional subsystem slug (e.g., "hrm", "scm"). 
+     * Optional subsystem slug (e.g., "hrm", "scm").
      * If not provided, it will be automatically detected from the URL.
      */
     subsystemSlug?: string
@@ -153,7 +153,7 @@ export function NavUser({ user, onLogout, subsystemSlug }: NavUserProps) {
                                 </Link>
                             </DropdownMenuItem>
 
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                                 className="cursor-pointer"
                                 onSelect={(e) => {
                                     e.preventDefault()
@@ -197,9 +197,9 @@ export function NavUser({ user, onLogout, subsystemSlug }: NavUserProps) {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
-            <ChangePasswordModal 
-                open={isPasswordModalOpen} 
-                onOpenChange={setIsPasswordModalOpen} 
+            <ChangePasswordModal
+                open={isPasswordModalOpen}
+                onOpenChange={setIsPasswordModalOpen}
             />
         </SidebarMenu>
     )

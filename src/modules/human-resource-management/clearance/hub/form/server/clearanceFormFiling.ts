@@ -113,6 +113,20 @@ async function readUserExists(userId: number): Promise<boolean> {
     return row !== null && toId(row.user_id) !== null;
 }
 
+async function deleteDirectusFileBestEffort(fileId: string): Promise<void> {
+    try {
+        if (fileId.trim() === "") return;
+        const base = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
+        if (base === "") return;
+        const token = process.env.DIRECTUS_STATIC_TOKEN;
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        await fetch(`${base}/files/${fileId}`, { method: "DELETE", headers, cache: "no-store" });
+    } catch {
+        return;
+    }
+}
+
 let listInFlight: Promise<number> | null = null;
 
 async function doEnsureClearanceDocsListId(): Promise<number> {
@@ -209,10 +223,14 @@ export async function fileClearanceFormPdf(
         const recordId = toId(filed.id);
         const filedListId = toId(filed.list_id);
         if (recordId !== null && filedListId !== null) {
+            const previousRef = toNullableText(filed.file_ref);
             await dFetch(`/items/employee_file_records/${recordId}`, {
                 method: "PATCH",
                 body: JSON.stringify({ file_ref: form.pdf_file, updated_at: now }),
             });
+            if (previousRef !== null && previousRef !== "" && previousRef !== form.pdf_file) {
+                await deleteDirectusFileBestEffort(previousRef);
+            }
             return { recordId, fileRef: form.pdf_file, listId: filedListId, alreadyFiled: true };
         }
     }
