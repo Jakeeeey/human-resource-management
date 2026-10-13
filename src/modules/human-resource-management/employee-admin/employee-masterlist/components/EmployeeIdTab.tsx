@@ -1,200 +1,372 @@
-import React, { useRef } from "react";
-import { User } from "../types";
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import Image from "next/image";
+import { Download } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { EmployeeIdCombobox } from "./employeeIdCombobox";
+import type { User } from "../types";
+import { EmployeeIdCardSide } from "./employeeIdCard";
+import {
+    EMPLOYEE_ID_IMAGE_PLACEHOLDER,
+    type EmployeeIdDoc,
+    employeeIdExportFilename,
+    parseEmployeeIdDoc,
+} from "./employeeIdTemplate";
+import { buildEmployeeIdValues } from "./employeeIdValues";
 
 interface EmployeeIdTabProps {
-  user: User;
+    readonly user: User;
+}
+
+type EmployeeIdStatus = "loading" | "unavailable" | "empty" | "corrupt" | "ready";
+
+type EmployeeIdResolvedKind = "empty" | "corrupt" | "ready";
+
+interface EmployeeIdOption {
+    readonly id: number;
+    readonly name: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readIdOptions(payload: unknown): EmployeeIdOption[] {
+    if (!isRecord(payload)) return [];
+    if (!Array.isArray(payload.data)) return [];
+    const options: EmployeeIdOption[] = [];
+    for (const entry of payload.data) {
+        if (!isRecord(entry)) continue;
+        if (entry.is_active === false || entry.is_active === 0) continue;
+        if (typeof entry.id !== "number" || typeof entry.name !== "string") continue;
+        options.push({ id: entry.id, name: entry.name });
+    }
+    return options;
 }
 
 export function EmployeeIdTab({ user }: EmployeeIdTabProps) {
-  const frontRef = useRef<HTMLDivElement>(null);
-  const backRef = useRef<HTMLDivElement>(null);
+    const frontRef = useRef<HTMLDivElement>(null);
+    const backRef = useRef<HTMLDivElement>(null);
+    const [status, setStatus] = useState<EmployeeIdStatus>("loading");
+    const [doc, setDoc] = useState<EmployeeIdDoc | null>(null);
+    const [resolvedDoc, setResolvedDoc] = useState<EmployeeIdDoc | null>(null);
+    const [resolvedKind, setResolvedKind] = useState<EmployeeIdResolvedKind>("empty");
+    const [templateName, setTemplateName] = useState<string>("");
+    const [resolvedName, setResolvedName] = useState<string>("");
+    const [values, setValues] = useState<Record<string, string>>({});
+    const [options, setOptions] = useState<EmployeeIdOption[]>([]);
+    const [overrideId, setOverrideId] = useState<string>("");
+    const [resolvedId, setResolvedId] = useState<string>("");
+    const [overrideBusy, setOverrideBusy] = useState<boolean>(false);
+    const [exporting, setExporting] = useState<"front" | "back" | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    const [reloadKey, setReloadKey] = useState<number>(0);
 
-  // Format Name
-  const formattedName = `${user.firstName} ${user.middleName ? user.middleName.charAt(0) + '. ' : ''}${user.lastName}`.toUpperCase();
-  const position = (user.position || "EMPLOYEE").toUpperCase();
+    useEffect(() => {
+        let cancelled = false;
+        async function load(): Promise<void> {
+            setStatus("loading");
+            setNotice(null);
+            setOverrideId("");
+            setResolvedId("");
+            let resolvedTemplateId = "";
+            let resolvedTemplateName = "";
+            try {
+                const res = await fetch(`/api/hrm/id-layout/resolve?user_id=${user.id}`);
+                if (!res.ok) throw new Error("resolve request failed");
+                const payload: unknown = await res.json();
+                if (!isRecord(payload)) throw new Error("resolve payload invalid");
+                const row = isRecord(payload.user) ? payload.user : {};
+                const company = isRecord(payload.company) ? payload.company : null;
+                if (!cancelled) setValues(buildEmployeeIdValues(user, row, company));
+                const template = payload.template;
+                if (template === null) {
+                    if (!cancelled) {
+                        setDoc(null);
+                        setResolvedDoc(null);
+                        setResolvedKind("empty");
+                        setTemplateName("");
+                        setResolvedName("");
+                        setStatus("empty");
+                    }
+                    return;
+                }
+                if (!isRecord(template)) throw new Error("template payload invalid");
+                const name = typeof template.name === "string" && template.name !== "" ? template.name : "ID template";
+                const templateId =
+                    typeof template.id === "number" || typeof template.id === "string" ? String(template.id) : "";
+                const parsed = parseEmployeeIdDoc(template.design_json);
+                if (parsed === null) {
+                    resolvedTemplateId = templateId;
+                    resolvedTemplateName = name;
+                    if (!cancelled) {
+                        setDoc(null);
+                        setResolvedDoc(null);
+                        setResolvedKind("corrupt");
+                        setTemplateName(name);
+                        setResolvedName(name);
+                        setResolvedId(templateId);
+                        setOverrideId(templateId);
+                        setStatus("corrupt");
+                    }
+                    return;
+                }
+                if (!cancelled) {
+                    resolvedTemplateId = templateId;
+                    resolvedTemplateName = name;
+                    setDoc(parsed);
+                    setResolvedDoc(parsed);
+                    setResolvedKind("ready");
+                    setTemplateName(name);
+                    setResolvedName(name);
+                    setResolvedId(templateId);
+                    setOverrideId(templateId);
+                    setStatus("ready");
+                }
+            } catch {
+                if (!cancelled) setStatus("unavailable");
+            }
+            try {
+                const listRes = await fetch("/api/hrm/id-layout/templates?page=1");
+                if (!listRes.ok) return;
+                const listPayload: unknown = await listRes.json();
+                if (cancelled) return;
+                const listed = readIdOptions(listPayload);
+                const resolvedNumeric = Number(resolvedTemplateId);
+                if (
+                    resolvedTemplateId !== "" &&
+                    Number.isInteger(resolvedNumeric) &&
+                    !listed.some((option) => option.id === resolvedNumeric)
+                ) {
+                    listed.unshift({
+                        id: resolvedNumeric,
+                        name: resolvedTemplateName !== "" ? resolvedTemplateName : "ID template",
+                    });
+                }
+                setOptions(listed);
+            } catch {
+                return;
+            }
+        }
+        void load();
+        return () => {
+            cancelled = true;
+        };
+    }, [user, reloadKey]);
 
-  // Address assembly - only City and Province as requested
-  const addressParts = [user.city, user.province].filter(Boolean);
-  const address = addressParts.length > 0 ? addressParts.join(", ").toUpperCase() : "N/A";
-
-  const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-  
-  const resolveImageUrl = (path?: string | null) => {
-    if (!path) return "";
-    if (path.startsWith("http") || path.startsWith("blob:")) return path;
-    if (isUUID(path)) {
-      return `/api/hrm/employee-admin/employee-master-list/assets/${path}`;
+    async function handleOverride(value: string): Promise<void> {
+        setOverrideId(value);
+        setNotice(null);
+        if (value !== "" && value === resolvedId) {
+            setDoc(resolvedDoc);
+            setTemplateName(resolvedName);
+            setStatus(resolvedKind);
+            return;
+        }
+        setOverrideBusy(true);
+        try {
+            const res = await fetch(`/api/hrm/id-layout/templates/${value}`);
+            if (!res.ok) throw new Error("template request failed");
+            const row: unknown = await res.json();
+            const design = isRecord(row) ? row.design_json : null;
+            const parsed = parseEmployeeIdDoc(design);
+            if (parsed === null) {
+                toast.error("That ID template could not be displayed.");
+                setNotice("That ID template could not be displayed.");
+                setOverrideId(resolvedId);
+                setDoc(resolvedDoc);
+                setTemplateName(resolvedName);
+                setStatus(resolvedKind);
+                return;
+            }
+            const name = isRecord(row) && typeof row.name === "string" && row.name !== "" ? row.name : "ID template";
+            setDoc(parsed);
+            setTemplateName(name);
+            setStatus("ready");
+        } catch {
+            toast.error("Could not load that ID template. Please try again.");
+            setNotice("Could not load that ID template. Please try again.");
+            setOverrideId(resolvedId);
+            setDoc(resolvedDoc);
+            setTemplateName(resolvedName);
+            setStatus(resolvedKind);
+        } finally {
+            setOverrideBusy(false);
+        }
     }
-    const base = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") || "";
-    return `${base}${path}`;
-  };
 
-  const imageUrl = resolveImageUrl(user.image);
-  const signatureUrl = resolveImageUrl(user.signature);
-
-  const idStyle: React.CSSProperties = {
-    width: "408px",
-    height: "648px",
-    position: "relative",
-    overflow: "hidden",
-    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-    borderRadius: "12px",
-    backgroundColor: "white",
-    flexShrink: 0,
-  };
-
-  const exportToPng = async (ref: React.RefObject<HTMLDivElement | null>, side: string) => {
-    if (!ref.current) return;
-    try {
-      const dataUrl = await toPng(ref.current, {
-        canvasWidth: 638,
-        canvasHeight: 1011,
-        style: {
-          transform: 'none',
-          boxShadow: 'none',
-          borderRadius: '0',
-        },
-      });
-      const link = document.createElement('a');
-      link.download = `ID-${side}-${user.firstName}-${user.lastName}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error('Export failed:', err);
+    async function exportSide(side: "front" | "back"): Promise<void> {
+        const target = side === "front" ? frontRef.current : backRef.current;
+        if (!target || !doc) return;
+        setExporting(side);
+        setNotice(null);
+        try {
+            const dataUrl = await toPng(target, {
+                pixelRatio: 2,
+                cacheBust: true,
+                imagePlaceholder: EMPLOYEE_ID_IMAGE_PLACEHOLDER,
+                style: {
+                    transform: "none",
+                    boxShadow: "none",
+                    borderRadius: "0",
+                },
+            });
+            const link = document.createElement("a");
+            link.download = employeeIdExportFilename(side, user.firstName, user.lastName);
+            link.href = dataUrl;
+            link.click();
+        } catch {
+            toast.error("ID export failed. Please try again.");
+            setNotice("ID export failed. Please try again.");
+        } finally {
+            setExporting(null);
+        }
     }
-  };
 
-  return (
-    <div className="flex flex-col gap-6 animate-in fade-in duration-300">
-      <div className="flex flex-col md:flex-row gap-8 justify-center items-start py-6 bg-muted/20 rounded-2xl min-h-[750px]">
-        
-        {/* FRONT SIDE */}
-        <div className="flex flex-col items-center gap-6">
-          <div className="relative group" style={{ perspective: "1000px" }}>
-            <div className="text-center mb-2 text-sm font-semibold text-muted-foreground uppercase tracking-widest">Front</div>
-            <div 
-              ref={frontRef} 
-              className="id-card-wrapper transition-transform duration-300 group-hover:shadow-2xl"
-              style={idStyle}
-            >
-              <Image 
-                src="/id_front_template.png" 
-                alt="ID Front Background" 
-                className="absolute inset-0 w-full h-full object-cover z-0"
-                crossOrigin="anonymous"
-                width={408}
-                height={648}
-                unoptimized
-              />
-              
-              <div className="absolute inset-0 z-10 flex flex-col items-center">
-                <div 
-                  className="absolute top-[21%] rounded-full overflow-hidden border-[4px] border-[#0e2a3f] bg-white flex items-center justify-center shadow-lg"
-                  style={{ width: "194px", height: "194px", left: "50%", transform: "translateX(-50%)" }}
-                >
-                  {imageUrl ? (
-                    <Image src={imageUrl} alt="Employee" className="w-full h-full object-cover" crossOrigin="anonymous" width={194} height={194} unoptimized />
-                  ) : (
-                    <span className="text-4xl font-bold text-muted-foreground">{user.firstName.charAt(0)}{user.lastName.charAt(0)}</span>
-                  )}
-                </div>
+    const frontPage = doc ? doc.pages.find((page) => page.side === "front") : undefined;
+    const backPage = doc ? doc.pages.find((page) => page.side === "back") : undefined;
+    const canRender = status === "ready" && doc !== null && frontPage !== undefined && backPage !== undefined;
+    const busy = exporting !== null || overrideBusy;
 
-                <div className="absolute top-[52%] w-full px-4 text-center">
-                  <h1 className="text-3xl font-black text-black leading-tight break-words uppercase " style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: "1px white", letterSpacing: "-0.5px" }}>
-                    {formattedName}
-                  </h1>
-                  <h2 className="text-[17px] font-bold text-black tracking-wide font-sans" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>
-                    {position}
-                  </h2>
+    return (
+        <div className="flex flex-col gap-6 animate-in fade-in duration-300">
+            <div className="flex flex-col gap-2 rounded-2xl border border-border/50 bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium">{templateName !== "" ? templateName : "No ID template"}</span>
+                    <span className="text-xs text-muted-foreground">Preview only. Changing this does not reassign the employee template.</span>
                 </div>
-
-                <div className="absolute top-[62.6%] left-[30.5%] flex flex-col gap-[6px]">
-                  <div className="text-[17px] font-bold text-black font-sans leading-tight h-[18px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>
-                    <span className="tracking-widest">{user.externalId || `MEN2-${String(user.id).padStart(4, '0')}`}</span>
-                  </div>
-                  <div className="text-[17px] font-bold text-black font-sans leading-tight h-[18px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>
-                    <span className="tracking-widest">{user.contact || "N/A"}</span>
-                  </div>
-                  <div className="text-[15px] font-bold text-black font-sans leading-tight h-[18px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".2px white", letterSpacing: "-0.5px" }}>
-                    <span className="tracking-widest text-black lowercase">{user.email || "N/A"}</span>
-                  </div>
-                </div>
-
-                <div className="absolute top-[73%] w-full flex justify-center px-10">
-                  {signatureUrl && (
-                    <Image src={signatureUrl} alt="Signature" className="max-h-[85px] w-auto object-contain" crossOrigin="anonymous" width={200} height={85} unoptimized />
-                  )}
-                </div>
-              </div>
+                <EmployeeIdCombobox
+                    value={overrideId}
+                    onValueChange={(value) => void handleOverride(value)}
+                    placeholder="Select template..."
+                    disabled={options.length === 0 || overrideBusy || status === "loading"}
+                    className="w-[240px]"
+                    options={options.map((option) => ({ value: String(option.id), label: option.name }))}
+                />
             </div>
-          </div>
-          
-          <Button 
-            onClick={() => exportToPng(frontRef, "Front")} 
-            variant="outline" 
-            className="gap-2 h-11 rounded-xl w-[200px] border-primary/20 hover:border-primary hover:bg-primary/5 transition-all mt-2"
-          >
-            <Download className="h-4 w-4" />
-            Export Front
-          </Button>
-        </div>
 
-        {/* BACK SIDE */}
-        <div className="flex flex-col items-center gap-6">
-          <div className="relative group" style={{ perspective: "1000px" }}>
-            <div className="text-center mb-2 text-sm font-semibold text-muted-foreground uppercase tracking-widest">Back</div>
-            <div 
-              ref={backRef} 
-              className="id-card-wrapper transition-transform duration-300 group-hover:shadow-2xl"
-              style={idStyle}
-            >
-              <Image src="/id_back_template.png" alt="ID Back Background" className="absolute inset-0 w-full h-full object-cover z-0" crossOrigin="anonymous" width={408} height={648} unoptimized />
-
-              <div className="absolute inset-0 z-10 flex flex-col">
-                <div className="absolute top-[23.8%] left-[43%] right-[6%] flex flex-col gap-[4.2px]">
-                  <div className="text-[13px] font-bold text-black font-sans leading-tight h-[16px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".3px white", letterSpacing: "-1.5px" }}>
-                    <span className="uppercase whitespace-nowrap overflow-hidden text-ellipsis">{address}</span>
-                  </div>
-                  <div className="text-[14px] font-bold text-black font-sans leading-tight h-[16px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>
-                    <span className="uppercase">
-                      {user.birthday ? new Date(user.birthday).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "N/A"}
-                    </span>
-                  </div>
-                  <div className="text-[14px] font-bold text-black font-sans leading-tight h-[17px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>
-                    <span>{user.sssNumber || "N/A"}</span>
-                  </div>
-                  <div className="text-[14px] font-bold text-black font-sans leading-tight h-[17px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>
-                    <span>{user.philHealthNumber || "N/A"}</span>
-                  </div>
-                  <div className="text-[14px] font-bold text-black font-sans leading-tight h-[17px] flex items-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>
-                    <span>{user.pagibigNumber || "N/A"}</span>
-                  </div>
+            {notice !== null && (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    {notice}
                 </div>
+            )}
 
-                <div className="absolute top-[40.8%] left-[6%] right-[6%] flex flex-col gap-1 items-center">
-                   <div className="flex w-full items-center justify-center font-bold text-[15.5px] uppercase mt-[14px]">
-                      <span className="truncate pr-4 text-center" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>{user.emergencyContactName || "N/A"}</span>
-                      <span className="pl-4" style={{ fontFamily: "Arial Black, Impact, sans-serif", WebkitTextStroke: ".5px white", letterSpacing: "-0.5px" }}>{user.emergencyContactNumber || "N/A"}</span>
-                   </div>
+            {status === "loading" && (
+                <div className="flex min-h-[400px] items-center justify-center rounded-2xl bg-muted/20 text-sm text-muted-foreground">
+                    Loading ID template…
                 </div>
-              </div>
-            </div>
-          </div>
-          <Button 
-            onClick={() => exportToPng(backRef, "Back")} 
-            variant="outline" 
-            className="gap-2 h-11 rounded-xl w-[200px] border-primary/20 hover:border-primary hover:bg-primary/5 transition-all mt-2"
-          >
-            <Download className="h-4 w-4" />
-            Export Back
-          </Button>
-        </div>
+            )}
 
-      </div>
-    </div>
-  );
+            {status === "unavailable" && (
+                <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-2xl bg-muted/20 px-6 text-center">
+                    <p className="text-sm font-medium">The ID service is currently unavailable. Please try again later.</p>
+                    <Button onClick={() => setReloadKey((key) => key + 1)} variant="outline" className="h-11 rounded-xl">
+                        Retry
+                    </Button>
+                </div>
+            )}
+
+            {status === "empty" && (
+                <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-2xl bg-muted/20 px-6 text-center">
+                    <p className="text-sm font-medium">No ID template is available for this employee.</p>
+                    <p className="text-xs text-muted-foreground">Ask HR to assign a company template or set a default template.</p>
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="h-11 w-[200px] rounded-xl" disabled>
+                            <Download className="h-4 w-4" />
+                            Export Front
+                        </Button>
+                        <Button variant="outline" className="h-11 w-[200px] rounded-xl" disabled>
+                            <Download className="h-4 w-4" />
+                            Export Back
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {status === "corrupt" && (
+                <div className="flex min-h-[400px] flex-col items-center justify-center gap-4 rounded-2xl bg-muted/20 px-6 text-center">
+                    <p className="text-sm font-medium">This ID template could not be displayed.</p>
+                    <p className="text-xs text-muted-foreground">The template data is invalid. Ask HR to review the template.</p>
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="h-11 w-[200px] rounded-xl" disabled>
+                            <Download className="h-4 w-4" />
+                            Export Front
+                        </Button>
+                        <Button variant="outline" className="h-11 w-[200px] rounded-xl" disabled>
+                            <Download className="h-4 w-4" />
+                            Export Back
+                        </Button>
+                    </div>
+                </div>
+            )}
+
+            {canRender && doc !== null && frontPage !== undefined && backPage !== undefined && (
+                <div className="flex flex-col gap-8 rounded-2xl bg-muted/20 py-6 md:flex-row md:items-start md:justify-center">
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="relative group" style={{ perspective: "1000px" }}>
+                            <div className="mb-2 text-center text-sm font-semibold uppercase tracking-widest text-muted-foreground">Front</div>
+                            <div
+                                ref={frontRef}
+                                className="transition-transform duration-300 group-hover:shadow-2xl"
+                                style={{
+                                    width: "408px",
+                                    height: "648px",
+                                    position: "relative",
+                                    overflow: "hidden",
+                                    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                                    borderRadius: "12px",
+                                    backgroundColor: "white",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <EmployeeIdCardSide page={frontPage} nodes={doc.nodes} values={values} />
+                            </div>
+                        </div>
+                        <Button
+                            onClick={() => void exportSide("front")}
+                            disabled={busy}
+                            variant="outline"
+                            className="mt-2 h-11 w-[200px] gap-2 rounded-xl border-primary/20 transition-all hover:border-primary hover:bg-primary/5"
+                        >
+                            <Download className="h-4 w-4" />
+                            {exporting === "front" ? "Exporting…" : "Export Front"}
+                        </Button>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="relative group" style={{ perspective: "1000px" }}>
+                            <div className="mb-2 text-center text-sm font-semibold uppercase tracking-widest text-muted-foreground">Back</div>
+                            <div
+                                ref={backRef}
+                                className="transition-transform duration-300 group-hover:shadow-2xl"
+                                style={{
+                                    width: "408px",
+                                    height: "648px",
+                                    position: "relative",
+                                    overflow: "hidden",
+                                    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                                    borderRadius: "12px",
+                                    backgroundColor: "white",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <EmployeeIdCardSide page={backPage} nodes={doc.nodes} values={values} />
+                            </div>
+                        </div>
+                        <Button
+                            onClick={() => void exportSide("back")}
+                            disabled={busy}
+                            variant="outline"
+                            className="mt-2 h-11 w-[200px] gap-2 rounded-xl border-primary/20 transition-all hover:border-primary hover:bg-primary/5"
+                        >
+                            <Download className="h-4 w-4" />
+                            {exporting === "back" ? "Exporting…" : "Export Back"}
+                        </Button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 }
