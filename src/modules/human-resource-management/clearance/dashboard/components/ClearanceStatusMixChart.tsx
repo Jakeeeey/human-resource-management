@@ -13,10 +13,12 @@ const CARD_SHELL =
 const STATUS_ORDER = ["pending", "in_progress", "completed"] as const;
 
 const STATUS_FILL: Record<string, string> = {
-    pending: "#94a3b8",
-    in_progress: "#0ea5e9",
-    completed: "#10b981",
+    pending: "hsl(var(--muted-foreground))",
+    in_progress: "hsl(var(--info))",
+    completed: "hsl(var(--success))",
 };
+
+const STATUS_FALLBACK_FILL = "hsl(var(--muted-foreground))";
 
 function pluralize(count: number, singular: string, plural: string): string {
     return `${count} ${count === 1 ? singular : plural}`;
@@ -81,7 +83,7 @@ export function ClearanceStatusMixChart({ slices }: { readonly slices: readonly 
             status,
             label: CLEARANCE_REQUEST_STATUS_LABELS[status],
             count: counts.get(status) ?? 0,
-            fill: STATUS_FILL[status] ?? "#94a3b8",
+            fill: STATUS_FILL[status] ?? STATUS_FALLBACK_FILL,
         }));
     }, [slices]);
     const total = rows.reduce((sum, row) => sum + row.count, 0);

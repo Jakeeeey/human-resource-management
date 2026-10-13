@@ -17,6 +17,11 @@ import type { ClearanceDashboardAgingBin } from "../types/clearance-dashboard.sc
 const CARD_SHELL =
     "rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,40,0.05)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.45)]";
 
+const CHART_TICK_FILL = "hsl(var(--muted-foreground))";
+const CHART_GRID_STROKE = "hsl(var(--border))";
+const CHART_SERIES_FILL = "hsl(var(--warning))";
+const CHART_CURSOR_FILL = "hsl(var(--primary))";
+
 export function ClearanceAgingChart({
     bins,
     staleAfterDays,
@@ -55,19 +60,22 @@ export function ClearanceAgingChart({
                 ) : (
                     <div className="mt-3 h-[220px] min-h-[220px] flex-1 sm:h-[260px]" role="img" aria-label={ariaSummary}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
-                                <CartesianGrid stroke="#94a3b8" strokeOpacity={0.12} vertical={false} />
+                            <BarChart data={rows} margin={{ top: 4, right: 8, bottom: 8, left: -16 }}>
+                                <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
                                 <XAxis
                                     dataKey="label"
-                                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                    tick={{ fontSize: 11, fill: CHART_TICK_FILL }}
                                     tickLine={false}
                                     axisLine={false}
-                                    interval="preserveStartEnd"
+                                    interval={0}
+                                    angle={-20}
+                                    dy={8}
+                                    height={52}
                                 />
                                 <YAxis
                                     allowDecimals={false}
                                     domain={[0, "dataMax"]}
-                                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                    tick={{ fontSize: 11, fill: CHART_TICK_FILL }}
                                     tickLine={false}
                                     axisLine={false}
                                     width={36}
@@ -83,9 +91,9 @@ export function ClearanceAgingChart({
                                     }}
                                     labelStyle={{ color: "hsl(var(--popover-foreground))" }}
                                     itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                                    cursor={{ fill: "#7c3aed", fillOpacity: 0.1 }}
+                                    cursor={{ fill: CHART_CURSOR_FILL, fillOpacity: 0.1 }}
                                 />
-                                <Bar dataKey="count" name="Clearances" fill="#f59e0b" radius={[8, 8, 0, 0]} maxBarSize={44} isAnimationActive={false} />
+                                <Bar dataKey="count" name="Clearances" fill={CHART_SERIES_FILL} radius={[8, 8, 0, 0]} maxBarSize={44} isAnimationActive={false} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

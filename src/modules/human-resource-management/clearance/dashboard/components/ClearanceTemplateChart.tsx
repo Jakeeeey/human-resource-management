@@ -21,6 +21,38 @@ const CARD_SHELL =
 const CHART_LIMIT = 8;
 const PAGE_SIZE = 6;
 
+const CHART_TICK_FILL = "hsl(var(--muted-foreground))";
+const CHART_GRID_STROKE = "hsl(var(--border))";
+const CHART_SERIES_FILL = "hsl(var(--success))";
+const CHART_CURSOR_FILL = "hsl(var(--primary))";
+
+const TEMPLATE_TICK_LIMIT = 22;
+
+function truncateTemplateName(name: string): string {
+    if (name.length <= TEMPLATE_TICK_LIMIT) return name;
+    return `${name.slice(0, TEMPLATE_TICK_LIMIT - 1)}…`;
+}
+
+interface TemplateYTickProps {
+    readonly x?: number;
+    readonly y?: number;
+    readonly payload?: { readonly value?: unknown };
+}
+
+function TemplateYTick({ x, y, payload }: TemplateYTickProps): React.JSX.Element | null {
+    const raw = typeof payload?.value === "string" ? payload.value : "";
+    if (raw === "") return null;
+    const short = truncateTemplateName(raw);
+    return (
+        <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+            <title>{raw}</title>
+            <text x={-8} y={0} dy={4} textAnchor="end" fontSize={11} fill={CHART_TICK_FILL}>
+                {short}
+            </text>
+        </g>
+    );
+}
+
 const FOCUS_RING =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
@@ -82,18 +114,28 @@ export function ClearanceTemplateChart({ rows }: { readonly rows: readonly Clear
                     </div>
                 ) : (
                     <React.Fragment>
+                        {totalCompleted === 0 ? (
+                            <div className="flex min-h-[220px] flex-1 flex-col items-center justify-center gap-2 py-10 text-center" role="img" aria-label="Completions by template chart with no completions yet">
+                                <Inbox className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                                <p className="text-sm font-medium text-foreground">No completions yet</p>
+                                <p className="max-w-xs text-xs text-muted-foreground">
+                                    {totalAssigned} assigned across {tableRows.length} {tableRows.length === 1 ? "template" : "templates"} · bars will appear here once HR confirms a clearance.
+                                </p>
+                            </div>
+                        ) : (
                         <div className="mt-3 min-h-[220px] flex-1" style={{ height: chartHeight }} role="img" aria-label={ariaSummary}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={chartRows} layout="vertical" margin={{ top: 0, right: 12, bottom: 0, left: 0 }}>
-                                    <CartesianGrid stroke="#94a3b8" strokeOpacity={0.12} vertical={false} />
-                                    <XAxis type="number" allowDecimals={false} domain={[0, "dataMax"]} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} />
+                                    <CartesianGrid stroke={CHART_GRID_STROKE} vertical={false} />
+                                    <XAxis type="number" allowDecimals={false} domain={[0, "dataMax"]} tick={{ fontSize: 11, fill: CHART_TICK_FILL }} tickLine={false} axisLine={false} />
                                     <YAxis
                                         type="category"
                                         dataKey="name"
-                                        tick={{ fontSize: 11, fill: "#94a3b8" }}
+                                        tick={<TemplateYTick />}
                                         tickLine={false}
                                         axisLine={false}
                                         width={168}
+                                        interval={0}
                                     />
                                     <Tooltip
                                         formatter={(value, name) => {
@@ -112,12 +154,13 @@ export function ClearanceTemplateChart({ rows }: { readonly rows: readonly Clear
                                         }}
                                         labelStyle={{ color: "hsl(var(--popover-foreground))" }}
                                         itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-                                        cursor={{ fill: "#7c3aed", fillOpacity: 0.1 }}
+                                        cursor={{ fill: CHART_CURSOR_FILL, fillOpacity: 0.1 }}
                                     />
-                                    <Bar dataKey="completed" name="Completed" fill="#10b981" radius={[0, 8, 8, 0]} maxBarSize={26} isAnimationActive={false} />
+                                    <Bar dataKey="completed" name="Completed" fill={CHART_SERIES_FILL} radius={[0, 8, 8, 0]} maxBarSize={26} isAnimationActive={false} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
+                        )}
                         <div className="mt-3 max-h-[320px] overflow-auto rounded-xl border border-border">
                             <table className="w-full min-w-[420px] text-left text-xs">
                                 <thead className="sticky top-0 z-10 bg-muted">
@@ -149,7 +192,7 @@ export function ClearanceTemplateChart({ rows }: { readonly rows: readonly Clear
                             </table>
                         </div>
                         {pageCount > 1 && (
-                            <div className="mt-3 flex items-center justify-between gap-2">
+                            <nav aria-label="Pagination" className="mt-3 flex items-center justify-between gap-2">
                                 <p className="text-xs tabular-nums text-muted-foreground">
                                     Page {safePage + 1} of {pageCount} · {pluralize(tableRows.length, "template", "templates")}
                                 </p>
@@ -177,7 +220,7 @@ export function ClearanceTemplateChart({ rows }: { readonly rows: readonly Clear
                                         <ChevronRight className="h-4 w-4" aria-hidden="true" />
                                     </Button>
                                 </div>
-                            </div>
+                            </nav>
                         )}
                     </React.Fragment>
                 )}

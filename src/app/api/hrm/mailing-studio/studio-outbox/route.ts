@@ -16,6 +16,8 @@ const SORT_ALLOWLIST = ["-id", "id", "-sent_at", "sent_at", "status", "-status"]
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 
+const EVENT_ONLY_FILTER = "&filter[campaign_id][_null]=true";
+
 function clampInt(raw: string | null, fallback: number, min: number, max: number): number {
     const parsed = raw === null ? Number.NaN : Number.parseInt(raw, 10);
     if (!Number.isInteger(parsed)) return fallback;
@@ -79,11 +81,11 @@ export async function GET(req: NextRequest) {
         const base =
             `/items/ms_outbox?fields=${OUTBOX_LIST_FIELDS}` +
             `&sort=${encodeURIComponent(sortParam)}&limit=${limit}&offset=${offset}` +
-            `&meta=filter_count${statusFilter}${eventFilter}${searchFilter}`;
+            `&meta=filter_count${EVENT_ONLY_FILTER}${statusFilter}${eventFilter}${searchFilter}`;
         const baseFallback =
             `/items/ms_outbox?fields=${OUTBOX_LIST_FIELDS_BASE}` +
             `&sort=${encodeURIComponent(sortParam)}&limit=${limit}&offset=${offset}` +
-            `&meta=filter_count${statusFilter}${eventFilter}${searchFilter}`;
+            `&meta=filter_count${EVENT_ONLY_FILTER}${statusFilter}${eventFilter}${searchFilter}`;
         const listed = (await dFetch(base)) as DirectusList;
         let rows = Array.isArray(listed?.data) ? listed.data : null;
         let total =

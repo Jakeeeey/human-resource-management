@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import {
     CLEARANCE_REQUEST_STATUSES,
@@ -19,12 +19,8 @@ export interface ClearanceHubItem {
     department_name_snapshot: string | null;
     sort_order: number;
     status: string;
-    expected_signer_user_id: number | null;
-    signed_by_user_id: number | null;
-    captured_by_user_id: number | null;
-    substitution_reason: string | null;
+    signatory_id: number | null;
     remarks: string | null;
-    signed_at: string | null;
 }
 
 export interface ClearanceHubRequest {
@@ -44,6 +40,16 @@ export interface ClearanceHubRequest {
 }
 
 export interface ClearanceHubTemplate {
+    id: number;
+    code: string;
+    title: string;
+    description: string | null;
+    department_id: number | null;
+    is_active: boolean;
+    sort_order: number;
+}
+
+export interface ClearanceHubSoaTemplate {
     id: number;
     code: string;
     title: string;
@@ -85,6 +91,7 @@ export interface UpdateClearanceItemInput {
 
 const REQUESTS_API = "/api/hrm/clearance/requests";
 const TEMPLATES_API = "/api/hrm/clearance/templates";
+const SOA_TEMPLATES_API = "/api/hrm/clearance/soa-templates";
 const APPROVED_RESIGNATIONS_API = "/api/hrm/clearance/approved-resignations";
 const ITEMS_API = "/api/hrm/clearance/items";
 const SIGNATORIES_API = "/api/hrm/clearance/signatories";
@@ -147,12 +154,8 @@ function parseHubItem(value: unknown): ClearanceHubItem | null {
         department_name_snapshot: toNullableText(value.department_name_snapshot),
         sort_order: toId(value.sort_order) ?? 0,
         status: typeof value.status === "string" ? value.status : "pending",
-        expected_signer_user_id: toNullableId(value.expected_signer_user_id),
-        signed_by_user_id: toNullableId(value.signed_by_user_id),
-        captured_by_user_id: toNullableId(value.captured_by_user_id),
-        substitution_reason: toNullableText(value.substitution_reason),
+        signatory_id: toNullableId(value.signatory_id),
         remarks: toNullableText(value.remarks),
-        signed_at: toNullableText(value.signed_at),
     };
 }
 
@@ -223,6 +226,23 @@ function parseHubTemplate(value: unknown): ClearanceHubTemplate | null {
     };
 }
 
+function parseHubSoaTemplate(value: unknown): ClearanceHubSoaTemplate | null {
+    if (!isRecord(value)) return null;
+    const id = toId(value.id);
+    const code = toNullableText(value.code);
+    const title = toNullableText(value.title);
+    if (id === null || code === null || title === null) return null;
+    return {
+        id,
+        code,
+        title,
+        description: toNullableText(value.description),
+        department_id: toNullableId(value.department_id),
+        is_active: toBoolean(value.is_active),
+        sort_order: toId(value.sort_order) ?? 0,
+    };
+}
+
 function parseApprovableResignation(value: unknown): ApprovableResignation | null {
     if (!isRecord(value)) return null;
     const id = toId(value.id);
@@ -259,36 +279,49 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
     return fallback;
 }
 
+export interface ClearanceHubListQuery {
+    page?: number;
+    limit?: number;
+    sort?: string;
+    search?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+}
+
+const DEFAULT_LIST_PAGE = 1;
+const DEFAULT_LIST_LIMIT = 10;
+
+const DEFAULT_LIST_QUERY: ClearanceHubListQuery = { page: DEFAULT_LIST_PAGE, limit: DEFAULT_LIST_LIMIT };
+
+function toListSearchParams(query: ClearanceHubListQuery): string {
+    const params = new URLSearchParams();
+    params.set("page", String(query.page ?? DEFAULT_LIST_PAGE));
+    params.set("limit", String(query.limit ?? DEFAULT_LIST_LIMIT));
+    if (query.sort !== undefined && query.sort !== "") params.set("sort", query.sort);
+    if (query.search !== undefined && query.search !== "") params.set("search", query.search);
+    if (query.status !== undefined && query.status !== "") params.set("status", query.status);
+    if (query.dateFrom !== undefined && query.dateFrom !== "") params.set("date_from", query.dateFrom);
+    if (query.dateTo !== undefined && query.dateTo !== "") params.set("date_to", query.dateTo);
+    const encoded = params.toString();
+    return encoded === "" ? "" : `?${encoded}`;
+}
+
 export function useClearanceHub() {
     const [requests, setRequests] = useState<ClearanceHubRequest[]>([]);
+    const [total, setTotal] = useState<number>(0);
     const [counts, setCounts] = useState<ClearanceHubCounts>({ total: 0, pending: 0, in_progress: 0, completed: 0 });
     const [templates, setTemplates] = useState<ClearanceHubTemplate[]>([]);
     const [templatesError, setTemplatesError] = useState<string | null>(null);
+    const [soaTemplates, setSoaTemplates] = useState<ClearanceHubSoaTemplate[]>([]);
+    const [soaTemplatesError, setSoaTemplatesError] = useState<string | null>(null);
     const [resignations, setResignations] = useState<ApprovableResignation[]>([]);
     const [resignationsError, setResignationsError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const lastQuery = useRef<ClearanceHubListQuery>({ ...DEFAULT_LIST_QUERY });
 
-    const refresh = useCallback(async (): Promise<void> => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await fetch(REQUESTS_API, { cache: "no-store" });
-            if (!response.ok) {
-                throw new Error(await readErrorMessage(response, "Failed to load clearance requests"));
-            }
-            const payload = (await response.json()) as { data?: unknown; counts?: unknown };
-            const rows = Array.isArray(payload.data) ? payload.data : [];
-            const parsed = rows
-                .map(parseHubRequest)
-                .filter((row): row is ClearanceHubRequest => row !== null);
-            setRequests(parsed);
-            setCounts(parseHubCounts(payload.counts, parsed));
-        } catch (err) {
-            setRequests([]);
-            setCounts({ total: 0, pending: 0, in_progress: 0, completed: 0 });
-            setError(err instanceof Error ? err.message : "Failed to load clearance requests");
-        }
+    const loadLookups = useCallback(async (): Promise<void> => {
         try {
             const response = await fetch(TEMPLATES_API, { cache: "no-store" });
             if (!response.ok) {
@@ -308,6 +341,24 @@ export function useClearanceHub() {
             setTemplatesError(err instanceof Error ? err.message : "Failed to load clearance templates");
         }
         try {
+            const response = await fetch(SOA_TEMPLATES_API, { cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response, "Failed to load SOA templates"));
+            }
+            const payload = (await response.json()) as { data?: unknown };
+            const rows = Array.isArray(payload.data) ? payload.data : [];
+            setSoaTemplates(
+                rows
+                    .map(parseHubSoaTemplate)
+                    .filter((row): row is ClearanceHubSoaTemplate => row !== null)
+                    .sort((left, right) => left.sort_order - right.sort_order || left.id - right.id)
+            );
+            setSoaTemplatesError(null);
+        } catch (err) {
+            setSoaTemplates([]);
+            setSoaTemplatesError(err instanceof Error ? err.message : "Failed to load SOA templates");
+        }
+        try {
             const response = await fetch(APPROVED_RESIGNATIONS_API, { cache: "no-store" });
             if (!response.ok) {
                 throw new Error(await readErrorMessage(response, "Failed to load approved resignations"));
@@ -323,17 +374,59 @@ export function useClearanceHub() {
         } catch (err) {
             setResignations([]);
             setResignationsError(err instanceof Error ? err.message : "Failed to load approved resignations");
-        } finally {
-            setIsLoading(false);
         }
     }, []);
 
+    const refreshLookups = useCallback(async (): Promise<void> => {
+        setIsLoading(true);
+        try {
+            await loadLookups();
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loadLookups]);
+
+    const refresh = useCallback(async (query?: ClearanceHubListQuery): Promise<void> => {
+        const effective = query ?? lastQuery.current;
+        if (query !== undefined) lastQuery.current = query;
+        setIsLoading(true);
+        setError(null);
+        try {
+            try {
+                const response = await fetch(`${REQUESTS_API}${toListSearchParams(effective)}`, { cache: "no-store" });
+                if (!response.ok) {
+                    throw new Error(await readErrorMessage(response, "Failed to load clearance requests"));
+                }
+                const payload = (await response.json()) as { data?: unknown; counts?: unknown; total?: unknown };
+                const rows = Array.isArray(payload.data) ? payload.data : [];
+                const parsed = rows
+                    .map(parseHubRequest)
+                    .filter((row): row is ClearanceHubRequest => row !== null);
+                setRequests(parsed);
+                setTotal(typeof payload.total === "number" && Number.isInteger(payload.total) ? payload.total : parsed.length);
+                setCounts(parseHubCounts(payload.counts, parsed));
+            } catch (err) {
+                setRequests([]);
+                setTotal(0);
+                setCounts({ total: 0, pending: 0, in_progress: 0, completed: 0 });
+                setError(err instanceof Error ? err.message : "Failed to load clearance requests");
+            }
+            await loadLookups();
+        } finally {
+            setIsLoading(false);
+        }
+    }, [loadLookups]);
+
     const assignClearance = useCallback(
-        async (resignationId: number, templateId: number): Promise<string> => {
+        async (resignationId: number, templateId: number, soaTemplateId?: number | null): Promise<string> => {
+            const body: Record<string, unknown> = { resignation_id: resignationId, template_id: templateId };
+            if (soaTemplateId !== undefined && soaTemplateId !== null) {
+                body.soa_template_id = soaTemplateId;
+            }
             const response = await fetch(REQUESTS_API, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ resignation_id: resignationId, template_id: templateId }),
+                body: JSON.stringify(body),
             });
             if (!response.ok) {
                 throw new Error(await readErrorMessage(response, "Failed to assign clearance"));
@@ -384,21 +477,6 @@ export function useClearanceHub() {
         [refresh]
     );
 
-    const unlockItem = useCallback(
-        async (id: number, reason: string): Promise<void> => {
-            const response = await fetch(`${ITEMS_API}/${id}/unlock`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ reason }),
-            });
-            if (!response.ok) {
-                throw new Error(await readErrorMessage(response, "Failed to unlock clearance item"));
-            }
-            await refresh();
-        },
-        [refresh]
-    );
-
     const updateItem = useCallback(
         async (id: number, input: UpdateClearanceItemInput): Promise<void> => {
             const body: Record<string, unknown> = {};
@@ -435,19 +513,22 @@ export function useClearanceHub() {
 
     return {
         requests,
+        total,
         counts,
         templates,
         templatesError,
+        soaTemplates,
+        soaTemplatesError,
         resignations,
         resignationsError,
         isLoading,
         error,
         refresh,
+        refreshLookups,
         assignClearance,
         fetchDetail,
         fetchCandidates,
         confirmRequest,
-        unlockItem,
         updateItem,
         replacePool,
     };

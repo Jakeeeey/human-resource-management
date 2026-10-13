@@ -313,7 +313,7 @@ export function OutboxPage() {
                     </span>
                     <div className="min-w-0">
                         <h1 className="text-lg font-semibold tracking-tight">Outbox</h1>
-                        <p className="text-sm text-muted-foreground">The record of everything the studio has sent and queued.</p>
+                        <p className="text-sm text-muted-foreground">The record of event-driven mail the studio has sent and queued.</p>
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

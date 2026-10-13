@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import type { JSX } from "react";
-import { X } from "lucide-react";
+import { AlertCircle, RefreshCw, X } from "lucide-react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,9 @@ export interface CategoryDialogProps {
     departments: readonly DirectoryDepartment[];
     employees: readonly DirectoryEmployee[];
     employeeName: (id: number) => string;
+    directoryIsError?: boolean;
+    directoryError?: string | null;
+    onRetryDirectory?: () => void;
     saving: boolean;
     onClose: () => void;
     onCreate: (input: CategoryCreateInput, poolUserIds: number[]) => void;
@@ -55,7 +59,7 @@ function isSignerType(value: string): value is ClearanceSignerType {
 function CategoryForm(
     props: Omit<CategoryDialogProps, "open" | "category"> & { category: ClearanceCategory | null }
 ): JSX.Element {
-    const { category, departments, employees, employeeName, saving, onClose, onCreate, onUpdate } = props;
+    const { category, departments, employees, employeeName, directoryIsError = false, directoryError = null, onRetryDirectory, saving, onClose, onCreate, onUpdate } = props;
     const isEdit = category !== null;
 
     const [label, setLabel] = useState(category?.label ?? "");
@@ -215,6 +219,7 @@ function CategoryForm(
                             }}
                             noneLabel="Select a department"
                             placeholder="Select the signing department"
+                            searchPlaceholder="Search departments…"
                             disabled={saving}
                         />
                     </div>
@@ -225,13 +230,34 @@ function CategoryForm(
                         <Label>
                             Signers<span className="text-destructive" aria-hidden="true">{" *"}</span>
                         </Label>
+                        {directoryIsError && (
+                            <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Could not load employees</AlertTitle>
+                                <AlertDescription className="space-y-2">
+                                    <p>{directoryError ?? "The employee directory is unavailable."}</p>
+                                    {onRetryDirectory && (
+                                        <Button variant="outline" size="sm" onClick={onRetryDirectory}>
+                                            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+                                            Retry
+                                        </Button>
+                                    )}
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         <EmployeeSelect
                             id="clearance-category-pool"
                             employees={availableEmployees}
                             value={pickerValue}
                             onValueChange={addPoolMember}
                             placeholder="Search employees to add…"
+                            searchPlaceholder="Search employees…"
                             disabled={saving}
+                            emptyMessage={
+                                directoryIsError
+                                    ? "Could not load employees. Retry, then search again."
+                                    : undefined
+                            }
                         />
                         {poolIds.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
@@ -303,6 +329,9 @@ export function CategoryDialog(props: CategoryDialogProps): JSX.Element {
                         departments={props.departments}
                         employees={props.employees}
                         employeeName={props.employeeName}
+                        directoryIsError={props.directoryIsError}
+                        directoryError={props.directoryError}
+                        onRetryDirectory={props.onRetryDirectory}
                         saving={props.saving}
                         onClose={props.onClose}
                         onCreate={props.onCreate}
