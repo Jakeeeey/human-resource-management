@@ -40,6 +40,7 @@ import type { AttendanceLogWithUser } from "../type";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import { computeLogOvertimeMinutes } from "../utils/overtimeUtils";
 
 export function AttendanceApprovalDaily() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -61,7 +62,17 @@ export function AttendanceApprovalDaily() {
         departmentId: selectedDeptId,
         approvalStatus: showApproved ? "all" : "pending"
       });
-      setLogs(response.data || []);
+      const mappedLogs = (response.data || []).map(log => {
+        const isApprovedOt = Boolean(log.ot_request && String(log.ot_request.status).toLowerCase() === "approved");
+        if (isApprovedOt && log.ot_request) {
+          return {
+            ...log,
+            overtime_minutes: computeLogOvertimeMinutes(log),
+          };
+        }
+        return log;
+      });
+      setLogs(mappedLogs);
     } catch {
       toast.error("Failed to load attendance logs");
     } finally {
