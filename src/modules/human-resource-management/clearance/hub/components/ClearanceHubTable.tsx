@@ -70,7 +70,6 @@ function filedLabel(createdAt: string | null): string {
 
 export function ClearanceHubTable({
     data,
-    resignations,
     selectedId,
     completionByRequest,
     onRetry,
@@ -96,21 +95,13 @@ export function ClearanceHubTable({
     const sortKey = sortKeyProp ?? internalSortKey;
     const sortDirection = sortDirectionProp ?? internalSortDirection;
 
-    const namesByResignation = useMemo(() => {
-        const map = new Map<number, string>();
-        for (const resignation of resignations) {
-            map.set(resignation.id, resignation.employee_name);
-        }
-        return map;
-    }, [resignations]);
-
     const orderedData = useMemo(() => {
         if (serverDriven) {
             if (sortKey !== "employee") return data;
             const rows = [...data];
             rows.sort((left, right) => {
-                const leftName = namesByResignation.get(left.resignation_id) ?? "";
-                const rightName = namesByResignation.get(right.resignation_id) ?? "";
+                const leftName = left.employee_name ?? "";
+                const rightName = right.employee_name ?? "";
                 const compared = leftName.localeCompare(rightName);
                 if (compared !== 0) return sortDirection === "asc" ? compared : -compared;
                 return left.id - right.id;
@@ -127,15 +118,15 @@ export function ClearanceHubTable({
                 if (rightFiled === "" && leftFiled !== "") return -1;
                 compared = leftFiled.localeCompare(rightFiled);
             } else {
-                const leftName = namesByResignation.get(left.resignation_id) ?? "";
-                const rightName = namesByResignation.get(right.resignation_id) ?? "";
+                const leftName = left.employee_name ?? "";
+                const rightName = right.employee_name ?? "";
                 compared = leftName.localeCompare(rightName);
             }
             if (compared !== 0) return sortDirection === "asc" ? compared : -compared;
             return left.id - right.id;
         });
         return rows;
-    }, [data, namesByResignation, serverDriven, sortKey, sortDirection]);
+    }, [data, serverDriven, sortKey, sortDirection]);
 
     const totalItems = total ?? orderedData.length;
     const totalPages = Math.ceil(totalItems / pageSize);
@@ -209,7 +200,7 @@ export function ClearanceHubTable({
         <div className="space-y-4">
             <ul className="space-y-3 xl:hidden">
                 {displayedData.map((request) => {
-                    const employeeName = namesByResignation.get(request.resignation_id) ?? "Unknown employee";
+                    const employeeName = request.employee_name ?? "Unknown employee";
                     const isActive = selectedId === request.id;
                     const checklist = completionByRequest.get(request.id) ?? toClearanceDocumentChecklist(request.id);
                     return (
@@ -313,7 +304,7 @@ export function ClearanceHubTable({
                     </TableHeader>
                     <TableBody>
                         {displayedData.map((request) => {
-                            const employeeName = namesByResignation.get(request.resignation_id) ?? "Unknown employee";
+                            const employeeName = request.employee_name ?? "Unknown employee";
                             const isActive = selectedId === request.id;
                             const checklist = completionByRequest.get(request.id) ?? toClearanceDocumentChecklist(request.id);
                             return (

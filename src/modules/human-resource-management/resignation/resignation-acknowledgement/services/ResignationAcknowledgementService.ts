@@ -23,7 +23,7 @@ interface ReviewInput {
     reviewerId: number;
 }
 
-export const RESIGNATION_ACTIVE_STATUSES = ["pending", "approved"] as const;
+export const RESIGNATION_ACTIVE_STATUSES = ["pending", "approved", "clearance_ongoing"] as const;
 
 interface AttachmentRef {
     fileId: string;
@@ -88,7 +88,7 @@ function toDepartmentRow(value: unknown): DirectusDepartmentRow | null {
 
 export const resignationAcknowledgementService = {
     async fetchRequests(options: { includeInactive: boolean }): Promise<ResignationRequestWithUser[]> {
-        const statusFilter = options.includeInactive ? "" : "filter[status][_in]=pending,approved&";
+        const statusFilter = options.includeInactive ? "" : "filter[status][_in]=pending,approved,clearance_ongoing&";
         const response = await directusGet(
             `/items/resignation_request?${statusFilter}sort=-filed_at&limit=-1&fields=*`
         );

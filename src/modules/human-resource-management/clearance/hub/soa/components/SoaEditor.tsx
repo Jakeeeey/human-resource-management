@@ -270,8 +270,16 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
 
     const previewModel = useMemo<SoaPrintInput | null>(() => {
         if (model === null) return null;
-        return applySignatoryOverrides({ ...model, lines: previewLines }, signatoryOverlay);
-    }, [model, previewLines, signatoryOverlay]);
+        return applySignatoryOverrides(
+            {
+                ...model,
+                lines: previewLines,
+                companyContact: companies.selected?.company_contact ?? null,
+                companyEmail: companies.selected?.company_email ?? null,
+            },
+            signatoryOverlay
+        );
+    }, [model, previewLines, signatoryOverlay, companies.selected]);
 
     const buildPreviewPdf = useCallback((): Uint8Array => {
         if (previewModel === null) return new Uint8Array();
@@ -656,7 +664,7 @@ export function SoaEditor({ requestId, autoPrint = false }: SoaEditorProps): JSX
                         type="button"
                         variant={hasUpload ? "outline" : "default"}
                         onClick={() => setSoa201Open(true)}
-                        disabled={isApproved}
+                        disabled={isApproved && !hasUpload}
                         aria-label={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
                         title={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
                     >

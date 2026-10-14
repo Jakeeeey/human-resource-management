@@ -221,7 +221,7 @@ export const ClearanceEventSchema = z.object({
 
 export type ClearanceEvent = z.infer<typeof ClearanceEventSchema>;
 
-export const CLEARANCE_DOCUMENT_KEYS = ["form", "soa", "quit_claim"] as const;
+export const CLEARANCE_DOCUMENT_KEYS = ["form", "soa", "quit_claim", "turnover"] as const;
 
 export type ClearanceDocumentKey = (typeof CLEARANCE_DOCUMENT_KEYS)[number];
 
@@ -229,6 +229,7 @@ export const CLEARANCE_DOCUMENT_LABELS: Record<ClearanceDocumentKey, string> = {
     form: "Clearance Form",
     soa: "SOA",
     quit_claim: "Quit Claims",
+    turnover: "Turnover Checklist",
 };
 
 export const CLEARANCE_DOCUMENT_STATES = ["missing", "pending", "approved"] as const;
@@ -253,6 +254,7 @@ export interface ClearanceDocumentChecklist {
     form: ClearanceDocumentEntry;
     soa: ClearanceDocumentEntry;
     quitClaim: ClearanceDocumentEntry;
+    turnover: ClearanceDocumentEntry;
     approvedCount: number;
     complete: boolean;
 }
@@ -265,12 +267,14 @@ export function toClearanceDocumentChecklist(
     requestId: number,
     form?: ClearanceDocumentSnapshot,
     soa?: ClearanceDocumentSnapshot,
-    quitClaim?: ClearanceDocumentSnapshot
+    quitClaim?: ClearanceDocumentSnapshot,
+    turnover?: ClearanceDocumentSnapshot
 ): ClearanceDocumentChecklist {
     const resolvedForm = form ?? MISSING_DOCUMENT_SNAPSHOT;
     const resolvedSoa = soa ?? MISSING_DOCUMENT_SNAPSHOT;
     const resolvedQuitClaim = quitClaim ?? MISSING_DOCUMENT_SNAPSHOT;
-    const approvedCount = [resolvedForm, resolvedSoa, resolvedQuitClaim].filter(
+    const resolvedTurnover = turnover ?? MISSING_DOCUMENT_SNAPSHOT;
+    const approvedCount = [resolvedForm, resolvedSoa, resolvedQuitClaim, resolvedTurnover].filter(
         (entry) => entry.state === "approved"
     ).length;
     return {
@@ -278,7 +282,8 @@ export function toClearanceDocumentChecklist(
         form: { key: "form", state: resolvedForm.state, refNo: resolvedForm.refNo, documentId: resolvedForm.documentId },
         soa: { key: "soa", state: resolvedSoa.state, refNo: resolvedSoa.refNo, documentId: resolvedSoa.documentId },
         quitClaim: { key: "quit_claim", state: resolvedQuitClaim.state, refNo: resolvedQuitClaim.refNo, documentId: resolvedQuitClaim.documentId },
+        turnover: { key: "turnover", state: resolvedTurnover.state, refNo: resolvedTurnover.refNo, documentId: resolvedTurnover.documentId },
         approvedCount,
-        complete: approvedCount === 3,
+        complete: approvedCount === 4,
     };
 }

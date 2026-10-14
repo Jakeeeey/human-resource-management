@@ -1,4 +1,4 @@
-import { jsPDF } from "jspdf";
+import { GState, jsPDF } from "jspdf";
 import { __createTable, __drawTable } from "jspdf-autotable";
 import type { RowInput } from "jspdf-autotable";
 
@@ -19,9 +19,19 @@ export interface SoaPrintInput {
     dateOfSeparation: string;
     companyName: string;
     companyAddress: string;
+    companyContact?: string | null;
+    companyEmail?: string | null;
     logoDataUrl: string | null;
     signatories: SoaSignatory[];
     lines: SoaPrintLine[];
+}
+
+interface SoaLetterhead {
+    company_name: string;
+    company_address?: string | null;
+    company_contact?: string | null;
+    company_email?: string | null;
+    logo_data_url?: string | null;
 }
 
 const MARGIN = 48;
@@ -31,21 +41,94 @@ const RED_B = 0;
 const GREY = 110;
 const HEADER_FILL: [number, number, number] = [0, 0, 0];
 const MIN_ROWS_PER_DEPARTMENT = 3;
-const LOGO_HEIGHT = 40;
-const LOGO_MAX_WIDTH = 160;
+const LETTERHEAD_NAME_SIZE = 15;
+const LETTERHEAD_META_SIZE = 9;
+const WATERMARK_MAX_WIDTH = 460;
+const WATERMARK_MAX_HEIGHT = 330;
+const WATERMARK_OPACITY = 0.14;
+const LETTERHEAD_LOGO_MAX_WIDTH = 150;
+const LETTERHEAD_LOGO_MAX_HEIGHT = 58;
 
 function formatAmount(value: number): string {
     return "Php. " + value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function sniffImageFormat(dataUrl: string): string | null {
-    if (dataUrl.startsWith("data:image/jpeg") || dataUrl.startsWith("data:image/jpg")) {
-        return "JPEG";
+function tryPlaceLogo(doc: jsPDF, dataUrl: string, x: number, y: number): void {
+    try {
+        const props = doc.getImageProperties(dataUrl);
+        if (props.width <= 0 || props.height <= 0) return;
+        const scale = Math.min(LETTERHEAD_LOGO_MAX_WIDTH / props.width, LETTERHEAD_LOGO_MAX_HEIGHT / props.height);
+        const width = props.width * scale;
+        const height = props.height * scale;
+        const offsetX = x + (LETTERHEAD_LOGO_MAX_WIDTH - width) / 2;
+        const offsetY = y + (LETTERHEAD_LOGO_MAX_HEIGHT - height) / 2;
+        const format = dataUrl.indexOf("data:image/jpeg") === 0 ? "JPEG" : "PNG";
+        doc.addImage(dataUrl, format, offsetX, offsetY, width, height);
+    } catch {
+        return;
     }
-    if (dataUrl.startsWith("data:image/png")) {
-        return "PNG";
+}
+
+function drawLetterhead(doc: jsPDF, company: SoaLetterhead, y: number): number {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const logo = company.logo_data_url ?? "";
+    if (logo !== "") {
+        tryPlaceLogo(doc, logo, MARGIN, y);
     }
-    return null;
+    const rightEdge = pageWidth - MARGIN;
+    const textCenterX =
+        logo !== "" ? (MARGIN + LETTERHEAD_LOGO_MAX_WIDTH + 12 + rightEdge) / 2 : pageWidth / 2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(LETTERHEAD_NAME_SIZE);
+    doc.setTextColor(0);
+    doc.text(company.company_name, textCenterX, y + 14, { align: "center" });
+    let cursor = y + 32;
+    doc.setFont("helvetica", "bolditalic");
+    doc.setFontSize(LETTERHEAD_META_SIZE);
+    const address = company.company_address ?? "";
+    if (address !== "") {
+        doc.text(address, textCenterX, cursor, { align: "center" });
+        cursor += 13;
+    }
+    const contactParts: string[] = [];
+    const contact = company.company_contact ?? "";
+    const email = company.company_email ?? "";
+    if (contact !== "") {
+        contactParts.push(contact);
+    }
+    if (email !== "") {
+        contactParts.push(email);
+    }
+    if (contactParts.length > 0) {
+        doc.text(contactParts.join(" | "), textCenterX, cursor, { align: "center" });
+        cursor += 13;
+    }
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.75);
+    const ruleY = Math.max(cursor + 4, y + LETTERHEAD_LOGO_MAX_HEIGHT + 6);
+    doc.line(MARGIN, ruleY, pageWidth - MARGIN, ruleY);
+    return ruleY + 18;
+}
+
+function drawWatermark(doc: jsPDF, logoDataUrl: string | null): void {
+    if (!logoDataUrl) return;
+    const format = logoDataUrl.indexOf("data:image/jpeg") === 0 ? "JPEG" : "PNG";
+    const total = doc.getNumberOfPages();
+    for (let page = 1; page <= total; page += 1) {
+        doc.setPage(page);
+        try {
+            const props = doc.getImageProperties(logoDataUrl);
+            if (props.width <= 0 || props.height <= 0) continue;
+            const scale = Math.min(WATERMARK_MAX_WIDTH / props.width, WATERMARK_MAX_HEIGHT / props.height);
+            const width = props.width * scale;
+            const height = props.height * scale;
+            doc.setGState(new GState({ opacity: WATERMARK_OPACITY }));
+            doc.addImage(logoDataUrl, format, (doc.internal.pageSize.getWidth() - width) / 2, (doc.internal.pageSize.getHeight() - height) / 2, width, height);
+            doc.setGState(new GState({ opacity: 1 }));
+        } catch {
+            doc.setGState(new GState({ opacity: 1 }));
+        }
+    }
 }
 
 export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
@@ -56,44 +139,19 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
     const contentWidth = pageWidth - MARGIN * 2;
     let y = MARGIN;
 
-    let textX = MARGIN;
-    let logoHeight = 0;
-    const logoFormat = input.logoDataUrl === null ? null : sniffImageFormat(input.logoDataUrl);
-    if (input.logoDataUrl !== null && logoFormat !== null) {
-        try {
-            const props = doc.getImageProperties(input.logoDataUrl);
-            const ratio = props.width / props.height;
-            let logoWidth = LOGO_HEIGHT * ratio;
-            let scaledHeight = LOGO_HEIGHT;
-            if (logoWidth > LOGO_MAX_WIDTH) {
-                logoWidth = LOGO_MAX_WIDTH;
-                scaledHeight = logoWidth / ratio;
-            }
-            doc.addImage(input.logoDataUrl, logoFormat, MARGIN, y, logoWidth, scaledHeight);
-            textX = MARGIN + logoWidth + 12;
-            logoHeight = scaledHeight;
-        } catch {
-            textX = MARGIN;
-            logoHeight = 0;
-        }
-    }
-
-    let headerTextHeight = 0;
     if (input.companyName !== "") {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(0);
-        const nameLines = doc.splitTextToSize(input.companyName, rightEdge - textX);
-        doc.text(nameLines, textX, y + 14);
-        headerTextHeight += nameLines.length * 16;
+        y = drawLetterhead(
+            doc,
+            {
+                company_name: input.companyName,
+                company_address: input.companyAddress,
+                company_contact: input.companyContact,
+                company_email: input.companyEmail,
+                logo_data_url: input.logoDataUrl,
+            },
+            y
+        );
     }
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(0);
-    const addressLines = doc.splitTextToSize("ADDRESS: " + input.companyAddress, rightEdge - textX);
-    doc.text(addressLines, textX, y + 14 + headerTextHeight);
-    headerTextHeight += addressLines.length * 12 + 4;
-    y += Math.max(logoHeight, headerTextHeight) + 12;
 
     const refRows: Array<[string, string]> = [
         ["REF No.:", input.refNo],
@@ -299,6 +357,8 @@ export function buildSoaPdf(input: SoaPrintInput): Uint8Array {
             doc.setTextColor(0);
         });
     }
+
+    drawWatermark(doc, input.logoDataUrl ?? null);
 
     const totalPages = doc.getNumberOfPages();
     for (let page = 1; page <= totalPages; page += 1) {

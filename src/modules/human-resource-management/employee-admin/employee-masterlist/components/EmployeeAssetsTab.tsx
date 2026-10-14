@@ -248,6 +248,8 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
       doc.setTextColor(100, 100, 100);
       
       // Build address parts
+      const directAddress =
+        typeof companyData?.company_address === "string" ? companyData.company_address.trim() : "";
       const addrParts = [
         companyData?.company_address,
         companyData?.company_brgy,
@@ -256,7 +258,7 @@ export function EmployeeAssetsTab({ user, departments = [] }: EmployeeAssetsTabP
         companyData?.company_zipCode
       ].filter(Boolean);
       
-      const fullAddress = addrParts.length > 0 ? addrParts.join(", ") : "Digital Hub, Quezon City, Philippines";
+      const fullAddress = directAddress || (addrParts.length > 0 ? addrParts.join(", ") : "Digital Hub, Quezon City, Philippines");
       doc.text(fullAddress, 65, 21);
       
       const contactParts = [];

@@ -453,7 +453,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                         type="button"
                         variant={hasUpload ? "outline" : "default"}
                         onClick={() => setUploadOpen(true)}
-                        disabled={frozen}
+                        disabled={frozen && !hasUpload}
                         aria-label={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
                         title={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
                     >
