@@ -37,6 +37,7 @@ export interface ClearanceHubRequest {
     signed_count: number;
     total_count: number;
     cleared: boolean;
+    employee_name: string | null;
 }
 
 export interface ClearanceHubTemplate {
@@ -190,6 +191,7 @@ function parseHubRequest(value: unknown): ClearanceHubRequest | null {
         signed_count: signedCount,
         total_count: totalCount,
         cleared: typeof value.cleared === "boolean" ? value.cleared : status === "completed",
+        employee_name: toNullableText(value.employee_name),
     };
 }
 

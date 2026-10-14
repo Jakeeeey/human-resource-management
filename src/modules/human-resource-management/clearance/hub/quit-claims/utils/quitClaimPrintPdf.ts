@@ -1,4 +1,4 @@
-import { jsPDF } from "jspdf";
+import { GState, jsPDF } from "jspdf";
 import { __createTable, __drawTable } from "jspdf-autotable";
 import type { RowInput, UserOptions } from "jspdf-autotable";
 
@@ -58,6 +58,12 @@ const ACCOUNTABILITY_MIN_ROWS = 5;
 const DEDUCTION_MIN_ROWS = 3;
 const DUE_MIN_ROWS = 3;
 const FALLBACK_COMPANY = "VERTEX TECHNOLOGIES CORPORATION";
+
+const WATERMARK_MAX_WIDTH = 460;
+const WATERMARK_MAX_HEIGHT = 330;
+const WATERMARK_OPACITY = 0.14;
+const LETTERHEAD_LOGO_MAX_WIDTH = 150;
+const LETTERHEAD_LOGO_MAX_HEIGHT = 58;
 
 const LONG_MONTHS = [
     "January",
@@ -172,10 +178,14 @@ function registryLines(ack: QuitClaimAcknowledgement | undefined): string[] {
 function tryPlaceLogo(doc: jsPDF, dataUrl: string, x: number, y: number): void {
     try {
         const props = doc.getImageProperties(dataUrl);
-        const height = 44;
-        const width = Math.min(130, (props.width / props.height) * height);
+        if (props.width <= 0 || props.height <= 0) return;
+        const scale = Math.min(LETTERHEAD_LOGO_MAX_WIDTH / props.width, LETTERHEAD_LOGO_MAX_HEIGHT / props.height);
+        const width = props.width * scale;
+        const height = props.height * scale;
+        const offsetX = x + (LETTERHEAD_LOGO_MAX_WIDTH - width) / 2;
+        const offsetY = y + (LETTERHEAD_LOGO_MAX_HEIGHT - height) / 2;
         const format = dataUrl.indexOf("data:image/jpeg") === 0 ? "JPEG" : "PNG";
-        doc.addImage(dataUrl, format, x, y, width, height);
+        doc.addImage(dataUrl, format, offsetX, offsetY, width, height);
     } catch {
         return;
     }
@@ -186,16 +196,19 @@ function drawLetterhead(doc: jsPDF, company: QuitClaimCompany, y: number): numbe
     if (logo !== "") {
         tryPlaceLogo(doc, logo, MARGIN, y);
     }
+    const rightEdge = PAGE_WIDTH - MARGIN;
+    const textCenterX =
+        logo !== "" ? (MARGIN + LETTERHEAD_LOGO_MAX_WIDTH + 12 + rightEdge) / 2 : PAGE_WIDTH / 2;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(TITLE_SIZE);
     doc.setTextColor(0);
-    doc.text(company.company_name, PAGE_WIDTH / 2, y + 14, { align: "center" });
+    doc.text(company.company_name, textCenterX, y + 14, { align: "center" });
     let cursor = y + 32;
     doc.setFont("helvetica", "bolditalic");
     doc.setFontSize(9);
     const address = company.company_address ?? "";
     if (address !== "") {
-        doc.text(address, PAGE_WIDTH / 2, cursor, { align: "center" });
+        doc.text(address, textCenterX, cursor, { align: "center" });
         cursor += 13;
     }
     const contactParts: string[] = [];
@@ -208,13 +221,14 @@ function drawLetterhead(doc: jsPDF, company: QuitClaimCompany, y: number): numbe
         contactParts.push(email);
     }
     if (contactParts.length > 0) {
-        doc.text(contactParts.join(" | "), PAGE_WIDTH / 2, cursor, { align: "center" });
+        doc.text(contactParts.join(" | "), textCenterX, cursor, { align: "center" });
         cursor += 13;
     }
     doc.setDrawColor(0);
     doc.setLineWidth(0.75);
-    doc.line(MARGIN, cursor + 4, PAGE_WIDTH - MARGIN, cursor + 4);
-    return cursor + 22;
+    const ruleY = Math.max(cursor + 4, y + LETTERHEAD_LOGO_MAX_HEIGHT + 6);
+    doc.line(MARGIN, ruleY, PAGE_WIDTH - MARGIN, ruleY);
+    return ruleY + 18;
 }
 
 function drawTitle(
@@ -743,6 +757,27 @@ function drawSection2Signatories(doc: jsPDF, values: QuitClaimValues, y: number)
     return cursor + 40;
 }
 
+function drawWatermark(doc: jsPDF, logoDataUrl: string | null): void {
+    if (!logoDataUrl) return;
+    const format = logoDataUrl.indexOf("data:image/jpeg") === 0 ? "JPEG" : "PNG";
+    const total = doc.getNumberOfPages();
+    for (let page = 1; page <= total; page += 1) {
+        doc.setPage(page);
+        try {
+            const props = doc.getImageProperties(logoDataUrl);
+            if (props.width <= 0 || props.height <= 0) continue;
+            const scale = Math.min(WATERMARK_MAX_WIDTH / props.width, WATERMARK_MAX_HEIGHT / props.height);
+            const width = props.width * scale;
+            const height = props.height * scale;
+            doc.setGState(new GState({ opacity: WATERMARK_OPACITY }));
+            doc.addImage(logoDataUrl, format, (PAGE_WIDTH - width) / 2, (PAGE_HEIGHT - height) / 2, width, height);
+            doc.setGState(new GState({ opacity: 1 }));
+        } catch {
+            doc.setGState(new GState({ opacity: 1 }));
+        }
+    }
+}
+
 function drawFooters(doc: jsPDF): void {
     const totalPages = doc.getNumberOfPages();
     for (let page = 1; page <= totalPages; page += 1) {
@@ -941,6 +976,7 @@ export function buildQuitClaimPdf(values: QuitClaimValues, company: QuitClaimCom
         y = writeParagraph(doc, line, MARGIN, y, CONTENT_WIDTH, BODY_SIZE, BODY_LEADING, false, 0);
     }
 
+    drawWatermark(doc, company.logo_data_url ?? null);
     drawFooters(doc);
     return new Uint8Array(doc.output("arraybuffer"));
 }

@@ -1,12 +1,14 @@
 import { z } from "zod";
 
-export const RESIGNATION_STATUSES = ["pending", "approved", "rejected", "withdrawn"] as const;
+export const RESIGNATION_STATUSES = ["pending", "approved", "clearance_ongoing", "cleared", "rejected", "withdrawn"] as const;
 
 export type ResignationStatus = (typeof RESIGNATION_STATUSES)[number];
 
 export const RESIGNATION_STATUS_LABELS: Record<ResignationStatus, string> = {
     pending: "Pending",
     approved: "Acknowledged",
+    clearance_ongoing: "Clearance Ongoing",
+    cleared: "Cleared",
     rejected: "Rejected",
     withdrawn: "Withdrawn",
 };

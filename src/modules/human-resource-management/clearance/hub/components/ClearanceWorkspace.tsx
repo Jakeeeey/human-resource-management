@@ -26,6 +26,7 @@ import { DocumentChecklist } from "./DocumentChecklist";
 import ClearanceFormModule from "../form";
 import ClearanceSoaModule from "../soa";
 import ClearanceQuitClaimsModule from "../quit-claims";
+import ClearanceTurnoverModule from "../turnover";
 import { parseClearanceHubTab } from "../utils/documentTabs";
 import styles from "./hub-status.module.css";
 
@@ -47,10 +48,8 @@ function WorkspaceSkeletons() {
 
 function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Element {
     const {
-        resignations,
         refresh,
         fetchDetail,
-        isLoading: hubLoading,
     } = useClearanceHubContext();
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -80,13 +79,7 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
         void reloadDetail();
     }, [reloadDetail]);
 
-    const resignationMatch = detail
-        ? resignations.find((entry) => entry.id === detail.resignation_id) ?? null
-        : null;
-    const employeeName = !detail
-        ? ""
-        : (resignationMatch ? resignationMatch.employee_name : "Unknown employee");
-    const nameLoading = detail !== null && resignationMatch === null && hubLoading;
+    const employeeName = detail ? (detail.employee_name ?? "Unknown employee") : "";
 
     const handleRefresh = async () => {
         await reloadDetail();
@@ -112,8 +105,8 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
     const approvedCount = documents.checklist?.approvedCount ?? 0;
     const filedLabel = formatPHT(detail?.created_at);
     const confirmedLabel = formatPHT(detail?.confirmed_at);
-    const progressLabel = `${approvedCount} of 3 approved`;
-    const progressValue = Math.round((approvedCount / 3) * 100);
+    const progressLabel = `${approvedCount} of 4 approved`;
+    const progressValue = Math.round((approvedCount / 4) * 100);
 
     return (
         <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
@@ -124,13 +117,9 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
                     </div>
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            {detail && nameLoading ? (
-                                <Skeleton className="h-9 w-56" aria-label="Loading employee name" />
-                            ) : (
-                                <h1 className="line-clamp-2 text-2xl font-bold sm:text-4xl" title={employeeName}>
-                                    {isLoading && !detail ? "Loading…" : employeeName}
-                                </h1>
-                            )}
+                            <h1 className="line-clamp-2 text-2xl font-bold sm:text-4xl" title={employeeName}>
+                                {isLoading && !detail ? "Loading…" : employeeName}
+                            </h1>
                             {detail ? (
                                 <StatusBadge tone={statusTone(detail.status)} className={detail.status === "completed" ? styles.signed : styles.pending}>
                                     {CLEARANCE_REQUEST_STATUS_LABELS[detail.status]}
@@ -167,6 +156,7 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
                     <TabsTrigger value="form" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Clearance Form</TabsTrigger>
                     <TabsTrigger value="soa" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">SOA</TabsTrigger>
                     <TabsTrigger value="quit-claims" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Quit Claims</TabsTrigger>
+                    <TabsTrigger value="turnover" className="min-h-11 shrink-0 md:min-h-0 text-base data-[state=active]:bg-primary data-[state=active]:font-semibold data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:border-transparent dark:data-[state=active]:text-primary-foreground">Turnover Checklist</TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview" className="m-0">
                     {isLoading && !detail ? (
@@ -240,6 +230,9 @@ function ClearanceWorkspaceInner({ requestId }: { requestId: number }): JSX.Elem
                 </TabsContent>
                 <TabsContent value="quit-claims" className="m-0">
                     <ClearanceQuitClaimsModule />
+                </TabsContent>
+                <TabsContent value="turnover" className="m-0">
+                    <ClearanceTurnoverModule />
                 </TabsContent>
             </Tabs>
         </div>

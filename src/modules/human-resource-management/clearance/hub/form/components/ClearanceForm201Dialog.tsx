@@ -179,32 +179,36 @@ export function ClearanceForm201Dialog({
                     <Button variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
                         Close
                     </Button>
-                    <Button
-                        variant="outline"
-                        className="w-full sm:w-auto"
-                        onClick={() => void handleUpload()}
-                        disabled={readOnly || uploading || saving}
-                    >
-                        {uploading ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                            <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
-                        )}
-                        {uploading ? "Uploading…" : "Upload"}
-                    </Button>
-                    <Button
-                        variant="default"
-                        className="w-full sm:w-auto"
-                        onClick={() => void handleSave()}
-                        disabled={stagedFileId === null || readOnly || saving || uploading}
-                    >
-                        {saving ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                            <Save className="mr-2 h-4 w-4" aria-hidden="true" />
-                        )}
-                        {saving ? "Saving…" : "Save"}
-                    </Button>
+                    {!readOnly && (
+                        <Button
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            onClick={() => void handleUpload()}
+                            disabled={uploading || saving}
+                        >
+                            {uploading ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            ) : (
+                                <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+                            )}
+                            {uploading ? "Uploading…" : "Upload"}
+                        </Button>
+                    )}
+                    {!readOnly && (
+                        <Button
+                            variant="default"
+                            className="w-full sm:w-auto"
+                            onClick={() => void handleSave()}
+                            disabled={stagedFileId === null || saving || uploading}
+                        >
+                            {saving ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            ) : (
+                                <Save className="mr-2 h-4 w-4" aria-hidden="true" />
+                            )}
+                            {saving ? "Saving…" : "Save"}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

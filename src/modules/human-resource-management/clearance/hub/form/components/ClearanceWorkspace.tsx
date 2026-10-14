@@ -259,6 +259,8 @@ export function ClearanceWorkspace({
             position: previewModel.position,
             company_name: previewModel.company_name ?? previewCompany?.company_name,
             company_address: previewModel.company_address ?? previewCompany?.company_address ?? null,
+            company_contact: previewCompany?.company_contact ?? null,
+            company_email: previewCompany?.company_email ?? null,
             logo_data_url: previewModel.logo_data_url ?? (previewCompany ? companyLogoDataUrl(previewCompany) : null),
             gmName,
             gmTitle,
@@ -300,7 +302,7 @@ export function ClearanceWorkspace({
     const hasUpload = form !== null && form.pdf_file !== null && form.pdf_file !== "";
     const isApproved = form?.status === "approved";
     const formReadonly = isCompleted || isApproved;
-    const showUpload = form !== null && !isCompleted;
+    const show201 = form !== null;
     const showApprove = form !== null && !isApproved && !isCompleted;
     const approveBlocked = !hasUpload;
     const approveDisabled = approving || approveBlocked;
@@ -382,7 +384,7 @@ export function ClearanceWorkspace({
     const saveDisabled = isSaving || gmSaving || signatoriesLoading || totalChanges === 0 || formReadonly;
 
     return (
-        <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
+        <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-xl font-bold tracking-tight">Clearance Form</h2>
@@ -416,14 +418,14 @@ export function ClearanceWorkspace({
                             Print
                         </Button>
                     ) : null}
-                    {showUpload ? (
+                    {show201 ? (
                         <Button
                             type="button"
                             variant={hasUpload ? "outline" : "default"}
                             size="sm"
                             className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
                             onClick={() => setForm201Open(true)}
-                            disabled={formReadonly}
+                            disabled={formReadonly && !hasUpload}
                             aria-label={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
                             title={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
                         >
@@ -509,7 +511,7 @@ export function ClearanceWorkspace({
                         />
                     ) : null}
                     </div>
-                    <div className="min-w-0 space-y-6">
+                    <div className="lg:sticky lg:top-4">
                         <LiveDocumentPreview
                             build={buildPreviewPdf}
                             revision={previewRevision}

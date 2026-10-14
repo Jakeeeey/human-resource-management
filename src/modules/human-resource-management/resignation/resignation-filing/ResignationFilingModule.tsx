@@ -34,6 +34,12 @@ function eligibilityMessage(eligibility: ResignationEligibility): string {
     if (eligibility.reason === "approved") {
         return "Your resignation has already been acknowledged, so you cannot file again.";
     }
+    if (eligibility.reason === "clearance_ongoing") {
+        return "Your resignation is already in the clearance process.";
+    }
+    if (eligibility.reason === "cleared") {
+        return "Your resignation has already been cleared.";
+    }
     if (eligibility.reason === "cooling_down") {
         if (eligibility.nextAllowedAt) {
             return `You can file a new resignation on ${formatPHT(eligibility.nextAllowedAt, { includeTime: false })}.`;

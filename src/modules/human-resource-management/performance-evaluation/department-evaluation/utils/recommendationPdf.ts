@@ -50,6 +50,8 @@ export interface RecommendationCompanyAddress {
 export function formatRecommendationCompanyAddress(
     parts: RecommendationCompanyAddress
 ): string {
+    const direct = typeof parts.company_address === "string" ? parts.company_address.trim() : "";
+    if (direct) return direct;
     return [
         parts.company_address,
         parts.company_brgy,

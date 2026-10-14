@@ -65,6 +65,7 @@ export interface ClearanceRequestDetail extends ClearanceRequestRow {
     signed_count: number;
     total_count: number;
     cleared: boolean;
+    employee_name: string | null;
 }
 
 export interface ClearanceRequestCounts {
@@ -594,6 +595,26 @@ async function readUserRecord(userId: number): Promise<Record<string, unknown> |
     return readSingleOrNull(`/items/user/${userId}?fields=${CLEARANCE_USER_FIELDS}`);
 }
 
+async function readEmployeeName(userId: number): Promise<string | null> {
+    const user = await readUserRecord(userId);
+    return user ? toFullName(user) : null;
+}
+
+async function readEmployeeNames(userIds: number[]): Promise<Map<number, string>> {
+    const names = new Map<number, string>();
+    if (userIds.length === 0) return names;
+    const raws = await readListRaw(
+        `/items/user?filter[user_id][_in]=${userIds.join(",")}&fields=user_id,user_fname,user_mname,user_lname&limit=-1`,
+        "user"
+    );
+    for (const raw of raws) {
+        const userId = toId(raw.user_id);
+        if (userId === null) continue;
+        names.set(userId, toFullName(raw));
+    }
+    return names;
+}
+
 async function listUserRecordsByDepartment(departmentId: number): Promise<Record<string, unknown>[]> {
     return readListRaw(
         `/items/user?filter[user_department][_eq]=${departmentId}&fields=${CLEARANCE_USER_FIELDS}&limit=-1`,
@@ -617,7 +638,11 @@ async function readDepartmentName(departmentId: number): Promise<string | null> 
     return toNullableText(row.department_name);
 }
 
-function toDetail(request: ClearanceRequestRow, items: ClearanceItemRow[]): ClearanceRequestDetail {
+function toDetail(
+    request: ClearanceRequestRow,
+    items: ClearanceItemRow[],
+    employeeName: string | null = null
+): ClearanceRequestDetail {
     const signed = items.filter((item) => item.status === "signed").length;
     return {
         ...request,
@@ -625,6 +650,7 @@ function toDetail(request: ClearanceRequestRow, items: ClearanceItemRow[]): Clea
         signed_count: signed,
         total_count: items.length,
         cleared: request.status === "completed",
+        employee_name: employeeName,
     };
 }
 
@@ -633,7 +659,7 @@ export async function getClearanceRequestDetail(id: number): Promise<ClearanceRe
     if (!request) {
         fail(CLEARANCE_REQUEST_ERROR_CODES.requestNotFound, `clearance_request ${id} does not exist`);
     }
-    return toDetail(request, await listItemRows(id));
+    return toDetail(request, await listItemRows(id), await readEmployeeName(request.user_id));
 }
 
 export async function readClearanceItemRequest(itemId: number): Promise<ClearanceRequestRow | null> {
@@ -685,7 +711,12 @@ export async function listClearanceRequests(query: ClearanceRequestListQuery): P
         requests.push(request);
     }
     const itemsByRequest = await listItemRowsForRequests(requests.map((request) => request.id));
-    const details = requests.map((request) => toDetail(request, itemsByRequest.get(request.id) ?? []));
+    const employeeNames = await readEmployeeNames([
+        ...new Set(requests.map((request) => request.user_id)),
+    ]);
+    const details = requests.map((request) =>
+        toDetail(request, itemsByRequest.get(request.id) ?? [], employeeNames.get(request.user_id) ?? null)
+    );
     const counts = await countClearanceRequests(filters);
     return {
         data: details,
@@ -820,6 +851,20 @@ export async function assignClearanceRequest(input: AssignClearanceRequestInput)
         reason: null,
         payload: { template_id: input.templateId, soa_template_id: soaTemplate ? soaTemplate.id : null, item_count: items.length },
     });
+    try {
+        const currentResignation = await readResignationRef(input.resignationId);
+        if (currentResignation && currentResignation.status === "approved") {
+            await dFetch(`/items/resignation_request/${input.resignationId}`, {
+                method: "PATCH",
+                body: JSON.stringify({
+                    status: "clearance_ongoing",
+                    updated_at: now,
+                    updated_by: input.actorId,
+                }),
+            });
+        }
+    } catch {
+    }
     return { request: toDetail(request, items), created: true };
 }
 
@@ -988,10 +1033,11 @@ export async function confirmClearanceRequest(id: number, actorId: number | null
 export async function syncClearanceRequestCompletion(requestId: number, actorId: number | null): Promise<void> {
     const request = await readRequestRow(requestId);
     if (!request) return;
-    const [formBody, soaBody, quitBody] = await Promise.all([
+    const [formBody, soaBody, quitBody, turnoverBody] = await Promise.all([
         dFetch(`/items/clearance_form?filter[request_id][_eq]=${requestId}&fields=status&limit=1`),
         dFetch(`/items/clearance_soa?filter[request_id][_eq]=${requestId}&fields=status&limit=1`),
         dFetch(`/items/clearance_quitclaim?filter[request_id][_eq]=${requestId}&fields=status&limit=1`),
+        dFetch(`/items/clearance_turnover?filter[request_id][_eq]=${requestId}&fields=status&limit=1`),
     ]);
     function firstStatus(body: unknown): string | null {
         if (!isRecord(body) || !Array.isArray(body.data) || body.data.length === 0) return null;
@@ -1001,16 +1047,41 @@ export async function syncClearanceRequestCompletion(requestId: number, actorId:
     }
     const allApproved = firstStatus(formBody) === "approved" &&
         firstStatus(soaBody) === "approved" &&
-        firstStatus(quitBody) === "approved";
+        firstStatus(quitBody) === "approved" &&
+        firstStatus(turnoverBody) === "approved";
     const now = nowUTC();
     if (allApproved) {
         if (request.status !== "completed") {
             await patchRequestRow(requestId, { status: "completed", updated_at: now, updated_by: actorId });
         }
+        if (request.resignation_id) {
+            const resignation = await readResignationRef(request.resignation_id);
+            if (resignation && (resignation.status === "clearance_ongoing" || resignation.status === "approved")) {
+                try {
+                    await dFetch(`/items/resignation_request/${request.resignation_id}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ status: "cleared", updated_at: now, updated_by: actorId }),
+                    });
+                } catch {
+                }
+            }
+        }
         return;
     }
     if (request.status === "completed") {
         await patchRequestRow(requestId, { status: "in_progress", updated_at: now, updated_by: actorId });
+        if (request.resignation_id) {
+            const resignation = await readResignationRef(request.resignation_id);
+            if (resignation && resignation.status === "cleared") {
+                try {
+                    await dFetch(`/items/resignation_request/${request.resignation_id}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ status: "clearance_ongoing", updated_at: now, updated_by: actorId }),
+                    });
+                } catch {
+                }
+            }
+        }
     }
 }
 

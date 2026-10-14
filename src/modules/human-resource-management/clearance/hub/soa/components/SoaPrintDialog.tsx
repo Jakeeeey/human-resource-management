@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import { AlertCircle, Download, Loader2, Printer, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -77,6 +77,15 @@ export function SoaPrintDialog({
     const printingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const viewUrl = previewUrl ? toFitWidthUrl(previewUrl) : null;
     const selectedCompanyId = companyChoice ?? pickDefaultCompany(companyOptions)?.id ?? null;
+    const printableModel = useMemo<SoaPrintInput | null>(() => {
+        if (!model) return null;
+        const resolved = employeeCompany ?? pickDefaultCompany(companyOptions);
+        return {
+            ...model,
+            companyContact: resolved?.company_contact ?? null,
+            companyEmail: resolved?.company_email ?? null,
+        };
+    }, [model, employeeCompany, companyOptions]);
 
     useEffect(() => {
         if (!open) {
@@ -97,10 +106,10 @@ export function SoaPrintDialog({
         }
         setPreviewUrl(null);
         try {
-            if (!model) {
+            if (!printableModel) {
                 throw new Error("missing-model");
             }
-            const bytes = buildSoaPdf(model);
+            const bytes = buildSoaPdf(printableModel);
             if (cancelled) return;
             const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
             const url = URL.createObjectURL(blob);
@@ -114,7 +123,7 @@ export function SoaPrintDialog({
         return () => {
             cancelled = true;
         };
-    }, [open, model]);
+    }, [open, printableModel]);
 
     useEffect(() => {
         return () => {

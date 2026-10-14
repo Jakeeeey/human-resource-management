@@ -207,6 +207,8 @@ export function ClearanceFormPrintDialog({
                 position: model.position,
                 company_name: model.company_name ?? selectedCompany?.company_name,
                 company_address: model.company_address ?? selectedCompany?.company_address ?? null,
+                company_contact: selectedCompany?.company_contact ?? null,
+                company_email: selectedCompany?.company_email ?? null,
                 logo_data_url: model.logo_data_url ?? letterheadLogo,
                 gmName: model.gmName,
                 gmTitle: model.gmTitle,
