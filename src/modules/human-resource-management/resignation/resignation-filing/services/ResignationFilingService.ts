@@ -1,6 +1,6 @@
-import { nowUTC } from "@/modules/human-resource-management/resignation/resignation-filing/utils/audit";
 import {
     type EnrichedResignationRequest,
+    type ResignationEmployeeOption,
     type ResignationRequest,
     type ResignationStatus,
 } from "../types";
@@ -15,6 +15,7 @@ const headers = {
 
 export type ResignationFilingCreateInput = {
     user_id: number;
+    created_by: number;
     resignation_date: string;
     reason: string;
     attachment_uuid: string | null;
@@ -54,7 +55,7 @@ export const resignationFilingService = {
                 attachment_name: input.attachment_name,
                 attachment_type: input.attachment_type,
                 filed_at: input.filed_at,
-                created_by: input.user_id,
+                created_by: input.created_by,
             };
             const response = await fetch(`${API_BASE_URL}/items/resignation_request`, {
                 method: "POST",
@@ -74,51 +75,39 @@ export const resignationFilingService = {
             throw new Error("VALIDATION_FAILED: Failed to submit resignation");
         }
     },
-    async withdraw(id: number, userId: number): Promise<"withdrawn" | "not_found" | "not_pending"> {
+    async fetchEmployees(): Promise<ResignationEmployeeOption[]> {
         try {
-            const detailResponse = await fetch(
-                `${API_BASE_URL}/items/resignation_request/${id}?fields=id,user_id,status`,
+            const response = await fetch(
+                `${API_BASE_URL}/items/user?filter[_or][0][is_deleted][_eq]=0&filter[_or][1][is_deleted][_null]=true&fields=user_id,user_fname,user_mname,user_lname&limit=-1&sort=user_lname`,
                 { headers }
             );
-            if (!detailResponse.ok) {
-                return "not_found";
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("DIRECTUS ERROR [fetchEmployees]:", errorText);
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const detailResult = await detailResponse.json();
-            const detail: Record<string, unknown> | null = detailResult.data ?? null;
-            if (detail === null || typeof detail !== "object") {
-                return "not_found";
-            }
-            const ownerId = toNullableId(detail.user_id);
-            if (ownerId === null || ownerId !== userId) {
-                return "not_found";
-            }
-            if (detail.status !== "pending") {
-                return "not_pending";
-            }
-            const patchResponse = await fetch(`${API_BASE_URL}/items/resignation_request/${id}`, {
-                method: "PATCH",
-                headers,
-                body: JSON.stringify({
-                    status: "withdrawn",
-                    updated_at: nowUTC(),
-                    updated_by: userId,
-                }),
-            });
-            if (!patchResponse.ok) {
-                const errorText = await patchResponse.text();
-                console.error(`DIRECTUS ERROR [withdraw:${id}]:`, errorText);
-                throw new Error(`HTTP error! status: ${patchResponse.status}`);
-            }
-            return "withdrawn";
+            const result = await response.json();
+            const rows: Record<string, unknown>[] = Array.isArray(result.data) ? result.data : [];
+            return rows.map((row) => ({
+                user_id: toId(row.user_id),
+                full_name: toFullName(row),
+            }));
         } catch (error) {
-            console.error("Error withdrawing resignation filing:", error);
-            throw new Error("INTERNAL_FAIL: Failed to withdraw resignation filing");
+            console.error("Error fetching employee directory:", error);
+            throw new Error("INTERNAL_FAIL: Failed to fetch employees");
         }
     },
 };
 
 function toStatus(value: unknown): ResignationStatus {
-    if (value === "pending" || value === "approved" || value === "rejected" || value === "withdrawn") {
+    if (
+        value === "pending" ||
+        value === "approved" ||
+        value === "clearance_ongoing" ||
+        value === "cleared" ||
+        value === "rejected" ||
+        value === "withdrawn"
+    ) {
         return value;
     }
     return "pending";
@@ -149,6 +138,14 @@ function toNullableId(value: unknown): number | null {
     }
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toFullName(row: Record<string, unknown>): string {
+    const parts = [row.user_fname, row.user_mname, row.user_lname].filter(
+        (part): part is string => typeof part === "string" && part.trim() !== ""
+    );
+    const name = parts.join(" ").trim();
+    return name === "" ? "Unnamed team member" : name;
 }
 
 function normalizeResignationRequest(row: Record<string, unknown>): EnrichedResignationRequest {

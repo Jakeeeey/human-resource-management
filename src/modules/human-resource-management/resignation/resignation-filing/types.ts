@@ -60,6 +60,7 @@ export const ResignationRequestSchema = z.object({
 export type ResignationRequest = z.infer<typeof ResignationRequestSchema>;
 
 export const ResignationFormSchema = z.object({
+    user_id: z.number().int().positive(),
     resignation_date: z.string().refine(isCalendarDate),
     reason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
     attachment_uuid: z.string().nullable().optional(),
@@ -68,6 +69,11 @@ export const ResignationFormSchema = z.object({
 });
 
 export type ResignationForm = z.infer<typeof ResignationFormSchema>;
+
+export interface ResignationEmployeeOption {
+    user_id: number;
+    full_name: string;
+}
 
 export const ResignationReviewSchema = z.object({
     id: z.number(),

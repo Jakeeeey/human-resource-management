@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatDateOnly, formatPHT } from "../utils/time";
 import { RESIGNATION_STATUS_LABELS } from "../types";
 import type { ResignationRequestWithUser } from "../types";
+import { RESIGNATION_STATUS_BADGE_STYLES } from "../statusBadgeStyles";
 import { ResignationAcknowledgementDialog } from "./ResignationAcknowledgementDialog";
 import { ResignationDetailDialog } from "./ResignationDetailDialog";
 
@@ -191,7 +192,10 @@ export function ResignationAcknowledgementTable({
                                         <TableCell>{formatDateOnly(request.resignation_date)}</TableCell>
                                         <TableCell>{formatPHT(request.filed_at)}</TableCell>
                                         <TableCell>
-                                            <Badge variant="secondary">
+                                            <Badge
+                                                variant="outline"
+                                                className={RESIGNATION_STATUS_BADGE_STYLES[request.status]}
+                                            >
                                                 {RESIGNATION_STATUS_LABELS[request.status]}
                                             </Badge>
                                         </TableCell>
