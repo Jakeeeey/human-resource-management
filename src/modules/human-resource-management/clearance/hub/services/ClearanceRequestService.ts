@@ -1066,6 +1066,15 @@ export async function syncClearanceRequestCompletion(requestId: number, actorId:
                 }
             }
         }
+        if (request.user_id) {
+            try {
+                await dFetch(`/items/user/${request.user_id}`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ is_deleted: 1 }),
+                });
+            } catch {
+            }
+        }
         return;
     }
     if (request.status === "completed") {
