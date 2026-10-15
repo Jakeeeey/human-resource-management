@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Loader2, Paperclip, Send, X } from "lucide-react";
+import { Loader2, Paperclip, Send, X } from "lucide-react";
 import { ATTACHMENT_ALLOWED_MIME, ATTACHMENT_MAX_BYTES, REASON_MAX_LENGTH, ResignationFormSchema } from "../types";
 import { phToday } from "../utils/time";
 import { useResignationFilingContext } from "../providers/ResignationFilingProvider";
@@ -21,7 +20,7 @@ interface PendingAttachment {
 }
 
 export function ResignationFilingForm() {
-    const { submitFiling, uploadAttachment } = useResignationFilingContext();
+    const { selectedUserId, submitFiling, uploadAttachment } = useResignationFilingContext();
     const [resignationDate, setResignationDate] = useState("");
     const [reason, setReason] = useState("");
     const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
@@ -79,6 +78,7 @@ export function ResignationFilingForm() {
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const parsed = ResignationFormSchema.safeParse({
+            user_id: selectedUserId ?? 0,
             resignation_date: resignationDate,
             reason,
             attachment_uuid: attachment?.uuid ?? null,
@@ -108,130 +108,117 @@ export function ResignationFilingForm() {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    File a Resignation
-                </CardTitle>
-                <CardDescription>Choose your effectivity date, state your reason, and optionally attach a supporting document.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-5">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="max-w-[16rem] space-y-2">
-                            <Label htmlFor="resignation-date">
-                                Effectivity Date <span className="text-destructive">*</span>
-                            </Label>
-                            <Input
-                                id="resignation-date"
-                                type="date"
-                                min={phToday()}
-                                value={resignationDate}
-                                onChange={(event) => setResignationDate(event.target.value)}
-                                disabled={isSubmitting}
-                            />
-                            {fieldErrors.resignation_date && (
-                                <p className="text-xs font-semibold text-destructive">{fieldErrors.resignation_date}</p>
-                            )}
+        <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="max-w-[16rem] space-y-2">
+                    <Label htmlFor="resignation-date">
+                        Effectivity Date <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                        id="resignation-date"
+                        type="date"
+                        min={phToday()}
+                        value={resignationDate}
+                        onChange={(event) => setResignationDate(event.target.value)}
+                        disabled={isSubmitting}
+                    />
+                    {fieldErrors.resignation_date && (
+                        <p className="text-xs font-semibold text-destructive">{fieldErrors.resignation_date}</p>
+                    )}
+                </div>
+            </div>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="resignation-reason">
+                        Reason <span className="text-destructive">*</span>
+                    </Label>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                        {reason.length}/{REASON_MAX_LENGTH}
+                    </span>
+                </div>
+                <Textarea
+                    id="resignation-reason"
+                    placeholder="State the reason for the resignation..."
+                    maxLength={REASON_MAX_LENGTH}
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    disabled={isSubmitting}
+                    className="min-h-[140px] resize-none"
+                />
+                {fieldErrors.reason && <p className="text-xs font-semibold text-destructive">{fieldErrors.reason}</p>}
+            </div>
+            <div className="space-y-2 border-t pt-5">
+                <Label>Attachment (optional)</Label>
+                <p className="text-xs text-muted-foreground">Support the filing with a document.</p>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={isSubmitting || isUploading}
+                />
+                {attachment ? (
+                    <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                            <Paperclip className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
                         </div>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="resignation-reason">
-                                Reason <span className="text-destructive">*</span>
-                            </Label>
-                            <span className="text-xs text-muted-foreground">
-                                {reason.length}/{REASON_MAX_LENGTH}
-                            </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">{attachment.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">{attachment.fileType || "Unknown type"}</p>
                         </div>
-                        <Textarea
-                            id="resignation-reason"
-                            placeholder="State the reason for your resignation..."
-                            maxLength={REASON_MAX_LENGTH}
-                            value={reason}
-                            onChange={(event) => setReason(event.target.value)}
-                            disabled={isSubmitting}
-                            className="min-h-[140px] resize-none"
-                        />
-                        {fieldErrors.reason && (
-                            <p className="text-xs font-semibold text-destructive">{fieldErrors.reason}</p>
-                        )}
-                    </div>
-                    <div className="space-y-2 border-t pt-5">
-                        <Label>Attachment (optional)</Label>
-                        <p className="text-xs text-muted-foreground">Support your filing with a document.</p>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-                            className="hidden"
-                            onChange={handleFileChange}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={removeAttachment}
                             disabled={isSubmitting || isUploading}
-                        />
-                        {attachment ? (
-                            <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                                    <Paperclip className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold">{attachment.name}</p>
-                                    <p className="truncate text-xs text-muted-foreground">{attachment.fileType || "Unknown type"}</p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={removeAttachment}
-                                    disabled={isSubmitting || isUploading}
-                                    className="shrink-0"
-                                >
-                                    <X className="h-4 w-4" />
-                                    Remove
-                                </Button>
-                            </div>
-                        ) : (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isSubmitting || isUploading}
-                                className="gap-2"
-                            >
-                                {isUploading ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        Uploading...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Paperclip className="h-4 w-4" />
-                                        Choose file
-                                    </>
-                                )}
-                            </Button>
-                        )}
-                        {uploadError && <p className="text-xs font-semibold text-destructive">{uploadError}</p>}
-                        <p className="text-xs text-muted-foreground">Images or PDF only, up to {MAX_MB} MB.</p>
-                    </div>
-                    <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-xs text-muted-foreground">Your filing goes to HR for review after submission.</p>
-                        <Button type="submit" disabled={isSubmitting || isUploading} className="gap-2 sm:shrink-0">
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    Submitting...
-                                </>
-                            ) : (
-                                <>
-                                    <Send className="h-4 w-4" />
-                                    Submit Resignation
-                                </>
-                            )}
+                            className="shrink-0"
+                        >
+                            <X className="h-4 w-4" aria-hidden="true" />
+                            Remove
                         </Button>
                     </div>
-                </form>
-            </CardContent>
-        </Card>
+                ) : (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isSubmitting || isUploading}
+                        className="gap-2"
+                    >
+                        {isUploading ? (
+                            <>
+                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                Uploading...
+                            </>
+                        ) : (
+                            <>
+                                <Paperclip className="h-4 w-4" aria-hidden="true" />
+                                Choose file
+                            </>
+                        )}
+                    </Button>
+                )}
+                {uploadError && <p className="text-xs font-semibold text-destructive">{uploadError}</p>}
+                <p className="text-xs text-muted-foreground">Images or PDF only, up to {MAX_MB} MB.</p>
+            </div>
+            <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-muted-foreground">This filing is reviewed in Resignation Acknowledgement.</p>
+                <Button type="submit" disabled={isSubmitting || isUploading} className="gap-2 sm:shrink-0">
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            Filing...
+                        </>
+                    ) : (
+                        <>
+                            <Send className="h-4 w-4" aria-hidden="true" />
+                            File resignation
+                        </>
+                    )}
+                </Button>
+            </div>
+        </form>
     );
 }

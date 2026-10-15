@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { resignationFilingService } from "@/modules/human-resource-management/resignation/resignation-filing/services/ResignationFilingService";
 
@@ -48,29 +48,17 @@ function resolveUserId(payload: Record<string, unknown> | null): number | null {
     return null;
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET() {
     try {
         const token = await getAuthToken();
         const payload = token ? decodeJwtPayload(token) : null;
-        const userId = resolveUserId(payload);
-        if (userId === null) {
+        if (resolveUserId(payload) === null) {
             return NextResponse.json({ error: "Unauthorized: No valid token" }, { status: 401 });
         }
-        const resolved = await params;
-        const filingId = Number(resolved.id);
-        if (!Number.isFinite(filingId)) {
-            return NextResponse.json({ error: "Resignation filing not found" }, { status: 404 });
-        }
-        const outcome = await resignationFilingService.withdraw(filingId, userId);
-        if (outcome === "withdrawn") {
-            return NextResponse.json({ success: true }, { status: 200 });
-        }
-        if (outcome === "not_pending") {
-            return NextResponse.json({ error: "Only a pending filing can be withdrawn" }, { status: 409 });
-        }
-        return NextResponse.json({ error: "Resignation filing not found" }, { status: 404 });
+        const data = await resignationFilingService.fetchEmployees();
+        return NextResponse.json({ data });
     } catch (error) {
-        console.error("PATCH resignation-filing withdraw error:", error);
-        return NextResponse.json({ error: "Failed to withdraw resignation filing" }, { status: 500 });
+        console.error("GET resignation-filing employees error:", error);
+        return NextResponse.json({ error: "Failed to fetch employees" }, { status: 500 });
     }
 }

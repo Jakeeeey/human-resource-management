@@ -7,6 +7,7 @@ import {
     type ResignationEligibility,
 } from "@/modules/human-resource-management/resignation/resignation-filing/cooldown";
 import { nowUTC } from "@/modules/human-resource-management/resignation/resignation-filing/utils/audit";
+import { formatPHT } from "@/modules/human-resource-management/resignation/resignation-filing/utils/time";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,31 +55,54 @@ function resolveUserId(payload: Record<string, unknown> | null): number | null {
     return null;
 }
 
+function toTargetUserId(value: string | null): number | null {
+    if (value === null || value.trim() === "") {
+        return null;
+    }
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
+        return null;
+    }
+    return parsed;
+}
+
 function eligibilityMessage(eligibility: ResignationEligibility): string {
     if (eligibility.canFile) {
         return "";
     }
     if (eligibility.reason === "pending") {
-        return "You already have a pending resignation filing under review.";
+        return "This employee already has a pending resignation filing under review.";
     }
     if (eligibility.reason === "approved") {
-        return "Your resignation has already been approved, so you cannot file again.";
+        return "This employee's resignation has already been acknowledged.";
+    }
+    if (eligibility.reason === "clearance_ongoing") {
+        return "This employee's resignation is already in the clearance process.";
+    }
+    if (eligibility.reason === "cleared") {
+        return "This employee's resignation has already been cleared.";
     }
     if (eligibility.reason === "cooling_down") {
-        return "You cannot file a new resignation until your cooling-off period ends.";
+        if (eligibility.nextAllowedAt) {
+            return `This employee can file a new resignation on ${formatPHT(eligibility.nextAllowedAt, { includeTime: false })}.`;
+        }
+        return "This employee cannot file a new resignation until the cooling-off period ends.";
     }
-    return "You cannot file a new resignation at this time.";
+    return "This employee cannot be filed for at this time.";
 }
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const token = await getAuthToken();
         const payload = token ? decodeJwtPayload(token) : null;
-        const userId = resolveUserId(payload);
-        if (userId === null) {
+        if (resolveUserId(payload) === null) {
             return NextResponse.json({ error: "Unauthorized: No valid token" }, { status: 401 });
         }
-        const data = await resignationFilingService.fetchByUser(userId);
+        const targetUserId = toTargetUserId(new URL(req.url).searchParams.get("user_id"));
+        if (targetUserId === null) {
+            return NextResponse.json({ data: [], eligibility: null, total: 0 });
+        }
+        const data = await resignationFilingService.fetchByUser(targetUserId);
         const eligibility = evaluateResignationEligibility(
             data.map((row) => ({ status: row.status, reviewed_at: row.reviewed_at ?? null })),
             nowUTC()
@@ -94,8 +118,8 @@ export async function POST(req: Request) {
     try {
         const token = await getAuthToken();
         const payload = token ? decodeJwtPayload(token) : null;
-        const userId = resolveUserId(payload);
-        if (userId === null) {
+        const actorId = resolveUserId(payload);
+        if (actorId === null) {
             return NextResponse.json({ error: "Unauthorized: No valid token" }, { status: 401 });
         }
         const body: unknown = await req.json();
@@ -106,7 +130,8 @@ export async function POST(req: Request) {
                 { status: 400 }
             );
         }
-        const rows = await resignationFilingService.fetchByUser(userId);
+        const targetUserId = parsed.data.user_id;
+        const rows = await resignationFilingService.fetchByUser(targetUserId);
         const eligibility = evaluateResignationEligibility(
             rows.map((row) => ({ status: row.status, reviewed_at: row.reviewed_at ?? null })),
             nowUTC()
@@ -118,7 +143,8 @@ export async function POST(req: Request) {
             );
         }
         const created = await resignationFilingService.create({
-            user_id: userId,
+            user_id: targetUserId,
+            created_by: actorId,
             resignation_date: parsed.data.resignation_date,
             reason: parsed.data.reason,
             attachment_uuid: parsed.data.attachment_uuid ?? null,

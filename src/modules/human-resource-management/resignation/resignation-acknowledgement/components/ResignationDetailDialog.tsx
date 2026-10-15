@@ -15,6 +15,7 @@ import { AlertCircle, Download, FileWarning, Loader2, RefreshCw } from "lucide-r
 import { formatDateOnly, formatPHT } from "../utils/time";
 import { RESIGNATION_STATUS_LABELS } from "../types";
 import type { ResignationRequestWithUser } from "../types";
+import { RESIGNATION_STATUS_BADGE_STYLES } from "../statusBadgeStyles";
 
 interface ResignationDetailDialogProps {
     isOpen: boolean;
@@ -121,7 +122,10 @@ export function ResignationDetailDialog({ isOpen, onClose, data }: ResignationDe
                             <div>
                                 <p className="text-xs text-muted-foreground">Status</p>
                                 <div className="mt-1">
-                                    <Badge variant="secondary">
+                                    <Badge
+                                        variant="outline"
+                                        className={RESIGNATION_STATUS_BADGE_STYLES[data.status]}
+                                    >
                                         {RESIGNATION_STATUS_LABELS[data.status]}
                                     </Badge>
                                 </div>
