@@ -13,13 +13,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { CalendarIcon, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPHT } from "./utils/time";
@@ -44,7 +37,6 @@ function ResignationAcknowledgementContent() {
     const [searchQuery, setSearchQuery] = useState("");
     const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
     const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-    const [nameFilter, setNameFilter] = useState<string | null>(null);
 
     const handleAcknowledge = async (id: number, remarks: string) => {
         try {
@@ -78,17 +70,7 @@ function ResignationAcknowledgementContent() {
         setSearchQuery("");
         setDateFrom(undefined);
         setDateTo(undefined);
-        setNameFilter(null);
     };
-
-    const employeeNames = useMemo(() => {
-        const names = requests.map((req) => {
-            return [req.user_fname, req.user_mname, req.user_lname]
-                .filter(Boolean)
-                .join(" ");
-        });
-        return Array.from(new Set(names)).sort();
-    }, [requests]);
 
     const filteredRequests = useMemo(() => {
         let filtered = [...requests];
@@ -125,23 +107,11 @@ function ResignationAcknowledgementContent() {
             });
         }
 
-        if (nameFilter !== null) {
-            filtered = filtered.filter((req) => {
-                const fullName = [req.user_fname, req.user_mname, req.user_lname]
-                    .filter(Boolean)
-                    .join(" ");
-                return fullName === nameFilter;
-            });
-        }
-
         return filtered;
-    }, [requests, searchQuery, dateFrom, dateTo, nameFilter]);
+    }, [requests, searchQuery, dateFrom, dateTo]);
 
     const hasActiveFilters =
-        searchQuery ||
-        dateFrom ||
-        dateTo ||
-        nameFilter !== null;
+        searchQuery.trim() !== "" || dateFrom !== undefined || dateTo !== undefined;
 
     return (
         <div className="space-y-6">
@@ -236,25 +206,6 @@ function ResignationAcknowledgementContent() {
                             </PopoverContent>
                         </Popover>
 
-                        <Select
-                            value={nameFilter !== null ? nameFilter : "all"}
-                            onValueChange={(value) =>
-                                setNameFilter(value === "all" ? null : value)
-                            }
-                        >
-                            <SelectTrigger className="w-42.5">
-                                <SelectValue placeholder="All Employees" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Employees</SelectItem>
-                                {employeeNames.map((name) => (
-                                    <SelectItem key={name} value={name}>
-                                        {name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
                         {hasActiveFilters && (
                             <Button variant="outline" size="sm" onClick={resetFilters}>
                                 <X className="mr-2 h-4 w-4" />
@@ -262,15 +213,15 @@ function ResignationAcknowledgementContent() {
                             </Button>
                         )}
 
-                        <div className="flex items-center gap-2">
+                        <div className="ml-auto flex items-center gap-2">
+                            <Label htmlFor="include-inactive">
+                                Show non-active resignations
+                            </Label>
                             <Switch
                                 id="include-inactive"
                                 checked={includeInactive}
                                 onCheckedChange={setIncludeInactive}
                             />
-                            <Label htmlFor="include-inactive">
-                                Show non-active resignations
-                            </Label>
                         </div>
                     </div>
                 </CardContent>
