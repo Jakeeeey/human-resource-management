@@ -9,6 +9,7 @@ import {
 import { ensureClearanceForm } from "@/modules/human-resource-management/clearance/hub/form/services/ClearanceFormService";
 import { ensureSoa } from "@/modules/human-resource-management/clearance/hub/soa/services/ClearanceSoaService";
 import { ensureQuitClaim } from "@/modules/human-resource-management/clearance/hub/quit-claims/services/ClearanceQuitClaimService";
+import { createTurnover } from "@/modules/human-resource-management/clearance/hub/turnover/services/ClearanceTurnoverService";
 import {
     authorizeClearanceRoute,
     mapClearanceRouteError,
@@ -106,6 +107,11 @@ export async function POST(req: NextRequest) {
                 await ensureQuitClaim(result.request.id, auth.cap.actorId);
             } catch (error) {
                 console.error("[clearance-requests] ensure quit claim failed:", error);
+            }
+            try {
+                await createTurnover({ requestId: result.request.id, actorId: auth.cap.actorId });
+            } catch (error) {
+                console.error("[clearance-requests] ensure turnover failed:", error);
             }
             return NextResponse.json(
                 { success: true, data: result.request },

@@ -12,6 +12,7 @@ import {
 const FORM_API = "/api/hrm/clearance/form";
 const SOA_API = "/api/hrm/clearance/soa";
 const QUIT_CLAIMS_API = "/api/hrm/clearance/quit-claims";
+const TURNOVER_API = "/api/hrm/clearance/turnover";
 const PAGE_LIMIT = 100;
 
 interface DocumentRow {
@@ -144,18 +145,21 @@ function indexByRequest(rows: DocumentRow[]): Map<number, ClearanceDocumentSnaps
 }
 
 export async function fetchCompletionIndex(): Promise<Map<number, ClearanceDocumentChecklist>> {
-    const [forms, soas, quitClaims] = await Promise.all([
+    const [forms, soas, quitClaims, turnovers] = await Promise.all([
         fetchDocumentRows(FORM_API, ""),
         fetchDocumentRows(SOA_API, ""),
         fetchDocumentRows(QUIT_CLAIMS_API, ""),
+        fetchDocumentRows(TURNOVER_API, ""),
     ]);
     const formsByRequest = indexByRequest(forms);
     const soasByRequest = indexByRequest(soas);
     const quitClaimsByRequest = indexByRequest(quitClaims);
+    const turnoversByRequest = indexByRequest(turnovers);
     const requestIds = new Set<number>([
         ...formsByRequest.keys(),
         ...soasByRequest.keys(),
         ...quitClaimsByRequest.keys(),
+        ...turnoversByRequest.keys(),
     ]);
     const index = new Map<number, ClearanceDocumentChecklist>();
     for (const requestId of requestIds) {
@@ -165,7 +169,8 @@ export async function fetchCompletionIndex(): Promise<Map<number, ClearanceDocum
                 requestId,
                 formsByRequest.get(requestId),
                 soasByRequest.get(requestId),
-                quitClaimsByRequest.get(requestId)
+                quitClaimsByRequest.get(requestId),
+                turnoversByRequest.get(requestId)
             )
         );
     }
@@ -176,16 +181,18 @@ export async function fetchDocumentChecklist(
     requestId: number,
     userId: number | null
 ): Promise<ClearanceDocumentChecklist> {
-    const [form, soa, quitClaimRows] = await Promise.all([
+    const [form, soa, quitClaimRows, turnover] = await Promise.all([
         fetchByRequest(FORM_API, requestId),
         fetchByRequest(SOA_API, requestId),
         fetchDocumentRows(QUIT_CLAIMS_API, userId === null ? "" : `user_id=${userId}`),
+        fetchByRequest(TURNOVER_API, requestId),
     ]);
     return toClearanceDocumentChecklist(
         requestId,
         toSnapshot(form),
         toSnapshot(soa),
-        toSnapshot(matchRequestRow(quitClaimRows, requestId))
+        toSnapshot(matchRequestRow(quitClaimRows, requestId)),
+        toSnapshot(turnover)
     );
 }
 

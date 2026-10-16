@@ -10,7 +10,7 @@ export interface ResignationEligibilityRow {
 
 export type ResignationEligibility =
     | { canFile: true; reason: null; nextAllowedAt: null }
-    | { canFile: false; reason: "pending" | "approved" | "cooling_down"; nextAllowedAt: string | null };
+    | { canFile: false; reason: "pending" | "approved" | "clearance_ongoing" | "cleared" | "cooling_down"; nextAllowedAt: string | null };
 
 export function evaluateResignationEligibility(rows: readonly ResignationEligibilityRow[], now: string): ResignationEligibility {
     const hasPending = rows.some((row) => row.status === "pending");
@@ -20,6 +20,14 @@ export function evaluateResignationEligibility(rows: readonly ResignationEligibi
     const hasApproved = rows.some((row) => row.status === "approved");
     if (hasApproved) {
         return { canFile: false, reason: "approved", nextAllowedAt: null };
+    }
+    const hasClearanceOngoing = rows.some((row) => row.status === "clearance_ongoing");
+    if (hasClearanceOngoing) {
+        return { canFile: false, reason: "clearance_ongoing", nextAllowedAt: null };
+    }
+    const hasCleared = rows.some((row) => row.status === "cleared");
+    if (hasCleared) {
+        return { canFile: false, reason: "cleared", nextAllowedAt: null };
     }
     const rejectedInstants: Date[] = [];
     for (const row of rows) {

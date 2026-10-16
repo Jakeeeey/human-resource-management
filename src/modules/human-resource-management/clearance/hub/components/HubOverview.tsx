@@ -171,21 +171,15 @@ export function ClearanceHubOverview() {
                     </Button>
                 )}
 
-                <p className="ml-auto text-sm text-muted-foreground" aria-live="polite">
-                    Showing <span className="font-semibold">{requests.length}</span>{" "}
-                    of <span className="font-semibold">{total}</span> clearance{" "}
-                    {total === 1 ? "request" : "requests"}
-                </p>
-
-                <div className="flex min-h-11 items-center gap-2">
+                <div className="ml-auto flex min-h-11 items-center gap-2">
+                    <Label htmlFor="hub-show-completed" className="cursor-pointer">
+                        Show completed
+                    </Label>
                     <Switch
                         id="hub-show-completed"
                         checked={showCompleted}
                         onCheckedChange={handleShowCompletedChange}
                     />
-                    <Label htmlFor="hub-show-completed" className="cursor-pointer">
-                        Show completed
-                    </Label>
                 </div>
             </div>
 

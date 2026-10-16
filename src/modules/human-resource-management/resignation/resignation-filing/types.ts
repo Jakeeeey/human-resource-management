@@ -1,12 +1,14 @@
 import { z } from "zod";
 
-export const RESIGNATION_STATUSES = ["pending", "approved", "rejected", "withdrawn"] as const;
+export const RESIGNATION_STATUSES = ["pending", "approved", "clearance_ongoing", "cleared", "rejected", "withdrawn"] as const;
 
 export type ResignationStatus = (typeof RESIGNATION_STATUSES)[number];
 
 export const RESIGNATION_STATUS_LABELS: Record<ResignationStatus, string> = {
     pending: "Pending",
-    approved: "Approved",
+    approved: "Acknowledged",
+    clearance_ongoing: "Clearance Ongoing",
+    cleared: "Cleared",
     rejected: "Rejected",
     withdrawn: "Withdrawn",
 };
@@ -58,6 +60,7 @@ export const ResignationRequestSchema = z.object({
 export type ResignationRequest = z.infer<typeof ResignationRequestSchema>;
 
 export const ResignationFormSchema = z.object({
+    user_id: z.number().int().positive(),
     resignation_date: z.string().refine(isCalendarDate),
     reason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
     attachment_uuid: z.string().nullable().optional(),
@@ -66,6 +69,11 @@ export const ResignationFormSchema = z.object({
 });
 
 export type ResignationForm = z.infer<typeof ResignationFormSchema>;
+
+export interface ResignationEmployeeOption {
+    user_id: number;
+    full_name: string;
+}
 
 export const ResignationReviewSchema = z.object({
     id: z.number(),

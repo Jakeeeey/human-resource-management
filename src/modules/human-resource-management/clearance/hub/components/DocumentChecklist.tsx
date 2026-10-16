@@ -93,7 +93,7 @@ export function DocumentCompletionBadge({
     }
     return (
         <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
-            {checklist.approvedCount} of 3 approved
+            {checklist.approvedCount} of 4 approved
         </span>
     );
 }
@@ -118,7 +118,7 @@ export function DocumentChecklist({
                     <Skeleton className="h-6 w-2/3" />
                 </CardHeader>
                 <CardContent className="space-y-2">
-                    {[...Array(3)].map((_, i) => (
+                    {[...Array(4)].map((_, i) => (
                         <Skeleton key={i} className="h-16 w-full" />
                     ))}
                 </CardContent>
@@ -156,20 +156,21 @@ export function DocumentChecklist({
                         </StatusBadge>
                     ) : (
                         <span className="text-sm text-muted-foreground tabular-nums">
-                            {checklist.approvedCount} of 3 approved
+                            {checklist.approvedCount} of 4 approved
                         </span>
                     )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                     {checklist.complete
-                        ? "Clearance Form, SOA, and Quit Claims are all approved. This request is fully complete."
-                        : "Full completion needs all three documents approved."}
+                        ? "Clearance Form, SOA, Quit Claims, and the Turnover Checklist are all approved. This request is fully complete."
+                        : "Full completion needs all four documents approved."}
                 </p>
             </CardHeader>
             <CardContent className="space-y-2">
                 <ChecklistRow entry={checklist.form} requestId={checklist.requestId} />
                 <ChecklistRow entry={checklist.soa} requestId={checklist.requestId} />
                 <ChecklistRow entry={checklist.quitClaim} requestId={checklist.requestId} />
+                <ChecklistRow entry={checklist.turnover} requestId={checklist.requestId} />
             </CardContent>
         </Card>
     );

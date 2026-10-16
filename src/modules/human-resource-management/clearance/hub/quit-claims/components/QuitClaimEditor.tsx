@@ -8,15 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, Check, Loader2, Lock, Minus, Plus, Printer, Upload } from "lucide-react";
+import { AlertCircle, Check, Eye, Loader2, Lock, Minus, Plus, Printer, Upload } from "lucide-react";
+import { QuitClaim201Dialog } from "./QuitClaim201Dialog";
 import { QuitClaimPrintDialog } from "./QuitClaimPrintDialog";
 import { LiveDocumentPreview } from "../../components/LiveDocumentPreview";
 import { OptionCombobox, type ClearanceOption } from "../../components/OptionCombobox";
 import type { CompanyOption } from "../../utils/company";
 import { companyLogoDataUrl, fetchEmployeeCompany, pickEmployeeCompany } from "../../utils/company";
-import { phToday } from "../../utils/time";
 import { buildQuitClaimPdf, type QuitClaimCompany } from "../utils/quitClaimPrintPdf";
-import { freezeApprovedQuitClaimPdf } from "../utils/approvedPdfFreeze";
 import {
     approveQuitClaim,
     defaultCompany,
@@ -142,18 +141,6 @@ function blankAcknowledgement(): QuitClaimAcknowledgement {
     };
 }
 
-function toUploadFileName(employeeName: string): string {
-    const cleaned = employeeName
-        .split("")
-        .filter((ch) => ch >= " " && !"<>:\"/\\|?*".includes(ch))
-        .join("")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 80);
-    const who = cleaned === "" ? "Employee" : cleaned;
-    return `Quit Claim - ${who} - ${phToday()}.pdf`;
-}
-
 function toCompanyOptions(options: CompanyOption[]): ClearanceOption[] {
     return options.map((option) => ({
         value: String(option.id),
@@ -201,11 +188,11 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
     const [values, setValues] = useState<QuitClaimValues | null>(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [uploading, setUploading] = useState(false);
     const [approving, setApproving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [printOpen, setPrintOpen] = useState(false);
+    const [uploadOpen, setUploadOpen] = useState(false);
     const [detail, setDetail] = useState<QuitClaimDetail | null>(null);
     const [company, setCompany] = useState<CompanyOption | null>(null);
     const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([]);
@@ -358,28 +345,20 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
         }
     }
 
-    async function handleUpload(): Promise<void> {
-        if (row === null || values === null || uploading || frozen) {
+    function handleUploaded(): void {
+        if (row === null || values === null) {
             return;
         }
-        setUploading(true);
-        setError(null);
-        try {
-            const bytes = buildQuitClaimPdf(values, toRendererCompany(company));
-            await freezeApprovedQuitClaimPdf({
-                documentId: row.id,
-                bytes,
-                fileName: toUploadFileName(values.identity.name),
-            });
-            const reloaded = await getQuitClaim(row.id);
-            setRow(reloaded);
-            setDetail({ ...reloaded, values });
-            onChanged(reloaded);
-        } catch (uploadError) {
-            setError(quitClaimErrorMessage(uploadError, "Could not upload the quit claim PDF to the 201 file."));
-        } finally {
-            setUploading(false);
-        }
+        void (async () => {
+            try {
+                const reloaded = await getQuitClaim(row.id);
+                setRow(reloaded);
+                setDetail({ ...reloaded, values });
+                onChanged(reloaded);
+            } catch (refreshError) {
+                setError(quitClaimErrorMessage(refreshError, "Could not refresh the quit claim."));
+            }
+        })();
     }
 
     async function handleApprove(): Promise<void> {
@@ -462,14 +441,28 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                         {saving ? "Saving…" : "Save"}
                     </Button>
                     <Button
-                        className="min-h-11 w-full bg-purple-600 text-white hover:bg-purple-700 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
-                        disabled={values === null || loading || uploading || frozen}
-                        onClick={() => void handleUpload()}
+                        variant="outline"
+                        className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
+                        disabled={detail === null || loading}
+                        onClick={() => setPrintOpen(true)}
                     >
-                        {uploading
-                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                            : <Upload className="h-4 w-4" aria-hidden="true" />}
-                        {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
+                        <Printer className="h-4 w-4" aria-hidden="true" />
+                        Print
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={hasUpload ? "outline" : "default"}
+                        onClick={() => setUploadOpen(true)}
+                        disabled={frozen && !hasUpload}
+                        aria-label={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
+                        title={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
+                    >
+                        {hasUpload ? (
+                            <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                        ) : (
+                            <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
+                        )}
+                        {hasUpload ? "View" : "Upload to 201"}
                     </Button>
                     {!frozen && (
                         <span title={approveBlockedReason ?? undefined}>
@@ -485,15 +478,6 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                             </Button>
                         </span>
                     )}
-                    <Button
-                        variant="outline"
-                        className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
-                        disabled={detail === null || loading}
-                        onClick={() => setPrintOpen(true)}
-                    >
-                        <Printer className="h-4 w-4" aria-hidden="true" />
-                        Print
-                    </Button>
                 </div>
             </div>
             {!frozen && !hasUpload && (
@@ -503,7 +487,7 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
             )}
             {!frozen && hasUpload && (
                 <p className="text-xs text-muted-foreground">
-                    Quit claim PDF filed to the 201 file. Re-upload replaces the filed copy.
+                    Signed copy filed to the 201 file. Replacing it overwrites the filed copy.
                 </p>
             )}
             {error && (
@@ -1219,6 +1203,19 @@ export function QuitClaimEditor({ quitclaimId, open, onChanged, autoOpenPrint = 
                         />
                     </div>
                 </div>
+            )}
+            {row !== null && values !== null && (
+                <QuitClaim201Dialog
+                    open={uploadOpen}
+                    onOpenChange={setUploadOpen}
+                    documentId={row.id}
+                    pdfFile={row.pdf_file}
+                    description={[values.identity.name, row.ref_no ?? ""]
+                        .filter((part) => part.trim() !== "")
+                        .join(" · ")}
+                    readOnly={frozen}
+                    onUploaded={handleUploaded}
+                />
             )}
             <QuitClaimPrintDialog quitclaim={detail} initialCompany={company} open={printOpen} onOpenChange={setPrintOpen} />
         </div>

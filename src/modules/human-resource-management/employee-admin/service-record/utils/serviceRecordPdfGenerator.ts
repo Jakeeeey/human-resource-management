@@ -123,16 +123,19 @@ export async function generateServiceRecordPdf(
       doc.text(String(companyData.company_name), pageWidth / 2, currentY, { align: "center" });
       currentY += 5;
 
-      const addressParts = [
-        companyData.company_address,
-        companyData.company_city,
-        companyData.company_province,
-      ].filter(Boolean);
+      const directAddress =
+        typeof companyData.company_address === "string" ? companyData.company_address.trim() : "";
+      const addressText =
+        directAddress ||
+        [companyData.company_address, companyData.company_city, companyData.company_province]
+          .map((part) => (typeof part === "string" ? part.trim() : ""))
+          .filter((part) => part !== "")
+          .join(", ");
 
-      if (addressParts.length > 0) {
+      if (addressText) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.text(addressParts.join(", "), pageWidth / 2, currentY, { align: "center" });
+        doc.text(addressText, pageWidth / 2, currentY, { align: "center" });
         currentY += 4.5;
       }
 

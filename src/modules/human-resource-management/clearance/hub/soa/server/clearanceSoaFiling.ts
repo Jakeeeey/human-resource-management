@@ -172,6 +172,18 @@ export function ensureClearanceDocsListId(): Promise<number> {
     return listInFlight;
 }
 
+async function deleteDirectusFile(fileId: string): Promise<void> {
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL;
+    if (!base || base.trim() === "") return;
+    const token = process.env.DIRECTUS_STATIC_TOKEN;
+    const headers: Record<string, string> =
+        token && token.trim() !== "" ? { Authorization: `Bearer ${token}` } : {};
+    await fetch(`${base.replace(/\/+$/, "")}/files/${encodeURIComponent(fileId)}`, {
+        method: "DELETE",
+        headers,
+    });
+}
+
 export async function fileClearanceSoaPdf(
     soaId: number
 ): Promise<FileClearanceSoaPdfResult> {
@@ -206,6 +218,7 @@ export async function fileClearanceSoaPdf(
         const recordId = toId(filed.id);
         const filedListId = toId(filed.list_id);
         if (recordId !== null && filedListId !== null) {
+            const previousRef = toNullableText(filed.file_ref);
             const patch: Record<string, unknown> = { file_ref: soa.pdf_file, updated_at: now };
             if (toNullableText(filed.record_name) !== recordName) {
                 patch.record_name = recordName;
@@ -216,6 +229,13 @@ export async function fileClearanceSoaPdf(
             });
             if (!isRecord(patched) || hasErrors(patched)) {
                 fail(CLEARANCE_SOA_FILING_ERROR_CODES.writeFailed, "employee_file_records update failed");
+            }
+            if (previousRef !== null && previousRef !== "" && previousRef !== soa.pdf_file) {
+                try {
+                    await deleteDirectusFile(previousRef);
+                } catch (error) {
+                    console.error("CLEARANCE_SOA_FILE_DELETE_FAILED:", error);
+                }
             }
             return { recordId, fileRef: soa.pdf_file, listId: filedListId, alreadyFiled: true };
         }

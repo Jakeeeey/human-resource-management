@@ -14,7 +14,6 @@ import {
 
 export function useSoaCompanies(requestId?: number | null) {
     const [options, setOptions] = useState<CompanyOption[]>([]);
-    const [selectedId, setSelectedId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [unreachable, setUnreachable] = useState(false);
     const [employeeCompanyId, setEmployeeCompanyId] = useState<number | null | undefined>(
@@ -42,8 +41,6 @@ export function useSoaCompanies(requestId?: number | null) {
                     return;
                 }
                 setOptions(parsed);
-                const fallback = pickDefaultCompany(parsed);
-                if (fallback) setSelectedId(fallback.id);
                 setLoading(false);
             } catch {
                 if (!cancelled) {
@@ -55,10 +52,6 @@ export function useSoaCompanies(requestId?: number | null) {
         return () => {
             cancelled = true;
         };
-    }, []);
-
-    const selectById = useCallback((id: number | null) => {
-        setSelectedId(id);
     }, []);
 
     const refreshEmployeeCompany = useCallback(async () => {
@@ -91,13 +84,11 @@ export function useSoaCompanies(requestId?: number | null) {
         ? pickEmployeeCompany(options, employeeCompanyId)
         : null;
 
-    const selected = employeeCompany ?? options.find((option) => option.id === selectedId) ?? null;
+    const selected = employeeCompany ?? pickDefaultCompany(options);
 
     return {
         options,
         selected,
-        selectedId,
-        selectById,
         loading,
         unreachable,
         logoDataUrl: companyLogoDataUrl(selected),

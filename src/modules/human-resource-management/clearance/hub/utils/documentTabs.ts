@@ -1,9 +1,9 @@
 import type { ClearanceDocumentKey } from "../types";
 
-export type ClearanceHubTab = "overview" | "form" | "soa" | "quit-claims";
+export type ClearanceHubTab = "overview" | "form" | "soa" | "quit-claims" | "turnover";
 
 export function parseClearanceHubTab(raw: string | null): ClearanceHubTab {
-    if (raw === "form" || raw === "soa" || raw === "quit-claims") {
+    if (raw === "form" || raw === "soa" || raw === "quit-claims" || raw === "turnover") {
         return raw;
     }
     return "overview";
@@ -15,6 +15,9 @@ export function clearanceHubTabForDocument(key: ClearanceDocumentKey): Exclude<C
     }
     if (key === "quit_claim") {
         return "quit-claims";
+    }
+    if (key === "turnover") {
+        return "turnover";
     }
     return "form";
 }

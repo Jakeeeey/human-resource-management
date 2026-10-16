@@ -16,32 +16,61 @@ function readFileId(body: unknown): string | null {
     return typeof id === "string" && id !== "" ? id : null;
 }
 
-export interface UploadFormPdfInput {
+export const MAX_CLEARANCE_PDF_BYTES = 10 * 1024 * 1024;
+
+function isPdfFile(file: File): boolean {
+    if (file.type.trim().toLowerCase() === "application/pdf") return true;
+    return file.name.trim().toLowerCase().endsWith(".pdf");
+}
+
+export function pickClearancePdfFile(): Promise<File | null> {
+    return new Promise<File | null>((resolve, reject) => {
+        if (typeof document === "undefined") {
+            resolve(null);
+            return;
+        }
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/pdf,.pdf";
+        input.style.position = "fixed";
+        input.style.left = "-10000px";
+        const pick = (): void => {
+            if (input.files === null || input.files.length === 0) {
+                input.remove();
+                resolve(null);
+                return;
+            }
+            const file = input.files[0];
+            input.remove();
+            if (!isPdfFile(file)) {
+                reject(new Error("Only PDF files can be uploaded."));
+                return;
+            }
+            if (file.size > MAX_CLEARANCE_PDF_BYTES) {
+                reject(new Error("File too large. Maximum size is 10 MB."));
+                return;
+            }
+            resolve(file);
+        };
+        input.addEventListener("change", pick, { once: true });
+        input.addEventListener(
+            "cancel",
+            () => {
+                input.remove();
+                resolve(null);
+            },
+            { once: true }
+        );
+        document.body.appendChild(input);
+        input.click();
+    });
+}
+
+export async function uploadClearanceForm201Staged(input: {
     documentId: number;
     bytes: Uint8Array;
     fileName: string;
-}
-
-export interface UploadFormPdfResult {
-    fileId: string;
-    recordId: number;
-    alreadyFiled: boolean;
-}
-
-export function toFormUploadFileName(employeeName: string, refNo: string): string {
-    const cleaned = employeeName
-        .split("")
-        .filter((ch) => ch >= " " && !"<>:/\\|?*\"".includes(ch))
-        .join("")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 80);
-    const who = cleaned === "" ? "Employee" : cleaned;
-    const ref = refNo.trim() === "" ? "pending" : refNo.trim();
-    return `Clearance - ${who} - ${ref}.pdf`;
-}
-
-export async function uploadFormPdf(input: UploadFormPdfInput): Promise<UploadFormPdfResult> {
+}): Promise<{ fileId: string }> {
     if (
         !Number.isInteger(input.documentId) ||
         input.documentId <= 0 ||
@@ -66,10 +95,17 @@ export async function uploadFormPdf(input: UploadFormPdfInput): Promise<UploadFo
     if (!uploadRes.ok || fileId === null) {
         throw new Error("Could not upload the clearance PDF. Please try again.");
     }
+    return { fileId };
+}
+
+export async function fileClearanceForm201(input: {
+    documentId: number;
+    fileId: string;
+}): Promise<void> {
     const attachRes = await fetch(`/api/hrm/clearance/form/${input.documentId}/attach-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdf_file_id: fileId }),
+        body: JSON.stringify({ pdf_file_id: input.fileId }),
     });
     if (!attachRes.ok) {
         throw new Error("Could not attach the clearance PDF. Please try again.");
@@ -85,9 +121,4 @@ export async function uploadFormPdf(input: UploadFormPdfInput): Promise<UploadFo
     if (recordId === null) {
         throw new Error("Could not file the clearance PDF to the 201 file. Please try again.");
     }
-    return {
-        fileId,
-        recordId,
-        alreadyFiled: fileBody.data.already_filed === true,
-    };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import { AlertCircle, Download, Loader2, Printer, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -24,12 +24,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { buildSoaPdf, type SoaPrintInput } from "../utils/soaPrintPdf";
-import { freezeApprovedSoaPdf } from "../utils/approvedPdfFreeze";
-import type { CompanyOption } from "../../utils/company";
+import { pickDefaultCompany, type CompanyOption } from "../../utils/company";
 
 interface SoaPrintDialogProps {
-    soaId: number | null;
-    pdfFile: string | null;
     model: SoaPrintInput | null;
     fileName: string;
     open: boolean;
@@ -39,8 +36,6 @@ interface SoaPrintDialogProps {
     companiesLoading: boolean;
     employeeCompany: CompanyOption | null;
     employeeCompanyLoading: boolean;
-    selectedCompanyId: number | null;
-    onSelectCompany: (id: number | null) => void;
     onCompanySaved: (companyId: number) => void;
     isApproved: boolean;
 }
@@ -59,8 +54,6 @@ function toFitWidthUrl(url: string): string {
 }
 
 export function SoaPrintDialog({
-    soaId,
-    pdfFile,
     model,
     fileName,
     open,
@@ -70,8 +63,6 @@ export function SoaPrintDialog({
     companiesLoading,
     employeeCompany,
     employeeCompanyLoading,
-    selectedCompanyId,
-    onSelectCompany,
     onCompanySaved,
     isApproved,
 }: SoaPrintDialogProps): JSX.Element {
@@ -80,13 +71,21 @@ export function SoaPrintDialog({
     const [error, setError] = useState<string | null>(null);
     const [savingCompany, setSavingCompany] = useState(false);
     const [companySaveError, setCompanySaveError] = useState<string | null>(null);
-    const [freezeState, setFreezeState] = useState<"idle" | "freezing" | "done" | "error">("idle");
-    const [freezeError, setFreezeError] = useState<string | null>(null);
+    const [companyChoice, setCompanyChoice] = useState<number | null>(null);
     const urlRef = useRef<string | null>(null);
-    const freezeKeyRef = useRef<string | null>(null);
     const printingRef = useRef(false);
     const printingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const viewUrl = previewUrl ? toFitWidthUrl(previewUrl) : null;
+    const selectedCompanyId = companyChoice ?? pickDefaultCompany(companyOptions)?.id ?? null;
+    const printableModel = useMemo<SoaPrintInput | null>(() => {
+        if (!model) return null;
+        const resolved = employeeCompany ?? pickDefaultCompany(companyOptions);
+        return {
+            ...model,
+            companyContact: resolved?.company_contact ?? null,
+            companyEmail: resolved?.company_email ?? null,
+        };
+    }, [model, employeeCompany, companyOptions]);
 
     useEffect(() => {
         if (!open) {
@@ -95,7 +94,6 @@ export function SoaPrintDialog({
                 urlRef.current = null;
             }
             setPreviewUrl(null);
-            setFreezeError(null);
             setCompanySaveError(null);
             return;
         }
@@ -108,10 +106,10 @@ export function SoaPrintDialog({
         }
         setPreviewUrl(null);
         try {
-            if (!model) {
+            if (!printableModel) {
                 throw new Error("missing-model");
             }
-            const bytes = buildSoaPdf(model);
+            const bytes = buildSoaPdf(printableModel);
             if (cancelled) return;
             const blob = new Blob([new Uint8Array(bytes)], { type: "application/pdf" });
             const url = URL.createObjectURL(blob);
@@ -125,30 +123,7 @@ export function SoaPrintDialog({
         return () => {
             cancelled = true;
         };
-    }, [open, model]);
-
-    useEffect(() => {
-        if (!open || !isApproved || soaId === null || model === null || model.refNo === "" || pdfFile) return;
-        if (building || previewUrl === null) return;
-        const key = `${soaId}:${model.refNo}`;
-        if (freezeKeyRef.current === key || freezeState !== "idle") return;
-        freezeKeyRef.current = key;
-        setFreezeState("freezing");
-        setFreezeError(null);
-        const snapshot = model;
-        const uploadName = fileName === "" ? `SOA - ${model.refNo}.pdf` : fileName;
-        (async () => {
-            try {
-                const bytes = buildSoaPdf(snapshot);
-                await freezeApprovedSoaPdf({ documentId: soaId, bytes, fileName: uploadName });
-                setFreezeState("done");
-            } catch {
-                freezeKeyRef.current = null;
-                setFreezeState("error");
-                setFreezeError("Could not store the approved PDF to the 201 file. Reopen this dialog to retry.");
-            }
-        })();
-    }, [open, soaId, model, pdfFile, building, previewUrl, fileName, freezeState, isApproved]);
+    }, [open, printableModel]);
 
     useEffect(() => {
         return () => {
@@ -279,7 +254,7 @@ export function SoaPrintDialog({
                                     <Label htmlFor="soa-print-company">Company</Label>
                                     <Select
                                         value={selectedCompanyId === null ? "" : String(selectedCompanyId)}
-                                        onValueChange={(next) => onSelectCompany(next === "" ? null : Number(next))}
+                                        onValueChange={(next) => setCompanyChoice(next === "" ? null : Number(next))}
                                         disabled={companiesLoading || companyOptions.length === 0 || savingCompany}
                                     >
                                         <SelectTrigger id="soa-print-company" className="w-full truncate">
@@ -317,19 +292,6 @@ export function SoaPrintDialog({
                                 <AlertTitle>Could not build the PDF.</AlertTitle>
                                 <AlertDescription>{error}</AlertDescription>
                             </Alert>
-                        )}
-                        {freezeState === "freezing" && (
-                            <p className="text-xs text-muted-foreground">
-                                Storing the approved PDF to the 201 file…
-                            </p>
-                        )}
-                        {freezeState === "done" && (
-                            <p className="text-xs text-muted-foreground">
-                                Approved PDF stored to the 201 file.
-                            </p>
-                        )}
-                        {freezeError && (
-                            <p className="text-xs text-destructive">{freezeError}</p>
                         )}
                         {building ? (
                             <div className="flex items-center justify-center gap-3 rounded-[var(--radius)] border bg-card px-4 py-16 shadow-sm">
