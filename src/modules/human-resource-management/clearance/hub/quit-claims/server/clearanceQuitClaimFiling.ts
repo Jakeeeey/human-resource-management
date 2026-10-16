@@ -78,6 +78,14 @@ async function readFirstOrNull(path: string): Promise<Record<string, unknown> | 
     return isRecord(first) ? first : null;
 }
 
+async function deleteDirectusFileBestEffort(fileId: string): Promise<void> {
+    try {
+        await dFetch(`/files/${encodeURIComponent(fileId)}`, { method: "DELETE" });
+    } catch {
+        return;
+    }
+}
+
 async function readQuitClaimRef(id: number): Promise<QuitClaimRef | null> {
     const row = await readSingleOrNull(
         `/items/clearance_quitclaim/${id}?fields=id,user_id,status,ref_no,pdf_file`
@@ -197,6 +205,7 @@ export async function fileClearanceQuitClaimPdf(
         const recordId = toId(filed.id);
         const filedListId = toId(filed.list_id);
         if (recordId !== null && filedListId !== null) {
+            const previousFileRef = toNullableText(filed.file_ref);
             const patch: Record<string, unknown> = { file_ref: quitclaim.pdf_file, updated_at: now };
             if (toNullableText(filed.record_name) !== recordName) {
                 patch.record_name = recordName;
@@ -207,6 +216,9 @@ export async function fileClearanceQuitClaimPdf(
             });
             if (!isRecord(patched) || hasErrors(patched)) {
                 fail(CLEARANCE_QUITCLAIM_FILING_ERROR_CODES.writeFailed, "employee_file_records update failed");
+            }
+            if (previousFileRef !== null && previousFileRef !== "" && previousFileRef !== quitclaim.pdf_file) {
+                await deleteDirectusFileBestEffort(previousFileRef);
             }
             return { recordId, fileRef: quitclaim.pdf_file, listId: filedListId, alreadyFiled: true };
         }

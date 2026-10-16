@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
-import { Check, Loader2, Printer, RefreshCw, Save, Upload } from "lucide-react";
+import { Check, Eye, Loader2, Printer, RefreshCw, Save, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,12 +23,11 @@ import {
 import { phToday } from "../../utils/time";
 import { LiveDocumentPreview } from "../../components/LiveDocumentPreview";
 import {
-    buildClearancePdf,
     buildClearancePdfBytes,
     type ClearancePrintEntry,
     type ClearancePrintInput,
 } from "../utils/clearancePrintPdf";
-import { toFormUploadFileName, uploadFormPdf } from "../utils/formPdfUpload";
+import { ClearanceForm201Dialog } from "./ClearanceForm201Dialog";
 import { ClearanceFormPrintDialog } from "./ClearanceFormPrintDialog";
 import { GmSignatoryCard } from "./GmSignatoryCard";
 import { SignatoryAssignmentCard } from "./SignatoryAssignmentCard";
@@ -66,11 +65,11 @@ export function ClearanceWorkspace({
         useClearanceWorkspace(requestId, employeeName);
     const [form, setForm] = useState<ClearanceForm | null>(null);
     const [printOpen, setPrintOpen] = useState(false);
+    const [form201Open, setForm201Open] = useState(false);
     const [gmName, setGmName] = useState("");
     const [gmTitle, setGmTitle] = useState("");
     const [savedGm, setSavedGm] = useState<{ name: string; title: string } | null>(null);
     const [gmSaving, setGmSaving] = useState(false);
-    const [uploading, setUploading] = useState(false);
     const [approving, setApproving] = useState(false);
     const [previewModel, setPreviewModel] = useState<ClearanceFormRenderModel | null>(null);
     const [previewCompany, setPreviewCompany] = useState<CompanyOption | null>(null);
@@ -260,6 +259,8 @@ export function ClearanceWorkspace({
             position: previewModel.position,
             company_name: previewModel.company_name ?? previewCompany?.company_name,
             company_address: previewModel.company_address ?? previewCompany?.company_address ?? null,
+            company_contact: previewCompany?.company_contact ?? null,
+            company_email: previewCompany?.company_email ?? null,
             logo_data_url: previewModel.logo_data_url ?? (previewCompany ? companyLogoDataUrl(previewCompany) : null),
             gmName,
             gmTitle,
@@ -291,69 +292,20 @@ export function ClearanceWorkspace({
         }
     }, [requestId]);
 
-    const handleUpload = useCallback(async () => {
-        if (!form || uploading || detail?.status === "completed" || form.status === "approved") return;
-        setUploading(true);
-        try {
-            const selected = await resolveCompany();
-            const params = new URLSearchParams({
-                request_id: String(requestId),
-                date: phToday(),
-                ref_no: form.ref_no ?? "",
-            });
-            const res = await fetch(`/api/hrm/clearance/form/render-model?${params.toString()}`);
-            const body: unknown = await res.json().catch(() => null);
-            if (!res.ok || !isRecord(body) || body.success !== true || !isRecord(body.data)) {
-                throw new Error("Could not build the clearance PDF. Please try again.");
-            }
-            const model = body.data as ClearanceFormRenderModel;
-            const entries: ClearancePrintEntry[] = model.roles.map((role) => ({
-                category: role.label,
-                signeeName: role.signeeName,
-                signatureDataUrl: null,
-                remarks: role.remarks,
-            }));
-            const blob = buildClearancePdf({
-                employeeName: model.employeeName,
-                entries,
-                refNo: model.refNo,
-                date: model.date,
-                position: model.position,
-                company_name: model.company_name ?? selected?.company_name,
-                company_address: model.company_address ?? selected?.company_address ?? null,
-                logo_data_url: model.logo_data_url ?? (selected ? companyLogoDataUrl(selected) : null),
-                gmName,
-                gmTitle,
-            });
-            const bytes = new Uint8Array(await blob.arrayBuffer());
-            const result = await uploadFormPdf({
-                documentId: form.id,
-                bytes,
-                fileName: toFormUploadFileName(model.employeeName, model.refNo),
-            });
-            await refreshFormRow();
-            toast.success(
-                result.alreadyFiled
-                    ? "Clearance PDF replaced in the 201 file."
-                    : "Clearance PDF uploaded to the 201 file."
-            );
-            refresh();
-            await documents.refresh();
-            onChanged();
-        } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Could not upload the clearance PDF. Please try again.");
-        } finally {
-            setUploading(false);
-        }
-    }, [form, uploading, detail, requestId, resolveCompany, gmName, gmTitle, refreshFormRow, refresh, documents, onChanged]);
+    const handleForm201Uploaded = useCallback(async (): Promise<void> => {
+        await refreshFormRow();
+        refresh();
+        await documents.refresh();
+        onChanged();
+    }, [refreshFormRow, refresh, documents, onChanged]);
 
     const hasUpload = form !== null && form.pdf_file !== null && form.pdf_file !== "";
     const isApproved = form?.status === "approved";
     const formReadonly = isCompleted || isApproved;
-    const showUpload = form !== null && !isCompleted;
+    const show201 = form !== null;
     const showApprove = form !== null && !isApproved && !isCompleted;
     const approveBlocked = !hasUpload;
-    const approveDisabled = approving || uploading || approveBlocked;
+    const approveDisabled = approving || approveBlocked;
 
     const handleApprove = useCallback(async () => {
         if (!form || approving) return;
@@ -432,7 +384,7 @@ export function ClearanceWorkspace({
     const saveDisabled = isSaving || gmSaving || signatoriesLoading || totalChanges === 0 || formReadonly;
 
     return (
-        <div className="mx-auto min-h-screen max-w-[1600px] space-y-6 p-2 sm:p-6 md:p-10">
+        <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-xl font-bold tracking-tight">Clearance Form</h2>
@@ -453,22 +405,36 @@ export function ClearanceWorkspace({
                         <Save className="mr-2 h-4 w-4" aria-hidden="true" />
                         {isSaving || gmSaving ? "Saving…" : "Save"}
                     </Button>
-                    {showUpload ? (
+                    {form ? (
                         <Button
-                            variant="default"
+                            variant="outline"
                             size="sm"
-                            className="min-h-11 w-full bg-purple-600 text-white hover:bg-purple-700 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
-                            onClick={() => void handleUpload()}
-                            disabled={uploading || approving || formReadonly}
-                            aria-label="Upload clearance PDF to the 201 file"
-                            title="Upload clearance PDF to the 201 file"
+                            className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
+                            onClick={() => setPrintOpen(true)}
+                            aria-label="Print clearance form"
+                            title="Print clearance form"
                         >
-                            {uploading ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
+                            Print
+                        </Button>
+                    ) : null}
+                    {show201 ? (
+                        <Button
+                            type="button"
+                            variant={hasUpload ? "outline" : "default"}
+                            size="sm"
+                            className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
+                            onClick={() => setForm201Open(true)}
+                            disabled={formReadonly && !hasUpload}
+                            aria-label={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
+                            title={hasUpload ? "View the filed signed copy" : "Upload to the 201 file"}
+                        >
+                            {hasUpload ? (
+                                <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
                             ) : (
                                 <Upload className="mr-2 h-4 w-4" aria-hidden="true" />
                             )}
-                            {uploading ? "Uploading…" : hasUpload ? "Re-upload to 201" : "Upload to 201"}
+                            {hasUpload ? "View" : "Upload to 201"}
                         </Button>
                     ) : null}
                     {showApprove ? (
@@ -495,19 +461,6 @@ export function ClearanceWorkspace({
                                 {approving ? "Approving…" : "Approve"}
                             </Button>
                         </span>
-                    ) : null}
-                    {form ? (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="min-h-11 w-full disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 sm:w-auto md:min-h-0"
-                            onClick={() => setPrintOpen(true)}
-                            aria-label="Print clearance form"
-                            title="Print clearance form"
-                        >
-                            <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
-                            Print
-                        </Button>
                     ) : null}
                 </div>
             </div>
@@ -558,7 +511,7 @@ export function ClearanceWorkspace({
                         />
                     ) : null}
                     </div>
-                    <div className="min-w-0 lg:sticky lg:top-4">
+                    <div className="lg:sticky lg:top-4">
                         <LiveDocumentPreview
                             build={buildPreviewPdf}
                             revision={previewRevision}
@@ -578,6 +531,18 @@ export function ClearanceWorkspace({
                     open={printOpen}
                     onOpenChange={setPrintOpen}
                     onSaved={() => void handleFormSaved()}
+                />
+            ) : null}
+
+            {form ? (
+                <ClearanceForm201Dialog
+                    open={form201Open}
+                    onOpenChange={setForm201Open}
+                    documentId={form.id}
+                    pdfFile={form.pdf_file}
+                    description={`${employeeName ?? "—"}${form.ref_no ? ` — REF ${form.ref_no}` : ""}`}
+                    readOnly={formReadonly}
+                    onUploaded={() => void handleForm201Uploaded()}
                 />
             ) : null}
         </div>

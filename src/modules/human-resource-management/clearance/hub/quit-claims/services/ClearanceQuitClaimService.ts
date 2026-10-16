@@ -468,6 +468,12 @@ export async function getQuitClaimValues(id: number): Promise<QuitClaimValues> {
     return (await getQuitClaim(id)).values;
 }
 
+export async function getQuitClaimPdfFileId(id: number): Promise<string | null> {
+    const row = await readSingleOrNull(`/items/clearance_quitclaim/${id}?fields=id,pdf_file`);
+    if (!row) return null;
+    return toNullableText(row.pdf_file);
+}
+
 export async function updateQuitClaimValues(
     id: number,
     values: unknown,

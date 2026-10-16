@@ -1,4 +1,4 @@
-import { jsPDF } from "jspdf";
+import { GState, jsPDF } from "jspdf";
 
 export interface ClearancePrintEntry {
     category: string;
@@ -15,9 +15,19 @@ export interface ClearancePrintInput {
     position?: string;
     company_name?: string;
     company_address?: string | null;
+    company_contact?: string | null;
+    company_email?: string | null;
     logo_data_url?: string | null;
     gmName?: string;
     gmTitle?: string;
+}
+
+interface ClearanceLetterhead {
+    company_name: string;
+    company_address?: string | null;
+    company_contact?: string | null;
+    company_email?: string | null;
+    logo_data_url?: string | null;
 }
 
 const PAGE_MARGIN = 48;
@@ -39,20 +49,93 @@ const IMAGE_HEIGHT = 30;
 const ROW_GAP = 16;
 const NAME_GAP = 15;
 const ROLE_GAP = 4;
-const LOGO_HEIGHT = 40;
-const LOGO_MAX_WIDTH = 160;
+const LETTERHEAD_NAME_SIZE = 15;
+const LETTERHEAD_META_SIZE = 9;
 const ACK_TEXT =
     "I hereby acknowledge and commit to fully comply with all required clearances and to settle any accountabilities in accordance with company policies and procedures";
 const SIGN_CAPTION = "Signature over printed Name/Date";
+const WATERMARK_MAX_WIDTH = 460;
+const WATERMARK_MAX_HEIGHT = 330;
+const WATERMARK_OPACITY = 0.14;
+const LETTERHEAD_LOGO_MAX_WIDTH = 150;
+const LETTERHEAD_LOGO_MAX_HEIGHT = 58;
 
-function sniffImageFormat(dataUrl: string): string | null {
-    if (dataUrl.startsWith("data:image/jpeg") || dataUrl.startsWith("data:image/jpg")) {
-        return "JPEG";
+function drawWatermark(doc: jsPDF, logoDataUrl: string | null): void {
+    if (!logoDataUrl) return;
+    const format = logoDataUrl.indexOf("data:image/jpeg") === 0 ? "JPEG" : "PNG";
+    const total = doc.getNumberOfPages();
+    for (let page = 1; page <= total; page += 1) {
+        doc.setPage(page);
+        try {
+            const props = doc.getImageProperties(logoDataUrl);
+            if (props.width <= 0 || props.height <= 0) continue;
+            const scale = Math.min(WATERMARK_MAX_WIDTH / props.width, WATERMARK_MAX_HEIGHT / props.height);
+            const width = props.width * scale;
+            const height = props.height * scale;
+            doc.setGState(new GState({ opacity: WATERMARK_OPACITY }));
+            doc.addImage(logoDataUrl, format, (doc.internal.pageSize.getWidth() - width) / 2, (doc.internal.pageSize.getHeight() - height) / 2, width, height);
+            doc.setGState(new GState({ opacity: 1 }));
+        } catch {
+            doc.setGState(new GState({ opacity: 1 }));
+        }
     }
-    if (dataUrl.startsWith("data:image/png")) {
-        return "PNG";
+}
+
+function tryPlaceLogo(doc: jsPDF, dataUrl: string, x: number, y: number): void {
+    try {
+        const props = doc.getImageProperties(dataUrl);
+        if (props.width <= 0 || props.height <= 0) return;
+        const scale = Math.min(LETTERHEAD_LOGO_MAX_WIDTH / props.width, LETTERHEAD_LOGO_MAX_HEIGHT / props.height);
+        const width = props.width * scale;
+        const height = props.height * scale;
+        const offsetX = x + (LETTERHEAD_LOGO_MAX_WIDTH - width) / 2;
+        const offsetY = y + (LETTERHEAD_LOGO_MAX_HEIGHT - height) / 2;
+        const format = dataUrl.indexOf("data:image/jpeg") === 0 ? "JPEG" : "PNG";
+        doc.addImage(dataUrl, format, offsetX, offsetY, width, height);
+    } catch {
+        return;
     }
-    return null;
+}
+
+function drawLetterhead(doc: jsPDF, company: ClearanceLetterhead, y: number): number {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const logo = company.logo_data_url ?? "";
+    if (logo !== "") {
+        tryPlaceLogo(doc, logo, PAGE_MARGIN, y);
+    }
+    const rightEdge = pageWidth - PAGE_MARGIN;
+    const textCenterX =
+        logo !== "" ? (PAGE_MARGIN + LETTERHEAD_LOGO_MAX_WIDTH + 12 + rightEdge) / 2 : pageWidth / 2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(LETTERHEAD_NAME_SIZE);
+    doc.setTextColor(0);
+    doc.text(company.company_name, textCenterX, y + 14, { align: "center" });
+    let cursor = y + 32;
+    doc.setFont("helvetica", "bolditalic");
+    doc.setFontSize(LETTERHEAD_META_SIZE);
+    const address = company.company_address ?? "";
+    if (address !== "") {
+        doc.text(address, textCenterX, cursor, { align: "center" });
+        cursor += 13;
+    }
+    const contactParts: string[] = [];
+    const contact = company.company_contact ?? "";
+    const email = company.company_email ?? "";
+    if (contact !== "") {
+        contactParts.push(contact);
+    }
+    if (email !== "") {
+        contactParts.push(email);
+    }
+    if (contactParts.length > 0) {
+        doc.text(contactParts.join(" | "), textCenterX, cursor, { align: "center" });
+        cursor += 13;
+    }
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.75);
+    const ruleY = Math.max(cursor + 4, y + LETTERHEAD_LOGO_MAX_HEIGHT + 6);
+    doc.line(PAGE_MARGIN, ruleY, pageWidth - PAGE_MARGIN, ruleY);
+    return ruleY + 18;
 }
 
 function tryPlaceSignature(
@@ -187,50 +270,19 @@ export function renderClearanceDocument(input: ClearancePrintInput): jsPDF {
         doc.line(x, ruleY + 16, x + columnWidth, ruleY + 16);
     }
 
-    const logoDataUrl = input.logo_data_url ?? null;
     const companyName = input.company_name ?? "";
-    const companyAddress = input.company_address ?? "";
-    const logoFormat = logoDataUrl === null ? null : sniffImageFormat(logoDataUrl);
-    let logoHeight = 0;
-    let headerTextX = PAGE_MARGIN;
-    if (logoDataUrl !== null && logoFormat !== null) {
-        try {
-            const props = doc.getImageProperties(logoDataUrl);
-            const ratio = props.width / props.height;
-            let logoWidth = LOGO_HEIGHT * ratio;
-            let scaledHeight = LOGO_HEIGHT;
-            if (logoWidth > LOGO_MAX_WIDTH) {
-                logoWidth = LOGO_MAX_WIDTH;
-                scaledHeight = logoWidth / ratio;
-            }
-            doc.addImage(logoDataUrl, logoFormat, PAGE_MARGIN, y, logoWidth, scaledHeight);
-            headerTextX = PAGE_MARGIN + logoWidth + 12;
-            logoHeight = scaledHeight;
-        } catch {
-            headerTextX = PAGE_MARGIN;
-            logoHeight = 0;
-        }
-    }
-    let headerTextHeight = 0;
     if (companyName !== "") {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(0);
-        const nameLines = doc.splitTextToSize(companyName, rightEdge - headerTextX) as string[];
-        doc.text(nameLines, headerTextX, y + 14);
-        headerTextHeight += nameLines.length * 16;
-    }
-    if (companyAddress !== "") {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(0);
-        const addressLines = doc.splitTextToSize(companyAddress, rightEdge - headerTextX) as string[];
-        doc.text(addressLines, headerTextX, y + 14 + headerTextHeight);
-        headerTextHeight += addressLines.length * 12 + 4;
-    }
-    const letterheadHeight = Math.max(logoHeight, headerTextHeight);
-    if (letterheadHeight > 0) {
-        y += letterheadHeight + 12;
+        y = drawLetterhead(
+            doc,
+            {
+                company_name: companyName,
+                company_address: input.company_address ?? "",
+                company_contact: input.company_contact ?? "",
+                company_email: input.company_email ?? "",
+                logo_data_url: input.logo_data_url ?? "",
+            },
+            y
+        );
     }
 
     const refValue = input.refNo ?? "";
@@ -354,6 +406,8 @@ export function renderClearanceDocument(input: ClearancePrintInput): jsPDF {
             gmCursor += ROLE_LINE;
         }
     }
+
+    drawWatermark(doc, input.logo_data_url ?? null);
 
     const totalPages = doc.getNumberOfPages();
     for (let page = 1; page <= totalPages; page += 1) {

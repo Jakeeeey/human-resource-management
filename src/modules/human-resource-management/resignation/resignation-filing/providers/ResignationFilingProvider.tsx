@@ -2,10 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { EnrichedResignationRequest, ResignationForm } from "../types";
+import type { EnrichedResignationRequest, ResignationEmployeeOption, ResignationForm } from "../types";
 import type { ResignationEligibility } from "../cooldown";
 
 const API_PATH = "/api/hrm/resignation/resignation-filing";
+const EMPLOYEES_PATH = "/api/hrm/resignation/resignation-filing/employees";
 const UPLOAD_PATH = "/api/hrm/resignation/resignation-filing/upload";
 
 export interface ResignationFilingSubmitResult {
@@ -37,6 +38,10 @@ interface FilingListBody {
     total?: number;
 }
 
+interface EmployeeListBody {
+    data?: ResignationEmployeeOption[];
+}
+
 interface UploadBody {
     success?: boolean;
     message?: string;
@@ -44,6 +49,12 @@ interface UploadBody {
 }
 
 interface ResignationFilingContextType {
+    employees: ResignationEmployeeOption[];
+    isLoadingEmployees: boolean;
+    employeesError: string | null;
+    selectedUserId: number | null;
+    selectedEmployee: ResignationEmployeeOption | null;
+    selectEmployee: (userId: number | null) => void;
     filings: EnrichedResignationRequest[];
     eligibility: ResignationEligibility | null;
     total: number;
@@ -51,7 +62,6 @@ interface ResignationFilingContextType {
     error: string | null;
     refresh: () => Promise<void>;
     submitFiling: (form: ResignationForm) => Promise<ResignationFilingSubmitResult>;
-    withdrawFiling: (id: number) => Promise<boolean>;
     uploadAttachment: (file: File) => Promise<ResignationAttachmentRef | null>;
 }
 
@@ -81,37 +91,111 @@ function toFieldErrors(issues: FilingIssue[] | undefined): Record<string, string
 }
 
 export function ResignationFilingProvider({ children }: { children: React.ReactNode }) {
+    const [employees, setEmployees] = useState<ResignationEmployeeOption[]>([]);
+    const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
+    const [employeesError, setEmployeesError] = useState<string | null>(null);
+    const [employeesToken, setEmployeesToken] = useState(0);
+
+    const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
     const [filings, setFilings] = useState<EnrichedResignationRequest[]>([]);
     const [eligibility, setEligibility] = useState<ResignationEligibility | null>(null);
     const [total, setTotal] = useState(0);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    const refresh = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await fetch(API_PATH, { cache: "no-store" });
-            if (!response.ok) {
-                const errBody = await readErrorBody(response);
-                throw new Error(errBody.error || "Failed to load resignation filings");
-            }
-            const result = (await response.json()) as FilingListBody;
-            setFilings(Array.isArray(result.data) ? result.data : []);
-            setTotal(typeof result.total === "number" ? result.total : 0);
-            setEligibility(result.eligibility ?? null);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : "Failed to load resignation filings";
-            setError(message);
-            toast.error(message);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    const [filingsToken, setFilingsToken] = useState(0);
 
     useEffect(() => {
-        refresh();
-    }, [refresh]);
+        let cancelled = false;
+        setIsLoadingEmployees(true);
+        setEmployeesError(null);
+        fetch(EMPLOYEES_PATH, { cache: "no-store" })
+            .then(async (response) => {
+                if (!response.ok) {
+                    const errBody = await readErrorBody(response);
+                    throw new Error(errBody.error || "Failed to load employees");
+                }
+                return (await response.json()) as EmployeeListBody;
+            })
+            .then((result) => {
+                if (cancelled) {
+                    return;
+                }
+                setEmployees(Array.isArray(result.data) ? result.data : []);
+            })
+            .catch((err: unknown) => {
+                if (cancelled) {
+                    return;
+                }
+                const message = err instanceof Error ? err.message : "Failed to load employees";
+                setEmployees([]);
+                setEmployeesError(message);
+                toast.error(message);
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setIsLoadingEmployees(false);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [employeesToken]);
+
+    useEffect(() => {
+        if (selectedUserId === null) {
+            setFilings([]);
+            setEligibility(null);
+            setTotal(0);
+            setError(null);
+            setIsLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setIsLoading(true);
+        setError(null);
+        const load = async () => {
+            try {
+                const response = await fetch(`${API_PATH}?user_id=${selectedUserId}`, { cache: "no-store" });
+                if (!response.ok) {
+                    const errBody = await readErrorBody(response);
+                    throw new Error(errBody.error || "Failed to load resignation filings");
+                }
+                const result = (await response.json()) as FilingListBody;
+                if (cancelled) {
+                    return;
+                }
+                setFilings(Array.isArray(result.data) ? result.data : []);
+                setTotal(typeof result.total === "number" ? result.total : 0);
+                setEligibility(result.eligibility ?? null);
+            } catch (err) {
+                if (cancelled) {
+                    return;
+                }
+                const message = err instanceof Error ? err.message : "Failed to load resignation filings";
+                setError(message);
+                toast.error(message);
+            } finally {
+                if (!cancelled) {
+                    setIsLoading(false);
+                }
+            }
+        };
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedUserId, filingsToken]);
+
+    const selectEmployee = useCallback((userId: number | null) => {
+        setSelectedUserId(userId);
+    }, []);
+
+    const refresh = useCallback(async () => {
+        setEmployeesToken((value) => value + 1);
+        if (selectedUserId !== null) {
+            setFilingsToken((value) => value + 1);
+        }
+    }, [selectedUserId]);
 
     const submitFiling = useCallback(
         async (form: ResignationForm): Promise<ResignationFilingSubmitResult> => {
@@ -130,8 +214,9 @@ export function ResignationFilingProvider({ children }: { children: React.ReactN
                     toast.error(message);
                     return { ok: false, fieldErrors: toFieldErrors(errBody.issues) };
                 }
-                toast.success("Resignation filed successfully");
-                await refresh();
+                const employeeName = employees.find((employee) => employee.user_id === form.user_id)?.full_name;
+                toast.success(employeeName ? `Resignation filed for ${employeeName}` : "Resignation filed");
+                setFilingsToken((value) => value + 1);
                 return { ok: true, fieldErrors: {} };
             } catch (err) {
                 const message = err instanceof Error ? err.message : "Failed to submit resignation";
@@ -139,26 +224,7 @@ export function ResignationFilingProvider({ children }: { children: React.ReactN
                 return { ok: false, fieldErrors: {} };
             }
         },
-        [refresh]
-    );
-
-    const withdrawFiling = useCallback(
-        async (id: number): Promise<boolean> => {
-            try {
-                const response = await fetch(`${API_PATH}/${id}/withdraw`, { method: "PATCH" });
-                if (!response.ok) {
-                    const errBody = await readErrorBody(response);
-                    throw new Error(errBody.error || "Failed to withdraw resignation filing");
-                }
-                toast.success("Resignation filing withdrawn");
-                await refresh();
-                return true;
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Failed to withdraw resignation filing");
-                return false;
-            }
-        },
-        [refresh]
+        [employees]
     );
 
     const uploadAttachment = useCallback(async (file: File): Promise<ResignationAttachmentRef | null> => {
@@ -177,8 +243,19 @@ export function ResignationFilingProvider({ children }: { children: React.ReactN
         }
     }, []);
 
+    const selectedEmployee = useMemo(
+        () => employees.find((employee) => employee.user_id === selectedUserId) ?? null,
+        [employees, selectedUserId]
+    );
+
     const contextValue = useMemo(
         () => ({
+            employees,
+            isLoadingEmployees,
+            employeesError,
+            selectedUserId,
+            selectedEmployee,
+            selectEmployee,
             filings,
             eligibility,
             total,
@@ -186,10 +263,24 @@ export function ResignationFilingProvider({ children }: { children: React.ReactN
             error,
             refresh,
             submitFiling,
-            withdrawFiling,
             uploadAttachment,
         }),
-        [filings, eligibility, total, isLoading, error, refresh, submitFiling, withdrawFiling, uploadAttachment]
+        [
+            employees,
+            isLoadingEmployees,
+            employeesError,
+            selectedUserId,
+            selectedEmployee,
+            selectEmployee,
+            filings,
+            eligibility,
+            total,
+            isLoading,
+            error,
+            refresh,
+            submitFiling,
+            uploadAttachment,
+        ]
     );
 
     return <ResignationFilingContext.Provider value={contextValue}>{children}</ResignationFilingContext.Provider>;

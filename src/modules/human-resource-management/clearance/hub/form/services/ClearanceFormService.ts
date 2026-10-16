@@ -233,6 +233,12 @@ async function readFormRow(id: number): Promise<ClearanceFormRow | null> {
     return normalizeFormRow(raw);
 }
 
+export async function readClearanceFormPdfFile(formId: number): Promise<string | null> {
+    if (!Number.isInteger(formId) || formId <= 0) return null;
+    const raw = await readSingleOrNull(`/items/clearance_form/${formId}?fields=pdf_file`);
+    return raw === null ? null : toNullableText(raw.pdf_file);
+}
+
 export async function ensureClearanceForm(requestId: number, actorId: number | null): Promise<ClearanceFormRow> {
     const request = await readRequestRef(requestId);
     if (!request) {
