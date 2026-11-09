@@ -8,8 +8,8 @@ import type {
   TrainingTakingResponse,
 } from "../types/training-taking.schema";
 import type {
-  StartQuizResponse,
-} from "@/modules/human-resource-management/recruitment/quiz-file-management/quiz-taking/types";
+  StartAssessmentResponse,
+} from "@/modules/human-resource-management/recruitment/assessment-file-management/assessment-taking/types";
 import type { AssignmentCompletionScalars } from "../trainingAssignmentAdapter";
 
 // trainingAssignmentProvider.tsx — client fetch layer for the
@@ -29,8 +29,8 @@ import {
 
 export interface StartAttemptResult {
   assignment: TrainingTakingAssignment;
-  quiz: StartQuizResponse["quiz"];
-  questions: StartQuizResponse["questions"];
+  assessment: StartAssessmentResponse["assessment"];
+  questions: StartAssessmentResponse["questions"];
   resumed: boolean;
 }
 

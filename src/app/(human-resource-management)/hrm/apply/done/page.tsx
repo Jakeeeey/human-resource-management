@@ -11,7 +11,7 @@ function DoneContent() {
     const searchParams = useSearchParams();
     const score = searchParams.get("score");
     const passedParam = searchParams.get("passed");
-    const quizName = searchParams.get("quiz");
+    const assessmentName = searchParams.get("assessment");
     const total = searchParams.get("total");
     const threshold = searchParams.get("threshold");
 
@@ -40,16 +40,16 @@ function DoneContent() {
                             No result was recorded for this assessment, so there is nothing to
                             show here. Please see the HR staff for assistance.
                         </p>
-                        {quizName && (
+                        {assessmentName && (
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Quiz</span>
-                                <span className="font-medium">{quizName}</span>
+                                <span className="text-muted-foreground">Assessment</span>
+                                <span className="font-medium">{assessmentName}</span>
                             </div>
                         )}
                     </div>
                     <Button
                         className="w-full"
-                        onClick={() => router.push("/hrm/recruitment/quiz-file-management/quiz-management")}
+                        onClick={() => router.push("/hrm/recruitment/assessment-file-management/assessment-management")}
                     >
                         Return to HR
                     </Button>
@@ -79,10 +79,10 @@ function DoneContent() {
                         <span className="text-muted-foreground">Assessment</span>
                         <span className="font-medium">Complete</span>
                     </div>
-                    {quizName && (
+                    {assessmentName && (
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">Quiz</span>
-                            <span className="font-medium">{quizName}</span>
+                            <span className="text-muted-foreground">Assessment</span>
+                            <span className="font-medium">{assessmentName}</span>
                         </div>
                     )}
                     {scoreNum != null && (
@@ -106,7 +106,7 @@ function DoneContent() {
                 </p>
                 <Button
                     className="w-full"
-                    onClick={() => router.push("/hrm/recruitment/quiz-file-management/quiz-management")}
+                    onClick={() => router.push("/hrm/recruitment/assessment-file-management/assessment-management")}
                 >
                     Return to HR
                 </Button>

@@ -10,7 +10,7 @@
  *   DERIVED flag (`isAssignmentOverdue`), never a stored state.
  * - Abandoned attempts stay `in_progress` with a reason; a retake opens a
  *   NEW `quiz_attempt` row under the SAME assignment id.
- * - Pass thresholds are INHERITED from the quiz definition via the real
+ * - Pass thresholds are INHERITED from the assessment definition via the real
  *   `gradeAnswers` result (`GradeResult.passThresholdSnapshot`) — this file
  *   never computes score, percentage, or pass/fail.
  * - The `application_id` bridge is an explicit HR manual link to the
@@ -18,10 +18,10 @@
  *   are never spoofed and never resolved from a profile.
  * - Draw/grade/history inputs are built VERBATIM from the existing engine
  *   shapes (`AnswerInput`, `SubmitAnswerPayload`, `TakingQuestion`,
- *   `QuizAttempt`). Grading is never re-implemented here.
+ *   `AssessmentAttempt`). Grading is never re-implemented here.
  *
- * Quiz-engine files (`quiz-draw.ts`, `grading.ts`, quiz-attempt routes,
- * quiz-history) are READ-ONLY: this module only imports their TYPES
+ * Assessment-engine files (`assessment-draw.ts`, `grading.ts`, assessment-attempt routes,
+ * assessment-history) are READ-ONLY: this module only imports their TYPES
  * (`import type` — zero runtime coupling, zero edits).
  */
 
@@ -29,13 +29,13 @@ import { parseUtcInstant } from "./utils/time";
 import type {
     AnswerInput,
     GradeResult,
-} from "@/modules/human-resource-management/recruitment/quiz-file-management/utils/grading";
-import type { QuizAttempt } from "@/modules/human-resource-management/recruitment/quiz-file-management/quiz-history/types";
+} from "@/modules/human-resource-management/recruitment/assessment-file-management/utils/grading";
+import type { AssessmentAttempt } from "@/modules/human-resource-management/recruitment/assessment-file-management/assessment-history/types";
 import type {
     AnswersByQuestionId,
     SubmitAnswerPayload,
     TakingQuestion,
-} from "@/modules/human-resource-management/recruitment/quiz-file-management/quiz-taking/types";
+} from "@/modules/human-resource-management/recruitment/assessment-file-management/assessment-taking/types";
 
 // ---------------------------------------------------------------------------
 // Contract (mirrors Directus `training_assignments`, keyed to the employee)
@@ -169,8 +169,8 @@ export function describeRetakeTarget(assignment: Pick<TrainingAssignment, "id" |
 // ---------------------------------------------------------------------------
 
 /**
- * Draw input: the quiz id passed STRAIGHT through to
- * `drawQuizQuestions(quizId: string | number)` (quiz-draw.ts:73).
+ * Draw input: the assessment id passed STRAIGHT through to
+ * `drawAssessmentQuestions(quizId: string | number)` (assessment-draw.ts:73).
  * No transform, no reinterpretation.
  */
 export function buildDrawInput(assignment: Pick<TrainingAssignment, "quiz_id">): number {
@@ -178,12 +178,12 @@ export function buildDrawInput(assignment: Pick<TrainingAssignment, "quiz_id">):
 }
 
 export type GradeInput =
-    | { ok: true; quizId: number; answers: AnswerInput[] }
+    | { ok: true; assessmentId: number; answers: AnswerInput[] }
     | { ok: false; error: string };
 
 /**
- * Grade input: `{ quizId, answers }` spread DIRECTLY into
- * `gradeAnswers(quizId: number, answers: AnswerInput[])` (grading.ts:80).
+ * Grade input: `{ assessmentId, answers }` spread DIRECTLY into
+ * `gradeAnswers(assessmentId: number, answers: AnswerInput[])` (grading.ts:80).
  * Answers pass through verbatim; only emptiness is rejected here.
  */
 export function buildGradeInput(
@@ -193,14 +193,14 @@ export function buildGradeInput(
     if (!Array.isArray(answers) || answers.length === 0) {
         return { ok: false, error: "A non-empty answers array is required for grading" };
     }
-    return { ok: true, quizId: assignment.quiz_id, answers };
+    return { ok: true, assessmentId: assignment.quiz_id, answers };
 }
 
 const CHOICE_TYPES = new Set(["true_false", "multiple_choice"]);
 
 /**
  * Submit-payload builder, VERBATIM from
- * `QuizTakingModule.buildSubmitAnswers` (QuizTakingModule.tsx:25-47):
+ * `AssessmentTakingModule.buildSubmitAnswers` (AssessmentTakingModule.tsx:25-47):
  * choice questions collapse to one `{ question_id, answer_given_choice_id,
  * presented_choice_ids }` row; text questions expand to one
  * `{ question_id, blank_index, answer_given_text }` row per blank.
@@ -245,7 +245,7 @@ export interface AssignmentCompletionScalars {
 
 /**
  * Reads completion scalars STRAIGHT off the real `GradeResult` — thresholds
- * inherited from the quiz definition, never redefined here. Carries no
+ * inherited from the assessment definition, never redefined here. Carries no
  * answers or answer keys (same rule as the taking-module done screen).
  */
 export function buildCompletionScalars(grade: GradeResult): AssignmentCompletionScalars {
@@ -259,10 +259,10 @@ export function buildCompletionScalars(grade: GradeResult): AssignmentCompletion
 }
 
 /**
- * History link: the completed attempt ref comes from the `QuizAttempt`
- * history shape (quiz-history/types.ts:12-27) — the assignment's
+ * History link: the completed attempt ref comes from the `AssessmentAttempt`
+ * history shape (assessment-history/types.ts:12-27) — the assignment's
  * `completed_ref` points at that attempt row.
  */
-export function buildCompletedRef(attempt: Pick<QuizAttempt, "id">): number {
+export function buildCompletedRef(attempt: Pick<AssessmentAttempt, "id">): number {
     return attempt.id;
 }
