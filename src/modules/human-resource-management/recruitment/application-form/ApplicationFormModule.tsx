@@ -24,7 +24,7 @@ import {
     type SubmitAttachment,
 } from "./types";
 import {
-    resolveTargetQuizId,
+    resolveTargetAssessmentId,
     submitApplication,
     uploadApplicationFile,
 } from "./providers/fetchProvider";
@@ -64,7 +64,7 @@ export function ApplicationFormModule() {
     const [draftPrompt, setDraftPrompt] = useState<StoredDraft | null>(null);
 
     useEffect(() => {
-        resolveTargetQuizId(quizIdOverride)
+        resolveTargetAssessmentId(quizIdOverride)
             .then(setQuizId)
             .finally(() => setQuizChecked(true));
         // eslint-disable-next-line react-hooks/exhaustive-deps

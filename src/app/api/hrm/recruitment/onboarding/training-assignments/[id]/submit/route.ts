@@ -4,14 +4,14 @@ import { dFetch } from "@/modules/human-resource-management/recruitment/onboardi
 import { dispatchMail } from "@/modules/human-resource-management/recruitment/mailing/utils/dispatchMail";
 import { logRedacted } from "@/modules/human-resource-management/recruitment/mailing/utils/mailLog";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-// Grade + persist entries reused from the untouched quiz engine: the SAME
-// `gradeAnswers` / `persistGradedAttempt` the `quiz-attempt` POST route
+// Grade + persist entries reused from the untouched assessment engine: the SAME
+// `gradeAnswers` / `persistGradedAttempt` the `assessment-attempt` POST route
 // calls — fed ONLY through the Todo 4 adapter builders (`buildGradeInput`,
 // `buildCompletionScalars`, `transitionAssignment`). Zero grading math here.
 import {
   gradeAnswers,
   persistGradedAttempt,
-} from "@/modules/human-resource-management/recruitment/quiz-file-management/utils/grading";
+} from "@/modules/human-resource-management/recruitment/assessment-file-management/utils/grading";
 import {
   SubmitTrainingAttemptSchema,
 } from "@/modules/human-resource-management/recruitment/onboarding/training/types/training-taking.schema";
@@ -49,7 +49,7 @@ export const dynamic = "force-dynamic";
 //   `in_progress`) — applicant ids are never accepted from the client and
 //   never fabricated. The assignment then moves to `completed` with
 //   `completed_ref` pointing at the engine attempt row, and the route
-//   returns ONLY display-safe scalars (same done-screen rule as the quiz
+//   returns ONLY display-safe scalars (same done-screen rule as the assessment
 //   taking module: no answers, no keys).
 
 function validationFailed(errors: Record<string, string[]>) {
@@ -146,7 +146,7 @@ export async function POST(
       );
     }
 
-    const outcome = await gradeAnswers(gradeInput.quizId, gradeInput.answers);
+    const outcome = await gradeAnswers(gradeInput.assessmentId, gradeInput.answers);
     if (!outcome.ok) {
       return NextResponse.json(
         { success: false, message: outcome.error },
@@ -179,7 +179,7 @@ export async function POST(
     }
 
     const attempt = await persistGradedAttempt({
-      quizId: gradeInput.quizId,
+      assessmentId: gradeInput.assessmentId,
       applicantId,
       administeredBy,
       startedAt: validation.data.started_at ?? null,

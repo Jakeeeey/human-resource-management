@@ -43,21 +43,21 @@ export async function submitApplication(
     return body as SubmitApplicationResult;
 }
 
-export async function resolveTargetQuizId(overrideQuizId: number | null): Promise<number | null> {
-    const res = await fetch("/api/hrm/recruitment/quiz-file-management/quiz-management", {
+export async function resolveTargetAssessmentId(overrideAssessmentId: number | null): Promise<number | null> {
+    const res = await fetch("/api/hrm/recruitment/assessment-file-management/assessment-management", {
         cache: "no-store",
     });
     if (!res.ok) return null;
     const body = await res.json().catch(() => null);
-    const quizzes: { id: number; status: string; is_applicant_quiz: unknown }[] =
-        body?.quizzes || [];
+    const assessments: { id: number; status: string; is_applicant_quiz: unknown }[] =
+        body?.assessments || [];
 
-    if (overrideQuizId != null) {
-        const match = quizzes.find((q) => q.id === overrideQuizId && q.status === "active");
+    if (overrideAssessmentId != null) {
+        const match = assessments.find((q) => q.id === overrideAssessmentId && q.status === "active");
         return match ? match.id : null;
     }
 
-    const flagged = quizzes.find(
+    const flagged = assessments.find(
         (q) =>
             (q.is_applicant_quiz === true || q.is_applicant_quiz === 1) &&
             q.status === "active"

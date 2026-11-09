@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { dFetch } from "@/modules/human-resource-management/recruitment/onboarding/utils/directus";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
-// Draw entry reused from the untouched quiz engine: this is the SAME
-// `drawQuizQuestions` function the existing auth-gated
-// `quiz-attempt/start` route calls — called through the Todo 4 adapter's
+// Draw entry reused from the untouched assessment engine: this is the SAME
+// `drawAssessmentQuestions` function the existing auth-gated
+// `assessment-attempt/start` route calls — called through the Todo 4 adapter's
 // `buildDrawInput`, never re-implemented.
-import { drawQuizQuestions } from "@/modules/human-resource-management/recruitment/quiz-file-management/utils/quiz-draw";
+import { drawAssessmentQuestions } from "@/modules/human-resource-management/recruitment/assessment-file-management/utils/assessment-draw";
 import {
   StartTrainingAttemptSchema,
 } from "@/modules/human-resource-management/recruitment/onboarding/training/types/training-taking.schema";
@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 // POST /api/hrm/recruitment/onboarding/training-assignments/[id]/start — hiree-owned
 // draw entry. Gates (in order): session cookie (same auth gate as the
-// existing `quiz-attempt/start` route -> 401), assignment exists (404),
+// existing `assessment-attempt/start` route -> 401), assignment exists (404),
 // hiree session owns the assignment (IDOR: mismatch -> 403), assignment
 // still takable (completed -> 409). Then draws via the untouched engine
 // and moves `assigned -> in_progress` (an already-`in_progress` assignment
@@ -92,7 +92,7 @@ export async function POST(
       );
     }
 
-    const drawn = await drawQuizQuestions(buildDrawInput(assignment));
+    const drawn = await drawAssessmentQuestions(buildDrawInput(assignment));
     if (!drawn.ok) {
       return NextResponse.json(
         { success: false, message: drawn.error },
@@ -115,7 +115,7 @@ export async function POST(
       success: true,
       data: {
         assignment: current,
-        quiz: drawn.body.quiz,
+        assessment: drawn.body.assessment,
         questions: drawn.body.questions,
         resumed,
       },
